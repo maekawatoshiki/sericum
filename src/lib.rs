@@ -1,7 +1,11 @@
+pub mod ir;
+
 #[cfg(test)]
 mod tests {
+    use crate::ir;
+
     #[test]
     fn it_works() {
-        assert_eq!(2 + 2, 4);
+        let a = ir::types::Type::Int32;
     }
 }
