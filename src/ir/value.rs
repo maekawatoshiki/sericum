@@ -23,6 +23,13 @@ impl Value {
         }
     }
 
+    pub fn get_id(&self) -> Option<ValueId> {
+        match self {
+            Value::Id(id, _) => Some(*id),
+            _ => None,
+        }
+    }
+
     pub fn to_string(&self) -> String {
         match self {
             Value::Immediate(iv) => match iv {

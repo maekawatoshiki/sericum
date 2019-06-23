@@ -1,8 +1,6 @@
 use super::function::*;
 use id_arena::*;
 
-pub type FunctionId = Id<Function>;
-
 #[derive(Clone, Debug)]
 pub struct Module {
     name: String,
@@ -19,6 +17,10 @@ impl Module {
 
     pub fn add_function(&mut self, f: Function) -> FunctionId {
         self.functions.alloc(f)
+    }
+
+    pub fn function_ref(&self, id: FunctionId) -> &Function {
+        &self.functions[id]
     }
 
     pub fn function_ref_mut(&mut self, id: FunctionId) -> &mut Function {

@@ -1,4 +1,4 @@
-use super::{opcode::*, types::*, value::*};
+use super::opcode::*;
 use id_arena::*;
 
 pub type BasicBlockId = Id<BasicBlock>;

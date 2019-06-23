@@ -1,3 +1,4 @@
+pub mod exec;
 pub mod ir;
 
 extern crate id_arena;
@@ -5,20 +6,21 @@ extern crate rustc_hash;
 
 #[cfg(test)]
 mod tests {
-    use crate::ir::{builder, function, module, types, value};
+    use crate::{
+        exec::interpreter::interp,
+        ir::{builder, function, module, types, value},
+    };
 
     #[test]
     fn module() {
         let mut m = module::Module::new("cilk");
 
-        let f = {
-            let f_id = m.add_function(function::Function::new(
-                "f",
-                types::Type::Int32,
-                vec![types::Type::Int32],
-            ));
-            m.function_ref_mut(f_id)
-        };
+        let f_id = m.add_function(function::Function::new(
+            "f",
+            types::Type::Int32,
+            vec![types::Type::Int32],
+        ));
+        let f = m.function_ref_mut(f_id);
 
         let mut builder = builder::Builder::new(f);
         let bb = builder.append_basic_block();
@@ -37,5 +39,10 @@ mod tests {
         builder.build_ret(val3);
 
         println!("{}", f.to_string());
+
+        println!(
+            "exec: ret: {:?}",
+            interp::Interpreter::new(&m).run_function(f_id, vec![interp::ConcreteValue::Int32(3)])
+        );
     }
 }

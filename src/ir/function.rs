@@ -1,6 +1,8 @@
 use super::{basic_block::*, types::*, value::*};
 use id_arena::*;
 
+pub type FunctionId = Id<Function>;
+
 #[derive(Debug, Clone)]
 pub struct Function {
     /// Function name
@@ -32,6 +34,10 @@ impl Function {
 
     pub fn append_basic_block(&mut self) -> BasicBlockId {
         self.basic_blocks.alloc(BasicBlock::new())
+    }
+
+    pub fn basic_block_ref(&self, id: BasicBlockId) -> &BasicBlock {
+        &self.basic_blocks[id]
     }
 
     pub fn basic_block_ref_mut(&mut self, id: BasicBlockId) -> &mut BasicBlock {
