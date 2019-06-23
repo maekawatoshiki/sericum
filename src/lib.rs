@@ -12,7 +12,7 @@ mod tests {
     };
 
     #[test]
-    fn module() {
+    fn interpret() {
         let mut m = module::Module::new("cilk");
 
         let f_id = m.add_function(function::Function::new(
@@ -40,9 +40,10 @@ mod tests {
 
         println!("{}", f.to_string());
 
-        println!(
-            "exec: ret: {:?}",
-            interp::Interpreter::new(&m).run_function(f_id, vec![interp::ConcreteValue::Int32(3)])
-        );
+        let ret =
+            interp::Interpreter::new(&m).run_function(f_id, vec![interp::ConcreteValue::Int32(3)]);
+        assert_eq!(ret, interp::ConcreteValue::Int32(4));
+
+        println!("exec: ret: {:?}", ret);
     }
 }
