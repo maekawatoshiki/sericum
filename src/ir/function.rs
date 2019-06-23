@@ -1,7 +1,5 @@
-use super::{basic_block::*, types::*};
+use super::{basic_block::*, types::*, value::*};
 use id_arena::*;
-
-pub type BasicBlockId = Id<BasicBlock>;
 
 #[derive(Debug, Clone)]
 pub struct Function {
@@ -16,6 +14,9 @@ pub struct Function {
 
     /// Basic blocks
     pub basic_blocks: Arena<BasicBlock>,
+
+    /// Value id
+    pub value_id: ValueId,
 }
 
 impl Function {
@@ -25,6 +26,7 @@ impl Function {
             ret_ty,
             params_ty,
             basic_blocks: Arena::new(),
+            value_id: 0,
         }
     }
 
@@ -34,6 +36,12 @@ impl Function {
 
     pub fn basic_block_ref_mut(&mut self, id: BasicBlockId) -> &mut BasicBlock {
         &mut self.basic_blocks[id]
+    }
+
+    pub fn next_value_id(&mut self) -> ValueId {
+        let id = self.value_id;
+        self.value_id += 1;
+        id
     }
 }
 
