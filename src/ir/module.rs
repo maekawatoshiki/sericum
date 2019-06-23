@@ -13,4 +13,8 @@ impl Module {
             functions: vec![],
         }
     }
+
+    pub fn add_function(&mut self, f: Function) {
+        self.functions.push(f);
+    }
 }

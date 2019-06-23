@@ -5,12 +5,11 @@ extern crate rustc_hash;
 
 #[cfg(test)]
 mod tests {
-    use crate::ir;
+    use crate::ir::{module, types};
 
     #[test]
-    fn it_works() {
-        // nonsense for now
-        let a = ir::types::Type::Int32;
-        let b = ir::module::Module::new("cilk");
+    fn module() {
+        let mut m = module::Module::new("cilk");
+        m.add_function(ir::function::Function::new("f", types::Type::Int32, vec![]));
     }
 }

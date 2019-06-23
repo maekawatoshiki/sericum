@@ -15,3 +15,14 @@ pub struct Function {
     /// Basic blocks
     pub basic_blocks: Arena<BasicBlock>,
 }
+
+impl Function {
+    pub fn new(name: &str, ret_ty: Type, params_ty: Vec<Type>) -> Self {
+        Self {
+            name: name.to_string(),
+            ret_ty,
+            params_ty,
+            basic_blocks: Arena::new(),
+        }
+    }
+}
