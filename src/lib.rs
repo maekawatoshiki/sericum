@@ -1,5 +1,8 @@
 pub mod ir;
 
+extern crate id_arena;
+extern crate rustc_hash;
+
 #[cfg(test)]
 mod tests {
     use crate::ir;
