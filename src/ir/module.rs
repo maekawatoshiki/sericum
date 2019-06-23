@@ -1,20 +1,27 @@
 use super::function::*;
+use id_arena::*;
+
+pub type FunctionId = Id<Function>;
 
 #[derive(Clone, Debug)]
 pub struct Module {
     name: String,
-    functions: Vec<Function>,
+    functions: Arena<Function>,
 }
 
 impl Module {
     pub fn new(name: &str) -> Self {
         Self {
             name: name.to_string(),
-            functions: vec![],
+            functions: Arena::new(),
         }
     }
 
-    pub fn add_function(&mut self, f: Function) {
-        self.functions.push(f);
+    pub fn add_function(&mut self, f: Function) -> FunctionId {
+        self.functions.alloc(f)
+    }
+
+    pub fn function_ref_mut(&mut self, id: FunctionId) -> &mut Function {
+        &mut self.functions[id]
     }
 }

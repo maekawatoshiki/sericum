@@ -32,3 +32,9 @@ impl Function {
         self.basic_blocks.alloc(BasicBlock::new())
     }
 }
+
+impl Function {
+    pub fn dump(&self) {
+        eprintln!("define {} {}", self.ret_ty.to_string(), self.name);
+    }
+}
