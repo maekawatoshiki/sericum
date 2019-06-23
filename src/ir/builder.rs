@@ -14,6 +14,10 @@ impl<'a> Builder<'a> {
         }
     }
 
+    pub fn get_param(&self, idx: usize) -> Option<Value> {
+        self.function.get_param(idx)
+    }
+
     pub fn append_basic_block(&mut self) -> BasicBlockId {
         self.function.append_basic_block()
     }
@@ -50,5 +54,21 @@ impl<'a> Builder<'a> {
             .iseq
             .push(Instruction::new(Opcode::Add(v1, v2), val.clone()));
         val
+    }
+
+    pub fn build_br(&mut self, id: BasicBlockId) -> Value {
+        self.function
+            .basic_block_ref_mut(self.cur_bb.unwrap())
+            .iseq
+            .push(Instruction::new(Opcode::Br(id), Value::None));
+        Value::None
+    }
+
+    pub fn build_ret(&mut self, v: Value) -> Value {
+        self.function
+            .basic_block_ref_mut(self.cur_bb.unwrap())
+            .iseq
+            .push(Instruction::new(Opcode::Ret(v), Value::None));
+        Value::None
     }
 }

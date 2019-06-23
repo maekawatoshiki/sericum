@@ -22,11 +22,11 @@ pub struct Function {
 impl Function {
     pub fn new(name: &str, ret_ty: Type, params_ty: Vec<Type>) -> Self {
         Self {
+            value_id: params_ty.len(),
             name: name.to_string(),
             ret_ty,
             params_ty,
             basic_blocks: Arena::new(),
-            value_id: 0,
         }
     }
 
@@ -36,6 +36,14 @@ impl Function {
 
     pub fn basic_block_ref_mut(&mut self, id: BasicBlockId) -> &mut BasicBlock {
         &mut self.basic_blocks[id]
+    }
+
+    pub fn get_param(&self, idx: usize) -> Option<Value> {
+        if idx >= self.params_ty.len() {
+            return None;
+        }
+
+        Some(Value::Id(idx, self.params_ty[idx].clone()))
     }
 
     pub fn next_value_id(&mut self) -> ValueId {

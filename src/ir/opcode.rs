@@ -1,5 +1,4 @@
-use super::types::*;
-use super::value::*;
+use super::{basic_block::*, types::*, value::*};
 
 #[derive(Clone, Debug)]
 pub struct Instruction {
@@ -12,6 +11,7 @@ pub enum Opcode {
     Alloca(Type),
     Load(Value),
     Add(Value, Value),
+    Br(BasicBlockId),
     Ret(Value),
 }
 
@@ -35,6 +35,7 @@ impl Opcode {
             Opcode::Alloca(ty) => format!("alloca {}", ty.to_string()),
             Opcode::Load(v) => format!("load {}", v.to_string()),
             Opcode::Add(v1, v2) => format!("add {}, {}", v1.to_string(), v2.to_string()),
+            Opcode::Br(id) => format!("br label{}", id.index()),
             Opcode::Ret(v) => format!("ret {}", v.to_string()),
         }
     }
