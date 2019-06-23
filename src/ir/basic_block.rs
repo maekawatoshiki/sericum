@@ -4,3 +4,9 @@ use super::opcode::*;
 pub struct BasicBlock {
     pub iseq: Vec<Opcode>,
 }
+
+impl BasicBlock {
+    pub fn new() -> Self {
+        Self { iseq: vec![] }
+    }
+}
