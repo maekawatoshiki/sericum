@@ -1,7 +1,9 @@
 [package]
 name = "cilk"
 version = "0.1.0"
-authors = ["maekawatoshiki <konndennsa@gmail.com>"]
+authors = ["uint256_t"]
 edition = "2018"
 
 [dependencies]
+rustc-hash = "1.0.1"
+id-arena = "2.2.1"
