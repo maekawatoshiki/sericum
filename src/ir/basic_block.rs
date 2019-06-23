@@ -1,4 +1,4 @@
-use super::opcode::*;
+use super::{opcode::*, types::*, value::*};
 use id_arena::*;
 
 pub type BasicBlockId = Id<BasicBlock>;
@@ -15,7 +15,7 @@ impl BasicBlock {
 
     pub fn to_string(&self) -> String {
         self.iseq.iter().fold("".to_string(), |s, instr| {
-            format!("{}\n", instr.to_string())
+            format!("{}{}\n", s, instr.to_string())
         })
     }
 }
