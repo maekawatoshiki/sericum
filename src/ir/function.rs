@@ -8,11 +8,8 @@ pub struct Function {
     /// Function name
     pub name: String,
 
-    /// Function returning type
-    pub ret_ty: Type,
-
-    /// Function parameters type
-    pub params_ty: Vec<Type>,
+    /// Function type
+    pub ty: Type,
 
     /// Basic blocks
     pub basic_blocks: Arena<BasicBlock>,
@@ -29,8 +26,7 @@ impl Function {
         Self {
             value_id: params_ty.len(),
             name: name.to_string(),
-            ret_ty,
-            params_ty,
+            ty: Type::func_ty(ret_ty, params_ty),
             basic_blocks: Arena::new(),
             instr_table: Arena::new(),
         }
@@ -49,17 +45,18 @@ impl Function {
     }
 
     pub fn get_param_value(&self, idx: usize) -> Option<Value> {
-        if idx >= self.params_ty.len() {
+        if idx >= self.ty.get_function_ty().unwrap().params_ty.len() {
             return None;
         }
         Some(Value::Argument(idx))
     }
 
     pub fn get_param_type(&self, idx: usize) -> Option<&Type> {
-        if idx >= self.params_ty.len() {
+        let params_ty = &self.ty.get_function_ty().unwrap().params_ty;
+        if idx >= params_ty.len() {
             return None;
         }
-        Some(&self.params_ty[idx])
+        Some(&params_ty[idx])
     }
 
     pub fn next_value_id(&mut self) -> ValueId {
@@ -75,11 +72,12 @@ impl Function {
 
 impl Function {
     pub fn to_string(&self) -> String {
+        let fty = self.ty.get_function_ty().unwrap();
         format!(
             "define {} {}({}) {{\n{}}}",
-            self.ret_ty.to_string(),
+            fty.ret_ty.to_string(),
             self.name,
-            self.params_ty.iter().fold("".to_string(), |mut s, p| {
+            fty.params_ty.iter().fold("".to_string(), |mut s, p| {
                 s += &(p.to_string() + ", ");
                 s
             }),
