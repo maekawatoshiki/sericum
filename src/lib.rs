@@ -8,7 +8,7 @@ extern crate rustc_hash;
 mod tests {
     use crate::{
         exec::interpreter::interp,
-        ir::{builder, function, module, types, value},
+        ir::{builder, function, module, opcode, types, value},
     };
 
     #[test]
@@ -36,6 +36,11 @@ mod tests {
         builder.set_insert_point(bb2);
         let arg0 = builder.get_param(0).unwrap();
         let val3 = builder.build_add(val2, arg0);
+        let eq = builder.build_icmp(
+            opcode::ICmpKind::Eq,
+            val3,
+            value::Value::Immediate(value::ImmediateValue::Int32(4)),
+        );
         builder.build_ret(val3);
 
         println!("{}", f.to_string());

@@ -14,8 +14,15 @@ pub enum Opcode {
     Alloca(Type),
     Load(Value),
     Add(Value, Value),
+    ICmp(ICmpKind, Value, Value),
     Br(BasicBlockId),
     Ret(Value),
+}
+
+#[derive(Clone, Debug)]
+pub enum ICmpKind {
+    Eq,
+    // Ne,
 }
 
 impl Instruction {
@@ -36,8 +43,22 @@ impl Opcode {
             Opcode::Add(v1, v2) => {
                 format!("add {}, {}", v1.to_string(f, false), v2.to_string(f, false))
             }
+            Opcode::ICmp(kind, v1, v2) => format!(
+                "icmp {} {}, {}",
+                kind.as_str(),
+                v1.to_string(f, false),
+                v2.to_string(f, false)
+            ),
             Opcode::Br(id) => format!("br label{}", id.index()),
             Opcode::Ret(v) => format!("ret {}", v.to_string(f, false)),
+        }
+    }
+}
+
+impl ICmpKind {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            ICmpKind::Eq => "eq",
         }
     }
 }

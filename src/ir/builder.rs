@@ -62,6 +62,17 @@ impl<'a> Builder<'a> {
         val
     }
 
+    pub fn build_icmp(&mut self, kind: ICmpKind, v1: Value, v2: Value) -> Value {
+        let instr = Instruction::new(Opcode::ICmp(kind, v1, v2), Type::Int1);
+        let instr_id = self.function.instr_id(instr);
+        let val = Value::Instruction(instr_id);
+        self.function
+            .basic_block_ref_mut(self.cur_bb.unwrap())
+            .iseq
+            .push(val);
+        val
+    }
+
     pub fn build_br(&mut self, id: BasicBlockId) -> Value {
         let instr = Instruction::new(Opcode::Br(id), Type::Void);
         let instr_id = self.function.instr_id(instr);

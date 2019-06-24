@@ -1,6 +1,7 @@
 #[derive(Debug, Clone, PartialEq)]
 pub enum Type {
     Void,
+    Int1,
     Int32,
     Pointer(Box<Type>),
     Function(Box<FunctionType>),
@@ -38,6 +39,7 @@ impl Type {
     pub fn to_string(&self) -> String {
         match self {
             Type::Void => "void".to_string(),
+            Type::Int1 => "i1".to_string(),
             Type::Int32 => "i32".to_string(),
             Type::Pointer(e) => format!("{}*", e.to_string()),
             Type::Function(f) => f.to_string(),

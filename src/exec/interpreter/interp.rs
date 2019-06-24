@@ -3,6 +3,7 @@ use rustc_hash::FxHashMap;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ConcreteValue {
+    Int1(bool),
     Int32(i32),
 }
 
@@ -50,6 +51,14 @@ impl<'a> Interpreter<'a> {
                     Opcode::Alloca(_ty) => {
                         mem.insert(instr_id, ConcreteValue::Int32(0));
                     }
+                    Opcode::ICmp(kind, v1, v2) => {
+                        let val = match kind {
+                            ICmpKind::Eq => {
+                                get_value(&v1, &args, &mut mem).eq(get_value(&v2, &args, &mut mem))
+                            }
+                        };
+                        mem.insert(instr_id, val);
+                    }
                     Opcode::Br(id) => {
                         bb = f.basic_block_ref(*id);
                     }
@@ -68,6 +77,15 @@ impl ConcreteValue {
     pub fn add(self, v: ConcreteValue) -> Self {
         match (self, v) {
             (ConcreteValue::Int32(i1), ConcreteValue::Int32(i2)) => ConcreteValue::Int32(i1 + i2),
+            _ => unimplemented!(),
+        }
+    }
+
+    pub fn eq(self, v: ConcreteValue) -> Self {
+        match (self, v) {
+            (ConcreteValue::Int32(i1), ConcreteValue::Int32(i2)) => ConcreteValue::Int1(i1 == i2),
+            (ConcreteValue::Int1(i1), ConcreteValue::Int1(i2)) => ConcreteValue::Int1(i1 == i2),
+            _ => unimplemented!(),
         }
     }
 }
