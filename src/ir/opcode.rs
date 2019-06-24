@@ -17,6 +17,7 @@ pub enum Opcode {
     ICmp(ICmpKind, Value, Value),
     Br(BasicBlockId),
     CondBr(Value, BasicBlockId, BasicBlockId),
+    Phi(Vec<(Value, BasicBlockId)>),
     Ret(Value),
 }
 
@@ -57,6 +58,9 @@ impl Opcode {
                 id1.index(),
                 id2.index()
             ),
+            Opcode::Phi(pairs) => pairs.iter().fold("phi".to_string(), |s, (val, bb)| {
+                format!("{} [{}, %label.{}]", s, val.to_string(f, false), bb.index())
+            }),
             Opcode::Ret(v) => format!("ret {}", v.to_string(f, false)),
         }
     }

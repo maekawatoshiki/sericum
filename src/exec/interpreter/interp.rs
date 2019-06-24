@@ -1,10 +1,12 @@
-use crate::ir::{function::*, module::*, opcode::*, value::*};
+use crate::ir::{function::*, module::*, opcode::*, types::*, value::*};
 use rustc_hash::FxHashMap;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ConcreteValue {
+    Void,
     Int1(bool),
     Int32(i32),
+    Mem(*mut u8),
 }
 
 #[derive(Debug)]
@@ -37,8 +39,10 @@ impl<'a> Interpreter<'a> {
             }
         }
 
-        let (_, mut bb) = f.basic_blocks.iter().next().unwrap();
-        loop {
+        let (mut cur_bb_id, mut bb) = f.basic_blocks.iter().next().unwrap();
+        let mut last_bb_id = cur_bb_id;
+
+        let ret = 'main: loop {
             for val in &bb.iseq {
                 let instr_id = val.get_instr_id().unwrap();
                 let instr = &f.instr_table[instr_id];
@@ -48,8 +52,17 @@ impl<'a> Interpreter<'a> {
                             get_value(&v1, &args, &mut mem).add(get_value(&v2, &args, &mut mem));
                         mem.insert(instr_id, val);
                     }
-                    Opcode::Alloca(_ty) => {
-                        mem.insert(instr_id, ConcreteValue::Int32(0));
+                    Opcode::Alloca(ty) => {
+                        mem.insert(
+                            instr_id,
+                            ConcreteValue::Mem(match ty {
+                                Type::Int1 => Box::into_raw(Box::new(0u8)) as *mut u8,
+                                Type::Int32 => Box::into_raw(Box::new(0u32)) as *mut u8,
+                                Type::Pointer(_) => unimplemented!(),
+                                Type::Void => unreachable!(),
+                                Type::Function(_) => unimplemented!(),
+                            }),
+                        );
                     }
                     Opcode::ICmp(kind, v1, v2) => {
                         let val = match kind {
@@ -60,24 +73,58 @@ impl<'a> Interpreter<'a> {
                         mem.insert(instr_id, val);
                     }
                     Opcode::Br(id) => {
+                        last_bb_id = cur_bb_id;
+                        cur_bb_id = *id;
                         bb = f.basic_block_ref(*id);
+                        break;
                     }
                     Opcode::CondBr(cond, bb1, bb2) => {
                         let cond = get_value(&cond, &args, &mut mem).i1_as_bool().unwrap();
-                        if cond {
-                            bb = f.basic_block_ref(*bb1);
-                        } else {
-                            bb = f.basic_block_ref(*bb2);
-                        }
+                        bb = f.basic_block_ref({
+                            last_bb_id = cur_bb_id;
+                            cur_bb_id = if cond { *bb1 } else { *bb2 };
+                            cur_bb_id
+                        });
+                        break;
                     }
-                    Opcode::Load(v) => {
-                        let val = mem.get(&v.get_instr_id().unwrap()).unwrap().clone();
+                    Opcode::Phi(pairs) => {
+                        let val = get_value(
+                            &pairs.iter().find(|&(_, bb)| bb == &last_bb_id).unwrap().0,
+                            &args,
+                            &mut mem,
+                        );
                         mem.insert(instr_id, val);
                     }
-                    Opcode::Ret(v) => return get_value(&v, &args, &mut mem),
+                    Opcode::Load(v) => {
+                        let ptr = match get_value(&v, &args, &mut mem) {
+                            ConcreteValue::Mem(ptr) => ptr,
+                            _ => unreachable!(),
+                        };
+                        let val = match v.get_type(f).get_element_ty().unwrap() {
+                            Type::Int1 => {
+                                ConcreteValue::Int1(if unsafe { *(ptr as *mut u8) } == 0 {
+                                    false
+                                } else {
+                                    true
+                                })
+                            }
+                            Type::Int32 => ConcreteValue::Int32(unsafe { *(ptr as *mut i32) }),
+                            _ => unimplemented!(),
+                        };
+                        mem.insert(instr_id, val);
+                    }
+                    Opcode::Ret(v) => break 'main get_value(&v, &args, &mut mem),
                 }
             }
+        };
+
+        for (_, cv) in mem {
+            if let ConcreteValue::Mem(m) = cv {
+                unsafe { Box::from_raw(m) };
+            }
         }
+
+        ret
     }
 }
 

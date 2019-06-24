@@ -95,6 +95,18 @@ impl<'a> Builder<'a> {
         Value::None
     }
 
+    pub fn build_phi(&mut self, pairs: Vec<(Value, BasicBlockId)>) -> Value {
+        let ty = pairs.get(0).unwrap().0.get_type(&self.function).clone();
+        let instr = Instruction::new(Opcode::Phi(pairs), ty);
+        let instr_id = self.function.instr_id(instr);
+        let val = Value::Instruction(instr_id);
+        self.function
+            .basic_block_ref_mut(self.cur_bb.unwrap())
+            .iseq
+            .push(val);
+        val
+    }
+
     pub fn build_ret(&mut self, v: Value) -> Value {
         let instr = Instruction::new(Opcode::Ret(v), Type::Void);
         let instr_id = self.function.instr_id(instr);
