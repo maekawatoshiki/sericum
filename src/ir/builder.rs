@@ -15,7 +15,7 @@ impl<'a> Builder<'a> {
     }
 
     pub fn get_param(&self, idx: usize) -> Option<Value> {
-        self.function.get_param(idx)
+        self.function.get_param_value(idx)
     }
 
     pub fn append_basic_block(&mut self) -> BasicBlockId {
@@ -27,48 +27,60 @@ impl<'a> Builder<'a> {
     }
 
     pub fn build_alloca(&mut self, ty: Type) -> Value {
-        let val = Value::Id(self.function.next_value_id(), ty.get_pointer_ty());
+        let ptr_ty = ty.get_pointer_ty();
+        let instr = Instruction::new(Opcode::Alloca(ty), ptr_ty);
+        let instr_id = self.function.instr_id(instr);
+        let val = Value::Instruction(instr_id);
         self.function
             .basic_block_ref_mut(self.cur_bb.unwrap())
             .iseq
-            .push(Instruction::new(Opcode::Alloca(ty), val.clone()));
+            .push(val);
         val
     }
 
     pub fn build_load(&mut self, v: Value) -> Value {
-        let val = Value::Id(
-            self.function.next_value_id(),
-            v.get_type().get_element_ty().unwrap().clone(),
-        );
+        let ty = v.get_type(&self.function).get_element_ty().unwrap().clone();
+        let instr = Instruction::new(Opcode::Load(v), ty);
+        let instr_id = self.function.instr_id(instr);
+        let val = Value::Instruction(instr_id);
         self.function
             .basic_block_ref_mut(self.cur_bb.unwrap())
             .iseq
-            .push(Instruction::new(Opcode::Load(v), val.clone()));
+            .push(val);
         val
     }
 
     pub fn build_add(&mut self, v1: Value, v2: Value) -> Value {
-        let val = Value::Id(self.function.next_value_id(), v1.get_type().clone());
+        let ty = v1.get_type(&self.function).clone();
+        let instr = Instruction::new(Opcode::Add(v1, v2), ty);
+        let instr_id = self.function.instr_id(instr);
+        let val = Value::Instruction(instr_id);
         self.function
             .basic_block_ref_mut(self.cur_bb.unwrap())
             .iseq
-            .push(Instruction::new(Opcode::Add(v1, v2), val.clone()));
+            .push(val);
         val
     }
 
     pub fn build_br(&mut self, id: BasicBlockId) -> Value {
+        let instr = Instruction::new(Opcode::Br(id), Type::Void);
+        let instr_id = self.function.instr_id(instr);
+        let val = Value::Instruction(instr_id);
         self.function
             .basic_block_ref_mut(self.cur_bb.unwrap())
             .iseq
-            .push(Instruction::new(Opcode::Br(id), Value::None));
+            .push(val);
         Value::None
     }
 
     pub fn build_ret(&mut self, v: Value) -> Value {
+        let instr = Instruction::new(Opcode::Ret(v), Type::Void);
+        let instr_id = self.function.instr_id(instr);
+        let val = Value::Instruction(instr_id);
         self.function
             .basic_block_ref_mut(self.cur_bb.unwrap())
             .iseq
-            .push(Instruction::new(Opcode::Ret(v), Value::None));
+            .push(val);
         Value::None
     }
 }

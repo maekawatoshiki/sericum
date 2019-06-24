@@ -1,11 +1,11 @@
-use super::opcode::*;
+use super::{function::*, value::*};
 use id_arena::*;
 
 pub type BasicBlockId = Id<BasicBlock>;
 
 #[derive(Clone, Debug)]
 pub struct BasicBlock {
-    pub iseq: Vec<Instruction>,
+    pub iseq: Vec<Value>,
 }
 
 impl BasicBlock {
@@ -13,9 +13,9 @@ impl BasicBlock {
         Self { iseq: vec![] }
     }
 
-    pub fn to_string(&self) -> String {
+    pub fn to_string(&self, f: &Function) -> String {
         self.iseq.iter().fold("".to_string(), |s, instr| {
-            format!("{}{}\n", s, instr.to_string())
+            format!("{}{}\n", s, instr.to_string(f, true))
         })
     }
 }

@@ -1,7 +1,7 @@
 use crate::ir::{function::*, module::*, opcode::*, value::*};
 use rustc_hash::FxHashMap;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum ConcreteValue {
     Int32(i32),
 }
@@ -21,13 +21,14 @@ impl<'a> Interpreter<'a> {
         let f = self.module.function_ref(id);
         let mut mem = FxHashMap::default();
 
-        for (i, arg) in args.into_iter().enumerate() {
-            mem.insert(i, arg);
-        }
-
-        fn get_value(val: &Value, mem: &mut FxHashMap<ValueId, ConcreteValue>) -> ConcreteValue {
+        fn get_value(
+            val: &Value,
+            args: &[ConcreteValue],
+            mem: &mut FxHashMap<InstructionId, ConcreteValue>,
+        ) -> ConcreteValue {
             match val {
-                Value::Id(id, _) => mem.get(&id).unwrap().clone(),
+                Value::Argument(n) => args[*n].clone(),
+                Value::Instruction(id) => mem.get(&id).unwrap().clone(),
                 Value::Immediate(im) => match im {
                     ImmediateValue::Int32(i) => ConcreteValue::Int32(*i),
                 },
@@ -37,23 +38,26 @@ impl<'a> Interpreter<'a> {
 
         let (_, mut bb) = f.basic_blocks.iter().next().unwrap();
         loop {
-            for instr in &bb.iseq {
+            for val in &bb.iseq {
+                let instr_id = val.get_instr_id().unwrap();
+                let instr = &f.instr_table[instr_id];
                 match &instr.opcode {
                     Opcode::Add(v1, v2) => {
-                        let val = get_value(v1, &mut mem).add(get_value(v2, &mut mem));
-                        mem.insert(instr.value.get_id().unwrap(), val);
+                        let val =
+                            get_value(&v1, &args, &mut mem).add(get_value(&v2, &args, &mut mem));
+                        mem.insert(instr_id, val);
                     }
                     Opcode::Alloca(_ty) => {
-                        mem.insert(instr.value.get_id().unwrap(), ConcreteValue::Int32(0));
+                        mem.insert(instr_id, ConcreteValue::Int32(0));
                     }
                     Opcode::Br(id) => {
                         bb = f.basic_block_ref(*id);
                     }
                     Opcode::Load(v) => {
-                        let val = mem.get(&v.get_id().unwrap()).unwrap().clone();
-                        mem.insert(instr.value.get_id().unwrap(), val);
+                        let val = mem.get(&v.get_instr_id().unwrap()).unwrap().clone();
+                        mem.insert(instr_id, val);
                     }
-                    Opcode::Ret(v) => return get_value(v, &mut mem),
+                    Opcode::Ret(v) => return get_value(&v, &args, &mut mem),
                 }
             }
         }
