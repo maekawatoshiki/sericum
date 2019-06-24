@@ -16,6 +16,7 @@ pub enum Opcode {
     Add(Value, Value),
     ICmp(ICmpKind, Value, Value),
     Br(BasicBlockId),
+    CondBr(Value, BasicBlockId, BasicBlockId),
     Ret(Value),
 }
 
@@ -49,7 +50,13 @@ impl Opcode {
                 v1.to_string(f, false),
                 v2.to_string(f, false)
             ),
-            Opcode::Br(id) => format!("br label{}", id.index()),
+            Opcode::Br(id) => format!("br %label.{}", id.index()),
+            Opcode::CondBr(v, id1, id2) => format!(
+                "br {} %label.{}, %label.{}",
+                v.to_string(f, false),
+                id1.index(),
+                id2.index()
+            ),
             Opcode::Ret(v) => format!("ret {}", v.to_string(f, false)),
         }
     }

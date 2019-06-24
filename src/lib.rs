@@ -25,6 +25,8 @@ mod tests {
         let mut builder = builder::Builder::new(f);
         let bb = builder.append_basic_block();
         let bb2 = builder.append_basic_block();
+        let if_true = builder.append_basic_block();
+        let if_false = builder.append_basic_block();
         builder.set_insert_point(bb);
         let var = builder.build_alloca(types::Type::Int32);
         let val = builder.build_load(var);
@@ -41,14 +43,20 @@ mod tests {
             val3,
             value::Value::Immediate(value::ImmediateValue::Int32(4)),
         );
+        builder.build_cond_br(eq, if_true, if_false);
+        builder.set_insert_point(if_true);
+        builder.build_ret(value::Value::Immediate(value::ImmediateValue::Int32(1)));
+        builder.set_insert_point(if_false);
         builder.build_ret(val3);
 
         println!("{}", f.to_string());
 
-        let ret =
-            interp::Interpreter::new(&m).run_function(f_id, vec![interp::ConcreteValue::Int32(3)]);
-        assert_eq!(ret, interp::ConcreteValue::Int32(4));
+        let mut interp = interp::Interpreter::new(&m);
+        let ret = interp.run_function(f_id, vec![interp::ConcreteValue::Int32(3)]);
+        assert_eq!(ret, interp::ConcreteValue::Int32(1));
+        let ret = interp.run_function(f_id, vec![interp::ConcreteValue::Int32(5)]);
+        assert_eq!(ret, interp::ConcreteValue::Int32(6));
 
-        println!("exec: ret: {:?}", ret);
+        println!("exec: f(5) = {:?}", ret);
     }
 }

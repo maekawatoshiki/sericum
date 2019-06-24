@@ -84,6 +84,17 @@ impl<'a> Builder<'a> {
         Value::None
     }
 
+    pub fn build_cond_br(&mut self, cond: Value, bb1: BasicBlockId, bb2: BasicBlockId) -> Value {
+        let instr = Instruction::new(Opcode::CondBr(cond, bb1, bb2), Type::Void);
+        let instr_id = self.function.instr_id(instr);
+        let val = Value::Instruction(instr_id);
+        self.function
+            .basic_block_ref_mut(self.cur_bb.unwrap())
+            .iseq
+            .push(val);
+        Value::None
+    }
+
     pub fn build_ret(&mut self, v: Value) -> Value {
         let instr = Instruction::new(Opcode::Ret(v), Type::Void);
         let instr_id = self.function.instr_id(instr);

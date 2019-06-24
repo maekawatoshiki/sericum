@@ -62,6 +62,14 @@ impl<'a> Interpreter<'a> {
                     Opcode::Br(id) => {
                         bb = f.basic_block_ref(*id);
                     }
+                    Opcode::CondBr(cond, bb1, bb2) => {
+                        let cond = get_value(&cond, &args, &mut mem).i1_as_bool().unwrap();
+                        if cond {
+                            bb = f.basic_block_ref(*bb1);
+                        } else {
+                            bb = f.basic_block_ref(*bb2);
+                        }
+                    }
                     Opcode::Load(v) => {
                         let val = mem.get(&v.get_instr_id().unwrap()).unwrap().clone();
                         mem.insert(instr_id, val);
@@ -86,6 +94,13 @@ impl ConcreteValue {
             (ConcreteValue::Int32(i1), ConcreteValue::Int32(i2)) => ConcreteValue::Int1(i1 == i2),
             (ConcreteValue::Int1(i1), ConcreteValue::Int1(i2)) => ConcreteValue::Int1(i1 == i2),
             _ => unimplemented!(),
+        }
+    }
+
+    pub fn i1_as_bool(self) -> Option<bool> {
+        match self {
+            ConcreteValue::Int1(b) => Some(b),
+            _ => None,
         }
     }
 }

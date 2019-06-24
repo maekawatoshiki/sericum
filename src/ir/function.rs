@@ -87,7 +87,7 @@ impl Function {
 
     fn basic_blocks_to_string(&self) -> String {
         self.basic_blocks.iter().fold("".to_string(), |s, (id, b)| {
-            format!("{}label{}:\n{}\n", s, id.index(), b.to_string(self))
+            format!("{}label.{}:\n{}\n", s, id.index(), b.to_string(self))
         })
     }
 }
