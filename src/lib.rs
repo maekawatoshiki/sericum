@@ -1,13 +1,19 @@
+#![feature(proc_macro_hygiene)]
+
 pub mod exec;
 pub mod ir;
 
+#[macro_use]
+extern crate dynasm;
+#[macro_use]
+extern crate dynasmrt;
 extern crate id_arena;
 extern crate rustc_hash;
 
 #[cfg(test)]
 mod tests {
     use crate::{
-        exec::interpreter::interp,
+        exec::{interpreter::interp, jit::x64::compiler},
         ir::{builder, function, module, opcode, types, value},
     };
 
@@ -122,5 +128,11 @@ mod tests {
         assert_eq!(ret, interp::ConcreteValue::Int32(55));
 
         println!("exec: fibo(10) = {:?}", ret);
+    }
+
+    #[test]
+    fn x64_jit() {
+        let mut m = module::Module::new("cilk");
+        compiler::JITCompiler::new(&m);
     }
 }
