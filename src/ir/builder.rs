@@ -84,6 +84,22 @@ impl<'a> Builder<'a> {
         val
     }
 
+    pub fn build_sub(&mut self, v1: Value, v2: Value) -> Value {
+        let ty = v1.get_type(self.module).clone();
+        let instr = Instruction::new(Opcode::Sub(v1, v2), ty);
+        let instr_id = self.function_ref_mut().instr_id(instr);
+        let val = Value::Instruction(InstructionValue {
+            func_id: self.func_id,
+            id: instr_id,
+        });
+        let bb = self.cur_bb.unwrap();
+        self.function_ref_mut()
+            .basic_block_ref_mut(bb)
+            .iseq
+            .push(val);
+        val
+    }
+
     pub fn build_icmp(&mut self, kind: ICmpKind, v1: Value, v2: Value) -> Value {
         let instr = Instruction::new(Opcode::ICmp(kind, v1, v2), Type::Int1);
         let instr_id = self.function_ref_mut().instr_id(instr);
@@ -132,6 +148,27 @@ impl<'a> Builder<'a> {
     pub fn build_phi(&mut self, pairs: Vec<(Value, BasicBlockId)>) -> Value {
         let ty = pairs.get(0).unwrap().0.get_type(self.module).clone();
         let instr = Instruction::new(Opcode::Phi(pairs), ty);
+        let instr_id = self.function_ref_mut().instr_id(instr);
+        let val = Value::Instruction(InstructionValue {
+            func_id: self.func_id,
+            id: instr_id,
+        });
+        let bb = self.cur_bb.unwrap();
+        self.function_ref_mut()
+            .basic_block_ref_mut(bb)
+            .iseq
+            .push(val);
+        val
+    }
+
+    pub fn build_call(&mut self, f: Value, args: Vec<Value>) -> Value {
+        let ty = f
+            .get_type(&self.module)
+            .get_function_ty()
+            .unwrap()
+            .ret_ty
+            .clone();
+        let instr = Instruction::new(Opcode::Call(f, args), ty);
         let instr_id = self.function_ref_mut().instr_id(instr);
         let val = Value::Instruction(InstructionValue {
             func_id: self.func_id,

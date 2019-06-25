@@ -35,7 +35,7 @@ impl<'a> Interpreter<'a> {
                 Value::Immediate(im) => match im {
                     ImmediateValue::Int32(i) => ConcreteValue::Int32(*i),
                 },
-                Value::Function(id) => unimplemented!(),
+                Value::Function(_id) => unimplemented!(),
                 Value::None => unimplemented!(),
             }
         }
@@ -53,6 +53,11 @@ impl<'a> Interpreter<'a> {
                             get_value(&v1, &args, &mut mem).add(get_value(&v2, &args, &mut mem));
                         mem.insert(instr_id, val);
                     }
+                    Opcode::Sub(v1, v2) => {
+                        let val =
+                            get_value(&v1, &args, &mut mem).sub(get_value(&v2, &args, &mut mem));
+                        mem.insert(instr_id, val);
+                    }
                     Opcode::Alloca(ty) => {
                         mem.insert(
                             instr_id,
@@ -66,11 +71,13 @@ impl<'a> Interpreter<'a> {
                         );
                     }
                     Opcode::ICmp(kind, v1, v2) => {
-                        let val = match kind {
-                            ICmpKind::Eq => {
-                                get_value(&v1, &args, &mut mem).eq(get_value(&v2, &args, &mut mem))
-                            }
-                        };
+                        let val =
+                            match kind {
+                                ICmpKind::Eq => get_value(&v1, &args, &mut mem)
+                                    .eq(get_value(&v2, &args, &mut mem)),
+                                ICmpKind::Le => get_value(&v1, &args, &mut mem)
+                                    .le(get_value(&v2, &args, &mut mem)),
+                            };
                         mem.insert(instr_id, val);
                     }
                     Opcode::Br(id) => {
@@ -152,10 +159,24 @@ impl ConcreteValue {
         }
     }
 
+    pub fn sub(self, v: ConcreteValue) -> Self {
+        match (self, v) {
+            (ConcreteValue::Int32(i1), ConcreteValue::Int32(i2)) => ConcreteValue::Int32(i1 - i2),
+            _ => unimplemented!(),
+        }
+    }
+
     pub fn eq(self, v: ConcreteValue) -> Self {
         match (self, v) {
             (ConcreteValue::Int32(i1), ConcreteValue::Int32(i2)) => ConcreteValue::Int1(i1 == i2),
             (ConcreteValue::Int1(i1), ConcreteValue::Int1(i2)) => ConcreteValue::Int1(i1 == i2),
+            _ => unimplemented!(),
+        }
+    }
+
+    pub fn le(self, v: ConcreteValue) -> Self {
+        match (self, v) {
+            (ConcreteValue::Int32(i1), ConcreteValue::Int32(i2)) => ConcreteValue::Int1(i1 <= i2),
             _ => unimplemented!(),
         }
     }

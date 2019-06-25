@@ -14,6 +14,7 @@ pub enum Opcode {
     Alloca(Type),
     Load(Value),
     Add(Value, Value),
+    Sub(Value, Value),
     ICmp(ICmpKind, Value, Value),
     Br(BasicBlockId),
     CondBr(Value, BasicBlockId, BasicBlockId),
@@ -25,6 +26,7 @@ pub enum Opcode {
 #[derive(Clone, Debug)]
 pub enum ICmpKind {
     Eq,
+    Le,
     // Ne,
 }
 
@@ -45,6 +47,9 @@ impl Opcode {
             Opcode::Load(v) => format!("load {}", v.to_string(m, false)),
             Opcode::Add(v1, v2) => {
                 format!("add {}, {}", v1.to_string(m, false), v2.to_string(m, false))
+            }
+            Opcode::Sub(v1, v2) => {
+                format!("sub {}, {}", v1.to_string(m, false), v2.to_string(m, false))
             }
             Opcode::ICmp(kind, v1, v2) => format!(
                 "icmp {} {}, {}",
@@ -80,6 +85,7 @@ impl ICmpKind {
     pub fn as_str(&self) -> &'static str {
         match self {
             ICmpKind::Eq => "eq",
+            ICmpKind::Le => "le",
         }
     }
 }
