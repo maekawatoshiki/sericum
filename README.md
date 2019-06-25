@@ -1,5 +1,8 @@
 # Cilk
 
+[![CircleCI](https://circleci.com/gh/maekawatoshiki/cilk.svg?style=shield)](https://circleci.com/gh/maekawatoshiki/cilk)
+[![](http://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
+
 (Toy) Compiler Infrastructure influenced by LLVM written in Rust.
 
 # How It Looks Like
