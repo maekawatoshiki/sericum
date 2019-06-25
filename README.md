@@ -8,37 +8,67 @@
 # How It Looks Like
 
 ```rust
-let mut m = Module::new("cilk");
+let mut m = module::Module::new("cilk");
+let fibo = m.add_function(Function::new(
+    "fibo",
+    types::Type::Int32,
+    vec![types::Type::Int32],
+));
+let mut builder = builder::Builder::new(&mut m, fibo);
 
-let func_id = m.add_function(
-                  Function::new(
-                    "inc",
-                    Type::Int32,
-                    vec![Type::Int32]
-                  )
-              );
-let func = m.function_ref_mut(func_id);
+let entry = builder.append_basic_block();
+let br1 = builder.append_basic_block();
+let br2 = builder.append_basic_block();
 
-let mut builder = Builder::new(func);
+builder.set_insert_point(entry);
+  let arg0 = builder.get_param(0).unwrap();
+  let eq1 = builder.build_icmp(
+      ICmpKind::Le,
+      arg0,
+      Value::Immediate(ImmediateValue::Int32(2)),
+  );
+  builder.build_cond_br(eq1, br1, br2);
 
-let bb = builder.append_basic_block();
-builder.set_insert_point(bb);
+builder.set_insert_point(br1);
+  builder.build_ret(Value::Immediate(ImmediateValue::Int32(1)));
+ 
+builder.set_insert_point(br2);
+  let fibo1arg = builder.build_sub(
+      arg0,
+      Value::Immediate(ImmediateValue::Int32(1)),
+  );
+  let fibo1 = builder.build_call(Value::Function(fibo), vec![fibo1arg]);
+  let fibo2arg = builder.build_sub(
+      arg0,
+      Value::Immediate(ImmediateValue::Int32(2)),
+  );
+  let fibo2 = builder.build_call(Value::Function(fibo), vec![fibo2arg]);
+  let add = builder.build_add(fibo1, fibo2);
+  builder.build_ret(add);
 
-let arg0 = builder.get_param(0).unwrap();
-let val = builder.build_add(
-                      arg0, 
-                      Value::Immediate(ImmediateValue::Int32(1))
-          );
-builder.build_ret(val);
+let f = m.function_ref(fibo);
+println!("Function dump:\n{}", f.to_string(&m));
 
-println!("Dump function:\n{}", func.to_string());
-// Dump function:
-// define i32 inc(i32, ) {
-// label0:
-// %1 = add i32 %0, i32 1
-// ret i32 %1
-// }
+// define i32 fibo(i32, ) {       
+// label.0:                      
+//     %0 = icmp le i32 %arg.0, i32 2
+//     br i1 %0 %label.1, %label.2
+        
+// label.1:       
+//     ret i32 1
+        
+// label.2:       
+//     %3 = sub i32 %arg.0, i32 1
+//     %4 = call i32 fibo(i32 %3, )
+//     %5 = sub i32 %arg.0, i32 2                   
+//     %6 = call i32 fibo(i32 %5, )
+//     %7 = add i32 %4, i32 %6
+//     ret i32 %7
+                     
+// }                               
 
-let ret = Interpreter::new(&m)
-                .run_function(func_id, vec![ConcreteValue::Int32(3)]);
-println!("return value: {:?}", ret); // ConcreteValue::Int32(4)
+let mut interp = interp::Interpreter::new(&m);
+let ret = interp.run_function(fibo, vec![interp::ConcreteValue::Int32(10)]);
+
+println!("fibo(10) = {:?}", ret); // fibo(10) = 55
+```
