@@ -1,4 +1,4 @@
-use super::{function::*, value::*};
+use super::{module::*, value::*};
 use id_arena::*;
 
 pub type BasicBlockId = Id<BasicBlock>;
@@ -13,9 +13,9 @@ impl BasicBlock {
         Self { iseq: vec![] }
     }
 
-    pub fn to_string(&self, f: &Function) -> String {
+    pub fn to_string(&self, m: &Module) -> String {
         self.iseq.iter().fold("".to_string(), |s, instr| {
-            format!("{}{}\n", s, instr.to_string(f, true))
+            format!("{}{}\n", s, instr.to_string(m, true))
         })
     }
 }

@@ -1,4 +1,4 @@
-use super::{basic_block::*, opcode::*, types::*, value::*};
+use super::{basic_block::*, module::*, opcode::*, types::*, value::*};
 use id_arena::*;
 
 pub type FunctionId = Id<Function>;
@@ -44,11 +44,14 @@ impl Function {
         &mut self.basic_blocks[id]
     }
 
-    pub fn get_param_value(&self, idx: usize) -> Option<Value> {
+    pub fn get_param_value(&self, func_id: FunctionId, idx: usize) -> Option<Value> {
         if idx >= self.ty.get_function_ty().unwrap().params_ty.len() {
             return None;
         }
-        Some(Value::Argument(idx))
+        Some(Value::Argument(ArgumentValue {
+            func_id,
+            index: idx,
+        }))
     }
 
     pub fn get_param_type(&self, idx: usize) -> Option<&Type> {
@@ -71,7 +74,7 @@ impl Function {
 }
 
 impl Function {
-    pub fn to_string(&self) -> String {
+    pub fn to_string(&self, m: &Module) -> String {
         let fty = self.ty.get_function_ty().unwrap();
         format!(
             "define {} {}({}) {{\n{}}}",
@@ -81,13 +84,13 @@ impl Function {
                 s += &(p.to_string() + ", ");
                 s
             }),
-            self.basic_blocks_to_string()
+            self.basic_blocks_to_string(m)
         )
     }
 
-    fn basic_blocks_to_string(&self) -> String {
+    fn basic_blocks_to_string(&self, m: &Module) -> String {
         self.basic_blocks.iter().fold("".to_string(), |s, (id, b)| {
-            format!("{}label.{}:\n{}\n", s, id.index(), b.to_string(self))
+            format!("{}label.{}:\n{}\n", s, id.index(), b.to_string(m))
         })
     }
 }

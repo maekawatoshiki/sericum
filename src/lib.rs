@@ -20,9 +20,7 @@ mod tests {
             types::Type::Int32,
             vec![types::Type::Int32],
         ));
-        let f = m.function_ref_mut(f_id);
-
-        let mut builder = builder::Builder::new(f);
+        let mut builder = builder::Builder::new(&mut m, f_id);
 
         let bb = builder.append_basic_block();
         let bb2 = builder.append_basic_block();
@@ -61,7 +59,8 @@ mod tests {
         ]);
         builder.build_ret(ret);
 
-        println!("{}", f.to_string());
+        let f = m.function_ref(f_id);
+        println!("{}", f.to_string(&m));
 
         let mut interp = interp::Interpreter::new(&m);
         let ret = interp.run_function(f_id, vec![interp::ConcreteValue::Int32(3)]);
@@ -71,4 +70,5 @@ mod tests {
 
         println!("exec: f(5) = {:?}", ret);
     }
+
 }

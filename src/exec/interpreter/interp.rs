@@ -30,11 +30,12 @@ impl<'a> Interpreter<'a> {
             mem: &mut FxHashMap<InstructionId, ConcreteValue>,
         ) -> ConcreteValue {
             match val {
-                Value::Argument(n) => args[*n].clone(),
-                Value::Instruction(id) => mem.get(&id).unwrap().clone(),
+                Value::Argument(ArgumentValue { index, .. }) => args[*index].clone(),
+                Value::Instruction(InstructionValue { id, .. }) => mem.get(&id).unwrap().clone(),
                 Value::Immediate(im) => match im {
                     ImmediateValue::Int32(i) => ConcreteValue::Int32(*i),
                 },
+                Value::Function(id) => unimplemented!(),
                 Value::None => unimplemented!(),
             }
         }
@@ -95,12 +96,27 @@ impl<'a> Interpreter<'a> {
                         );
                         mem.insert(instr_id, val);
                     }
+                    Opcode::Call(f, f_args) => match f {
+                        Value::Function(id) => {
+                            let val = self.run_function(
+                                *id,
+                                f_args
+                                    .iter()
+                                    .map(|arg| get_value(&arg, &args, &mut mem))
+                                    .collect(),
+                            );
+                            if val != ConcreteValue::Void {
+                                mem.insert(instr_id, val);
+                            }
+                        }
+                        _ => unimplemented!(),
+                    },
                     Opcode::Load(v) => {
                         let ptr = match get_value(&v, &args, &mut mem) {
                             ConcreteValue::Mem(ptr) => ptr,
                             _ => unreachable!(),
                         };
-                        let val = match v.get_type(f).get_element_ty().unwrap() {
+                        let val = match v.get_type(&self.module).get_element_ty().unwrap() {
                             Type::Int1 => {
                                 ConcreteValue::Int1(if unsafe { *(ptr as *mut u8) } == 0 {
                                     false
