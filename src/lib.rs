@@ -5,7 +5,6 @@ pub mod ir;
 
 #[macro_use]
 extern crate dynasm;
-#[macro_use]
 extern crate dynasmrt;
 extern crate id_arena;
 extern crate rustc_hash;
@@ -133,6 +132,24 @@ mod tests {
     #[test]
     fn x64_jit() {
         let mut m = module::Module::new("cilk");
-        compiler::JITCompiler::new(&m);
+
+        let f_id = m.add_function(function::Function::new(
+            "f",
+            types::Type::Int32,
+            vec![types::Type::Int32],
+        ));
+        let mut builder = builder::Builder::new(&mut m, f_id);
+
+        let entry = builder.append_basic_block();
+        builder.set_insert_point(entry);
+        let arg = builder.get_param(0).unwrap();
+        builder.build_ret(arg);
+
+        let f = m.function_ref(f_id);
+        println!("{}", f.to_string(&m));
+
+        let mut jit = compiler::JITCompiler::new(&m);
+        jit.compile(f_id);
+        println!("x64: {}", jit.run(f_id));
     }
 }
