@@ -115,18 +115,24 @@ impl<'a> Builder<'a> {
         val
     }
 
-    pub fn build_br(&mut self, id: BasicBlockId) -> Value {
-        let instr = Instruction::new(Opcode::Br(id), Type::Void);
+    pub fn build_br(&mut self, dst_id: BasicBlockId) -> Value {
+        let instr = Instruction::new(Opcode::Br(dst_id), Type::Void);
         let instr_id = self.function_ref_mut().instr_id(instr);
         let val = Value::Instruction(InstructionValue {
             func_id: self.func_id,
             id: instr_id,
         });
-        let bb = self.cur_bb.unwrap();
+        let cur_bb_id = self.cur_bb.unwrap();
+
+        let cur_bb = self.function_ref_mut().basic_block_ref_mut(cur_bb_id);
+        cur_bb.iseq.push(val);
+        cur_bb.succ.push(dst_id);
+
         self.function_ref_mut()
-            .basic_block_ref_mut(bb)
-            .iseq
-            .push(val);
+            .basic_block_ref_mut(dst_id)
+            .pred
+            .push(cur_bb_id);
+
         Value::None
     }
 
@@ -137,11 +143,22 @@ impl<'a> Builder<'a> {
             func_id: self.func_id,
             id: instr_id,
         });
-        let bb = self.cur_bb.unwrap();
+        let cur_bb_id = self.cur_bb.unwrap();
+
+        let cur_bb = self.function_ref_mut().basic_block_ref_mut(cur_bb_id);
+        cur_bb.iseq.push(val);
+        cur_bb.succ.push(bb1);
+        cur_bb.succ.push(bb2);
+
         self.function_ref_mut()
-            .basic_block_ref_mut(bb)
-            .iseq
-            .push(val);
+            .basic_block_ref_mut(bb1)
+            .pred
+            .push(cur_bb_id);
+        self.function_ref_mut()
+            .basic_block_ref_mut(bb2)
+            .pred
+            .push(cur_bb_id);
+
         Value::None
     }
 
