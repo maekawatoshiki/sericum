@@ -108,12 +108,11 @@ impl<'a> LivenessAnalyzer<'a> {
         }
 
         for pred_id in bb.pred.clone() {
-            let mut pred = &mut bbs[pred_id];
+            let pred = &mut bbs[pred_id];
             if !pred.live_out.contains(&instr_id) {
                 pred.live_out.insert(instr_id);
                 self.propagate(pred_id, bbs, instr_id);
             }
-            // *f.basic_block_ref_mut(*pred_id) = pred;
         }
     }
 }
