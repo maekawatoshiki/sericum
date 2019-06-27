@@ -14,9 +14,6 @@ pub struct Function {
     /// Basic blocks
     pub basic_blocks: Arena<BasicBlock>,
 
-    /// Value id
-    pub value_id: ValueId,
-
     /// Instruction arena
     pub instr_table: Arena<Instruction>,
 }
@@ -24,7 +21,6 @@ pub struct Function {
 impl Function {
     pub fn new(name: &str, ret_ty: Type, params_ty: Vec<Type>) -> Self {
         Self {
-            value_id: params_ty.len(),
             name: name.to_string(),
             ty: Type::func_ty(ret_ty, params_ty),
             basic_blocks: Arena::new(),
@@ -62,12 +58,6 @@ impl Function {
         Some(&params_ty[idx])
     }
 
-    pub fn next_value_id(&mut self) -> ValueId {
-        let id = self.value_id;
-        self.value_id += 1;
-        id
-    }
-
     pub fn instr_id(&mut self, instr: Instruction) -> InstructionId {
         self.instr_table.alloc(instr)
     }
@@ -90,7 +80,17 @@ impl Function {
 
     fn basic_blocks_to_string(&self, m: &Module) -> String {
         self.basic_blocks.iter().fold("".to_string(), |s, (id, b)| {
-            format!("{}label.{}:\n{}\n", s, id.index(), b.to_string(m))
+            format!(
+                "{}label.{}:\tpred:{:?},succ:{:?},def{:?},in{:?},out{:?}\n{}\n",
+                s,
+                id.index(),
+                &b.pred,
+                &b.succ,
+                &b.def,
+                &b.live_in,
+                &b.live_out,
+                b.to_string(m)
+            )
         })
     }
 }

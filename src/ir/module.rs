@@ -3,8 +3,8 @@ use id_arena::*;
 
 #[derive(Clone, Debug)]
 pub struct Module {
-    name: String,
-    functions: Arena<Function>,
+    pub name: String,
+    pub functions: Arena<Function>,
 }
 
 impl Module {
