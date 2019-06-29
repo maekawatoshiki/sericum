@@ -13,6 +13,7 @@ pub struct Instruction {
 pub enum Opcode {
     Alloca(Type),
     Load(Value),
+    Store(Value, Value),
     Add(Value, Value),
     Sub(Value, Value),
     ICmp(ICmpKind, Value, Value),
@@ -45,6 +46,11 @@ impl Opcode {
         match self {
             Opcode::Alloca(ty) => format!("alloca {}", ty.to_string()),
             Opcode::Load(v) => format!("load {}", v.to_string(m, false)),
+            Opcode::Store(src, dst) => format!(
+                "store {}, {}",
+                src.to_string(m, false),
+                dst.to_string(m, false)
+            ),
             Opcode::Add(v1, v2) => {
                 format!("add {}, {}", v1.to_string(m, false), v2.to_string(m, false))
             }

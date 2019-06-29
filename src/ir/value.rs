@@ -95,4 +95,10 @@ impl ImmediateValue {
             ImmediateValue::Int32(_) => &Type::Int32,
         }
     }
+
+    pub fn as_int32(&self) -> i32 {
+        match self {
+            ImmediateValue::Int32(i) => *i,
+        }
+    }
 }

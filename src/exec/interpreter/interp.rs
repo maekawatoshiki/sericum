@@ -136,6 +136,18 @@ impl<'a> Interpreter<'a> {
                         };
                         mem.insert(instr_id, val);
                     }
+                    Opcode::Store(src, dst) => {
+                        let dst_ptr = match get_value(&dst, &args, &mut mem) {
+                            ConcreteValue::Mem(ptr) => ptr,
+                            _ => unreachable!(),
+                        };
+                        match get_value(&src, &args, &mut mem) {
+                            ConcreteValue::Int32(i) => {
+                                unsafe { *(dst_ptr as *mut i32) = i };
+                            }
+                            _ => unimplemented!(),
+                        }
+                    }
                     Opcode::Ret(v) => break 'main get_value(&v, &args, &mut mem),
                 }
             }

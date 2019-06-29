@@ -11,14 +11,17 @@ impl<'a> RegisterAllocator<'a> {
         Self { module }
     }
 
-    pub fn analyze(&mut self) {
+    pub fn analyze(&mut self) -> FxHashMap<FunctionId, FxHashMap<InstructionId, (usize, bool)>> {
         let fs = self.module.functions.clone();
-        for (_, f) in &fs {
+        let mut v = FxHashMap::default();
+        for (id, f) in &fs {
             let (a, b) = self.collect_regs(f);
-            println!("reg: \n\tregs:{:?}\n\tlast use:{:?}", a, b);
+            println!("reg: \n\tregs:{:?}\n\tlast use:{:?}\n\t", a, b);
             let r = self.scan(a, b);
             println!("alloced: {:?}", r);
+            v.insert(id, r);
         }
+        v
     }
 
     pub fn scan(
@@ -28,11 +31,13 @@ impl<'a> RegisterAllocator<'a> {
     ) -> FxHashMap<InstructionId, (usize, bool)> {
         let mut alloc = FxHashMap::default();
         let mut used = FxHashMap::default();
-        let num_reg = 2;
+        let num_reg = 3;
 
+        let mut regs: Vec<InstructionId> = regs.iter().map(|x| *x).collect();
+        regs.sort();
         for reg in &regs {
             let mut found = false;
-            for i in 0..num_reg {
+            for i in 0..num_reg - 1 {
                 if used.contains_key(&i)
                     && reg.index() < last_use.get(used.get(&i).unwrap()).unwrap().index()
                 {
@@ -73,6 +78,7 @@ impl<'a> RegisterAllocator<'a> {
     ) {
         let mut regs = FxHashSet::default();
         let mut last_use = FxHashMap::default(); // (reg, instr that used reg the last)
+        let mut linstr = None;
 
         for (_, bb) in &f.basic_blocks {
             for instr_val in bb.iseq.clone() {
@@ -101,7 +107,10 @@ impl<'a> RegisterAllocator<'a> {
                             }
                         }
                     }
-                    Opcode::ICmp(_, v1, v2) | Opcode::Add(v1, v2) | Opcode::Sub(v1, v2) => {
+                    Opcode::Store(v1, v2)
+                    | Opcode::ICmp(_, v1, v2)
+                    | Opcode::Add(v1, v2)
+                    | Opcode::Sub(v1, v2) => {
                         if let Some(id) = v1.get_instr_id() {
                             last_use.insert(id, instr_id);
                         }
@@ -113,25 +122,41 @@ impl<'a> RegisterAllocator<'a> {
                 }
 
                 match instr.opcode {
-                    Opcode::Add(_, _)
-                    | Opcode::Alloca(_)
+                    Opcode::Add(_, _) | Opcode::Sub(_, _) => {
+                        regs.insert(instr_id);
+                        last_use.insert(instr_id, instr_id);
+                    }
+                    Opcode::Alloca(_)
                     | Opcode::ICmp(_, _, _)
                     | Opcode::Load(_)
-                    | Opcode::Phi(_)
-                    | Opcode::Sub(_, _) => {
+                    | Opcode::Phi(_) => {
                         regs.insert(instr_id);
+                        last_use.insert(instr_id, instr_id);
                     }
                     Opcode::Call(f, _)
                         if f.get_type(&self.module).get_function_ty().unwrap().ret_ty
                             != Type::Void =>
                     {
                         regs.insert(instr_id);
+                        last_use.insert(instr_id, instr_id);
+                    }
+                    Opcode::Store(_, dst) => {
+                        if let Some(id) = dst.get_instr_id() {
+                            regs.insert(id);
+                            last_use.insert(instr_id, instr_id);
+                        }
                     }
                     Opcode::Call(_, _)
                     | Opcode::Br(_)
                     | Opcode::CondBr(_, _, _)
                     | Opcode::Ret(_) => {}
                 }
+
+                linstr = Some(instr_id);
+            }
+
+            for out in &bb.live_out {
+                last_use.insert(*out, linstr.unwrap());
             }
         }
 

@@ -49,6 +49,11 @@ impl<'a> LivenessAnalyzer<'a> {
                         bb.def.insert(instr_id);
                     }
                 }
+                Opcode::Store(_, dst) => {
+                    if let Some(id) = dst.get_instr_id() {
+                        bb.def.insert(id);
+                    }
+                }
                 Opcode::Br(_) | Opcode::CondBr(_, _, _) | Opcode::Ret(_) => {}
             }
         }
@@ -78,7 +83,10 @@ impl<'a> LivenessAnalyzer<'a> {
                     }
                 }
             }
-            Opcode::ICmp(_, v1, v2) | Opcode::Add(v1, v2) | Opcode::Sub(v1, v2) => {
+            Opcode::Store(v1, v2)
+            | Opcode::ICmp(_, v1, v2)
+            | Opcode::Add(v1, v2)
+            | Opcode::Sub(v1, v2) => {
                 if let Some(id) = v1.get_instr_id() {
                     self.propagate(bb_id, bb, id);
                 }
