@@ -1,6 +1,11 @@
-use crate::ir::{basic_block::*, function::*, module::*, opcode::*, types::*};
-use id_arena::*;
+use crate::ir::{function::*, module::*, opcode::*, types::*};
 use rustc_hash::{FxHashMap, FxHashSet};
+
+#[derive(Debug, Clone)]
+pub struct RegisterAllocInfo {
+    pub regs: FxHashMap<InstructionId, (usize, bool)>,
+    pub last_use: FxHashMap<InstructionId, InstructionId>,
+}
 
 pub struct RegisterAllocator<'a> {
     pub module: &'a mut Module,
@@ -11,23 +16,15 @@ impl<'a> RegisterAllocator<'a> {
         Self { module }
     }
 
-    pub fn analyze(
-        &mut self,
-    ) -> FxHashMap<
-        FunctionId,
-        (
-            FxHashMap<InstructionId, (usize, bool)>, // regs
-            FxHashMap<InstructionId, InstructionId>, // last use
-        ),
-    > {
+    pub fn analyze(&mut self) -> FxHashMap<FunctionId, RegisterAllocInfo> {
         let fs = self.module.functions.clone();
         let mut v = FxHashMap::default();
         for (id, f) in &fs {
             let (a, b) = self.collect_regs(f);
             println!("reg: \n\tregs:{:?}\n\tlast use:{:?}\n\t", a, b);
-            let r = self.scan(a, b.clone());
-            println!("alloced: {:?}", r);
-            v.insert(id, (r, b));
+            let regs = self.scan(a, b.clone());
+            println!("alloced: {:?}", regs);
+            v.insert(id, RegisterAllocInfo { regs, last_use: b });
         }
         v
     }
@@ -56,7 +53,7 @@ impl<'a> RegisterAllocator<'a> {
                 found = true;
                 break;
             }
-            if (found) {
+            if found {
                 continue;
             }
 

@@ -1,6 +1,12 @@
+use super::regalloc::RegisterAllocInfo;
 use crate::ir::{basic_block::*, function::*, module::*, opcode::*, types::*, value::*};
 use dynasmrt::*;
 use rustc_hash::FxHashMap;
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum GenericValue {
+    Int32(i32),
+}
 
 #[derive(Debug)]
 pub struct JITCompiler<'a> {
@@ -18,35 +24,34 @@ impl<'a> JITCompiler<'a> {
         }
     }
 
-    pub fn run(mut self, id: FunctionId) -> i32 {
+    pub fn run(mut self, id: FunctionId, args: Vec<GenericValue>) -> i32 {
         let f_entry = *self.function_map.get(&id).unwrap();
-        let args = vec![9];
-        let aa = self.asm.offset();
+        let entry = self.asm.offset();
+
         for arg in args.iter().rev() {
-            dynasm!(self.asm
-                    ; mov r11, *arg
-                    ; push r11);
+            match arg {
+                GenericValue::Int32(i) => {
+                    dynasm!(self.asm
+                        ; mov r11, *i
+                        ; push r11);
+                }
+            }
         }
+
         dynasm!(self.asm
                 ; call =>f_entry
                 ; add rsp, 8*(args.len() as i32)
                 ; ret);
+
         let buf = self.asm.finalize().unwrap();
-        let f: extern "C" fn() -> i32 = unsafe { ::std::mem::transmute(buf.ptr(aa)) };
+        let f: extern "C" fn() -> i32 = unsafe { ::std::mem::transmute(buf.ptr(entry)) };
         f()
     }
 
-    pub fn compile(
-        &mut self,
-        id: FunctionId,
-        (regs, last_use): &(
-            FxHashMap<InstructionId, (usize, bool)>,
-            FxHashMap<InstructionId, InstructionId>,
-        ),
-    ) {
+    pub fn compile(&mut self, id: FunctionId, info: &RegisterAllocInfo) {
         let f = self.module.function_ref(id);
 
-        let params_len = f.ty.get_function_ty().unwrap().params_ty.len();
+        // let params_len = f.ty.get_function_ty().unwrap().params_ty.len();
         let f_entry = self.asm.new_dynamic_label();
 
         self.function_map.insert(id, f_entry);
@@ -72,7 +77,7 @@ impl<'a> JITCompiler<'a> {
                 let instr = &f.instr_table[instr_id];
                 match &instr.opcode {
                     Opcode::Add(v1, v2) => {
-                        let reg_num = regs.get(&instr_id).unwrap().0;
+                        let reg_num = info.regs.get(&instr_id).unwrap().0;
                         match (v1, v2) {
                             (
                                 Value::Argument(ArgumentValue { index, .. }),
@@ -84,15 +89,15 @@ impl<'a> JITCompiler<'a> {
                                 Value::Instruction(InstructionValue { id: id1, .. }),
                                 Value::Instruction(InstructionValue { id: id2, .. }),
                             ) => {
-                                let reg1 = regs.get(&id1).unwrap().0 as u8;
-                                let reg2 = regs.get(&id2).unwrap().0 as u8;
+                                let reg1 = info.regs.get(&id1).unwrap().0 as u8;
+                                let reg2 = info.regs.get(&id2).unwrap().0 as u8;
                                 dynasm!(self.asm; mov Ra(reg_num as u8), Ra(reg1); add Ra(reg_num as u8), Ra(reg2))
                             }
                             _ => unimplemented!(),
                         }
                     }
                     Opcode::Sub(v1, v2) => {
-                        let reg_num = regs.get(&instr_id).unwrap().0;
+                        let reg_num = info.regs.get(&instr_id).unwrap().0;
                         match (v1, v2) {
                             (
                                 Value::Argument(ArgumentValue { index, .. }),
@@ -109,11 +114,11 @@ impl<'a> JITCompiler<'a> {
                         match f {
                             Value::Function(f_id) => {
                                 let mut save_regs = vec![];
-                                for (bgn, end) in last_use {
+                                for (bgn, end) in &info.last_use {
                                     if bgn.index() < instr_id.index()
                                         && instr_id.index() < end.index()
                                     {
-                                        save_regs.push(regs.get(bgn).unwrap().0);
+                                        save_regs.push(info.regs.get(&bgn).unwrap().0);
                                     }
                                 }
                                 println!("save: {:?}", save_regs);
@@ -127,7 +132,7 @@ impl<'a> JITCompiler<'a> {
                                 for arg in args {
                                     match arg {
                                         Value::Instruction(InstructionValue { id, .. }) => {
-                                            let reg_num = regs.get(&id).unwrap().0;
+                                            let reg_num = info.regs.get(&id).unwrap().0;
                                             dynasm!(self.asm; push Ra(reg_num as u8))
                                         }
                                         _ => unimplemented!(),
@@ -135,7 +140,7 @@ impl<'a> JITCompiler<'a> {
                                 }
                                 dynasm!(self.asm; call =>*l);
                                 if returns {
-                                    let reg_num = regs.get(&instr_id).unwrap().0;
+                                    let reg_num = info.regs.get(&instr_id).unwrap().0;
                                     dynasm!(self.asm; mov Ra(reg_num as u8), rax);
                                 }
                                 dynasm!(self.asm; add rsp, 8*(args.len() as i32));
@@ -149,7 +154,7 @@ impl<'a> JITCompiler<'a> {
                     }
                     Opcode::CondBr(cond, b1, b2) => match cond {
                         Value::Instruction(iv) => {
-                            let reg_num = regs.get(&iv.id).unwrap().0;
+                            let reg_num = info.regs.get(&iv.id).unwrap().0;
                             match reg_num {
                                 0 => dynasm!(self.asm ; cmp al, 1),
                                 1 => dynasm!(self.asm ; cmp bl, 1),
@@ -167,7 +172,7 @@ impl<'a> JITCompiler<'a> {
                         _ => unimplemented!(),
                     },
                     Opcode::ICmp(kind, v1, v2) => {
-                        let reg_num = regs.get(&instr_id).unwrap().0;
+                        let reg_num = info.regs.get(&instr_id).unwrap().0;
                         match kind {
                             ICmpKind::Le => match v1 {
                                 Value::Argument(arg) => match v2 {
@@ -186,7 +191,7 @@ impl<'a> JITCompiler<'a> {
                     Opcode::Ret(v) => {
                         match v {
                             Value::Instruction(iv) => {
-                                let reg_num = regs.get(&iv.id).unwrap().0 as u8;
+                                let reg_num = info.regs.get(&iv.id).unwrap().0 as u8;
                                 dynasm!(self.asm; mov eax, Rd(reg_num));
                             }
                             Value::Immediate(ImmediateValue::Int32(x)) => {

@@ -81,14 +81,29 @@ impl Function {
     fn basic_blocks_to_string(&self, m: &Module) -> String {
         self.basic_blocks.iter().fold("".to_string(), |s, (id, b)| {
             format!(
-                "{}label.{}:\tpred:{:?},succ:{:?},def{:?},in{:?},out{:?}\n{}\n",
+                "{}label.{}:\t// pred({}), succ({}), def({}), in({}), out({})\n{}\n",
                 s,
                 id.index(),
-                &b.pred,
-                &b.succ,
-                &b.def,
-                &b.live_in,
-                &b.live_out,
+                &b.pred
+                    .iter()
+                    .fold("".to_string(), |s, x| format!("{}{},", s, x.index()))
+                    .trim_matches(','),
+                &b.succ
+                    .iter()
+                    .fold("".to_string(), |s, x| format!("{}{},", s, x.index()))
+                    .trim_matches(','),
+                &b.def
+                    .iter()
+                    .fold("".to_string(), |s, x| format!("{}{},", s, x.index()))
+                    .trim_matches(','),
+                &b.live_in
+                    .iter()
+                    .fold("".to_string(), |s, x| format!("{}{},", s, x.index()))
+                    .trim_matches(','),
+                &b.live_out
+                    .iter()
+                    .fold("".to_string(), |s, x| format!("{}{},", s, x.index()))
+                    .trim_matches(','),
                 b.to_string(m)
             )
         })

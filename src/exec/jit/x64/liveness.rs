@@ -11,24 +11,29 @@ impl<'a> LivenessAnalyzer<'a> {
     }
 
     pub fn analyze(&mut self) {
-        let mut fs = self.module.functions.clone();
-        for (_, f) in &mut fs {
-            let mut bbs = f.basic_blocks.clone();
-            for (bb_id, bb) in &mut bbs {
+        let mut functions = self.module.functions.clone();
+
+        for (_, f) in &mut functions {
+            let mut basic_blocks = f.basic_blocks.clone();
+
+            for (_, bb) in &mut basic_blocks {
                 self.set_def(&f, bb);
             }
-            for (bb_id, bb) in &bbs.clone() {
-                for instr in bb.iseq.clone() {
+
+            for (bb_id, bb) in basic_blocks.clone() {
+                for instr in &bb.iseq {
                     self.visit(
                         bb_id,
-                        &mut bbs,
-                        f.instr_table[instr.get_instr_id().unwrap()].clone(),
+                        &mut basic_blocks,
+                        &f.instr_table[instr.get_instr_id().unwrap()],
                     );
                 }
             }
-            f.basic_blocks = bbs;
+
+            f.basic_blocks = basic_blocks;
         }
-        self.module.functions = fs;
+
+        self.module.functions = functions;
     }
 
     pub fn set_def(&mut self, f: &Function, bb: &mut BasicBlock) {
@@ -59,40 +64,28 @@ impl<'a> LivenessAnalyzer<'a> {
         }
     }
 
-    pub fn visit(&mut self, bb_id: BasicBlockId, bb: &mut Arena<BasicBlock>, instr: Instruction) {
-        match instr.opcode {
+    pub fn visit(&mut self, bb_id: BasicBlockId, bbs: &mut Arena<BasicBlock>, instr: &Instruction) {
+        match &instr.opcode {
             Opcode::Call(func, args) => {
-                if let Some(id) = func.get_instr_id() {
-                    self.propagate(bb_id, bb, id);
-                }
-                for arg in &args {
-                    if let Some(id) = arg.get_instr_id() {
-                        self.propagate(bb_id, bb, id);
-                    }
+                some_then!(id, func.get_instr_id(), self.propagate(bb_id, bbs, id));
+                for arg in args {
+                    some_then!(id, arg.get_instr_id(), self.propagate(bb_id, bbs, id));
                 }
             }
             Opcode::CondBr(v, _, _) | Opcode::Ret(v) | Opcode::Load(v) => {
-                if let Some(id) = v.get_instr_id() {
-                    self.propagate(bb_id, bb, id);
-                }
+                some_then!(id, v.get_instr_id(), self.propagate(bb_id, bbs, id));
             }
             Opcode::Phi(vals) => {
-                for (val, _) in &vals {
-                    if let Some(id) = val.get_instr_id() {
-                        self.propagate(bb_id, bb, id);
-                    }
+                for (val, _) in vals {
+                    some_then!(id, val.get_instr_id(), self.propagate(bb_id, bbs, id));
                 }
             }
             Opcode::Store(v1, v2)
             | Opcode::ICmp(_, v1, v2)
             | Opcode::Add(v1, v2)
             | Opcode::Sub(v1, v2) => {
-                if let Some(id) = v1.get_instr_id() {
-                    self.propagate(bb_id, bb, id);
-                }
-                if let Some(id) = v2.get_instr_id() {
-                    self.propagate(bb_id, bb, id);
-                }
+                some_then!(id, v1.get_instr_id(), self.propagate(bb_id, bbs, id));
+                some_then!(id, v2.get_instr_id(), self.propagate(bb_id, bbs, id));
             }
             _ => {}
         }
@@ -105,6 +98,7 @@ impl<'a> LivenessAnalyzer<'a> {
         instr_id: InstructionId,
     ) {
         let bb = &mut bbs[bb_id];
+
         if bb.def.contains(&instr_id) {
             return;
         }
