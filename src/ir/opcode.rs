@@ -2,11 +2,13 @@ use super::{basic_block::*, module::*, types::*, value::*};
 use id_arena::*;
 
 pub type InstructionId = Id<Instruction>;
+pub type UniqueIndex = usize;
 
 #[derive(Clone, Debug)]
 pub struct Instruction {
     pub opcode: Opcode,
     pub ty: Type,
+    pub unique_idx: UniqueIndex,
 }
 
 #[derive(Clone, Debug)]
@@ -32,8 +34,12 @@ pub enum ICmpKind {
 }
 
 impl Instruction {
-    pub fn new(opcode: Opcode, ty: Type) -> Self {
-        Self { opcode, ty }
+    pub fn new(opcode: Opcode, ty: Type, unique_idx: UniqueIndex) -> Self {
+        Self {
+            opcode,
+            ty,
+            unique_idx,
+        }
     }
 
     pub fn to_string(&self, m: &Module) -> String {

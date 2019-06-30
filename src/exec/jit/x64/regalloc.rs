@@ -3,8 +3,8 @@ use rustc_hash::{FxHashMap, FxHashSet};
 
 #[derive(Debug, Clone)]
 pub struct RegisterAllocInfo {
-    pub regs: FxHashMap<InstructionId, (usize, bool)>,
-    pub last_use: FxHashMap<InstructionId, InstructionId>,
+    pub regs: FxHashMap<UniqueIndex, (usize, bool)>,
+    pub last_use: FxHashMap<UniqueIndex, UniqueIndex>, // TODO: Instruction should have a use_list instead of last_use
 }
 
 pub struct RegisterAllocator<'a> {
@@ -31,21 +31,19 @@ impl<'a> RegisterAllocator<'a> {
 
     pub fn scan(
         &mut self,
-        regs: FxHashSet<InstructionId>,
-        last_use: FxHashMap<InstructionId, InstructionId>,
-    ) -> FxHashMap<InstructionId, (usize, bool)> {
+        regs: FxHashSet<UniqueIndex>,
+        last_use: FxHashMap<UniqueIndex, UniqueIndex>,
+    ) -> FxHashMap<UniqueIndex, (usize, bool)> {
         let mut alloc = FxHashMap::default();
         let mut used = FxHashMap::default();
         let num_reg = 3;
 
-        let mut regs: Vec<InstructionId> = regs.iter().map(|x| *x).collect();
+        let mut regs: Vec<UniqueIndex> = regs.iter().map(|x| *x).collect();
         regs.sort();
         for reg in &regs {
             let mut found = false;
             for i in 0..num_reg - 1 {
-                if used.contains_key(&i)
-                    && reg.index() < last_use.get(used.get(&i).unwrap()).unwrap().index()
-                {
+                if used.contains_key(&i) && reg < last_use.get(used.get(&i).unwrap()).unwrap() {
                     continue;
                 }
                 alloc.insert(*reg, (i, false));
@@ -60,8 +58,8 @@ impl<'a> RegisterAllocator<'a> {
             used.insert(num_reg - 1, *reg);
             let mut k = 0;
             for i in 1..num_reg {
-                if last_use.get(used.get(&k).unwrap()).unwrap().index()
-                    < last_use.get(used.get(&i).unwrap()).unwrap().index()
+                if last_use.get(used.get(&k).unwrap()).unwrap()
+                    < last_use.get(used.get(&i).unwrap()).unwrap()
                 {
                     k = i;
                 }
@@ -77,10 +75,7 @@ impl<'a> RegisterAllocator<'a> {
     pub fn collect_regs(
         &mut self,
         f: &Function,
-    ) -> (
-        FxHashSet<InstructionId>,
-        FxHashMap<InstructionId, InstructionId>,
-    ) {
+    ) -> (FxHashSet<UniqueIndex>, FxHashMap<UniqueIndex, UniqueIndex>) {
         let mut regs = FxHashSet::default();
         let mut last_use = FxHashMap::default(); // (reg, instr that used reg the last)
         let mut linstr = None;
@@ -89,78 +84,64 @@ impl<'a> RegisterAllocator<'a> {
             for instr_val in bb.iseq.clone() {
                 let instr_id = instr_val.get_instr_id().unwrap();
                 let instr = &f.instr_table[instr_id];
+                let uniqidx = f.instr_id_to_unique_idx(instr_id);
                 match instr.opcode {
                     Opcode::Call(ref func, ref args) => {
-                        if let Some(id) = func.get_instr_id() {
-                            last_use.insert(id, instr_id);
-                        }
+                        some_then!(id, func.get_instr_id(), {
+                            last_use.insert(f.instr_id_to_unique_idx(id), uniqidx);
+                        });
                         for arg in args {
-                            if let Some(id) = arg.get_instr_id() {
-                                last_use.insert(id, instr_id);
-                            }
+                            some_then!(id, arg.get_instr_id(), {
+                                last_use.insert(f.instr_id_to_unique_idx(id), uniqidx);
+                            });
+                        }
+                        if func
+                            .get_type(&self.module)
+                            .get_function_ty()
+                            .unwrap()
+                            .ret_ty
+                            != Type::Void
+                        {
+                            regs.insert(uniqidx);
+                            last_use.insert(uniqidx, uniqidx);
                         }
                     }
                     Opcode::CondBr(ref v, _, _) | Opcode::Ret(ref v) | Opcode::Load(ref v) => {
-                        if let Some(id) = v.get_instr_id() {
-                            last_use.insert(id, instr_id);
-                        }
+                        some_then!(id, v.get_instr_id(), {
+                            last_use.insert(f.instr_id_to_unique_idx(id), uniqidx);
+                        });
                     }
                     Opcode::Phi(ref vals) => {
                         for (val, _) in vals {
-                            if let Some(id) = val.get_instr_id() {
-                                last_use.insert(id, instr_id);
-                            }
+                            some_then!(id, val.get_instr_id(), {
+                                last_use.insert(f.instr_id_to_unique_idx(id), uniqidx);
+                            });
                         }
                     }
                     Opcode::Store(v1, v2)
                     | Opcode::ICmp(_, v1, v2)
                     | Opcode::Add(v1, v2)
                     | Opcode::Sub(v1, v2) => {
-                        if let Some(id) = v1.get_instr_id() {
-                            last_use.insert(id, instr_id);
-                        }
-                        if let Some(id) = v2.get_instr_id() {
-                            last_use.insert(id, instr_id);
-                        }
+                        some_then!(id, v1.get_instr_id(), {
+                            last_use.insert(f.instr_id_to_unique_idx(id), uniqidx);
+                        });
+                        some_then!(id, v2.get_instr_id(), {
+                            last_use.insert(f.instr_id_to_unique_idx(id), uniqidx);
+                        });
+                        regs.insert(f.instr_id_to_unique_idx(instr_id));
+                        last_use.insert(uniqidx, uniqidx);
+                    }
+                    Opcode::Alloca(_) => {
+                        regs.insert(f.instr_id_to_unique_idx(instr_id));
+                        last_use.insert(uniqidx, uniqidx);
                     }
                     _ => {}
                 }
 
-                match instr.opcode {
-                    Opcode::Add(_, _) | Opcode::Sub(_, _) => {
-                        regs.insert(instr_id);
-                        last_use.insert(instr_id, instr_id);
-                    }
-                    Opcode::Alloca(_)
-                    | Opcode::ICmp(_, _, _)
-                    | Opcode::Load(_)
-                    | Opcode::Phi(_) => {
-                        regs.insert(instr_id);
-                        last_use.insert(instr_id, instr_id);
-                    }
-                    Opcode::Call(f, _)
-                        if f.get_type(&self.module).get_function_ty().unwrap().ret_ty
-                            != Type::Void =>
-                    {
-                        regs.insert(instr_id);
-                        last_use.insert(instr_id, instr_id);
-                    }
-                    Opcode::Store(_, dst) => {
-                        if let Some(id) = dst.get_instr_id() {
-                            regs.insert(id);
-                            last_use.insert(instr_id, instr_id);
-                        }
-                    }
-                    Opcode::Call(_, _)
-                    | Opcode::Br(_)
-                    | Opcode::CondBr(_, _, _)
-                    | Opcode::Ret(_) => {}
-                }
-
-                linstr = Some(instr_id);
+                linstr = Some(uniqidx);
             }
 
-            for out in &bb.live_out {
+            for out in &bb.liveness.borrow().live_out {
                 last_use.insert(*out, linstr.unwrap());
             }
         }

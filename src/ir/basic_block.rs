@@ -1,18 +1,25 @@
 use super::{module::*, opcode::*, value::*};
 use id_arena::*;
 use rustc_hash::FxHashSet;
+use std::{cell::RefCell, rc::Rc};
 
 pub type BasicBlockId = Id<BasicBlock>;
 
 #[derive(Clone, Debug)]
 pub struct BasicBlock {
+    pub liveness: Rc<RefCell<LivenessInfo>>,
+
     pub pred: Vec<BasicBlockId>,
     pub succ: Vec<BasicBlockId>,
-    pub def: FxHashSet<InstructionId>,
-    pub live_in: FxHashSet<InstructionId>,
-    pub live_out: FxHashSet<InstructionId>,
 
     pub iseq: Vec<Value>,
+}
+
+#[derive(Clone, Debug)]
+pub struct LivenessInfo {
+    pub def: FxHashSet<UniqueIndex>,
+    pub live_in: FxHashSet<UniqueIndex>,
+    pub live_out: FxHashSet<UniqueIndex>,
 }
 
 impl BasicBlock {
@@ -21,9 +28,7 @@ impl BasicBlock {
             iseq: vec![],
             pred: vec![],
             succ: vec![],
-            def: FxHashSet::default(),
-            live_in: FxHashSet::default(),
-            live_out: FxHashSet::default(),
+            liveness: Rc::new(RefCell::new(LivenessInfo::new())),
         }
     }
 
@@ -31,5 +36,15 @@ impl BasicBlock {
         self.iseq.iter().fold("".to_string(), |s, instr| {
             format!("{}{}\n", s, instr.to_string(m, true))
         })
+    }
+}
+
+impl LivenessInfo {
+    pub fn new() -> Self {
+        Self {
+            def: FxHashSet::default(),
+            live_in: FxHashSet::default(),
+            live_out: FxHashSet::default(),
+        }
     }
 }

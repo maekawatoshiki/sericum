@@ -16,6 +16,9 @@ pub struct Function {
 
     /// Instruction arena
     pub instr_table: Arena<Instruction>,
+
+    /// Unique index for SSA
+    unique_index_counter: UniqueIndex,
 }
 
 impl Function {
@@ -25,6 +28,7 @@ impl Function {
             ty: Type::func_ty(ret_ty, params_ty),
             basic_blocks: Arena::new(),
             instr_table: Arena::new(),
+            unique_index_counter: 1,
         }
     }
 
@@ -61,6 +65,27 @@ impl Function {
     pub fn instr_id(&mut self, instr: Instruction) -> InstructionId {
         self.instr_table.alloc(instr)
     }
+
+    // pub fn uniquify_instructions(&mut self) {
+    //     let mut n = 1;
+    //     for (_, bb) in &mut self.basic_blocks {
+    //         for instr_val in &mut bb.iseq {
+    //             let id = instr_val.get_instr_id().unwrap();
+    //             self.instr_table[id].unique_idx = n;
+    //             n += 1
+    //         }
+    //     }
+    // }
+
+    pub fn instr_id_to_unique_idx(&self, id: InstructionId) -> UniqueIndex {
+        self.instr_table[id].unique_idx
+    }
+
+    pub fn next_unique_idx(&mut self) -> UniqueIndex {
+        let n = self.unique_index_counter;
+        self.unique_index_counter += 1;
+        n
+    }
 }
 
 impl Function {
@@ -79,6 +104,16 @@ impl Function {
     }
 
     fn basic_blocks_to_string(&self, m: &Module) -> String {
+        fn unique_idx_to_instr_id(f: &Function, ui: UniqueIndex) -> Option<InstructionId> {
+            f.instr_table.iter().find_map(|(id, instr)| {
+                if instr.unique_idx == ui {
+                    Some(id)
+                } else {
+                    None
+                }
+            })
+        }
+
         self.basic_blocks.iter().fold("".to_string(), |s, (id, b)| {
             format!(
                 "{}label.{}:\t// pred({}), succ({}), def({}), in({}), out({})\n{}\n",
@@ -92,17 +127,35 @@ impl Function {
                     .iter()
                     .fold("".to_string(), |s, x| format!("{}{},", s, x.index()))
                     .trim_matches(','),
-                &b.def
+                &b.liveness
+                    .borrow()
+                    .def
                     .iter()
-                    .fold("".to_string(), |s, x| format!("{}{},", s, x.index()))
+                    .fold("".to_string(), |s, x| format!(
+                        "{}{},",
+                        s,
+                        unique_idx_to_instr_id(self, *x).unwrap().index()
+                    ))
                     .trim_matches(','),
-                &b.live_in
+                &b.liveness
+                    .borrow()
+                    .live_in
                     .iter()
-                    .fold("".to_string(), |s, x| format!("{}{},", s, x.index()))
+                    .fold("".to_string(), |s, x| format!(
+                        "{}{},",
+                        s,
+                        unique_idx_to_instr_id(self, *x).unwrap().index()
+                    ))
                     .trim_matches(','),
-                &b.live_out
+                &b.liveness
+                    .borrow()
+                    .live_out
                     .iter()
-                    .fold("".to_string(), |s, x| format!("{}{},", s, x.index()))
+                    .fold("".to_string(), |s, x| format!(
+                        "{}{},",
+                        s,
+                        unique_idx_to_instr_id(self, *x).unwrap().index()
+                    ))
                     .trim_matches(','),
                 b.to_string(m)
             )
