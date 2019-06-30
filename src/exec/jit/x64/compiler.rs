@@ -20,7 +20,7 @@ impl<'a> JITCompiler<'a> {
 
     pub fn run(mut self, id: FunctionId) -> i32 {
         let f_entry = *self.function_map.get(&id).unwrap();
-        let args = vec![10];
+        let args = vec![9];
         let aa = self.asm.offset();
         for arg in args.iter().rev() {
             dynasm!(self.asm
@@ -36,7 +36,14 @@ impl<'a> JITCompiler<'a> {
         f()
     }
 
-    pub fn compile(&mut self, id: FunctionId, regs: &FxHashMap<InstructionId, (usize, bool)>) {
+    pub fn compile(
+        &mut self,
+        id: FunctionId,
+        (regs, last_use): &(
+            FxHashMap<InstructionId, (usize, bool)>,
+            FxHashMap<InstructionId, InstructionId>,
+        ),
+    ) {
         let f = self.module.function_ref(id);
 
         let params_len = f.ty.get_function_ty().unwrap().params_ty.len();
@@ -71,7 +78,7 @@ impl<'a> JITCompiler<'a> {
                                 Value::Argument(ArgumentValue { index, .. }),
                                 Value::Immediate(ImmediateValue::Int32(i)),
                             ) => {
-                                dynasm!(self.asm; mov Ra(reg_num as u8), [rbp+8*(2+*index as i32)]; add eax, *i)
+                                dynasm!(self.asm; mov Ra(reg_num as u8), [rbp+8*(2+*index as i32)]; add Ra(reg_num as u8), *i)
                             }
                             (
                                 Value::Instruction(InstructionValue { id: id1, .. }),
@@ -91,7 +98,7 @@ impl<'a> JITCompiler<'a> {
                                 Value::Argument(ArgumentValue { index, .. }),
                                 Value::Immediate(ImmediateValue::Int32(i)),
                             ) => {
-                                dynasm!(self.asm; mov Rd(reg_num as u8), [rbp+8*(2+*index as i32)]; sub eax, *i)
+                                dynasm!(self.asm; mov Rd(reg_num as u8), [rbp+8*(2+*index as i32)]; sub Rd(reg_num as u8), *i)
                             }
                             _ => unimplemented!(),
                         }
@@ -101,14 +108,40 @@ impl<'a> JITCompiler<'a> {
                             != Type::Void;
                         match f {
                             Value::Function(f_id) => {
+                                let mut save_regs = vec![];
+                                for (bgn, end) in last_use {
+                                    if bgn.index() < instr_id.index()
+                                        && instr_id.index() < end.index()
+                                    {
+                                        save_regs.push(regs.get(bgn).unwrap().0);
+                                    }
+                                }
+                                println!("save: {:?}", save_regs);
+
                                 let l = self.function_map.get(&f_id).unwrap(); // TODO
-                                if returns {
-                                    dynasm!(self.asm; push rax);
+
+                                for save_reg in &save_regs {
+                                    dynasm!(self.asm; push Ra(*save_reg as u8));
+                                }
+
+                                for arg in args {
+                                    match arg {
+                                        Value::Instruction(InstructionValue { id, .. }) => {
+                                            let reg_num = regs.get(&id).unwrap().0;
+                                            dynasm!(self.asm; push Ra(reg_num as u8))
+                                        }
+                                        _ => unimplemented!(),
+                                    }
                                 }
                                 dynasm!(self.asm; call =>*l);
                                 if returns {
                                     let reg_num = regs.get(&instr_id).unwrap().0;
-                                    dynasm!(self.asm; mov Rd(reg_num as u8), eax; pop rax);
+                                    dynasm!(self.asm; mov Ra(reg_num as u8), rax);
+                                }
+                                dynasm!(self.asm; add rsp, 8*(args.len() as i32));
+
+                                for save_reg in save_regs.iter().rev() {
+                                    dynasm!(self.asm; pop Ra(*save_reg as u8));
                                 }
                             }
                             _ => unimplemented!(),
@@ -141,12 +174,7 @@ impl<'a> JITCompiler<'a> {
                                     Value::Immediate(n) => {
                                         dynasm!(self.asm
                                             ; cmp [rbp+8*(2+arg.index as i32)], n.as_int32() as i8);
-                                        match reg_num {
-                                            0 => dynasm!(self.asm; setle al),
-                                            1 => dynasm!(self.asm; setle bl),
-                                            2 => dynasm!(self.asm; setle cl),
-                                            _ => unimplemented!(),
-                                        }
+                                        dynasm!(self.asm; setle Rb(reg_num as u8));
                                     }
                                     _ => unimplemented!(),
                                 },
@@ -156,22 +184,17 @@ impl<'a> JITCompiler<'a> {
                         }
                     }
                     Opcode::Ret(v) => {
-                        dynasm!(self.asm ; pop rbp);
                         match v {
                             Value::Instruction(iv) => {
-                                let reg_num = regs.get(&iv.id).unwrap().0;
-                                match reg_num {
-                                    0 => dynasm!(self.asm ; ret),
-                                    1 => dynasm!(self.asm ; mov eax, ebx ; ret),
-                                    2 => dynasm!(self.asm ; mov eax, ecx ; ret),
-                                    _ => unimplemented!(),
-                                }
+                                let reg_num = regs.get(&iv.id).unwrap().0 as u8;
+                                dynasm!(self.asm; mov eax, Rd(reg_num));
                             }
                             Value::Immediate(ImmediateValue::Int32(x)) => {
-                                dynasm!(self.asm ; mov eax, *x ; ret);
+                                dynasm!(self.asm ; mov eax, *x);
                             }
                             _ => unimplemented!(),
                         }
+                        dynasm!(self.asm ; pop rbp; ret);
                     }
                     _ => {}
                 }

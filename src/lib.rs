@@ -179,7 +179,7 @@ mod tests {
         };
 
         let mut interp = interp::Interpreter::new(&m);
-        let ret = interp.run_function(f_id, vec![interp::ConcreteValue::Int32(10)]);
+        let ret = interp.run_function(f_id, vec![interp::ConcreteValue::Int32(9)]);
         println!("exec: f(5) = {:?}", ret);
 
         let mut jit = compiler::JITCompiler::new(&m);

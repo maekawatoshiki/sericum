@@ -11,15 +11,23 @@ impl<'a> RegisterAllocator<'a> {
         Self { module }
     }
 
-    pub fn analyze(&mut self) -> FxHashMap<FunctionId, FxHashMap<InstructionId, (usize, bool)>> {
+    pub fn analyze(
+        &mut self,
+    ) -> FxHashMap<
+        FunctionId,
+        (
+            FxHashMap<InstructionId, (usize, bool)>, // regs
+            FxHashMap<InstructionId, InstructionId>, // last use
+        ),
+    > {
         let fs = self.module.functions.clone();
         let mut v = FxHashMap::default();
         for (id, f) in &fs {
             let (a, b) = self.collect_regs(f);
             println!("reg: \n\tregs:{:?}\n\tlast use:{:?}\n\t", a, b);
-            let r = self.scan(a, b);
+            let r = self.scan(a, b.clone());
             println!("alloced: {:?}", r);
-            v.insert(id, r);
+            v.insert(id, (r, b));
         }
         v
     }
