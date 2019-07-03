@@ -81,6 +81,19 @@ impl Function {
         self.instr_table[id].unique_idx
     }
 
+    pub fn find_instruction_by_unique_idx(&self, idx: UniqueIndex) -> Option<&Instruction> {
+        for (_, bb) in &self.basic_blocks {
+            for instr_val in &bb.iseq {
+                let instr_id = instr_val.get_instr_id().unwrap();
+                let instr = &self.instr_table[instr_id];
+                if instr.unique_idx == idx {
+                    return Some(instr);
+                }
+            }
+        }
+        None
+    }
+
     pub fn next_unique_idx(&mut self) -> UniqueIndex {
         let n = self.unique_index_counter;
         self.unique_index_counter += 1;
@@ -104,16 +117,6 @@ impl Function {
     }
 
     fn basic_blocks_to_string(&self, m: &Module) -> String {
-        fn unique_idx_to_instr_id(f: &Function, ui: UniqueIndex) -> Option<InstructionId> {
-            f.instr_table.iter().find_map(|(id, instr)| {
-                if instr.unique_idx == ui {
-                    Some(id)
-                } else {
-                    None
-                }
-            })
-        }
-
         self.basic_blocks.iter().fold("".to_string(), |s, (id, b)| {
             format!(
                 "{}label.{}:\t// pred({}), succ({}), def({}), in({}), out({})\n{}\n",
@@ -131,31 +134,19 @@ impl Function {
                     .borrow()
                     .def
                     .iter()
-                    .fold("".to_string(), |s, x| format!(
-                        "{}{},",
-                        s,
-                        unique_idx_to_instr_id(self, *x).unwrap().index()
-                    ))
+                    .fold("".to_string(), |s, x| format!("{}{},", s, *x,))
                     .trim_matches(','),
                 &b.liveness
                     .borrow()
                     .live_in
                     .iter()
-                    .fold("".to_string(), |s, x| format!(
-                        "{}{},",
-                        s,
-                        unique_idx_to_instr_id(self, *x).unwrap().index()
-                    ))
+                    .fold("".to_string(), |s, x| format!("{}{},", s, *x))
                     .trim_matches(','),
                 &b.liveness
                     .borrow()
                     .live_out
                     .iter()
-                    .fold("".to_string(), |s, x| format!(
-                        "{}{},",
-                        s,
-                        unique_idx_to_instr_id(self, *x).unwrap().index()
-                    ))
+                    .fold("".to_string(), |s, x| format!("{}{},", s, *x))
                     .trim_matches(','),
                 b.to_string(m)
             )

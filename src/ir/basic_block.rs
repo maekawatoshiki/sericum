@@ -18,8 +18,8 @@ pub struct BasicBlock {
 #[derive(Clone, Debug)]
 pub struct LivenessInfo {
     pub def: FxHashSet<UniqueIndex>,
-    pub live_in: FxHashSet<UniqueIndex>,
-    pub live_out: FxHashSet<UniqueIndex>,
+    pub live_in: FxHashSet<UniqueIndex>, // TODO: Should be FxHashSet<InstructionId>
+    pub live_out: FxHashSet<UniqueIndex>, // TODO: Should be FxHashSet<InstructionId>
 }
 
 impl BasicBlock {

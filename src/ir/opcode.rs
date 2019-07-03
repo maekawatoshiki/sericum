@@ -1,14 +1,25 @@
 use super::{basic_block::*, module::*, types::*, value::*};
 use id_arena::*;
+use std::{cell::RefCell, rc::Rc};
+// use rustc_hash::FxHashMap;
 
 pub type InstructionId = Id<Instruction>;
-pub type UniqueIndex = usize;
+pub type UniqueIndex = usize; // TODO: Rename to VRegIndex?
+pub type RegisterAllocInfoRef = Rc<RefCell<RegisterAllocInfo>>;
 
 #[derive(Clone, Debug)]
 pub struct Instruction {
     pub opcode: Opcode,
     pub ty: Type,
     pub unique_idx: UniqueIndex,
+    pub reg: RegisterAllocInfoRef,
+}
+
+#[derive(Debug, Clone)]
+pub struct RegisterAllocInfo {
+    pub reg: Option<usize>,
+    pub spill: bool,
+    pub last_use: Option<UniqueIndex>,
 }
 
 #[derive(Clone, Debug)]
@@ -39,11 +50,22 @@ impl Instruction {
             opcode,
             ty,
             unique_idx,
+            reg: Rc::new(RefCell::new(RegisterAllocInfo::new())),
         }
     }
 
     pub fn to_string(&self, m: &Module) -> String {
         self.opcode.to_string(m)
+    }
+}
+
+impl RegisterAllocInfo {
+    pub fn new() -> Self {
+        Self {
+            reg: None,
+            spill: false,
+            last_use: None,
+        }
     }
 }
 

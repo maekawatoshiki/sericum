@@ -251,23 +251,21 @@ mod tests {
         let f = m.function_ref(fibo);
         println!("{}", f.to_string(&m));
 
-        let regs = {
-            let mut liveness = liveness::LivenessAnalyzer::new(&m);
-            liveness.analyze();
+        let mut liveness = liveness::LivenessAnalyzer::new(&m);
+        liveness.analyze();
 
-            let f = m.function_ref(fibo);
-            println!("liveness: {}", f.to_string(&m));
+        let f = m.function_ref(fibo);
+        println!("liveness: {}", f.to_string(&m));
 
-            let mut regalloc = regalloc::RegisterAllocator::new(&mut m);
-            regalloc.analyze()
-        };
+        let mut regalloc = regalloc::RegisterAllocator::new(&m);
+        regalloc.analyze();
 
         let mut interp = interp::Interpreter::new(&m);
         let ret = interp.run_function(fibo, vec![interp::ConcreteValue::Int32(9)]);
         println!("exec: fibo(9) = {:?}", ret);
 
         let mut jit = compiler::JITCompiler::new(&m);
-        jit.compile(fibo, regs.get(&fibo).unwrap());
+        jit.compile(fibo);
         println!(
             "jit: fibo(9) = {}",
             jit.run(fibo, vec![compiler::GenericValue::Int32(9)])

@@ -1,6 +1,5 @@
 // TODO: Better assembler than dynasm-rs?
 
-use super::regalloc::RegisterAllocInfo;
 use crate::ir::{basic_block::*, function::*, module::*, opcode::*, types::*, value::*};
 use dynasmrt::*;
 use rustc_hash::FxHashMap;
@@ -52,7 +51,7 @@ impl<'a> JITCompiler<'a> {
         f()
     }
 
-    pub fn compile(&mut self, id: FunctionId, info: &RegisterAllocInfo) {
+    pub fn compile(&mut self, id: FunctionId) {
         let f = self.module.function_ref(id);
 
         // let params_len = f.ty.get_function_ty().unwrap().params_ty.len();
@@ -82,7 +81,7 @@ impl<'a> JITCompiler<'a> {
                 let uniqidx = instr.unique_idx;
                 match &instr.opcode {
                     Opcode::Add(v1, v2) => {
-                        let rn = info.regs.get(&uniqidx).unwrap().0 as u8;
+                        let rn = instr.reg.borrow().reg.unwrap() as u8;
                         match (v1, v2) {
                             (
                                 Value::Argument(ArgumentValue { index, .. }),
@@ -94,31 +93,28 @@ impl<'a> JITCompiler<'a> {
                                 Value::Instruction(InstructionValue { id: id1, .. }),
                                 Value::Argument(ArgumentValue { index, .. }),
                             ) => {
-                                let reg1 =
-                                    info.regs.get(&f.instr_id_to_unique_idx(*id1)).unwrap().0 as u8;
+                                let reg1 = f.instr_table[*id1].reg.borrow().reg.unwrap() as u8;
                                 dynasm!(self.asm; mov Ra(rn), Ra(reg1); add Ra(rn), [rbp+8*(2+*index as i32)])
                             }
                             (
                                 Value::Instruction(InstructionValue { id: id1, .. }),
                                 Value::Instruction(InstructionValue { id: id2, .. }),
                             ) => {
-                                let reg1 =
-                                    info.regs.get(&f.instr_id_to_unique_idx(*id1)).unwrap().0 as u8;
-                                let reg2 =
-                                    info.regs.get(&f.instr_id_to_unique_idx(*id2)).unwrap().0 as u8;
+                                let reg1 = f.instr_table[*id1].reg.borrow().reg.unwrap() as u8;
+                                let reg2 = f.instr_table[*id2].reg.borrow().reg.unwrap() as u8;
                                 dynasm!(self.asm; mov Ra(rn), Ra(reg1); add Ra(rn), Ra(reg2))
                             }
                             _ => unimplemented!(),
                         }
                     }
                     Opcode::Sub(v1, v2) => {
-                        let reg_num = info.regs.get(&uniqidx).unwrap().0;
+                        let rn = instr.reg.borrow().reg.unwrap() as u8;
                         match (v1, v2) {
                             (
                                 Value::Argument(ArgumentValue { index, .. }),
                                 Value::Immediate(ImmediateValue::Int32(i)),
                             ) => {
-                                dynasm!(self.asm; mov Rd(reg_num as u8), [rbp+8*(2+*index as i32)]; sub Rd(reg_num as u8), *i)
+                                dynasm!(self.asm; mov Rd(rn), [rbp+8*(2+*index as i32)]; sub Rd(rn), *i)
                             }
                             _ => unimplemented!(),
                         }
@@ -133,9 +129,14 @@ impl<'a> JITCompiler<'a> {
                         match func {
                             Value::Function(f_id) => {
                                 let mut save_regs = vec![];
-                                for (bgn, end) in &info.last_use {
-                                    if *bgn < uniqidx && uniqidx < *end {
-                                        save_regs.push(info.regs.get(bgn).unwrap().0);
+                                for (_, instr) in &f.instr_table {
+                                    let bgn = instr.unique_idx;
+                                    let end = match instr.reg.borrow().last_use {
+                                        Some(last_use) => last_use,
+                                        None => continue,
+                                    };
+                                    if bgn < uniqidx && uniqidx < end {
+                                        save_regs.push(instr.reg.borrow().reg.unwrap());
                                     }
                                 }
                                 println!("save: {:?}", save_regs);
@@ -149,20 +150,17 @@ impl<'a> JITCompiler<'a> {
                                 for arg in args {
                                     match arg {
                                         Value::Instruction(InstructionValue { id, .. }) => {
-                                            let reg_num = info
-                                                .regs
-                                                .get(&f.instr_id_to_unique_idx(*id))
-                                                .unwrap()
-                                                .0;
-                                            dynasm!(self.asm; push Ra(reg_num as u8))
+                                            let rn =
+                                                f.instr_table[*id].reg.borrow().reg.unwrap() as u8;
+                                            dynasm!(self.asm; push Ra(rn))
                                         }
                                         _ => unimplemented!(),
                                     }
                                 }
                                 dynasm!(self.asm; call =>*l);
                                 if returns {
-                                    let reg_num = info.regs.get(&uniqidx).unwrap().0;
-                                    dynasm!(self.asm; mov Ra(reg_num as u8), rax);
+                                    let rn = instr.reg.borrow().reg.unwrap() as u8;
+                                    dynasm!(self.asm; mov Ra(rn), rax);
                                 }
                                 dynasm!(self.asm; add rsp, 8*(args.len() as i32));
 
@@ -175,14 +173,8 @@ impl<'a> JITCompiler<'a> {
                     }
                     Opcode::CondBr(cond, b1, b2) => match cond {
                         Value::Instruction(iv) => {
-                            let reg_num =
-                                info.regs.get(&f.instr_id_to_unique_idx(iv.id)).unwrap().0;
-                            match reg_num {
-                                0 => dynasm!(self.asm ; cmp al, 1),
-                                1 => dynasm!(self.asm ; cmp bl, 1),
-                                2 => dynasm!(self.asm ; cmp cl, 1),
-                                _ => unimplemented!(),
-                            }
+                            let rn = f.instr_table[iv.id].reg.borrow_mut().reg.unwrap() as u8;
+                            dynasm!(self.asm ; cmp Rb(rn), 1);
                             let l1 = *bbs
                                 .entry(*b1)
                                 .or_insert_with(|| self.asm.new_dynamic_label());
@@ -194,7 +186,7 @@ impl<'a> JITCompiler<'a> {
                         _ => unimplemented!(),
                     },
                     Opcode::ICmp(kind, v1, v2) => {
-                        let reg_num = info.regs.get(&uniqidx).unwrap().0;
+                        let reg_num = instr.reg.borrow().reg.unwrap() as u8;
                         match kind {
                             ICmpKind::Le => match v1 {
                                 Value::Argument(arg) => match v2 {
@@ -223,10 +215,8 @@ impl<'a> JITCompiler<'a> {
                     Opcode::Ret(v) => {
                         match v {
                             Value::Instruction(iv) => {
-                                let reg_num =
-                                    info.regs.get(&f.instr_id_to_unique_idx(iv.id)).unwrap().0
-                                        as u8;
-                                dynasm!(self.asm; mov eax, Rd(reg_num));
+                                let rn = f.instr_table[iv.id].reg.borrow_mut().reg.unwrap() as u8;
+                                dynasm!(self.asm; mov eax, Rd(rn));
                             }
                             Value::Immediate(ImmediateValue::Int32(x)) => {
                                 dynasm!(self.asm ; mov eax, *x);
