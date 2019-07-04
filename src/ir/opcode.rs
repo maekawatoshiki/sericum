@@ -63,8 +63,9 @@ impl Instruction {
     }
 
     pub fn set_phy_reg(&self, reg: usize, spill: bool) {
+        const REGISTER_OFFSET: usize = 10; // Instruction.reg.reg=0 means r10
         let mut reg_info = self.reg.borrow_mut();
-        reg_info.reg = Some(reg);
+        reg_info.reg = Some(reg + REGISTER_OFFSET);
         reg_info.spill = spill;
     }
 }

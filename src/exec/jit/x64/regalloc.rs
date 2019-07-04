@@ -21,19 +21,20 @@ impl<'a> RegisterAllocator<'a> {
             //     );
             // }
             self.scan(f);
-            // for (_, instr) in &f.instr_table {
-            //     println!(
-            //         "  vreg:{} - reg:{:?}",
-            //         instr.vreg,
-            //         instr.reg.borrow().reg
-            //     );
-            // }
+            for (_, instr) in &f.instr_table {
+                println!(
+                    "  vreg:{} - reg:{:?},spill:{:?}",
+                    instr.vreg,
+                    instr.reg.borrow().reg,
+                    instr.reg.borrow().spill
+                );
+            }
         }
     }
 
     pub fn scan(&mut self, f: &Function) {
         let mut used = FxHashMap::default();
-        let num_reg = 3;
+        let num_reg = 5;
 
         for (_, bb) in &f.basic_blocks {
             for instr_val in &bb.iseq {

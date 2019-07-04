@@ -54,7 +54,7 @@ impl<'a> JITCompiler<'a> {
     pub fn compile(&mut self, id: FunctionId) {
         let f = self.module.function_ref(id);
 
-        // let params_len = f.ty.get_function_ty().unwrap().params_ty.len();
+        let params_len = f.ty.get_function_ty().unwrap().params_ty.len() as i32;
         let f_entry = self.asm.new_dynamic_label();
 
         self.function_map.insert(id, f_entry);
@@ -63,9 +63,13 @@ impl<'a> JITCompiler<'a> {
             ; => f_entry
             ; push rbp
             ; mov rbp, rsp
+            ; sub rsp, params_len*4
         );
 
         let mut bbs: FxHashMap<BasicBlockId, DynamicLabel> = FxHashMap::default();
+
+        let mut alloca_map: FxHashMap<UniqueIndex, usize> = FxHashMap::default();
+        let mut local_var_count = 0;
 
         for (bb_id, bb) in &f.basic_blocks {
             if bb_id.index() != 0 {
@@ -80,6 +84,31 @@ impl<'a> JITCompiler<'a> {
                 let instr = &f.instr_table[instr_id];
                 let uniqidx = instr.vreg;
                 match &instr.opcode {
+                    // TODO: Support types other than Int32
+                    Opcode::Alloca(_ty) => {
+                        alloca_map.insert(instr.vreg, local_var_count);
+                        local_var_count += 1;
+                    }
+                    Opcode::Load(Value::Instruction(InstructionValue { id, .. })) => {
+                        let rn = instr.reg.borrow().reg.unwrap() as u8;
+                        let n = *alloca_map.get(&f.instr_table[*id].vreg).unwrap() as i32;
+                        dynasm!(self.asm; mov Rd(rn), [rbp-4*(1+n)]);
+                    }
+                    Opcode::Store(
+                        Value::Instruction(InstructionValue { id: src_id, .. }),
+                        Value::Instruction(InstructionValue { id: dst_id, .. }),
+                    ) => {
+                        let rn = f.instr_table[*src_id].reg.borrow().reg.unwrap() as u8;
+                        let n = *alloca_map.get(&f.instr_table[*dst_id].vreg).unwrap() as i32;
+                        dynasm!(self.asm; mov DWORD [rbp-4*(1+n)], Rd(rn));
+                    }
+                    Opcode::Store(
+                        Value::Immediate(ImmediateValue::Int32(i)),
+                        Value::Instruction(InstructionValue { id: dst_id, .. }),
+                    ) => {
+                        let n = *alloca_map.get(&f.instr_table[*dst_id].vreg).unwrap() as i32;
+                        dynasm!(self.asm; mov DWORD [rbp-4*(1+n)], *i);
+                    }
                     Opcode::Add(v1, v2) => {
                         let rn = instr.reg.borrow().reg.unwrap() as u8;
                         match (v1, v2) {
@@ -104,6 +133,13 @@ impl<'a> JITCompiler<'a> {
                                 let reg2 = f.instr_table[*id2].reg.borrow().reg.unwrap() as u8;
                                 dynasm!(self.asm; mov Ra(rn), Ra(reg1); add Ra(rn), Ra(reg2))
                             }
+                            (
+                                Value::Instruction(InstructionValue { id: id1, .. }),
+                                Value::Immediate(ImmediateValue::Int32(i)),
+                            ) => {
+                                let reg1 = f.instr_table[*id1].reg.borrow().reg.unwrap() as u8;
+                                dynasm!(self.asm; mov Ra(rn), Ra(reg1); add Ra(rn), *i)
+                            }
                             _ => unimplemented!(),
                         }
                     }
@@ -114,7 +150,7 @@ impl<'a> JITCompiler<'a> {
                                 Value::Argument(ArgumentValue { index, .. }),
                                 Value::Immediate(ImmediateValue::Int32(i)),
                             ) => {
-                                dynasm!(self.asm; mov Rd(rn), [rbp+8*(2+*index as i32)]; sub Rd(rn), *i)
+                                dynasm!(self.asm; mov Ra(rn), [rbp+8*(2+*index as i32)]; sub Ra(rn), *i)
                             }
                             _ => unimplemented!(),
                         }
@@ -185,18 +221,28 @@ impl<'a> JITCompiler<'a> {
                         }
                         _ => unimplemented!(),
                     },
+                    Opcode::Br(bb) => {
+                        let label = *bbs
+                            .entry(*bb)
+                            .or_insert_with(|| self.asm.new_dynamic_label());
+                        dynasm!(self.asm; jmp =>label);
+                    }
                     Opcode::ICmp(kind, v1, v2) => {
                         let reg_num = instr.reg.borrow().reg.unwrap() as u8;
                         match kind {
-                            ICmpKind::Le => match v1 {
-                                Value::Argument(arg) => match v2 {
-                                    Value::Immediate(n) => {
-                                        dynasm!(self.asm
+                            ICmpKind::Le => match (v1, v2) {
+                                (Value::Argument(arg), Value::Immediate(n)) => {
+                                    dynasm!(self.asm
                                             ; cmp [rbp+8*(2+arg.index as i32)], n.as_int32() as i8);
-                                        dynasm!(self.asm; setle Rb(reg_num as u8));
-                                    }
-                                    _ => unimplemented!(),
-                                },
+                                    dynasm!(self.asm; setle Rb(reg_num as u8));
+                                }
+                                (Value::Instruction(iv), Value::Argument(arg)) => {
+                                    let rn =
+                                        f.instr_table[iv.id].reg.borrow_mut().reg.unwrap() as u8;
+                                    dynasm!(self.asm
+                                            ; cmp Rb(rn), [rbp+8*(2+arg.index as i32)]);
+                                    dynasm!(self.asm; setle Rb(reg_num as u8));
+                                }
                                 _ => unimplemented!(),
                             },
                             ICmpKind::Eq => match v1 {
@@ -223,11 +269,15 @@ impl<'a> JITCompiler<'a> {
                             }
                             _ => unimplemented!(),
                         }
-                        dynasm!(self.asm ; pop rbp; ret);
+                        dynasm!(self.asm ; add rsp, params_len*4; pop rbp; ret);
                     }
-                    _ => {}
+                    e => unimplemented!("{:?}", e),
                 }
             }
         }
     }
+}
+
+pub extern "C" fn print(a: i32) {
+    println!("{}", a);
 }

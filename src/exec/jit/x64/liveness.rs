@@ -40,10 +40,10 @@ impl<'a> LivenessAnalyzer<'a> {
                             def.insert(idx);
                         }
                     }
-                    Opcode::Store(_, dst) => {
-                        some_then!(id, dst.get_instr_id(), {
-                            def.insert(f.instr_table[id].vreg);
-                        });
+                    Opcode::Store(_, _dst) => {
+                        // some_then!(id, dst.get_instr_id(), {
+                        //     // def.insert(f.instr_table[id].vreg);
+                        // });
                     }
                     Opcode::Br(_) | Opcode::CondBr(_, _, _) | Opcode::Ret(_) => {}
                 }
@@ -88,15 +88,17 @@ impl<'a> LivenessAnalyzer<'a> {
         let bb = &f.basic_blocks[bb_id];
         let idx = f.instr_table[instr_id].vreg;
 
-        let mut bb_liveness = bb.liveness.borrow_mut();
+        {
+            let mut bb_liveness = bb.liveness.borrow_mut();
 
-        if bb_liveness.def.contains(&idx) {
-            return;
-        }
+            if bb_liveness.def.contains(&idx) {
+                return;
+            }
 
-        if !bb_liveness.live_in.insert(instr_id) {
-            // live_in already had the value instr_id
-            return;
+            if !bb_liveness.live_in.insert(instr_id) {
+                // live_in already had the value instr_id
+                return;
+            }
         }
 
         for pred_id in &bb.pred {

@@ -72,6 +72,25 @@ impl<'a> Builder<'a> {
         val
     }
 
+    pub fn build_store(&mut self, src: Value, dst: Value) -> Value {
+        let instr = Instruction::new(
+            Opcode::Store(src, dst),
+            Type::Void,
+            self.function_ref_mut().next_vreg(),
+        );
+        let instr_id = self.function_ref_mut().instr_id(instr);
+        let val = Value::Instruction(InstructionValue {
+            func_id: self.func_id,
+            id: instr_id,
+        });
+        let bb = self.cur_bb.unwrap();
+        self.function_ref_mut()
+            .basic_block_ref_mut(bb)
+            .iseq
+            .push(val);
+        Value::None
+    }
+
     pub fn build_add(&mut self, v1: Value, v2: Value) -> Value {
         let ty = v1.get_type(self.module).clone();
         let instr = Instruction::new(Opcode::Add(v1, v2), ty, self.function_ref_mut().next_vreg());
