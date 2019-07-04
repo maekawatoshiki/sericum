@@ -71,22 +71,22 @@ impl Function {
     //     for (_, bb) in &mut self.basic_blocks {
     //         for instr_val in &mut bb.iseq {
     //             let id = instr_val.get_instr_id().unwrap();
-    //             self.instr_table[id].unique_idx = n;
+    //             self.instr_table[id].vreg = n;
     //             n += 1
     //         }
     //     }
     // }
 
-    pub fn instr_id_to_unique_idx(&self, id: InstructionId) -> UniqueIndex {
-        self.instr_table[id].unique_idx
+    pub fn instr_id_to_vreg(&self, id: InstructionId) -> UniqueIndex {
+        self.instr_table[id].vreg
     }
 
-    pub fn find_instruction_by_unique_idx(&self, idx: UniqueIndex) -> Option<&Instruction> {
+    pub fn find_instruction_by_vreg(&self, idx: UniqueIndex) -> Option<&Instruction> {
         for (_, bb) in &self.basic_blocks {
             for instr_val in &bb.iseq {
                 let instr_id = instr_val.get_instr_id().unwrap();
                 let instr = &self.instr_table[instr_id];
-                if instr.unique_idx == idx {
+                if instr.vreg == idx {
                     return Some(instr);
                 }
             }
@@ -94,7 +94,7 @@ impl Function {
         None
     }
 
-    pub fn next_unique_idx(&mut self) -> UniqueIndex {
+    pub fn next_vreg(&mut self) -> UniqueIndex {
         let n = self.unique_index_counter;
         self.unique_index_counter += 1;
         n
@@ -140,13 +140,19 @@ impl Function {
                     .borrow()
                     .live_in
                     .iter()
-                    .fold("".to_string(), |s, x| format!("{}{},", s, *x))
+                    .fold("".to_string(), |s, x| format!(
+                        "{}{},",
+                        s, self.instr_table[*x].vreg
+                    ))
                     .trim_matches(','),
                 &b.liveness
                     .borrow()
                     .live_out
                     .iter()
-                    .fold("".to_string(), |s, x| format!("{}{},", s, *x))
+                    .fold("".to_string(), |s, x| format!(
+                        "{}{},",
+                        s, self.instr_table[*x].vreg
+                    ))
                     .trim_matches(','),
                 b.to_string(m)
             )

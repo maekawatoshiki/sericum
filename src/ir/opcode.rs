@@ -11,7 +11,7 @@ pub type RegisterAllocInfoRef = Rc<RefCell<RegisterAllocInfo>>;
 pub struct Instruction {
     pub opcode: Opcode,
     pub ty: Type,
-    pub unique_idx: UniqueIndex,
+    pub vreg: UniqueIndex,
     pub reg: RegisterAllocInfoRef,
 }
 
@@ -45,17 +45,27 @@ pub enum ICmpKind {
 }
 
 impl Instruction {
-    pub fn new(opcode: Opcode, ty: Type, unique_idx: UniqueIndex) -> Self {
+    pub fn new(opcode: Opcode, ty: Type, vreg: UniqueIndex) -> Self {
         Self {
             opcode,
             ty,
-            unique_idx,
+            vreg,
             reg: Rc::new(RefCell::new(RegisterAllocInfo::new())),
         }
     }
 
     pub fn to_string(&self, m: &Module) -> String {
         self.opcode.to_string(m)
+    }
+
+    pub fn set_last_use(&self, last_use: Option<UniqueIndex>) {
+        self.reg.borrow_mut().last_use = last_use;
+    }
+
+    pub fn set_phy_reg(&self, reg: usize, spill: bool) {
+        let mut reg_info = self.reg.borrow_mut();
+        reg_info.reg = Some(reg);
+        reg_info.spill = spill;
     }
 }
 

@@ -20,9 +20,11 @@ impl<'a> LivenessAnalyzer<'a> {
     pub fn set_def(&mut self, f: &Function) {
         for (_, bb) in &f.basic_blocks {
             let def = &mut bb.liveness.borrow_mut().def;
+
             for instr_val in &bb.iseq {
                 let instr = &f.instr_table[instr_val.get_instr_id().unwrap()];
-                let idx = instr.unique_idx;
+                let idx = instr.vreg;
+
                 match instr.opcode {
                     Opcode::Add(_, _)
                     | Opcode::Alloca(_)
@@ -40,7 +42,7 @@ impl<'a> LivenessAnalyzer<'a> {
                     }
                     Opcode::Store(_, dst) => {
                         some_then!(id, dst.get_instr_id(), {
-                            def.insert(f.instr_table[id].unique_idx);
+                            def.insert(f.instr_table[id].vreg);
                         });
                     }
                     Opcode::Br(_) | Opcode::CondBr(_, _, _) | Opcode::Ret(_) => {}
@@ -53,6 +55,7 @@ impl<'a> LivenessAnalyzer<'a> {
         for (bb_id, bb) in &f.basic_blocks {
             for instr_val in &bb.iseq {
                 let instr = &f.instr_table[instr_val.get_instr_id().unwrap()];
+
                 match &instr.opcode {
                     Opcode::Call(func, args) => {
                         some_then!(id, func.get_instr_id(), self.propagate(f, bb_id, id));
@@ -83,7 +86,7 @@ impl<'a> LivenessAnalyzer<'a> {
 
     pub fn propagate(&mut self, f: &Function, bb_id: BasicBlockId, instr_id: InstructionId) {
         let bb = &f.basic_blocks[bb_id];
-        let idx = f.instr_table[instr_id].unique_idx;
+        let idx = f.instr_table[instr_id].vreg;
 
         let mut bb_liveness = bb.liveness.borrow_mut();
 
@@ -91,15 +94,15 @@ impl<'a> LivenessAnalyzer<'a> {
             return;
         }
 
-        if !bb_liveness.live_in.insert(idx) {
-            // live_in already had the value idx
+        if !bb_liveness.live_in.insert(instr_id) {
+            // live_in already had the value instr_id
             return;
         }
 
         for pred_id in &bb.pred {
             let pred = &f.basic_blocks[*pred_id];
-            if pred.liveness.borrow_mut().live_out.insert(idx) {
-                // live_out didn't have the value idx
+            if pred.liveness.borrow_mut().live_out.insert(instr_id) {
+                // live_out didn't have the value instr_id
                 self.propagate(f, *pred_id, instr_id);
             }
         }

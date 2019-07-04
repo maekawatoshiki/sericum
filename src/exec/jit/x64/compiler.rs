@@ -78,7 +78,7 @@ impl<'a> JITCompiler<'a> {
             for val in &bb.iseq {
                 let instr_id = val.get_instr_id().unwrap();
                 let instr = &f.instr_table[instr_id];
-                let uniqidx = instr.unique_idx;
+                let uniqidx = instr.vreg;
                 match &instr.opcode {
                     Opcode::Add(v1, v2) => {
                         let rn = instr.reg.borrow().reg.unwrap() as u8;
@@ -130,7 +130,7 @@ impl<'a> JITCompiler<'a> {
                             Value::Function(f_id) => {
                                 let mut save_regs = vec![];
                                 for (_, instr) in &f.instr_table {
-                                    let bgn = instr.unique_idx;
+                                    let bgn = instr.vreg;
                                     let end = match instr.reg.borrow().last_use {
                                         Some(last_use) => last_use,
                                         None => continue,

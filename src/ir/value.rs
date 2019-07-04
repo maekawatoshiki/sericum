@@ -70,7 +70,7 @@ impl Value {
                 } else {
                     format!(
                         "    %{} = {}",
-                        f.instr_id_to_unique_idx(*id),
+                        f.instr_id_to_vreg(*id),
                         instr.to_string(module)
                     )
                 }
@@ -80,7 +80,7 @@ impl Value {
                 format!(
                     "{} %{}",
                     f.instr_table[*id].ty.to_string(),
-                    f.instr_id_to_unique_idx(*id)
+                    f.instr_id_to_vreg(*id)
                 )
             }
             Value::Function(id) if instr => {

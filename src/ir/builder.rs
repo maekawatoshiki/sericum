@@ -41,7 +41,7 @@ impl<'a> Builder<'a> {
         let instr = Instruction::new(
             Opcode::Alloca(ty),
             ptr_ty,
-            self.function_ref_mut().next_unique_idx(),
+            self.function_ref_mut().next_vreg(),
         );
         let instr_id = self.function_ref_mut().instr_id(instr);
         let val = Value::Instruction(InstructionValue {
@@ -58,11 +58,7 @@ impl<'a> Builder<'a> {
 
     pub fn build_load(&mut self, v: Value) -> Value {
         let ty = v.get_type(self.module).get_element_ty().unwrap().clone();
-        let instr = Instruction::new(
-            Opcode::Load(v),
-            ty,
-            self.function_ref_mut().next_unique_idx(),
-        );
+        let instr = Instruction::new(Opcode::Load(v), ty, self.function_ref_mut().next_vreg());
         let instr_id = self.function_ref_mut().instr_id(instr);
         let val = Value::Instruction(InstructionValue {
             func_id: self.func_id,
@@ -78,11 +74,7 @@ impl<'a> Builder<'a> {
 
     pub fn build_add(&mut self, v1: Value, v2: Value) -> Value {
         let ty = v1.get_type(self.module).clone();
-        let instr = Instruction::new(
-            Opcode::Add(v1, v2),
-            ty,
-            self.function_ref_mut().next_unique_idx(),
-        );
+        let instr = Instruction::new(Opcode::Add(v1, v2), ty, self.function_ref_mut().next_vreg());
         let instr_id = self.function_ref_mut().instr_id(instr);
         let val = Value::Instruction(InstructionValue {
             func_id: self.func_id,
@@ -98,11 +90,7 @@ impl<'a> Builder<'a> {
 
     pub fn build_sub(&mut self, v1: Value, v2: Value) -> Value {
         let ty = v1.get_type(self.module).clone();
-        let instr = Instruction::new(
-            Opcode::Sub(v1, v2),
-            ty,
-            self.function_ref_mut().next_unique_idx(),
-        );
+        let instr = Instruction::new(Opcode::Sub(v1, v2), ty, self.function_ref_mut().next_vreg());
         let instr_id = self.function_ref_mut().instr_id(instr);
         let val = Value::Instruction(InstructionValue {
             func_id: self.func_id,
@@ -120,7 +108,7 @@ impl<'a> Builder<'a> {
         let instr = Instruction::new(
             Opcode::ICmp(kind, v1, v2),
             Type::Int1,
-            self.function_ref_mut().next_unique_idx(),
+            self.function_ref_mut().next_vreg(),
         );
         let instr_id = self.function_ref_mut().instr_id(instr);
         let val = Value::Instruction(InstructionValue {
@@ -139,7 +127,7 @@ impl<'a> Builder<'a> {
         let instr = Instruction::new(
             Opcode::Br(dst_id),
             Type::Void,
-            self.function_ref_mut().next_unique_idx(),
+            self.function_ref_mut().next_vreg(),
         );
         let instr_id = self.function_ref_mut().instr_id(instr);
         let val = Value::Instruction(InstructionValue {
@@ -164,7 +152,7 @@ impl<'a> Builder<'a> {
         let instr = Instruction::new(
             Opcode::CondBr(cond, bb1, bb2),
             Type::Void,
-            self.function_ref_mut().next_unique_idx(),
+            self.function_ref_mut().next_vreg(),
         );
         let instr_id = self.function_ref_mut().instr_id(instr);
         let val = Value::Instruction(InstructionValue {
@@ -192,11 +180,7 @@ impl<'a> Builder<'a> {
 
     pub fn build_phi(&mut self, pairs: Vec<(Value, BasicBlockId)>) -> Value {
         let ty = pairs.get(0).unwrap().0.get_type(self.module).clone();
-        let instr = Instruction::new(
-            Opcode::Phi(pairs),
-            ty,
-            self.function_ref_mut().next_unique_idx(),
-        );
+        let instr = Instruction::new(Opcode::Phi(pairs), ty, self.function_ref_mut().next_vreg());
         let instr_id = self.function_ref_mut().instr_id(instr);
         let val = Value::Instruction(InstructionValue {
             func_id: self.func_id,
@@ -220,7 +204,7 @@ impl<'a> Builder<'a> {
         let instr = Instruction::new(
             Opcode::Call(f, args),
             ty,
-            self.function_ref_mut().next_unique_idx(),
+            self.function_ref_mut().next_vreg(),
         );
         let instr_id = self.function_ref_mut().instr_id(instr);
         let val = Value::Instruction(InstructionValue {
@@ -239,7 +223,7 @@ impl<'a> Builder<'a> {
         let instr = Instruction::new(
             Opcode::Ret(v),
             Type::Void,
-            self.function_ref_mut().next_unique_idx(),
+            self.function_ref_mut().next_vreg(),
         );
         let instr_id = self.function_ref_mut().instr_id(instr);
         let val = Value::Instruction(InstructionValue {

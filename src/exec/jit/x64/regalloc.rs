@@ -1,4 +1,4 @@
-use crate::ir::{function::*, module::*, opcode::*, types::*};
+use crate::ir::{function::*, module::*, opcode::*};
 use rustc_hash::FxHashMap;
 
 pub struct RegisterAllocator<'a> {
@@ -16,7 +16,7 @@ impl<'a> RegisterAllocator<'a> {
             // for (_, instr) in &f.instr_table {
             //     println!(
             //         "  vreg:{} - last_use:{:?}",
-            //         instr.unique_idx,
+            //         instr.vreg,
             //         instr.reg.borrow().last_use
             //     );
             // }
@@ -24,7 +24,7 @@ impl<'a> RegisterAllocator<'a> {
             // for (_, instr) in &f.instr_table {
             //     println!(
             //         "  vreg:{} - reg:{:?}",
-            //         instr.unique_idx,
+            //         instr.vreg,
             //         instr.reg.borrow().reg
             //     );
             // }
@@ -52,17 +52,12 @@ impl<'a> RegisterAllocator<'a> {
                             .borrow()
                             .last_use
                             .unwrap();
-                        if instr.unique_idx < target_last_use {
+                        if instr.vreg < target_last_use {
                             continue;
                         }
                     }
 
-                    {
-                        let mut reg = instr.reg.borrow_mut();
-                        reg.reg = Some(i);
-                        reg.spill = false
-                    }
-
+                    instr.set_phy_reg(i, false);
                     used.insert(i, instr_id);
                     found = true;
                     break;
@@ -90,17 +85,8 @@ impl<'a> RegisterAllocator<'a> {
                     }
                 }
 
-                {
-                    let mut reg = instr.reg.borrow_mut();
-                    reg.reg = Some(k);
-                    reg.spill = false
-                }
-
-                {
-                    let mut reg = f.instr_table[*used.get(&k).unwrap()].reg.borrow_mut();
-                    reg.reg = Some(num_reg - 1);
-                    reg.spill = true;
-                }
+                instr.set_phy_reg(k, false);
+                f.instr_table[*used.get(&k).unwrap()].set_phy_reg(num_reg - 1, true);
 
                 *used.get_mut(&k).unwrap() = instr_id;
             }
@@ -114,72 +100,74 @@ impl<'a> RegisterAllocator<'a> {
             for instr_val in &bb.iseq {
                 let instr_id = instr_val.get_instr_id().unwrap();
                 let instr = &f.instr_table[instr_id];
-                let uniqidx = instr.unique_idx;
+                let cur_vreg = instr.vreg;
+
                 match instr.opcode {
                     Opcode::Call(ref func, ref args) => {
-                        some_then!(id, func.get_instr_id(), {
-                            let mut reg_info = f.instr_table[id].reg.borrow_mut();
-                            reg_info.last_use = Some(uniqidx);
-                        });
+                        some_then!(
+                            id,
+                            func.get_instr_id(),
+                            f.instr_table[id].set_last_use(Some(cur_vreg))
+                        );
                         for arg in args {
-                            some_then!(id, arg.get_instr_id(), {
-                                let mut reg_info = f.instr_table[id].reg.borrow_mut();
-                                reg_info.last_use = Some(uniqidx);
-                            });
+                            some_then!(
+                                id,
+                                arg.get_instr_id(),
+                                f.instr_table[id].set_last_use(Some(cur_vreg))
+                            );
                         }
-                        if func
-                            .get_type(&self.module)
-                            .get_function_ty()
-                            .unwrap()
-                            .ret_ty
-                            != Type::Void
-                        {
-                            instr.reg.borrow_mut().last_use = Some(uniqidx);
-                        }
+                        // if func
+                        //     .get_type(&self.module)
+                        //     .get_function_ty()
+                        //     .unwrap()
+                        //     .ret_ty
+                        //     != Type::Void
+                        // {
+                        //     instr.set_last_use(Some(cur_vreg));
+                        // }
                     }
                     Opcode::CondBr(ref v, _, _) | Opcode::Ret(ref v) | Opcode::Load(ref v) => {
-                        some_then!(id, v.get_instr_id(), {
-                            let mut reg_info = f.instr_table[id].reg.borrow_mut();
-                            reg_info.last_use = Some(uniqidx);
-                        });
+                        some_then!(
+                            id,
+                            v.get_instr_id(),
+                            f.instr_table[id].set_last_use(Some(cur_vreg))
+                        );
                     }
                     Opcode::Phi(ref vals) => {
                         for (val, _) in vals {
-                            some_then!(id, val.get_instr_id(), {
-                                let mut reg_info = f.instr_table[id].reg.borrow_mut();
-                                reg_info.last_use = Some(uniqidx);
-                            });
+                            some_then!(
+                                id,
+                                val.get_instr_id(),
+                                f.instr_table[id].set_last_use(Some(cur_vreg))
+                            );
                         }
                     }
                     Opcode::Store(v1, v2)
                     | Opcode::ICmp(_, v1, v2)
                     | Opcode::Add(v1, v2)
                     | Opcode::Sub(v1, v2) => {
-                        some_then!(id, v1.get_instr_id(), {
-                            let mut reg_info = f.instr_table[id].reg.borrow_mut();
-                            reg_info.last_use = Some(uniqidx);
-                        });
-                        some_then!(id, v2.get_instr_id(), {
-                            let mut reg_info = f.instr_table[id].reg.borrow_mut();
-                            reg_info.last_use = Some(uniqidx);
-                        });
-                        instr.reg.borrow_mut().last_use = Some(uniqidx);
+                        some_then!(
+                            id,
+                            v1.get_instr_id(),
+                            f.instr_table[id].set_last_use(Some(cur_vreg))
+                        );
+                        some_then!(
+                            id,
+                            v2.get_instr_id(),
+                            f.instr_table[id].set_last_use(Some(cur_vreg))
+                        );
+                        // instr.set_last_use(Some(cur_vreg));
                     }
-                    Opcode::Alloca(_) => {
-                        instr.reg.borrow_mut().last_use = Some(uniqidx);
+                    Opcode::Br(_) | Opcode::Alloca(_) => {
+                        // instr.reg.borrow_mut().last_use = Some(cur_vreg);
                     }
-                    _ => {}
                 }
 
-                last_instr = Some(uniqidx);
+                last_instr = Some(cur_vreg);
             }
 
             for out in &bb.liveness.borrow().live_out {
-                f.find_instruction_by_unique_idx(*out)
-                    .unwrap()
-                    .reg
-                    .borrow_mut()
-                    .last_use = last_instr;
+                f.instr_table[*out].set_last_use(last_instr);
             }
         }
     }
