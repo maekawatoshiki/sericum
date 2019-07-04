@@ -41,6 +41,11 @@ impl<'a> RegisterAllocator<'a> {
                 let instr_id = instr_val.get_instr_id().unwrap();
                 let instr = &f.instr_table[instr_id];
 
+                match &instr.opcode {
+                    Opcode::Alloca(_) => continue,
+                    _ => {}
+                }
+
                 if instr.reg.borrow().last_use.is_none() {
                     continue;
                 }
