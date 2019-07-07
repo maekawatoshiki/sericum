@@ -2,7 +2,7 @@ use super::{basic_block::*, function::*, module::*, opcode::*, types::*, value::
 
 #[derive(Debug)]
 pub struct Builder<'a> {
-    module: &'a mut Module,
+    pub module: &'a mut Module,
     func_id: FunctionId,
     cur_bb: Option<BasicBlockId>,
 }

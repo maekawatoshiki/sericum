@@ -1,46 +1,27 @@
 use cilk::{
     exec::{interpreter::interp, jit::x64::compiler, jit::x64::liveness, jit::x64::regalloc},
-    ir::{builder, function, module, opcode, types, value},
+    *,
 };
+use rustc_hash::FxHashMap;
 
 #[test]
 pub fn jit_fibo() {
     let mut m = module::Module::new("cilk");
 
-    let fibo = m.add_function(function::Function::new(
-        "fbo",
-        types::Type::Int32,
-        vec![types::Type::Int32],
-    ));
-    let mut builder = builder::Builder::new(&mut m, fibo);
-
-    // fibonacci
-    let entry = builder.append_basic_block();
-    let br1 = builder.append_basic_block();
-    let br2 = builder.append_basic_block();
-    builder.set_insert_point(entry);
-    let arg0 = builder.get_param(0).unwrap();
-    let eq1 = builder.build_icmp(
-        opcode::ICmpKind::Le,
-        arg0,
-        value::Value::Immediate(value::ImmediateValue::Int32(2)),
-    );
-    builder.build_cond_br(eq1, br1, br2);
-    builder.set_insert_point(br1);
-    builder.build_ret(value::Value::Immediate(value::ImmediateValue::Int32(1)));
-    builder.set_insert_point(br2);
-    let fibo1arg = builder.build_sub(
-        arg0,
-        value::Value::Immediate(value::ImmediateValue::Int32(1)),
-    );
-    let fibo1 = builder.build_call(value::Value::Function(fibo), vec![fibo1arg]);
-    let fibo2arg = builder.build_sub(
-        arg0,
-        value::Value::Immediate(value::ImmediateValue::Int32(2)),
-    );
-    let fibo2 = builder.build_call(value::Value::Function(fibo), vec![fibo2arg]);
-    let add = builder.build_add(fibo1, fibo2);
-    builder.build_ret(add);
+    let fibo = cilk_ir!(m; define [i32] f (i32) {
+        entry:
+            cond = icmp le (%arg.0), (i32 2);
+            br (%cond) l1, l2;
+        l1:
+            ret (i32 1);
+        l2:
+            a1 = sub (%arg.0), (i32 1);
+            r1 = call f [(%a1)];
+            a2 = sub (%arg.0), (i32 2);
+            r2 = call f [(%a2)];
+            r3 = add (%r1), (%r2);
+            ret (%r3);
+    });
 
     let mut liveness = liveness::LivenessAnalyzer::new(&m);
     liveness.analyze();
@@ -57,6 +38,7 @@ pub fn jit_fibo() {
 
     let mut jit = compiler::JITCompiler::new(&m);
     jit.compile(fibo);
+
     println!(
         "jit: fibo(9) = {:?}",
         jit.run(fibo, vec![compiler::GenericValue::Int32(9)])
