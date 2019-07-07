@@ -18,7 +18,7 @@ pub struct Function {
     pub instr_table: Arena<Instruction>,
 
     /// Unique index for SSA
-    unique_index_counter: UniqueIndex,
+    vreg_counter: VirtualRegister,
 }
 
 impl Function {
@@ -28,7 +28,7 @@ impl Function {
             ty: Type::func_ty(ret_ty, params_ty),
             basic_blocks: Arena::new(),
             instr_table: Arena::new(),
-            unique_index_counter: 1,
+            vreg_counter: 1,
         }
     }
 
@@ -77,11 +77,11 @@ impl Function {
     //     }
     // }
 
-    pub fn instr_id_to_vreg(&self, id: InstructionId) -> UniqueIndex {
+    pub fn instr_id_to_vreg(&self, id: InstructionId) -> VirtualRegister {
         self.instr_table[id].vreg
     }
 
-    pub fn find_instruction_by_vreg(&self, idx: UniqueIndex) -> Option<&Instruction> {
+    pub fn find_instruction_by_vreg(&self, idx: VirtualRegister) -> Option<&Instruction> {
         for (_, bb) in &self.basic_blocks {
             for instr_val in &bb.iseq {
                 let instr_id = instr_val.get_instr_id().unwrap();
@@ -94,9 +94,9 @@ impl Function {
         None
     }
 
-    pub fn next_vreg(&mut self) -> UniqueIndex {
-        let n = self.unique_index_counter;
-        self.unique_index_counter += 1;
+    pub fn next_vreg(&mut self) -> VirtualRegister {
+        let n = self.vreg_counter;
+        self.vreg_counter += 1;
         n
     }
 }

@@ -21,14 +21,15 @@ impl<'a> RegisterAllocator<'a> {
             //     );
             // }
             self.scan(f);
-            for (_, instr) in &f.instr_table {
+
+            when_debug!(for (_, instr) in &f.instr_table {
                 println!(
-                    "  vreg:{} - reg:{:?},spill:{:?}",
+                    "vreg:{}\treg:{:?}\tspill:{:?}",
                     instr.vreg,
                     instr.reg.borrow().reg,
                     instr.reg.borrow().spill
                 );
-            }
+            });
         }
     }
 

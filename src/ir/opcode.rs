@@ -4,14 +4,14 @@ use std::{cell::RefCell, rc::Rc};
 // use rustc_hash::FxHashMap;
 
 pub type InstructionId = Id<Instruction>;
-pub type UniqueIndex = usize; // TODO: Rename to VRegIndex?
+pub type VirtualRegister = usize;
 pub type RegisterAllocInfoRef = Rc<RefCell<RegisterAllocInfo>>;
 
 #[derive(Clone, Debug)]
 pub struct Instruction {
     pub opcode: Opcode,
     pub ty: Type,
-    pub vreg: UniqueIndex,
+    pub vreg: VirtualRegister,
     pub reg: RegisterAllocInfoRef,
 }
 
@@ -19,7 +19,7 @@ pub struct Instruction {
 pub struct RegisterAllocInfo {
     pub reg: Option<usize>,
     pub spill: bool,
-    pub last_use: Option<UniqueIndex>,
+    pub last_use: Option<VirtualRegister>,
 }
 
 #[derive(Clone, Debug)]
@@ -45,7 +45,7 @@ pub enum ICmpKind {
 }
 
 impl Instruction {
-    pub fn new(opcode: Opcode, ty: Type, vreg: UniqueIndex) -> Self {
+    pub fn new(opcode: Opcode, ty: Type, vreg: VirtualRegister) -> Self {
         Self {
             opcode,
             ty,
@@ -58,14 +58,13 @@ impl Instruction {
         self.opcode.to_string(m)
     }
 
-    pub fn set_last_use(&self, last_use: Option<UniqueIndex>) {
+    pub fn set_last_use(&self, last_use: Option<VirtualRegister>) {
         self.reg.borrow_mut().last_use = last_use;
     }
 
     pub fn set_phy_reg(&self, reg: usize, spill: bool) {
-        const REGISTER_OFFSET: usize = 10; // Instruction.reg.reg=0 means r10
         let mut reg_info = self.reg.borrow_mut();
-        reg_info.reg = Some(reg + REGISTER_OFFSET);
+        reg_info.reg = Some(reg);
         reg_info.spill = spill;
     }
 }
