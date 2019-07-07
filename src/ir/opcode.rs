@@ -7,6 +7,9 @@ pub type InstructionId = Id<Instruction>;
 pub type VirtualRegister = usize;
 pub type RegisterAllocInfoRef = Rc<RefCell<RegisterAllocInfo>>;
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Register(usize);
+
 #[derive(Clone, Debug)]
 pub struct Instruction {
     pub opcode: Opcode,
@@ -17,7 +20,7 @@ pub struct Instruction {
 
 #[derive(Debug, Clone)]
 pub struct RegisterAllocInfo {
-    pub reg: Option<usize>,
+    pub reg: Option<Register>,
     pub spill: bool,
     pub last_use: Option<VirtualRegister>,
 }
@@ -64,7 +67,7 @@ impl Instruction {
 
     pub fn set_phy_reg(&self, reg: usize, spill: bool) {
         let mut reg_info = self.reg.borrow_mut();
-        reg_info.reg = Some(reg);
+        reg_info.reg = Some(Register(reg));
         reg_info.spill = spill;
     }
 }
@@ -131,5 +134,15 @@ impl ICmpKind {
             ICmpKind::Eq => "eq",
             ICmpKind::Le => "le",
         }
+    }
+}
+
+impl Register {
+    pub fn shift(self, n: usize) -> Register {
+        Register(self.0 + n)
+    }
+
+    pub fn as_u8(&self) -> u8 {
+        self.0 as u8
     }
 }
