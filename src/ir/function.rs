@@ -108,10 +108,13 @@ impl Function {
             "define {} {}({}) {{\n{}}}",
             fty.ret_ty.to_string(),
             self.name,
-            fty.params_ty.iter().fold("".to_string(), |mut s, p| {
-                s += &(p.to_string() + ", ");
-                s
-            }),
+            fty.params_ty
+                .iter()
+                .fold("".to_string(), |mut s, p| {
+                    s += &(p.to_string() + ", ");
+                    s
+                })
+                .trim_matches(&[',', ' '][0..]),
             self.basic_blocks_to_string(m)
         )
     }

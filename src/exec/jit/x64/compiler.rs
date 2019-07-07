@@ -27,7 +27,7 @@ impl<'a> JITCompiler<'a> {
         }
     }
 
-    pub fn run(&mut self, id: FunctionId, args: Vec<GenericValue>) -> i32 {
+    pub fn run(&mut self, id: FunctionId, args: Vec<GenericValue>) -> GenericValue {
         let f_entry = *self.function_map.get(&id).unwrap();
         let entry = self.asm.offset();
 
@@ -49,8 +49,19 @@ impl<'a> JITCompiler<'a> {
         self.asm.commit();
         let executor = self.asm.reader();
         let buf = executor.lock();
-        let f: extern "C" fn() -> i32 = unsafe { ::std::mem::transmute(buf.ptr(entry)) };
-        f()
+        let f: extern "C" fn() -> u64 = unsafe { ::std::mem::transmute(buf.ptr(entry)) };
+
+        match &self
+            .module
+            .function_ref(id)
+            .ty
+            .get_function_ty()
+            .unwrap()
+            .ret_ty
+        {
+            Type::Int32 => GenericValue::Int32(f() as i32),
+            _ => unimplemented!(),
+        }
     }
 
     pub fn compile(&mut self, id: FunctionId) {
