@@ -6,9 +6,34 @@ use rustc_hash::FxHashMap;
 
 const REGISTER_OFFSET: usize = 10; // Instruction.reg.reg=0 means r10
 
+#[rustfmt::skip]
+macro_rules! reg {
+    ($f:expr; $instr_id:expr) => {{
+        $f.instr_table[$instr_id].reg.borrow().reg.unwrap()
+            .shift(REGISTER_OFFSET).as_u8()
+    }};
+    ($instr:expr) => {{
+        $instr.reg.borrow().reg.unwrap()
+            .shift(REGISTER_OFFSET).as_u8()
+    }};
+}
+
+#[rustfmt::skip]
+macro_rules! vreg {
+    ($f:expr ; $instr_id:expr) => {{
+        $f.instr_table[$instr_id].vreg
+    }};
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum GenericValue {
     Int32(i32),
+}
+
+#[derive(Debug)]
+pub struct AllocaManager {
+    locals: FxHashMap<VirtualRegister, usize>,
+    cur_size: usize,
 }
 
 #[derive(Debug)]
@@ -16,6 +41,7 @@ pub struct JITCompiler<'a> {
     module: &'a Module,
     asm: x64::Assembler,
     function_map: FxHashMap<FunctionId, DynamicLabel>,
+    alloca_mgr: AllocaManager,
 }
 
 impl<'a> JITCompiler<'a> {
@@ -24,6 +50,7 @@ impl<'a> JITCompiler<'a> {
             module,
             asm: x64::Assembler::new().unwrap(),
             function_map: FxHashMap::default(),
+            alloca_mgr: AllocaManager::new(),
         }
     }
 
@@ -67,18 +94,6 @@ impl<'a> JITCompiler<'a> {
     pub fn compile(&mut self, id: FunctionId) {
         let f = self.module.function_ref(id);
 
-        macro_rules! reg {
-            ($instr_id:expr) => {{
-                f.instr_table[$instr_id]
-                    .reg
-                    .borrow()
-                    .reg
-                    .unwrap()
-                    .shift(REGISTER_OFFSET)
-                    .as_u8()
-            }};
-        }
-
         let params_len = f.ty.get_function_ty().unwrap().params_ty.len() as i32;
         let f_entry = self.asm.new_dynamic_label();
 
@@ -93,9 +108,6 @@ impl<'a> JITCompiler<'a> {
 
         let mut bbs: FxHashMap<BasicBlockId, DynamicLabel> = FxHashMap::default();
 
-        let mut alloca_map: FxHashMap<VirtualRegister, usize> = FxHashMap::default();
-        let mut local_var_count = 0;
-
         for (bb_id, bb) in &f.basic_blocks {
             if bb_id.index() != 0 {
                 let label = *bbs
@@ -107,117 +119,15 @@ impl<'a> JITCompiler<'a> {
             for val in &bb.iseq {
                 let instr_id = val.get_instr_id().unwrap();
                 let instr = &f.instr_table[instr_id];
-                let uniqidx = instr.vreg;
+
                 match &instr.opcode {
                     // TODO: Support types other than Int32
-                    Opcode::Alloca(_ty) => {
-                        alloca_map.insert(instr.vreg, local_var_count);
-                        local_var_count += 1;
-                    }
-                    Opcode::Load(Value::Instruction(InstructionValue { id, .. })) => {
-                        let rn = instr
-                            .reg
-                            .borrow()
-                            .reg
-                            .unwrap()
-                            .shift(REGISTER_OFFSET)
-                            .as_u8();
-                        let n = *alloca_map.get(&f.instr_table[*id].vreg).unwrap() as i32;
-                        dynasm!(self.asm; mov Rd(rn), [rbp-4*(1+n)]);
-                    }
-                    Opcode::Store(
-                        Value::Instruction(InstructionValue { id: src_id, .. }),
-                        Value::Instruction(InstructionValue { id: dst_id, .. }),
-                    ) => {
-                        let rn = f.instr_table[*src_id]
-                            .reg
-                            .borrow()
-                            .reg
-                            .unwrap()
-                            .shift(REGISTER_OFFSET)
-                            .as_u8();
-                        let n = *alloca_map.get(&f.instr_table[*dst_id].vreg).unwrap() as i32;
-                        dynasm!(self.asm; mov DWORD [rbp-4*(1+n)], Rd(rn));
-                    }
-                    Opcode::Store(
-                        Value::Immediate(ImmediateValue::Int32(i)),
-                        Value::Instruction(InstructionValue { id: dst_id, .. }),
-                    ) => {
-                        let n = *alloca_map.get(&f.instr_table[*dst_id].vreg).unwrap() as i32;
-                        dynasm!(self.asm; mov DWORD [rbp-4*(1+n)], *i);
-                    }
-                    Opcode::Add(v1, v2) => {
-                        let rn = instr
-                            .reg
-                            .borrow()
-                            .reg
-                            .unwrap()
-                            .shift(REGISTER_OFFSET)
-                            .as_u8();
-                        match (v1, v2) {
-                            (
-                                Value::Argument(ArgumentValue { index, .. }),
-                                Value::Immediate(ImmediateValue::Int32(i)),
-                            ) => {
-                                dynasm!(self.asm; mov Ra(rn), [rbp+8*(2+*index as i32)]; add Ra(rn), *i);
-                            }
-                            (
-                                Value::Instruction(InstructionValue { id: id1, .. }),
-                                Value::Argument(ArgumentValue { index, .. }),
-                            ) => {
-                                let reg1 = f.instr_table[*id1]
-                                    .reg
-                                    .borrow()
-                                    .reg
-                                    .unwrap()
-                                    .shift(REGISTER_OFFSET)
-                                    .as_u8();
-                                dynasm!(self.asm; mov Ra(rn), Ra(reg1); add Ra(rn), [rbp+8*(2+*index as i32)])
-                            }
-                            (
-                                Value::Instruction(InstructionValue { id: id1, .. }),
-                                Value::Instruction(InstructionValue { id: id2, .. }),
-                            ) => {
-                                let reg1 = f.instr_table[*id1]
-                                    .reg
-                                    .borrow()
-                                    .reg
-                                    .unwrap()
-                                    .shift(REGISTER_OFFSET)
-                                    .as_u8();
-                                let reg2 = f.instr_table[*id2]
-                                    .reg
-                                    .borrow()
-                                    .reg
-                                    .unwrap()
-                                    .shift(REGISTER_OFFSET)
-                                    .as_u8();
-                                dynasm!(self.asm; mov Ra(rn), Ra(reg1); add Ra(rn), Ra(reg2))
-                            }
-                            (
-                                Value::Instruction(InstructionValue { id: id1, .. }),
-                                Value::Immediate(ImmediateValue::Int32(i)),
-                            ) => {
-                                let reg1 = f.instr_table[*id1]
-                                    .reg
-                                    .borrow()
-                                    .reg
-                                    .unwrap()
-                                    .shift(REGISTER_OFFSET)
-                                    .as_u8();
-                                dynasm!(self.asm; mov Ra(rn), Ra(reg1); add Ra(rn), *i)
-                            }
-                            _ => unimplemented!(),
-                        }
-                    }
+                    Opcode::Alloca(ty) => self.alloca_mgr.allocate(instr.vreg, ty),
+                    Opcode::Load(op1) => self.compile_load(&f, &instr, op1),
+                    Opcode::Store(op1, op2) => self.compile_store(&f, op1, op2),
+                    Opcode::Add(op1, op2) => self.compile_add(&f, &instr, op1, op2),
                     Opcode::Sub(v1, v2) => {
-                        let rn = instr
-                            .reg
-                            .borrow()
-                            .reg
-                            .unwrap()
-                            .shift(REGISTER_OFFSET)
-                            .as_u8();
+                        let rn = reg!(instr);
                         match (v1, v2) {
                             (
                                 Value::Argument(ArgumentValue { index, .. }),
@@ -229,20 +139,14 @@ impl<'a> JITCompiler<'a> {
                         }
                     }
                     Opcode::Mul(v1, v2) => {
-                        let rn = instr
-                            .reg
-                            .borrow()
-                            .reg
-                            .unwrap()
-                            .shift(REGISTER_OFFSET)
-                            .as_u8();
+                        let rn = reg!(instr);
                         match (v1, v2) {
                             (
                                 Value::Instruction(InstructionValue { id: id1, .. }),
                                 Value::Instruction(InstructionValue { id: id2, .. }),
                             ) => {
-                                let reg1 = reg!(*id1);
-                                let reg2 = reg!(*id2);
+                                let reg1 = reg!(f; *id1);
+                                let reg2 = reg!(f; *id2);
                                 dynasm!(self.asm; mov Ra(rn), Ra(reg1));
                                 dynasm!(self.asm; imul Ra(rn), Ra(reg2));
                             }
@@ -250,19 +154,13 @@ impl<'a> JITCompiler<'a> {
                         }
                     }
                     Opcode::Rem(v1, v2) => {
-                        let rn = instr
-                            .reg
-                            .borrow()
-                            .reg
-                            .unwrap()
-                            .shift(REGISTER_OFFSET)
-                            .as_u8();
+                        let rn = reg!(instr);
                         match (v1, v2) {
                             (
                                 Value::Argument(ArgumentValue { index, .. }),
                                 Value::Instruction(InstructionValue { id: id1, .. }),
                             ) => {
-                                let reg1 = reg!(*id1);
+                                let reg1 = reg!(f; *id1);
                                 dynasm!(self.asm
                                     ; mov rax, [rbp+8*(2+*index as i32)]
                                     ; mov rdx, 0
@@ -293,22 +191,14 @@ impl<'a> JITCompiler<'a> {
                         match func {
                             Value::Function(f_id) => {
                                 let mut save_regs = vec![];
-                                for (_, instr) in &f.instr_table {
-                                    let bgn = instr.vreg;
-                                    let end = match instr.reg.borrow().last_use {
+                                for (_, i) in &f.instr_table {
+                                    let bgn = i.vreg;
+                                    let end = match i.reg.borrow().last_use {
                                         Some(last_use) => last_use,
                                         None => continue,
                                     };
-                                    if bgn < uniqidx && uniqidx < end {
-                                        save_regs.push(
-                                            instr
-                                                .reg
-                                                .borrow()
-                                                .reg
-                                                .unwrap()
-                                                .shift(REGISTER_OFFSET)
-                                                .as_u8(),
-                                        );
+                                    if bgn < instr.vreg && instr.vreg < end {
+                                        save_regs.push(reg!(i));
                                     }
                                 }
 
@@ -323,14 +213,7 @@ impl<'a> JITCompiler<'a> {
                                 for arg in args {
                                     match arg {
                                         Value::Instruction(InstructionValue { id, .. }) => {
-                                            let rn = f.instr_table[*id]
-                                                .reg
-                                                .borrow()
-                                                .reg
-                                                .unwrap()
-                                                .shift(REGISTER_OFFSET)
-                                                .as_u8();
-                                            dynasm!(self.asm; push Ra(rn))
+                                            dynasm!(self.asm; push Ra(reg!(f; *id)))
                                         }
                                         _ => unimplemented!(),
                                     }
@@ -357,13 +240,7 @@ impl<'a> JITCompiler<'a> {
                     }
                     Opcode::CondBr(cond, b1, b2) => match cond {
                         Value::Instruction(iv) => {
-                            let rn = f.instr_table[iv.id]
-                                .reg
-                                .borrow_mut()
-                                .reg
-                                .unwrap()
-                                .shift(REGISTER_OFFSET)
-                                .as_u8();
+                            let rn = reg!(f; iv.id);
                             dynasm!(self.asm ; cmp Rb(rn), 1);
                             let l1 = *bbs
                                 .entry(*b1)
@@ -382,13 +259,7 @@ impl<'a> JITCompiler<'a> {
                         dynasm!(self.asm; jmp =>label);
                     }
                     Opcode::ICmp(kind, v1, v2) => {
-                        let reg_num = instr
-                            .reg
-                            .borrow()
-                            .reg
-                            .unwrap()
-                            .shift(REGISTER_OFFSET)
-                            .as_u8();
+                        let reg_num = reg!(instr);
                         match kind {
                             ICmpKind::Le => match (v1, v2) {
                                 (Value::Argument(arg), Value::Immediate(n)) => {
@@ -397,7 +268,7 @@ impl<'a> JITCompiler<'a> {
                                     dynasm!(self.asm; setle Rb(reg_num));
                                 }
                                 (Value::Instruction(iv), Value::Argument(arg)) => {
-                                    let rn = reg!(iv.id);
+                                    let rn = reg!(f; iv.id);
                                     dynasm!(self.asm
                                             ; cmp Rd(rn), [rbp+8*(2+arg.index as i32)]
                                             ; setle Rb(reg_num as u8));
@@ -411,7 +282,7 @@ impl<'a> JITCompiler<'a> {
                                         ; sete Rb(reg_num as u8));
                                 }
                                 (Value::Instruction(instr), Value::Immediate(n)) => {
-                                    let reg1 = reg!(instr.id);
+                                    let reg1 = reg!(f; instr.id);
                                     dynasm!(self.asm
                                         ; cmp Ra(reg1), n.as_int32()
                                         ; sete Rb(reg_num as u8));
@@ -423,13 +294,7 @@ impl<'a> JITCompiler<'a> {
                     Opcode::Ret(v) => {
                         match v {
                             Value::Instruction(iv) => {
-                                let rn = f.instr_table[iv.id]
-                                    .reg
-                                    .borrow_mut()
-                                    .reg
-                                    .unwrap()
-                                    .shift(REGISTER_OFFSET)
-                                    .as_u8();
+                                let rn = reg!(f; iv.id);
                                 dynasm!(self.asm; mov eax, Rd(rn));
                             }
                             Value::Immediate(ImmediateValue::Int32(x)) => {
@@ -442,6 +307,94 @@ impl<'a> JITCompiler<'a> {
                     e => unimplemented!("{:?}", e),
                 }
             }
+        }
+    }
+
+    pub fn compile_load(&mut self, func: &Function, instr: &Instruction, op1: &Value) {
+        match op1 {
+            Value::Instruction(v) => {
+                let n = self.alloca_mgr.get_local_offset(vreg!(func; v.id)).unwrap() as i32;
+                dynasm!(self.asm; mov Rd(reg!(instr)), [rbp-n]);
+            }
+            e => unimplemented!("{:?}", e),
+        }
+    }
+
+    pub fn compile_store(&mut self, func: &Function, op1: &Value, op2: &Value) {
+        match (op1, op2) {
+            (Value::Instruction(src), Value::Instruction(dst)) => {
+                let n = self
+                    .alloca_mgr
+                    .get_local_offset(vreg!(func; dst.id))
+                    .unwrap() as i32;
+                dynasm!(self.asm; mov DWORD [rbp-n], Rd(reg!(func; src.id)));
+            }
+            (Value::Immediate(ImmediateValue::Int32(i)), Value::Instruction(dst)) => {
+                let n = self
+                    .alloca_mgr
+                    .get_local_offset(vreg!(func; dst.id))
+                    .unwrap() as i32;
+                dynasm!(self.asm; mov DWORD [rbp-n], *i);
+            }
+            e => unimplemented!("{:?}", e),
+        }
+    }
+
+    pub fn compile_add(&mut self, f: &Function, instr: &Instruction, op1: &Value, op2: &Value) {
+        let rn = reg!(instr);
+        match (op1, op2) {
+            (Value::Argument(a), Value::Immediate(ImmediateValue::Int32(i))) => {
+                dynasm!(self.asm; mov Ra(rn), [rbp+8*(2+a.index as i32)]; add Ra(rn), *i)
+            }
+            (Value::Instruction(v), Value::Argument(a)) => {
+                dynasm!(self.asm; mov Ra(rn), Ra(reg!(f; v.id)); add Ra(rn), [rbp+8*(2+a.index as i32)])
+            }
+            (Value::Instruction(v1), Value::Instruction(v2)) => {
+                dynasm!(self.asm; mov Ra(rn), Ra(reg!(f; v1.id)); add Ra(rn), Ra(reg!(f; v2.id)))
+            }
+            (Value::Instruction(v), Value::Immediate(ImmediateValue::Int32(i))) => {
+                dynasm!(self.asm; mov Ra(rn), Ra(reg!(f; v.id)); add Ra(rn), *i)
+            }
+            _ => unimplemented!(),
+        }
+    }
+}
+
+impl AllocaManager {
+    pub fn new() -> Self {
+        Self {
+            locals: FxHashMap::default(),
+            cur_size: 0,
+        }
+    }
+
+    pub fn reset(&mut self) {
+        self.cur_size = 0;
+        self.locals.clear();
+    }
+
+    pub fn allocate(&mut self, vreg: VirtualRegister, ty: &Type) {
+        self.cur_size += ty.size_in_byte();
+        self.locals.insert(vreg, self.cur_size);
+    }
+
+    pub fn get_local_offset(&self, vreg: VirtualRegister) -> Option<usize> {
+        self.locals.get(&vreg).map(|x| *x)
+    }
+}
+
+trait TypeSize {
+    fn size_in_byte(&self) -> usize;
+}
+
+impl TypeSize for Type {
+    fn size_in_byte(&self) -> usize {
+        match self {
+            Type::Int1 => 1,
+            Type::Int32 => 4,
+            Type::Pointer(_) => 8,
+            Type::Function(_) => unimplemented!(),
+            Type::Void => 0,
         }
     }
 }
