@@ -32,6 +32,8 @@ pub enum Opcode {
     Store(Value, Value),
     Add(Value, Value),
     Sub(Value, Value),
+    Mul(Value, Value),
+    Rem(Value, Value),
     ICmp(ICmpKind, Value, Value),
     Br(BasicBlockId),
     CondBr(Value, BasicBlockId, BasicBlockId),
@@ -97,6 +99,12 @@ impl Opcode {
             }
             Opcode::Sub(v1, v2) => {
                 format!("sub {}, {}", v1.to_string(m, false), v2.to_string(m, false))
+            }
+            Opcode::Mul(v1, v2) => {
+                format!("mul {}, {}", v1.to_string(m, false), v2.to_string(m, false))
+            }
+            Opcode::Rem(v1, v2) => {
+                format!("rem {}, {}", v1.to_string(m, false), v2.to_string(m, false))
             }
             Opcode::ICmp(kind, v1, v2) => format!(
                 "icmp {} {}, {}",

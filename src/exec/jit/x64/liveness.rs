@@ -27,11 +27,13 @@ impl<'a> LivenessAnalyzer<'a> {
 
                 match instr.opcode {
                     Opcode::Add(_, _)
+                    | Opcode::Mul(_, _)
+                    | Opcode::Rem(_, _)
+                    | Opcode::Sub(_, _)
                     | Opcode::Alloca(_)
                     | Opcode::ICmp(_, _, _)
                     | Opcode::Load(_)
-                    | Opcode::Phi(_)
-                    | Opcode::Sub(_, _) => {
+                    | Opcode::Phi(_) => {
                         def.insert(idx);
                     }
                     Opcode::Call(f, _) => {

@@ -67,6 +67,18 @@ impl<'a> JITCompiler<'a> {
     pub fn compile(&mut self, id: FunctionId) {
         let f = self.module.function_ref(id);
 
+        macro_rules! reg {
+            ($instr_id:expr) => {{
+                f.instr_table[$instr_id]
+                    .reg
+                    .borrow()
+                    .reg
+                    .unwrap()
+                    .shift(REGISTER_OFFSET)
+                    .as_u8()
+            }};
+        }
+
         let params_len = f.ty.get_function_ty().unwrap().params_ty.len() as i32;
         let f_entry = self.asm.new_dynamic_label();
 
@@ -210,8 +222,63 @@ impl<'a> JITCompiler<'a> {
                             (
                                 Value::Argument(ArgumentValue { index, .. }),
                                 Value::Immediate(ImmediateValue::Int32(i)),
+                            ) => dynasm!(self.asm
+                                    ; mov Ra(rn), [rbp+8*(2+*index as i32)]
+                                    ; sub Ra(rn), *i),
+                            _ => unimplemented!(),
+                        }
+                    }
+                    Opcode::Mul(v1, v2) => {
+                        let rn = instr
+                            .reg
+                            .borrow()
+                            .reg
+                            .unwrap()
+                            .shift(REGISTER_OFFSET)
+                            .as_u8();
+                        match (v1, v2) {
+                            (
+                                Value::Instruction(InstructionValue { id: id1, .. }),
+                                Value::Instruction(InstructionValue { id: id2, .. }),
                             ) => {
-                                dynasm!(self.asm; mov Ra(rn), [rbp+8*(2+*index as i32)]; sub Ra(rn), *i)
+                                let reg1 = reg!(*id1);
+                                let reg2 = reg!(*id2);
+                                dynasm!(self.asm; mov Ra(rn), Ra(reg1));
+                                dynasm!(self.asm; imul Ra(rn), Ra(reg2));
+                            }
+                            _ => unimplemented!(),
+                        }
+                    }
+                    Opcode::Rem(v1, v2) => {
+                        let rn = instr
+                            .reg
+                            .borrow()
+                            .reg
+                            .unwrap()
+                            .shift(REGISTER_OFFSET)
+                            .as_u8();
+                        match (v1, v2) {
+                            (
+                                Value::Argument(ArgumentValue { index, .. }),
+                                Value::Instruction(InstructionValue { id: id1, .. }),
+                            ) => {
+                                let reg1 = reg!(*id1);
+                                dynasm!(self.asm
+                                    ; mov rax, [rbp+8*(2+*index as i32)]
+                                    ; mov rdx, 0
+                                    ; idiv Ra(reg1)
+                                    ; mov Ra(rn), rdx);
+                            }
+                            (
+                                Value::Argument(ArgumentValue { index, .. }),
+                                Value::Immediate(ImmediateValue::Int32(i)),
+                            ) => {
+                                dynasm!(self.asm
+                                    ; mov rax, [rbp+8*(2+*index as i32)]
+                                    ; mov Ra(rn), *i
+                                    ; mov rdx, 0
+                                    ; idiv Ra(rn)
+                                    ; mov Ra(rn), rdx);
                             }
                             _ => unimplemented!(),
                         }
@@ -326,33 +393,30 @@ impl<'a> JITCompiler<'a> {
                             ICmpKind::Le => match (v1, v2) {
                                 (Value::Argument(arg), Value::Immediate(n)) => {
                                     dynasm!(self.asm
-                                            ; cmp [rbp+8*(2+arg.index as i32)], n.as_int32() as i8);
+                                            ; cmp QWORD [rbp+8*(2+arg.index as i32)], n.as_int32());
                                     dynasm!(self.asm; setle Rb(reg_num));
                                 }
                                 (Value::Instruction(iv), Value::Argument(arg)) => {
-                                    let rn = f.instr_table[iv.id]
-                                        .reg
-                                        .borrow_mut()
-                                        .reg
-                                        .unwrap()
-                                        .shift(REGISTER_OFFSET)
-                                        .as_u8();
+                                    let rn = reg!(iv.id);
                                     dynasm!(self.asm
-                                            ; cmp Rb(rn), [rbp+8*(2+arg.index as i32)]);
-                                    dynasm!(self.asm; setle Rb(reg_num as u8));
+                                            ; cmp Rd(rn), [rbp+8*(2+arg.index as i32)]
+                                            ; setle Rb(reg_num as u8));
                                 }
                                 _ => unimplemented!(),
                             },
-                            ICmpKind::Eq => match v1 {
-                                Value::Argument(arg) => match v2 {
-                                    Value::Immediate(n) => {
-                                        dynasm!(self.asm
-                                            ; cmp [rbp+8*(2+arg.index as i32)], n.as_int32() as i8);
-                                        dynasm!(self.asm; sete Rb(reg_num as u8));
-                                    }
-                                    _ => unimplemented!(),
-                                },
-                                _ => unimplemented!(),
+                            ICmpKind::Eq => match (v1, v2) {
+                                (Value::Argument(arg), Value::Immediate(n)) => {
+                                    dynasm!(self.asm
+                                        ; cmp QWORD [rbp+8*(2+arg.index as i32)], n.as_int32()
+                                        ; sete Rb(reg_num as u8));
+                                }
+                                (Value::Instruction(instr), Value::Immediate(n)) => {
+                                    let reg1 = reg!(instr.id);
+                                    dynasm!(self.asm
+                                        ; cmp Ra(reg1), n.as_int32()
+                                        ; sete Rb(reg_num as u8));
+                                }
+                                e => unimplemented!("{:?}", e),
                             },
                         }
                     }

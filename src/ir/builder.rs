@@ -123,6 +123,38 @@ impl<'a> Builder<'a> {
         val
     }
 
+    pub fn build_mul(&mut self, v1: Value, v2: Value) -> Value {
+        let ty = v1.get_type(self.module).clone();
+        let instr = Instruction::new(Opcode::Mul(v1, v2), ty, self.function_ref_mut().next_vreg());
+        let instr_id = self.function_ref_mut().instr_id(instr);
+        let val = Value::Instruction(InstructionValue {
+            func_id: self.func_id,
+            id: instr_id,
+        });
+        let bb = self.cur_bb.unwrap();
+        self.function_ref_mut()
+            .basic_block_ref_mut(bb)
+            .iseq
+            .push(val);
+        val
+    }
+
+    pub fn build_rem(&mut self, v1: Value, v2: Value) -> Value {
+        let ty = v1.get_type(self.module).clone();
+        let instr = Instruction::new(Opcode::Rem(v1, v2), ty, self.function_ref_mut().next_vreg());
+        let instr_id = self.function_ref_mut().instr_id(instr);
+        let val = Value::Instruction(InstructionValue {
+            func_id: self.func_id,
+            id: instr_id,
+        });
+        let bb = self.cur_bb.unwrap();
+        self.function_ref_mut()
+            .basic_block_ref_mut(bb)
+            .iseq
+            .push(val);
+        val
+    }
+
     pub fn build_icmp(&mut self, kind: ICmpKind, v1: Value, v2: Value) -> Value {
         let instr = Instruction::new(
             Opcode::ICmp(kind, v1, v2),

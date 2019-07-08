@@ -58,6 +58,16 @@ impl<'a> Interpreter<'a> {
                             get_value(&v1, &args, &mut mem).sub(get_value(&v2, &args, &mut mem));
                         mem.insert(instr_id, val);
                     }
+                    Opcode::Mul(v1, v2) => {
+                        let val =
+                            get_value(&v1, &args, &mut mem).mul(get_value(&v2, &args, &mut mem));
+                        mem.insert(instr_id, val);
+                    }
+                    Opcode::Rem(v1, v2) => {
+                        let val =
+                            get_value(&v1, &args, &mut mem).rem(get_value(&v2, &args, &mut mem));
+                        mem.insert(instr_id, val);
+                    }
                     Opcode::Alloca(ty) => {
                         mem.insert(
                             instr_id,
@@ -174,6 +184,20 @@ impl ConcreteValue {
     pub fn sub(self, v: ConcreteValue) -> Self {
         match (self, v) {
             (ConcreteValue::Int32(i1), ConcreteValue::Int32(i2)) => ConcreteValue::Int32(i1 - i2),
+            _ => unimplemented!(),
+        }
+    }
+
+    pub fn mul(self, v: ConcreteValue) -> Self {
+        match (self, v) {
+            (ConcreteValue::Int32(i1), ConcreteValue::Int32(i2)) => ConcreteValue::Int32(i1 * i2),
+            _ => unimplemented!(),
+        }
+    }
+
+    pub fn rem(self, v: ConcreteValue) -> Self {
+        match (self, v) {
+            (ConcreteValue::Int32(i1), ConcreteValue::Int32(i2)) => ConcreteValue::Int32(i1 % i2),
             _ => unimplemented!(),
         }
     }

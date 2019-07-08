@@ -152,7 +152,9 @@ impl<'a> RegisterAllocator<'a> {
                     Opcode::Store(v1, v2)
                     | Opcode::ICmp(_, v1, v2)
                     | Opcode::Add(v1, v2)
-                    | Opcode::Sub(v1, v2) => {
+                    | Opcode::Sub(v1, v2)
+                    | Opcode::Mul(v1, v2)
+                    | Opcode::Rem(v1, v2) => {
                         some_then!(
                             id,
                             v1.get_instr_id(),
