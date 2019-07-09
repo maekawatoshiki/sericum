@@ -59,24 +59,40 @@ impl<'a> Builder<'a> {
     }
 
     pub fn build_add(&mut self, v1: Value, v2: Value) -> Value {
+        if let Some(konst) = v1.const_add(&v2) {
+            return konst;
+        }
+
         let instr = self.create_instr_value(Opcode::Add(v1, v2), v1.get_type(self.module).clone());
         self.append_instr_to_cur_bb(instr);
         instr
     }
 
     pub fn build_sub(&mut self, v1: Value, v2: Value) -> Value {
+        if let Some(konst) = v1.const_sub(&v2) {
+            return konst;
+        }
+
         let instr = self.create_instr_value(Opcode::Sub(v1, v2), v1.get_type(self.module).clone());
         self.append_instr_to_cur_bb(instr);
         instr
     }
 
     pub fn build_mul(&mut self, v1: Value, v2: Value) -> Value {
+        if let Some(konst) = v1.const_mul(&v2) {
+            return konst;
+        }
+
         let instr = self.create_instr_value(Opcode::Mul(v1, v2), v1.get_type(self.module).clone());
         self.append_instr_to_cur_bb(instr);
         instr
     }
 
     pub fn build_rem(&mut self, v1: Value, v2: Value) -> Value {
+        if let Some(konst) = v1.const_rem(&v2) {
+            return konst;
+        }
+
         let instr = self.create_instr_value(Opcode::Rem(v1, v2), v1.get_type(self.module).clone());
         self.append_instr_to_cur_bb(instr);
         instr

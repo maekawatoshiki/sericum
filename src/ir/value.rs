@@ -2,7 +2,19 @@ use super::{function::*, module::*, opcode::*, types::*};
 
 pub type ValueId = usize;
 
-#[derive(Debug, Clone, Copy)]
+macro_rules! const_op { ($name:ident, $op:tt) => {
+    pub fn $name(&self, v: &Value) -> Option<Value> {
+        use ImmediateValue::*;
+        match (self, v) {
+            (Value::Immediate(imm1), Value::Immediate(imm2)) => match (imm1, imm2) {
+                (Int32(i1), Int32(i2)) => Some(Value::Immediate(Int32(i1 $op i2))),
+            },
+            _ => None,
+        }
+    }
+}}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Value {
     Argument(ArgumentValue),
     Immediate(ImmediateValue),
@@ -11,19 +23,19 @@ pub enum Value {
     None,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ArgumentValue {
     pub func_id: FunctionId,
     pub index: usize,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct InstructionValue {
     pub func_id: FunctionId,
     pub id: InstructionId,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ImmediateValue {
     Int32(i32),
 }
@@ -51,6 +63,15 @@ impl Value {
             _ => None,
         }
     }
+
+    // Constant folding
+
+    const_op!(const_add, +);
+    const_op!(const_sub, -);
+    const_op!(const_mul, *);
+    const_op!(const_rem, %);
+
+    // Utils
 
     pub fn to_string(&self, module: &Module, instr: bool) -> String {
         match self {
