@@ -194,7 +194,9 @@ impl<'a> JITCompiler<'a> {
                                 for (_, i) in &f.instr_table {
                                     let bgn = i.vreg;
                                     let end = match i.reg.borrow().last_use {
-                                        Some(last_use) => last_use,
+                                        Some(last_use) => {
+                                            vreg!(self.module.function_ref(*f_id); last_use)
+                                        }
                                         None => continue,
                                     };
                                     if bgn < instr.vreg && instr.vreg < end {

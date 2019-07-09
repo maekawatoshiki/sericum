@@ -54,11 +54,12 @@ impl<'a> RegisterAllocator<'a> {
                 let mut found = false;
                 for i in 0..num_reg - 1 {
                     if used.contains_key(&i) {
-                        let target_last_use = f.instr_table[*used.get(&i).unwrap()]
+                        let target_last_use_id = f.instr_table[*used.get(&i).unwrap()]
                             .reg
                             .borrow()
                             .last_use
                             .unwrap();
+                        let target_last_use = f.instr_table[target_last_use_id].vreg;
                         if instr.vreg < target_last_use {
                             continue;
                         }
@@ -107,20 +108,19 @@ impl<'a> RegisterAllocator<'a> {
             for instr_val in &bb.iseq {
                 let instr_id = instr_val.get_instr_id().unwrap();
                 let instr = &f.instr_table[instr_id];
-                let cur_vreg = instr.vreg;
 
                 match instr.opcode {
                     Opcode::Call(ref func, ref args) => {
                         some_then!(
                             id,
                             func.get_instr_id(),
-                            f.instr_table[id].set_last_use(Some(cur_vreg))
+                            f.instr_table[id].set_last_use(Some(instr_id))
                         );
                         for arg in args {
                             some_then!(
                                 id,
                                 arg.get_instr_id(),
-                                f.instr_table[id].set_last_use(Some(cur_vreg))
+                                f.instr_table[id].set_last_use(Some(instr_id))
                             );
                         }
                         // if func
@@ -130,14 +130,14 @@ impl<'a> RegisterAllocator<'a> {
                         //     .ret_ty
                         //     != Type::Void
                         // {
-                        //     instr.set_last_use(Some(cur_vreg));
+                        //     instr.set_last_use(Some(instr_id));
                         // }
                     }
                     Opcode::CondBr(ref v, _, _) | Opcode::Ret(ref v) | Opcode::Load(ref v) => {
                         some_then!(
                             id,
                             v.get_instr_id(),
-                            f.instr_table[id].set_last_use(Some(cur_vreg))
+                            f.instr_table[id].set_last_use(Some(instr_id))
                         );
                     }
                     Opcode::Phi(ref vals) => {
@@ -145,7 +145,7 @@ impl<'a> RegisterAllocator<'a> {
                             some_then!(
                                 id,
                                 val.get_instr_id(),
-                                f.instr_table[id].set_last_use(Some(cur_vreg))
+                                f.instr_table[id].set_last_use(Some(instr_id))
                             );
                         }
                     }
@@ -158,21 +158,21 @@ impl<'a> RegisterAllocator<'a> {
                         some_then!(
                             id,
                             v1.get_instr_id(),
-                            f.instr_table[id].set_last_use(Some(cur_vreg))
+                            f.instr_table[id].set_last_use(Some(instr_id))
                         );
                         some_then!(
                             id,
                             v2.get_instr_id(),
-                            f.instr_table[id].set_last_use(Some(cur_vreg))
+                            f.instr_table[id].set_last_use(Some(instr_id))
                         );
-                        // instr.set_last_use(Some(cur_vreg));
+                        // instr.set_last_use(Some(instr_id));
                     }
                     Opcode::Br(_) | Opcode::Alloca(_) => {
                         // instr.reg.borrow_mut().last_use = Some(cur_vreg);
                     }
                 }
 
-                last_instr = Some(cur_vreg);
+                last_instr = Some(instr_id);
             }
 
             for out in &bb.liveness.borrow().live_out {

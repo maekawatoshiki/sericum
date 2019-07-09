@@ -22,7 +22,7 @@ pub struct Instruction {
 pub struct RegisterAllocInfo {
     pub reg: Option<Register>,
     pub spill: bool,
-    pub last_use: Option<VirtualRegister>,
+    pub last_use: Option<InstructionId>,
 }
 
 #[derive(Clone, Debug)]
@@ -63,7 +63,7 @@ impl Instruction {
         self.opcode.to_string(m)
     }
 
-    pub fn set_last_use(&self, last_use: Option<VirtualRegister>) {
+    pub fn set_last_use(&self, last_use: Option<InstructionId>) {
         self.reg.borrow_mut().last_use = last_use;
     }
 
