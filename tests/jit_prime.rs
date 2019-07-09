@@ -64,20 +64,23 @@ pub fn jit_prime() {
     regalloc.analyze();
 
     let mut interp = interp::Interpreter::new(&m);
+
     let ret = interp.run_function(prime, vec![interp::ConcreteValue::Int32(97)]);
     println!("interp: prime(97) = {:?}", ret);
+    assert_eq!(ret, interp::ConcreteValue::Int32(1));
+
     let ret = interp.run_function(prime, vec![interp::ConcreteValue::Int32(104)]);
     println!("interp: prime(104) = {:?}", ret);
+    assert_eq!(ret, interp::ConcreteValue::Int32(0));
 
     let mut jit = compiler::JITCompiler::new(&m);
     jit.compile(prime);
 
-    println!(
-        "jit: prime(10009723) = {:?}",
-        jit.run(prime, vec![compiler::GenericValue::Int32(10009723)])
-    );
-    println!(
-        "jit: prime(10009721) = {:?}",
-        jit.run(prime, vec![compiler::GenericValue::Int32(10009721)])
-    );
+    let ret = jit.run(prime, vec![compiler::GenericValue::Int32(10009723)]);
+    println!("jit: prime(10009723) = {:?}", ret);
+    assert_eq!(ret, compiler::GenericValue::Int32(1));
+
+    let ret = jit.run(prime, vec![compiler::GenericValue::Int32(10009721)]);
+    println!("jit: prime(10009721) = {:?}", ret);
+    assert_eq!(ret, compiler::GenericValue::Int32(0));
 }

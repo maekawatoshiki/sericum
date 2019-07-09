@@ -74,11 +74,11 @@ pub fn sum() {
     let mut interp = interp::Interpreter::new(&m);
     let ret = interp.run_function(sum, vec![interp::ConcreteValue::Int32(10)]);
     println!("exec: sum(10) = {:?}", ret);
+    assert_eq!(ret, interp::ConcreteValue::Int32(55));
 
     let mut jit = compiler::JITCompiler::new(&m);
     jit.compile(sum);
-    println!(
-        "jit: sum(10) = {:?}",
-        jit.run(sum, vec![compiler::GenericValue::Int32(10)])
-    );
+    let ret = jit.run(sum, vec![compiler::GenericValue::Int32(10)]);
+    println!("jit: sum(10) = {:?}", ret);
+    assert_eq!(ret, compiler::GenericValue::Int32(55));
 }
