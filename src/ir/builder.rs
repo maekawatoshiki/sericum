@@ -52,7 +52,7 @@ impl<'a> Builder<'a> {
         self.function_ref_mut()
             .basic_block_ref_mut(bb)
             .iseq
-            .push(val);
+            .push_back(val);
         val
     }
 
@@ -68,7 +68,7 @@ impl<'a> Builder<'a> {
         self.function_ref_mut()
             .basic_block_ref_mut(bb)
             .iseq
-            .push(val);
+            .push_back(val);
         val
     }
 
@@ -87,7 +87,7 @@ impl<'a> Builder<'a> {
         self.function_ref_mut()
             .basic_block_ref_mut(bb)
             .iseq
-            .push(val);
+            .push_back(val);
         Value::None
     }
 
@@ -103,7 +103,7 @@ impl<'a> Builder<'a> {
         self.function_ref_mut()
             .basic_block_ref_mut(bb)
             .iseq
-            .push(val);
+            .push_back(val);
         val
     }
 
@@ -119,7 +119,7 @@ impl<'a> Builder<'a> {
         self.function_ref_mut()
             .basic_block_ref_mut(bb)
             .iseq
-            .push(val);
+            .push_back(val);
         val
     }
 
@@ -135,7 +135,7 @@ impl<'a> Builder<'a> {
         self.function_ref_mut()
             .basic_block_ref_mut(bb)
             .iseq
-            .push(val);
+            .push_back(val);
         val
     }
 
@@ -151,7 +151,7 @@ impl<'a> Builder<'a> {
         self.function_ref_mut()
             .basic_block_ref_mut(bb)
             .iseq
-            .push(val);
+            .push_back(val);
         val
     }
 
@@ -170,7 +170,7 @@ impl<'a> Builder<'a> {
         self.function_ref_mut()
             .basic_block_ref_mut(bb)
             .iseq
-            .push(val);
+            .push_back(val);
         val
     }
 
@@ -188,7 +188,7 @@ impl<'a> Builder<'a> {
         let cur_bb_id = self.cur_bb.unwrap();
 
         let cur_bb = self.function_ref_mut().basic_block_ref_mut(cur_bb_id);
-        cur_bb.iseq.push(val);
+        cur_bb.iseq.push_back(val);
         cur_bb.succ.push(dst_id);
 
         self.function_ref_mut()
@@ -213,7 +213,7 @@ impl<'a> Builder<'a> {
         let cur_bb_id = self.cur_bb.unwrap();
 
         let cur_bb = self.function_ref_mut().basic_block_ref_mut(cur_bb_id);
-        cur_bb.iseq.push(val);
+        cur_bb.iseq.push_back(val);
         cur_bb.succ.push(bb1);
         cur_bb.succ.push(bb2);
 
@@ -241,7 +241,7 @@ impl<'a> Builder<'a> {
         self.function_ref_mut()
             .basic_block_ref_mut(bb)
             .iseq
-            .push(val);
+            .push_back(val);
         val
     }
 
@@ -266,7 +266,7 @@ impl<'a> Builder<'a> {
         self.function_ref_mut()
             .basic_block_ref_mut(bb)
             .iseq
-            .push(val);
+            .push_back(val);
         val
     }
 
@@ -285,7 +285,7 @@ impl<'a> Builder<'a> {
         self.function_ref_mut()
             .basic_block_ref_mut(bb)
             .iseq
-            .push(val);
+            .push_back(val);
         Value::None
     }
 }

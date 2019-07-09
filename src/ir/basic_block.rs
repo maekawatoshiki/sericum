@@ -1,18 +1,26 @@
 use super::{module::*, opcode::*, value::*};
 use id_arena::*;
 use rustc_hash::FxHashSet;
-use std::{cell::RefCell, rc::Rc};
+use std::{
+    collections::LinkedList,
+    {cell::RefCell, rc::Rc},
+};
 
 pub type BasicBlockId = Id<BasicBlock>;
 
 #[derive(Clone, Debug)]
 pub struct BasicBlock {
+    /// Information for liveness analysis
     pub liveness: Rc<RefCell<LivenessInfo>>,
 
+    /// Predecessors
     pub pred: Vec<BasicBlockId>,
+
+    /// Successors
     pub succ: Vec<BasicBlockId>,
 
-    pub iseq: Vec<Value>,
+    /// Instruction list
+    pub iseq: LinkedList<Value>,
 }
 
 #[derive(Clone, Debug)]
@@ -25,7 +33,7 @@ pub struct LivenessInfo {
 impl BasicBlock {
     pub fn new() -> Self {
         Self {
-            iseq: vec![],
+            iseq: LinkedList::new(),
             pred: vec![],
             succ: vec![],
             liveness: Rc::new(RefCell::new(LivenessInfo::new())),
