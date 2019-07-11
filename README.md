@@ -5,7 +5,7 @@
 
 (Toy) Compiler Infrastructure influenced by LLVM written in Rust.
 
-# How It Looks Like
+# Example
 
 ```rust
 let mut m = module::Module::new("cilk");

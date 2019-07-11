@@ -23,14 +23,11 @@ pub fn jit_fibo() {
             ret (%r3);
     });
 
-    let mut liveness = liveness::LivenessAnalyzer::new(&m);
-    liveness.analyze();
+    liveness::LivenessAnalyzer::new(&m).analyze();
+    regalloc::RegisterAllocator::new(&m).analyze();
 
     let f = m.function_ref(fibo);
     println!("liveness analyzed: {}", f.to_string(&m));
-
-    let mut regalloc = regalloc::RegisterAllocator::new(&m);
-    regalloc.analyze();
 
     let mut interp = interp::Interpreter::new(&m);
     let ret = interp.run_function(fibo, vec![interp::ConcreteValue::Int32(9)]);
@@ -38,7 +35,7 @@ pub fn jit_fibo() {
     assert_eq!(ret, interp::ConcreteValue::Int32(34));
 
     let mut jit = compiler::JITCompiler::new(&m);
-    jit.compile(fibo);
+    jit.compile_module();
 
     let ret = jit.run(fibo, vec![compiler::GenericValue::Int32(9)]);
     println!("jit: fibo(9) = {:?}", ret);

@@ -91,13 +91,18 @@ impl<'a> JITCompiler<'a> {
         }
     }
 
-    pub fn compile(&mut self, id: FunctionId) {
+    pub fn compile_module(&mut self) {
+        for (f_id, _) in &self.module.functions {
+            self.compile_function(f_id);
+        }
+    }
+
+    pub fn compile_function(&mut self, id: FunctionId) {
         let f = self.module.function_ref(id);
 
         let params_len = f.ty.get_function_ty().unwrap().params_ty.len() as i32;
-        let f_entry = self.asm.new_dynamic_label();
 
-        self.function_map.insert(id, f_entry);
+        let f_entry = self.get_function_entry_label(id);
 
         dynasm!(self.asm
             ; => f_entry
@@ -210,8 +215,8 @@ impl<'a> JITCompiler<'a> {
 
                                 self.push_args(f, args);
 
-                                let lbl = self.function_map.get(&f_id).unwrap(); // TODO: What if function (which f_id points) is not compiled?
-                                dynasm!(self.asm; call => *lbl);
+                                let f_entry = self.get_function_entry_label(*f_id);
+                                dynasm!(self.asm; call => f_entry);
 
                                 if returns {
                                     dynasm!(self.asm; mov Ra(reg!(instr)), rax);
@@ -296,6 +301,16 @@ impl<'a> JITCompiler<'a> {
                 }
             }
         }
+    }
+
+    pub fn get_function_entry_label(&mut self, f_id: FunctionId) -> DynamicLabel {
+        if self.function_map.contains_key(&f_id) {
+            return *self.function_map.get(&f_id).unwrap();
+        }
+
+        let f_entry = self.asm.new_dynamic_label();
+        self.function_map.insert(f_id, f_entry);
+        f_entry
     }
 
     pub fn push_args(&mut self, f: &Function, args: &[Value]) {

@@ -54,14 +54,11 @@ pub fn jit_prime() {
             ret (i32 1);
     });
 
-    let mut liveness = liveness::LivenessAnalyzer::new(&m);
-    liveness.analyze();
+    liveness::LivenessAnalyzer::new(&m).analyze();
+    regalloc::RegisterAllocator::new(&m).analyze();
 
     let f = m.function_ref(prime);
     println!("liveness: {}", f.to_string(&m));
-
-    let mut regalloc = regalloc::RegisterAllocator::new(&m);
-    regalloc.analyze();
 
     let mut interp = interp::Interpreter::new(&m);
 
@@ -74,7 +71,7 @@ pub fn jit_prime() {
     assert_eq!(ret, interp::ConcreteValue::Int32(0));
 
     let mut jit = compiler::JITCompiler::new(&m);
-    jit.compile(prime);
+    jit.compile_module();
 
     let ret = jit.run(prime, vec![compiler::GenericValue::Int32(10009723)]);
     println!("jit: prime(10009723) = {:?}", ret);

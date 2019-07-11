@@ -62,14 +62,11 @@ pub fn sum() {
     let val_total = builder.build_load(var_total);
     builder.build_ret(val_total);
 
-    let mut liveness = liveness::LivenessAnalyzer::new(&m);
-    liveness.analyze();
+    liveness::LivenessAnalyzer::new(&m).analyze();
+    regalloc::RegisterAllocator::new(&m).analyze();
 
     let f = m.function_ref(sum);
     println!("{}", f.to_string(&m));
-
-    let mut regalloc = regalloc::RegisterAllocator::new(&m);
-    regalloc.analyze();
 
     let mut interp = interp::Interpreter::new(&m);
     let ret = interp.run_function(sum, vec![interp::ConcreteValue::Int32(10)]);
@@ -77,7 +74,8 @@ pub fn sum() {
     assert_eq!(ret, interp::ConcreteValue::Int32(55));
 
     let mut jit = compiler::JITCompiler::new(&m);
-    jit.compile(sum);
+    jit.compile_module();
+
     let ret = jit.run(sum, vec![compiler::GenericValue::Int32(10)]);
     println!("jit: sum(10) = {:?}", ret);
     assert_eq!(ret, compiler::GenericValue::Int32(55));

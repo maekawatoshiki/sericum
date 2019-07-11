@@ -20,8 +20,8 @@ fn func_call() {
             ret (%r);
     });
 
-    let mut liveness = liveness::LivenessAnalyzer::new(&m);
-    liveness.analyze();
+    liveness::LivenessAnalyzer::new(&m).analyze();
+    regalloc::RegisterAllocator::new(&m).analyze();
 
     let f1 = m.function_ref(func1);
     println!("liveness analyzed:\n{}", f1.to_string(&m));
@@ -29,12 +29,8 @@ fn func_call() {
     let f2 = m.function_ref(func2);
     println!("liveness analyzed:\n{}", f2.to_string(&m));
 
-    let mut regalloc = regalloc::RegisterAllocator::new(&m);
-    regalloc.analyze();
-
     let mut jit = compiler::JITCompiler::new(&m);
-    jit.compile(func1);
-    jit.compile(func2);
+    jit.compile_module();
 
     let ret = jit.run(func2, vec![]);
     println!("jit: {:?}", ret);
@@ -59,17 +55,14 @@ fn func_call2() {
             ret (%a);
     });
 
-    let mut liveness = liveness::LivenessAnalyzer::new(&m);
-    liveness.analyze();
+    liveness::LivenessAnalyzer::new(&m).analyze();
+    regalloc::RegisterAllocator::new(&m).analyze();
 
     println!("\n{}", m.function_ref(main).to_string(&m));
     println!("\n{}", m.function_ref(f).to_string(&m));
 
-    regalloc::RegisterAllocator::new(&m).analyze();
-
     let mut jit = compiler::JITCompiler::new(&m);
-    jit.compile(f);
-    jit.compile(main);
+    jit.compile_module();
 
     let ret = jit.run(main, vec![]);
     println!("jit: {:?}", ret);
