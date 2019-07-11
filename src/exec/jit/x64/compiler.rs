@@ -194,9 +194,7 @@ impl<'a> JITCompiler<'a> {
                                 for (_, i) in &f.instr_table {
                                     let bgn = i.vreg;
                                     let end = match i.reg.borrow().last_use {
-                                        Some(last_use) => {
-                                            vreg!(self.module.function_ref(*f_id); last_use)
-                                        }
+                                        Some(last_use) => vreg!(f; last_use),
                                         None => continue,
                                     };
                                     if bgn < instr.vreg && instr.vreg < end {
@@ -206,21 +204,15 @@ impl<'a> JITCompiler<'a> {
 
                                 when_debug!(println!("saved register: {:?}", save_regs));
 
-                                let l = self.function_map.get(&f_id).unwrap(); // TODO
-
                                 for save_reg in &save_regs {
                                     dynasm!(self.asm; push Ra(*save_reg));
                                 }
 
-                                for arg in args {
-                                    match arg {
-                                        Value::Instruction(InstructionValue { id, .. }) => {
-                                            dynasm!(self.asm; push Ra(reg!(f; *id)))
-                                        }
-                                        _ => unimplemented!(),
-                                    }
-                                }
-                                dynasm!(self.asm; call =>*l);
+                                self.push_args(f, args);
+
+                                let lbl = self.function_map.get(&f_id).unwrap(); // TODO: What if function (which f_id points) is not compiled?
+                                dynasm!(self.asm; call => *lbl);
+
                                 if returns {
                                     let rn = instr
                                         .reg
@@ -231,10 +223,11 @@ impl<'a> JITCompiler<'a> {
                                         .as_u8();
                                     dynasm!(self.asm; mov Ra(rn), rax);
                                 }
+
                                 dynasm!(self.asm; add rsp, 8*(args.len() as i32));
 
                                 for save_reg in save_regs.iter().rev() {
-                                    dynasm!(self.asm; pop Ra(*save_reg ));
+                                    dynasm!(self.asm; pop Ra(*save_reg));
                                 }
                             }
                             _ => unimplemented!(),
@@ -308,6 +301,19 @@ impl<'a> JITCompiler<'a> {
                     }
                     e => unimplemented!("{:?}", e),
                 }
+            }
+        }
+    }
+
+    pub fn push_args(&mut self, f: &Function, args: &[Value]) {
+        for arg in args {
+            match arg {
+                Value::Instruction(InstructionValue { id, .. }) => {
+                    dynasm!(self.asm; push Ra(reg!(f; *id)))
+                }
+                Value::Immediate(ImmediateValue::Int32(i)) => dynasm!(self.asm; push *i),
+                Value::Argument(arg) => dynasm!(self.asm; push AWORD [rbp+8*(2+arg.index as i32)]),
+                _ => unimplemented!(),
             }
         }
     }
