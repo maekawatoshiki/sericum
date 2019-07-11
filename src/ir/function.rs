@@ -137,7 +137,10 @@ impl Function {
                     .borrow()
                     .def
                     .iter()
-                    .fold("".to_string(), |s, x| format!("{}{},", s, *x,))
+                    .fold("".to_string(), |s, x| format!(
+                        "{}{},",
+                        s, self.instr_table[*x].vreg
+                    ))
                     .trim_matches(','),
                 &b.liveness
                     .borrow()

@@ -25,7 +25,7 @@ pub struct BasicBlock {
 
 #[derive(Clone, Debug)]
 pub struct LivenessInfo {
-    pub def: FxHashSet<VirtualRegister>,
+    pub def: FxHashSet<InstructionId>,
     pub live_in: FxHashSet<InstructionId>,
     pub live_out: FxHashSet<InstructionId>,
 }

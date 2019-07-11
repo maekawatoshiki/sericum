@@ -400,7 +400,3 @@ impl TypeSize for Type {
         }
     }
 }
-
-pub extern "C" fn print(a: i32) {
-    println!("{}", a);
-}

@@ -22,8 +22,8 @@ impl<'a> LivenessAnalyzer<'a> {
             let def = &mut bb.liveness.borrow_mut().def;
 
             for instr_val in &bb.iseq {
-                let instr = &f.instr_table[instr_val.get_instr_id().unwrap()];
-                let idx = instr.vreg;
+                let instr_id = instr_val.get_instr_id().unwrap();
+                let instr = &f.instr_table[instr_id];
 
                 match instr.opcode {
                     Opcode::Add(_, _)
@@ -34,12 +34,12 @@ impl<'a> LivenessAnalyzer<'a> {
                     | Opcode::ICmp(_, _, _)
                     | Opcode::Load(_)
                     | Opcode::Phi(_) => {
-                        def.insert(idx);
+                        def.insert(instr_id);
                     }
                     Opcode::Call(f, _) => {
                         if f.get_type(&self.module).get_function_ty().unwrap().ret_ty != Type::Void
                         {
-                            def.insert(idx);
+                            def.insert(instr_id);
                         }
                     }
                     Opcode::Store(_, _dst) => {
@@ -88,12 +88,11 @@ impl<'a> LivenessAnalyzer<'a> {
 
     pub fn propagate(&mut self, f: &Function, bb_id: BasicBlockId, instr_id: InstructionId) {
         let bb = &f.basic_blocks[bb_id];
-        let idx = f.instr_table[instr_id].vreg;
 
         {
             let mut bb_liveness = bb.liveness.borrow_mut();
 
-            if bb_liveness.def.contains(&idx) {
+            if bb_liveness.def.contains(&instr_id) {
                 return;
             }
 
