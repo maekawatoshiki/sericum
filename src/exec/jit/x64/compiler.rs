@@ -214,14 +214,7 @@ impl<'a> JITCompiler<'a> {
                                 dynasm!(self.asm; call => *lbl);
 
                                 if returns {
-                                    let rn = instr
-                                        .reg
-                                        .borrow()
-                                        .reg
-                                        .unwrap()
-                                        .shift(REGISTER_OFFSET)
-                                        .as_u8();
-                                    dynasm!(self.asm; mov Ra(rn), rax);
+                                    dynasm!(self.asm; mov Ra(reg!(instr)), rax);
                                 }
 
                                 dynasm!(self.asm; add rsp, 8*(args.len() as i32));

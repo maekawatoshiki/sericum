@@ -1,6 +1,6 @@
 use cilk::{
-    exec::{interpreter::interp, jit::x64::compiler, jit::x64::liveness, jit::x64::regalloc},
-    ir::{builder, function, module, opcode, types, value},
+    exec::{jit::x64::compiler, jit::x64::liveness, jit::x64::regalloc},
+    ir::{builder, function, module, types, value},
     *,
 };
 
@@ -37,5 +37,40 @@ fn func_call() {
     jit.compile(func2);
 
     let ret = jit.run(func2, vec![]);
+    println!("jit: {:?}", ret);
+}
+
+#[test]
+fn func_call2() {
+    let mut m = module::Module::new("cilk");
+
+    let f = cilk_ir!(m; define [i32] f (i32) {
+        entry:
+            r = add (%arg.0), (i32 1);
+            ret (%r);
+    });
+
+    let main = cilk_ir!(m; define [i32] main (i32) {
+        entry:
+            i = alloca i32;
+            store (i32 100), (%i);
+            li = load (%i);
+            a = call f [(%li)];
+            ret (%a);
+    });
+
+    let mut liveness = liveness::LivenessAnalyzer::new(&m);
+    liveness.analyze();
+
+    println!("\n{}", m.function_ref(main).to_string(&m));
+    println!("\n{}", m.function_ref(f).to_string(&m));
+
+    regalloc::RegisterAllocator::new(&m).analyze();
+
+    let mut jit = compiler::JITCompiler::new(&m);
+    jit.compile(f);
+    jit.compile(main);
+
+    let ret = jit.run(main, vec![]);
     println!("jit: {:?}", ret);
 }
