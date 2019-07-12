@@ -1,5 +1,5 @@
 use cilk::{
-    exec::{interpreter::interp, jit::x64::compiler, jit::x64::liveness, jit::x64::regalloc},
+    exec::{interpreter::interp, jit::x64::compiler},
     ir::{builder, function, module, opcode, types, value},
 };
 
@@ -62,12 +62,6 @@ pub fn sum() {
     let val_total = builder.build_load(var_total);
     builder.build_ret(val_total);
 
-    liveness::LivenessAnalyzer::new(&m).analyze();
-    regalloc::RegisterAllocator::new(&m).analyze();
-
-    let f = m.function_ref(sum);
-    println!("{}", f.to_string(&m));
-
     let mut interp = interp::Interpreter::new(&m);
     let ret = interp.run_function(sum, vec![interp::ConcreteValue::Int32(10)]);
     println!("exec: sum(10) = {:?}", ret);
@@ -75,6 +69,8 @@ pub fn sum() {
 
     let mut jit = compiler::JITCompiler::new(&m);
     jit.compile_module();
+
+    println!("{}", m.function_ref(sum).to_string(&m));
 
     let ret = jit.run(sum, vec![compiler::GenericValue::Int32(10)]);
     println!("jit: sum(10) = {:?}", ret);

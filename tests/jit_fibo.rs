@@ -1,5 +1,5 @@
 use cilk::{
-    exec::{interpreter::interp, jit::x64::compiler, jit::x64::liveness, jit::x64::regalloc},
+    exec::{interpreter::interp, jit::x64::compiler},
     *,
 };
 use rustc_hash::FxHashMap;
@@ -23,12 +23,6 @@ pub fn jit_fibo() {
             ret (%r3);
     });
 
-    liveness::LivenessAnalyzer::new(&m).analyze();
-    regalloc::RegisterAllocator::new(&m).analyze();
-
-    let f = m.function_ref(fibo);
-    println!("liveness analyzed: {}", f.to_string(&m));
-
     let mut interp = interp::Interpreter::new(&m);
     let ret = interp.run_function(fibo, vec![interp::ConcreteValue::Int32(9)]);
     println!("exec: fibo(9) = {:?}", ret);
@@ -36,6 +30,8 @@ pub fn jit_fibo() {
 
     let mut jit = compiler::JITCompiler::new(&m);
     jit.compile_module();
+
+    println!("liveness analyzed: {}", m.function_ref(fibo).to_string(&m));
 
     let ret = jit.run(fibo, vec![compiler::GenericValue::Int32(9)]);
     println!("jit: fibo(9) = {:?}", ret);

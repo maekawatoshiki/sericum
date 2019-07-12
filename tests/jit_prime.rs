@@ -1,5 +1,5 @@
 use cilk::{
-    exec::{interpreter::interp, jit::x64::compiler, jit::x64::liveness, jit::x64::regalloc},
+    exec::{interpreter::interp, jit::x64::compiler},
     *,
 };
 use rustc_hash::FxHashMap;
@@ -54,12 +54,6 @@ pub fn jit_prime() {
             ret (i32 1);
     });
 
-    liveness::LivenessAnalyzer::new(&m).analyze();
-    regalloc::RegisterAllocator::new(&m).analyze();
-
-    let f = m.function_ref(prime);
-    println!("liveness: {}", f.to_string(&m));
-
     let mut interp = interp::Interpreter::new(&m);
 
     let ret = interp.run_function(prime, vec![interp::ConcreteValue::Int32(97)]);
@@ -72,6 +66,8 @@ pub fn jit_prime() {
 
     let mut jit = compiler::JITCompiler::new(&m);
     jit.compile_module();
+
+    println!("liveness: {}", m.function_ref(prime).to_string(&m));
 
     let ret = jit.run(prime, vec![compiler::GenericValue::Int32(10009723)]);
     println!("jit: prime(10009723) = {:?}", ret);

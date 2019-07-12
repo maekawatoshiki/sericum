@@ -1,5 +1,6 @@
 // TODO: Better assembler than dynasm-rs?
 
+use super::{liveness, regalloc};
 use crate::ir::{basic_block::*, function::*, module::*, opcode::*, types::*, value::*};
 use dynasmrt::*;
 use rustc_hash::FxHashMap;
@@ -46,6 +47,9 @@ pub struct JITCompiler<'a> {
 
 impl<'a> JITCompiler<'a> {
     pub fn new(module: &'a Module) -> Self {
+        liveness::LivenessAnalyzer::new(&module).analyze();
+        regalloc::RegisterAllocator::new(&module).analyze();
+
         Self {
             module,
             asm: x64::Assembler::new().unwrap(),
@@ -131,7 +135,6 @@ impl<'a> JITCompiler<'a> {
                 }
 
                 match &instr.opcode {
-                    // TODO: Support types other than Int32
                     Opcode::Alloca(ty) => self.alloca_mgr.allocate(instr.vreg, ty),
                     Opcode::Load(op1) => self.compile_load(&f, &instr, op1),
                     Opcode::Store(op1, op2) => self.compile_store(&f, op1, op2),
