@@ -9,19 +9,31 @@ pub enum ConcreteValue {
     Mem(*mut u8),
 }
 
-#[derive(Debug)]
 pub struct Interpreter<'a> {
     module: &'a Module,
+    internal_func: FxHashMap<String, fn(&[ConcreteValue]) -> ConcreteValue>,
 }
 
 impl<'a> Interpreter<'a> {
     pub fn new(module: &'a Module) -> Self {
-        Self { module }
+        Self {
+            module,
+            internal_func: {
+                vec![("cilk.println.i32".to_string(), cilk_println_i32 as _)]
+                    .into_iter()
+                    .collect::<FxHashMap<_, _>>()
+            },
+        }
     }
 
     // TODO: Refactor
     pub fn run_function(&mut self, id: FunctionId, args: Vec<ConcreteValue>) -> ConcreteValue {
         let f = self.module.function_ref(id);
+
+        if let Some(f) = self.internal_func.get(&f.name) {
+            return f(&args);
+        }
+
         let mut mem = FxHashMap::default();
 
         fn get_value(
@@ -223,4 +235,12 @@ impl ConcreteValue {
             _ => None,
         }
     }
+}
+
+fn cilk_println_i32(args: &[ConcreteValue]) -> ConcreteValue {
+    match args[0] {
+        ConcreteValue::Int32(i) => println!("{}", i),
+        _ => unimplemented!(),
+    }
+    ConcreteValue::Void
 }

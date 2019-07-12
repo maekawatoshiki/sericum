@@ -17,6 +17,9 @@ pub struct Function {
     /// Instruction arena
     pub instr_table: Arena<Instruction>,
 
+    /// True if internal function
+    pub internal: bool,
+
     /// Unique index for SSA
     vreg_counter: VirtualRegister,
 }
@@ -28,6 +31,11 @@ impl Function {
             ty: Type::func_ty(ret_ty, params_ty),
             basic_blocks: Arena::new(),
             instr_table: Arena::new(),
+            // TODO
+            internal: match name {
+                "cilk.println.i32" => true,
+                _ => false,
+            },
             vreg_counter: 1,
         }
     }

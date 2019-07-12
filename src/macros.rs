@@ -22,12 +22,18 @@ macro_rules! cilk_parse_ty {
     (i32) => {
         types::Type::Int32
     };
+    (void) => {
+        types::Type::Void
+    };
 }
 
 #[macro_export]
 macro_rules! cilk_value {
     ($builder:expr; %arg . $n:expr) => {{
         $builder.get_param($n).unwrap()
+    }};
+    ($builder:expr; void) => {{
+        value::Value::None
     }};
     ($builder:expr; i32 $n:expr) => {{
         value::Value::Immediate(value::ImmediateValue::Int32($n))
@@ -96,6 +102,11 @@ macro_rules! cilk_expr {
     ($builder:expr; $bb_map:expr; $x:ident = call $name:ident [$( ( $($arg:tt)* ) ),*] ; $($remain:tt)*) => {
         let args = vec![ $( cilk_value!($builder; $( $arg )*) ),* ];
         let $x = $builder.build_call(value::Value::Function($builder.module.find_function_by_name(stringify!($name)).unwrap()), args);
+        cilk_expr!($builder; $bb_map; $( $remain )*);
+    };
+    ($builder:expr; $bb_map:expr; $x:ident = call (->$id:expr) [$( ( $($arg:tt)* ) ),*] ; $($remain:tt)*) => {
+        let args = vec![ $( cilk_value!($builder; $( $arg )*) ),* ];
+        let $x = $builder.build_call(value::Value::Function($id), args);
         cilk_expr!($builder; $bb_map; $( $remain )*);
     };
     ($builder:expr; $bb_map:expr; $x:ident = icmp $kind:ident ($($val1:tt)*), ($($val2:tt)*); $($remain:tt)*) => {

@@ -29,6 +29,7 @@ macro_rules! vreg {
 #[derive(Debug, Clone, PartialEq)]
 pub enum GenericValue {
     Int32(i32),
+    None,
 }
 
 #[derive(Debug)]
@@ -43,6 +44,7 @@ pub struct JITCompiler<'a> {
     asm: x64::Assembler,
     function_map: FxHashMap<FunctionId, DynamicLabel>,
     alloca_mgr: AllocaManager,
+    internal_func: FxHashMap<String, u64>, // (fn, param count)
 }
 
 impl<'a> JITCompiler<'a> {
@@ -55,6 +57,11 @@ impl<'a> JITCompiler<'a> {
             asm: x64::Assembler::new().unwrap(),
             function_map: FxHashMap::default(),
             alloca_mgr: AllocaManager::new(),
+            internal_func: {
+                vec![("cilk.println.i32".to_string(), cilk_println_i32 as _)]
+                    .into_iter()
+                    .collect::<FxHashMap<_, _>>()
+            },
         }
     }
 
@@ -69,6 +76,7 @@ impl<'a> JITCompiler<'a> {
                         ; mov r11, *i
                         ; push r11);
                 }
+                GenericValue::None => unreachable!(),
             }
         }
 
@@ -91,6 +99,10 @@ impl<'a> JITCompiler<'a> {
             .ret_ty
         {
             Type::Int32 => GenericValue::Int32(f() as i32),
+            Type::Void => {
+                f();
+                GenericValue::None
+            }
             _ => unimplemented!(),
         }
     }
@@ -194,51 +206,7 @@ impl<'a> JITCompiler<'a> {
                             _ => unimplemented!(),
                         }
                     }
-                    Opcode::Call(func, args) => {
-                        let returns = func
-                            .get_type(&self.module)
-                            .get_function_ty()
-                            .unwrap()
-                            .ret_ty
-                            != Type::Void;
-                        match func {
-                            Value::Function(f_id) => {
-                                let mut save_regs = vec![];
-                                for (_, i) in &f.instr_table {
-                                    let bgn = i.vreg;
-                                    let end = match i.reg.borrow().last_use {
-                                        Some(last_use) => vreg!(f; last_use),
-                                        None => continue,
-                                    };
-                                    if bgn < instr.vreg && instr.vreg < end {
-                                        save_regs.push(reg!(i));
-                                    }
-                                }
-
-                                when_debug!(println!("saved register: {:?}", save_regs));
-
-                                for save_reg in &save_regs {
-                                    dynasm!(self.asm; push Ra(*save_reg));
-                                }
-
-                                self.push_args(f, args);
-
-                                let f_entry = self.get_function_entry_label(*f_id);
-                                dynasm!(self.asm; call => f_entry);
-
-                                if returns {
-                                    dynasm!(self.asm; mov Ra(reg!(instr)), rax);
-                                }
-
-                                dynasm!(self.asm; add rsp, 8*(args.len() as i32));
-
-                                for save_reg in save_regs.iter().rev() {
-                                    dynasm!(self.asm; pop Ra(*save_reg));
-                                }
-                            }
-                            _ => unimplemented!(),
-                        }
-                    }
+                    Opcode::Call(callee, args) => self.compile_call(&f, &instr, callee, args),
                     Opcode::CondBr(cond, b1, b2) => match cond {
                         Value::Instruction(iv) => {
                             let rn = reg!(f; iv.id);
@@ -274,6 +242,15 @@ impl<'a> JITCompiler<'a> {
                                             ; cmp Rd(rn), [rbp+8*(2+arg.index as i32)]
                                             ; setle Rb(reg_num as u8));
                                 }
+                                (
+                                    Value::Instruction(iv),
+                                    Value::Immediate(ImmediateValue::Int32(i)),
+                                ) => {
+                                    let rn = reg!(f; iv.id);
+                                    dynasm!(self.asm
+                                            ; cmp Rd(rn), *i
+                                            ; setle Rb(reg_num as u8));
+                                }
                                 _ => unimplemented!(),
                             },
                             ICmpKind::Eq => match (v1, v2) {
@@ -301,6 +278,7 @@ impl<'a> JITCompiler<'a> {
                             Value::Immediate(ImmediateValue::Int32(x)) => {
                                 dynasm!(self.asm ; mov eax, *x);
                             }
+                            Value::None => {}
                             _ => unimplemented!(),
                         }
                         dynasm!(self.asm ; add rsp, params_len*4; pop rbp; ret);
@@ -329,6 +307,26 @@ impl<'a> JITCompiler<'a> {
                 }
                 Value::Immediate(ImmediateValue::Int32(i)) => dynasm!(self.asm; push *i),
                 Value::Argument(arg) => dynasm!(self.asm; push AWORD [rbp+8*(2+arg.index as i32)]),
+                _ => unimplemented!(),
+            }
+        }
+    }
+
+    pub fn assign_args_to_regs(&mut self, caller: &Function, args: &[Value]) {
+        let pregs = vec![7, 6, 2, 1, 8, 9]; // rdi, rsi, rdx, rcx, r8, r9
+        for (i, arg) in args.iter().enumerate() {
+            let r = match pregs.get(i) {
+                Some(r) => *r as u8,
+                None => unimplemented!("too many arguments for internal function"),
+            }; // TODO
+            match arg {
+                Value::Instruction(InstructionValue { id, .. }) => {
+                    dynasm!(self.asm; mov Ra(r), Ra(reg!(caller; *id)))
+                }
+                Value::Immediate(ImmediateValue::Int32(i)) => dynasm!(self.asm; mov Ra(r), *i),
+                Value::Argument(arg) => {
+                    dynasm!(self.asm; mov Ra(r), AWORD [rbp+8*(2+arg.index as i32)])
+                }
                 _ => unimplemented!(),
             }
         }
@@ -382,6 +380,78 @@ impl<'a> JITCompiler<'a> {
             _ => unimplemented!(),
         }
     }
+
+    pub fn compile_call(
+        &mut self,
+        f: &Function,
+        instr: &Instruction,
+        callee: &Value,
+        args: &[Value],
+    ) {
+        let returns = callee
+            .get_type(&self.module)
+            .get_function_ty()
+            .unwrap()
+            .ret_ty
+            != Type::Void;
+        match callee {
+            Value::Function(callee_id) => {
+                let callee_entity = self.module.function_ref(*callee_id);
+
+                let mut save_regs = vec![];
+                for (_, i) in &f.instr_table {
+                    // TODO
+                    if i.reg.borrow().reg.is_none() {
+                        continue;
+                    }
+
+                    let bgn = i.vreg;
+                    let end = match i.reg.borrow().last_use {
+                        Some(last_use) => vreg!(f; last_use),
+                        None => continue,
+                    };
+                    if bgn < instr.vreg && instr.vreg < end {
+                        save_regs.push(reg!(i));
+                    }
+                }
+
+                when_debug!(println!("saved register: {:?}", save_regs));
+
+                for save_reg in &save_regs {
+                    dynasm!(self.asm; push Ra(*save_reg));
+                }
+
+                if !callee_entity.internal {
+                    self.push_args(f, args);
+                }
+
+                if callee_entity.internal {
+                    self.assign_args_to_regs(f, args);
+                    let callee = self.internal_func.get(&callee_entity.name).unwrap();
+                    dynasm!(self.asm
+                        ; mov rax, QWORD *callee as _
+                        ; call rax
+                    );
+                } else {
+                    let f_entry = self.get_function_entry_label(*callee_id);
+                    dynasm!(self.asm; call => f_entry);
+                }
+
+                if returns {
+                    dynasm!(self.asm; mov Ra(reg!(instr)), rax);
+                }
+
+                if !callee_entity.internal {
+                    dynasm!(self.asm; add rsp, 8*(args.len() as i32));
+                }
+
+                for save_reg in save_regs.iter().rev() {
+                    dynasm!(self.asm; pop Ra(*save_reg));
+                }
+            }
+            _ => unimplemented!(),
+        }
+    }
 }
 
 impl AllocaManager {
@@ -420,5 +490,13 @@ impl TypeSize for Type {
             Type::Function(_) => unimplemented!(),
             Type::Void => 0,
         }
+    }
+}
+
+use libc;
+// Internal function cilk.println.i32
+pub extern "C" fn cilk_println_i32(i: i32) {
+    unsafe {
+        libc::printf("%d\n\0".as_ptr() as *const i8, i);
     }
 }

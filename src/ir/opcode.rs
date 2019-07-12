@@ -92,7 +92,7 @@ impl RegisterAllocInfo {
 impl Opcode {
     pub fn must_return_value(&self) -> bool {
         match self {
-            Opcode::Br(_) | Opcode::CondBr(_, _, _) | Opcode::Ret(_) | Opcode::Store(_, _) |
+            Opcode::Br(_) | Opcode::CondBr(_, _, _) | Opcode::Ret(_) | Opcode::Store(_, _) | Opcode::Call(_, _) |
                 /* alloca doesn't occupy register = */ Opcode::Alloca(_)=> false,
             _ => true,
         }

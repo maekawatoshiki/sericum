@@ -8,6 +8,13 @@ use rustc_hash::FxHashMap;
 pub fn jit_prime() {
     let mut m = module::Module::new("cilk");
 
+    // Internal function must be defined when you use it
+    let cilk_println_i32 = m.add_function(ir::function::Function::new(
+        "cilk.println.i32",
+        ir::types::Type::Void,
+        vec![ir::types::Type::Int32],
+    ));
+
     /*
      * int prime(int n) {
      *     if (n == 2) return 1;
@@ -54,6 +61,30 @@ pub fn jit_prime() {
             ret (i32 1);
     });
 
+    let main = cilk_ir!(m; define [void] main () {
+        entry:
+            i = alloca i32;
+            store (i32 2), (%i);
+            br l1;
+        l1:
+            li = load (%i);
+            c = icmp le (%li), (i32 100);
+            br (%c) l2, l3;
+        l2:
+            p = call prime [(%li)];
+            c = icmp eq (%p), (i32 1);
+            br (%c) l4, l5;
+        l4:
+            __ = call (->cilk_println_i32) [(%li)];
+            br l5;
+        l5:
+            a = add (%li), (i32 1);
+            store (%a), (%i);
+            br l1;
+        l3:
+            ret (void);
+    });
+
     let mut interp = interp::Interpreter::new(&m);
 
     let ret = interp.run_function(prime, vec![interp::ConcreteValue::Int32(97)]);
@@ -68,6 +99,7 @@ pub fn jit_prime() {
     jit.compile_module();
 
     println!("liveness: {}", m.function_ref(prime).to_string(&m));
+    println!("liveness: {}", m.function_ref(main).to_string(&m));
 
     let ret = jit.run(prime, vec![compiler::GenericValue::Int32(10009723)]);
     println!("jit: prime(10009723) = {:?}", ret);
@@ -76,4 +108,7 @@ pub fn jit_prime() {
     let ret = jit.run(prime, vec![compiler::GenericValue::Int32(10009721)]);
     println!("jit: prime(10009721) = {:?}", ret);
     assert_eq!(ret, compiler::GenericValue::Int32(0));
+
+    println!("main:");
+    jit.run(main, vec![]);
 }
