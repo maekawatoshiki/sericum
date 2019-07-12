@@ -72,6 +72,11 @@ impl Instruction {
         reg_info.reg = Some(Register(reg));
         reg_info.spill = spill;
     }
+
+    pub fn can_be_eliminated(&self) -> bool {
+        let no_phy_reg = self.reg.borrow().reg.is_none();
+        self.opcode.must_return_value() && no_phy_reg
+    }
 }
 
 impl RegisterAllocInfo {
@@ -85,6 +90,14 @@ impl RegisterAllocInfo {
 }
 
 impl Opcode {
+    pub fn must_return_value(&self) -> bool {
+        match self {
+            Opcode::Br(_) | Opcode::CondBr(_, _, _) | Opcode::Ret(_) | Opcode::Store(_, _) |
+                /* alloca doesn't occupy register = */ Opcode::Alloca(_)=> false,
+            _ => true,
+        }
+    }
+
     pub fn to_string(&self, m: &Module) -> String {
         match self {
             Opcode::Alloca(ty) => format!("alloca {}", ty.to_string()),

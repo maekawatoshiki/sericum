@@ -125,6 +125,11 @@ impl<'a> JITCompiler<'a> {
                 let instr_id = val.get_instr_id().unwrap();
                 let instr = &f.instr_table[instr_id];
 
+                // TODO: Need something like dead code elimination pass
+                if instr.can_be_eliminated() {
+                    continue;
+                }
+
                 match &instr.opcode {
                     // TODO: Support types other than Int32
                     Opcode::Alloca(ty) => self.alloca_mgr.allocate(instr.vreg, ty),
