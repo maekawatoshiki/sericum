@@ -56,7 +56,7 @@ impl<'a> Interpreter<'a> {
         let mut last_bb_id = cur_bb_id;
 
         let ret = 'main: loop {
-            for val in &bb.iseq {
+            for val in &*bb.iseq.borrow() {
                 let instr_id = val.get_instr_id().unwrap();
                 let instr = &f.instr_table[instr_id];
                 match &instr.opcode {

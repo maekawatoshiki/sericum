@@ -1,9 +1,11 @@
 #![feature(proc_macro_hygiene)]
+#![feature(drain_filter)]
 
 #[macro_use]
 pub mod macros;
 pub mod exec;
 pub mod ir;
+pub mod pass;
 
 pub use ir::*;
 

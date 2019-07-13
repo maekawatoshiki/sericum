@@ -38,7 +38,7 @@ impl<'a> RegisterAllocator<'a> {
         let num_reg = 5;
 
         for (_, bb) in &f.basic_blocks {
-            for instr_val in &bb.iseq {
+            for instr_val in &*bb.iseq_ref() {
                 let instr_id = instr_val.get_instr_id().unwrap();
                 let instr = &f.instr_table[instr_id];
 
@@ -105,7 +105,7 @@ impl<'a> RegisterAllocator<'a> {
         let mut last_instr = None;
 
         for (_, bb) in &f.basic_blocks {
-            for instr_val in &bb.iseq {
+            for instr_val in &*bb.iseq_ref() {
                 let instr_id = instr_val.get_instr_id().unwrap();
                 let instr = &f.instr_table[instr_id];
 

@@ -74,16 +74,16 @@ impl Function {
         self.instr_table.alloc(instr)
     }
 
-    // pub fn uniquify_instructions(&mut self) {
-    //     let mut n = 1;
-    //     for (_, bb) in &mut self.basic_blocks {
-    //         for instr_val in &mut bb.iseq {
-    //             let id = instr_val.get_instr_id().unwrap();
-    //             self.instr_table[id].vreg = n;
-    //             n += 1
-    //         }
-    //     }
-    // }
+    pub fn renumber_vreg(&mut self) {
+        let mut n = 1;
+        for (_, bb) in &mut self.basic_blocks {
+            for instr_val in &mut *bb.iseq_ref_mut() {
+                let id = instr_val.get_instr_id().unwrap();
+                self.instr_table[id].vreg = n;
+                n += 1
+            }
+        }
+    }
 
     pub fn instr_id_to_vreg(&self, id: InstructionId) -> VirtualRegister {
         self.instr_table[id].vreg
@@ -91,7 +91,7 @@ impl Function {
 
     pub fn find_instruction_by_vreg(&self, idx: VirtualRegister) -> Option<&Instruction> {
         for (_, bb) in &self.basic_blocks {
-            for instr_val in &bb.iseq {
+            for instr_val in &*bb.iseq_ref() {
                 let instr_id = instr_val.get_instr_id().unwrap();
                 let instr = &self.instr_table[instr_id];
                 if instr.vreg == idx {

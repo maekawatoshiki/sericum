@@ -21,7 +21,7 @@ impl<'a> LivenessAnalyzer<'a> {
         for (_, bb) in &f.basic_blocks {
             let def = &mut bb.liveness.borrow_mut().def;
 
-            for instr_val in &bb.iseq {
+            for instr_val in &*bb.iseq.borrow() {
                 let instr_id = instr_val.get_instr_id().unwrap();
                 let instr = &f.instr_table[instr_id];
 
@@ -55,7 +55,7 @@ impl<'a> LivenessAnalyzer<'a> {
 
     pub fn visit(&mut self, f: &Function) {
         for (bb_id, bb) in &f.basic_blocks {
-            for instr_val in &bb.iseq {
+            for instr_val in &*bb.iseq.borrow() {
                 let instr = &f.instr_table[instr_val.get_instr_id().unwrap()];
 
                 match &instr.opcode {

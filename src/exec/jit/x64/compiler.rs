@@ -1,7 +1,10 @@
 // TODO: Better assembler than dynasm-rs?
 
 use super::{liveness, regalloc};
-use crate::ir::{basic_block::*, function::*, module::*, opcode::*, types::*, value::*};
+use crate::{
+    ir::{basic_block::*, function::*, module::*, opcode::*, types::*, value::*},
+    pass::dead_code_elimination,
+};
 use dynasmrt::*;
 use rustc_hash::FxHashMap;
 
@@ -52,6 +55,8 @@ impl<'a> JITCompiler<'a> {
         liveness::LivenessAnalyzer::new(&module).analyze();
         regalloc::RegisterAllocator::new(&module).analyze();
 
+        dead_code_elimination::DeadCodeEliminationPass::new(&module).run_on_module();
+
         Self {
             module,
             asm: x64::Assembler::new().unwrap(),
@@ -66,7 +71,7 @@ impl<'a> JITCompiler<'a> {
     }
 
     pub fn run(&mut self, id: FunctionId, args: Vec<GenericValue>) -> GenericValue {
-        let f_entry = *self.function_map.get(&id).unwrap();
+        let f_entry = self.get_function_entry_label(id);
         let entry = self.asm.offset();
 
         for arg in args.iter().rev() {
@@ -137,14 +142,14 @@ impl<'a> JITCompiler<'a> {
                 dynasm!(self.asm; =>label);
             }
 
-            for val in &bb.iseq {
+            for val in &*bb.iseq.borrow() {
                 let instr_id = val.get_instr_id().unwrap();
                 let instr = &f.instr_table[instr_id];
 
                 // TODO: Need something like dead code elimination pass
-                if instr.can_be_eliminated() {
-                    continue;
-                }
+                // if instr.can_be_eliminated() {
+                //     continue;
+                // }
 
                 match &instr.opcode {
                     Opcode::Alloca(ty) => self.alloca_mgr.allocate(instr.vreg, ty),

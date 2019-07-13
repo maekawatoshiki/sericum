@@ -183,7 +183,7 @@ impl<'a> Builder<'a> {
         let bb = self.cur_bb.unwrap();
         self.function_ref_mut()
             .basic_block_ref_mut(bb)
-            .iseq
+            .iseq_ref_mut()
             .push_back(instr);
     }
 }
