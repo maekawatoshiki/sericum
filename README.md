@@ -79,9 +79,6 @@ println!("fibo(10) = {:?}", ret); // fibo(10) = Int32(55)
 
 // JIT SUPPORTS ONLY x86_64
 
-liveness::LivenessAnalyzer::new(&m).analyze();
-regalloc::RegisterAllocator::new(&m).analyze();
-
 let mut jit = compiler::JITCompiler::new(&m);
 jit.compile_module(); // compile the whole module
 

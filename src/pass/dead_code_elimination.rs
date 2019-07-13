@@ -1,5 +1,5 @@
 use super::Pass;
-use crate::ir::{function::*, module::*, opcode::*};
+use crate::ir::{function::*, module::*};
 
 pub struct DeadCodeEliminationPass {}
 

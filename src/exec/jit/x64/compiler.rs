@@ -1,6 +1,6 @@
 // TODO: Better assembler than dynasm-rs?
 
-use super::{liveness, regalloc};
+use super::regalloc;
 use crate::{
     ir::{basic_block::*, function::*, module::*, opcode::*, types::*, value::*},
     pass::*,
@@ -52,7 +52,6 @@ pub struct JITCompiler<'a> {
 
 impl<'a> JITCompiler<'a> {
     pub fn new(module: &'a Module) -> Self {
-        liveness::LivenessAnalyzer::new(module).analyze();
         regalloc::RegisterAllocator::new(module).analyze();
 
         Self {

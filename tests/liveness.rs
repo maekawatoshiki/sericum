@@ -1,18 +1,15 @@
-use cilk::{
-    exec::jit::x64::liveness,
-    ir::{builder, function, module, opcode, types, value},
-};
+use cilk::ir::{builder, function, module, opcode, types, value};
 
 #[test]
 pub fn liveness() {
     let mut m = module::Module::new("cilk");
 
-    let fibo = m.add_function(function::Function::new(
+    let f = m.add_function(function::Function::new(
         "f",
         types::Type::Int32,
         vec![types::Type::Int32],
     ));
-    let mut builder = builder::Builder::new(&mut m, fibo);
+    let mut builder = builder::Builder::new(&mut m, f);
 
     let bb = builder.append_basic_block();
     let bb2 = builder.append_basic_block();
@@ -55,12 +52,5 @@ pub fn liveness() {
     ]);
     builder.build_ret(ret);
 
-    let f = m.function_ref(fibo);
-    println!("{}", f.to_string(&m));
-
-    let mut liveness = liveness::LivenessAnalyzer::new(&m);
-    liveness.analyze();
-
-    let f = m.function_ref(fibo);
-    println!("liveness: {}", f.to_string(&m));
+    println!("{}", m.function_ref(f).to_string(&m));
 }
