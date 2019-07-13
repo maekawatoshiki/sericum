@@ -86,4 +86,5 @@ fn func_call3() {
 
     let ret = jit.run(main, vec![]);
     println!("jit: {:?}", ret);
+    assert_eq!(ret, compiler::GenericValue::Int32(100));
 }

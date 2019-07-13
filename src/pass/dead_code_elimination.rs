@@ -1,34 +1,31 @@
 use super::Pass;
-use crate::ir::{basic_block::*, function::*, module::*, opcode::*, types::*};
+use crate::ir::{function::*, module::*, opcode::*};
 
-pub struct DeadCodeEliminationPass<'a> {
-    module: &'a Module,
-}
+pub struct DeadCodeEliminationPass {}
 
-impl<'a> DeadCodeEliminationPass<'a> {
-    pub fn new(module: &'a Module) -> Self {
-        Self { module }
+impl DeadCodeEliminationPass {
+    pub fn new() -> Self {
+        Self {}
     }
 
-    pub fn run_on_module(&mut self) {
-        for (_, f) in &self.module.functions {
+    pub fn run_on_module(&mut self, module: &Module) {
+        for (_, f) in &module.functions {
             self.run_on_function(&f);
         }
     }
 
-    pub fn run_on_function(&self, f: &Function) {
+    pub fn run_on_function(&mut self, f: &Function) {
         for (_, bb) in &f.basic_blocks {
             bb.iseq_ref_mut().drain_filter(|instr_val| {
                 let instr = &f.instr_table[instr_val.get_instr_id().unwrap()];
-                println!("{:?} - {}", instr, instr.can_be_eliminated());
                 instr.can_be_eliminated()
             });
         }
     }
 }
 
-impl<'a> Pass for DeadCodeEliminationPass<'a> {
-    fn run(module: &Module) {
-        DeadCodeEliminationPass::new(module).run_on_module()
+impl Pass for DeadCodeEliminationPass {
+    fn run(&mut self, module: &Module) {
+        self.run_on_module(module)
     }
 }

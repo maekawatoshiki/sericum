@@ -18,6 +18,16 @@ macro_rules! when_debug {
 }
 
 #[macro_export]
+macro_rules! matches {
+    ($e:expr, $p:pat) => {
+        match $e {
+            $p => true,
+            _ => false,
+        }
+    };
+}
+
+#[macro_export]
 macro_rules! cilk_parse_ty {
     (i32) => {
         types::Type::Int32

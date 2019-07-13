@@ -75,7 +75,9 @@ impl Instruction {
 
     pub fn can_be_eliminated(&self) -> bool {
         let no_phy_reg = self.reg.borrow().reg.is_none();
-        self.opcode.must_return_value() && no_phy_reg
+        let no_last_use = self.reg.borrow().last_use.is_none();
+        let unused_alloca = matches!(self.opcode, Opcode::Alloca(_)) && no_last_use;
+        unused_alloca || (self.opcode.returns_value() && no_phy_reg)
     }
 }
 
@@ -90,10 +92,10 @@ impl RegisterAllocInfo {
 }
 
 impl Opcode {
-    pub fn must_return_value(&self) -> bool {
+    pub fn returns_value(&self) -> bool {
         match self {
             Opcode::Br(_) | Opcode::CondBr(_, _, _) | Opcode::Ret(_) | Opcode::Store(_, _) | Opcode::Call(_, _) |
-                /* alloca doesn't occupy register = */ Opcode::Alloca(_)=> false,
+                /* alloca doesn't return value = */ Opcode::Alloca(_)=> false,
             _ => true,
         }
     }

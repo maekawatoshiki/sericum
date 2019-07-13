@@ -3,7 +3,7 @@
 use super::{liveness, regalloc};
 use crate::{
     ir::{basic_block::*, function::*, module::*, opcode::*, types::*, value::*},
-    pass::dead_code_elimination,
+    pass::*,
 };
 use dynasmrt::*;
 use rustc_hash::FxHashMap;
@@ -41,21 +41,19 @@ pub struct AllocaManager {
     cur_size: usize,
 }
 
-#[derive(Debug)]
 pub struct JITCompiler<'a> {
     module: &'a Module,
     asm: x64::Assembler,
     function_map: FxHashMap<FunctionId, DynamicLabel>,
     alloca_mgr: AllocaManager,
-    internal_func: FxHashMap<String, u64>, // (fn, param count)
+    internal_func: FxHashMap<String, u64>, // fn
+    pass_mgr: PassManager,
 }
 
 impl<'a> JITCompiler<'a> {
     pub fn new(module: &'a Module) -> Self {
-        liveness::LivenessAnalyzer::new(&module).analyze();
-        regalloc::RegisterAllocator::new(&module).analyze();
-
-        dead_code_elimination::DeadCodeEliminationPass::new(&module).run_on_module();
+        liveness::LivenessAnalyzer::new(module).analyze();
+        regalloc::RegisterAllocator::new(module).analyze();
 
         Self {
             module,
@@ -67,7 +65,18 @@ impl<'a> JITCompiler<'a> {
                     .into_iter()
                     .collect::<FxHashMap<_, _>>()
             },
+            pass_mgr: {
+                let mut pass_mgr = PassManager::new();
+                pass_mgr.add_pass(Box::new(
+                    dead_code_elimination::DeadCodeEliminationPass::new(),
+                ));
+                pass_mgr
+            },
         }
+    }
+
+    pub fn add_pass(&mut self, pass: Box<dyn Pass>) {
+        self.pass_mgr.add_pass(pass);
     }
 
     pub fn run(&mut self, id: FunctionId, args: Vec<GenericValue>) -> GenericValue {
@@ -113,16 +122,16 @@ impl<'a> JITCompiler<'a> {
     }
 
     pub fn compile_module(&mut self) {
+        self.pass_mgr.run_as_necessary(&self.module);
+
         for (f_id, _) in &self.module.functions {
             self.compile_function(f_id);
         }
     }
 
-    pub fn compile_function(&mut self, id: FunctionId) {
+    fn compile_function(&mut self, id: FunctionId) {
         let f = self.module.function_ref(id);
-
         let params_len = f.ty.get_function_ty().unwrap().params_ty.len() as i32;
-
         let f_entry = self.get_function_entry_label(id);
 
         dynasm!(self.asm
