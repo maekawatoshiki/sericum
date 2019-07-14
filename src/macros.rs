@@ -1,6 +1,6 @@
 #[macro_export]
 macro_rules! some_then {
-    ($x:ident, $e:expr, $t:expr) => {{
+    ($x:pat, $e:expr, $t:expr) => {{
         if let Some($x) = $e {
             $t
         }
@@ -107,6 +107,14 @@ macro_rules! cilk_expr {
         let val1 = cilk_value!($builder; $( $val1 )*);
         let val2 = cilk_value!($builder; $( $val2 )*);
         let $x = $builder.build_rem(val1, val2);
+        cilk_expr!($builder; $bb_map; $( $remain )*);
+    };
+    ($builder:expr; $bb_map:expr; $x:ident = phi [$( [ ($($arg:tt)*), $bb:ident ] ),*] ; $($remain:tt)*) => {
+        let args = vec![$(
+                           (cilk_value!($builder; $( $arg )*),
+                            *$bb_map.entry(stringify!($bb)).or_insert_with(|| $builder.append_basic_block()))
+                       ),*];
+        let $x = $builder.build_phi(args);
         cilk_expr!($builder; $bb_map; $( $remain )*);
     };
     ($builder:expr; $bb_map:expr; $x:ident = call $name:ident [$( ( $($arg:tt)* ) ),*] ; $($remain:tt)*) => {

@@ -48,6 +48,7 @@ pub struct JITCompiler<'a> {
     alloca_mgr: AllocaManager,
     internal_func: FxHashMap<String, u64>, // fn
     pass_mgr: PassManager,
+    phi_map: FxHashMap<BasicBlockId, (Value, InstructionId)>,
 }
 
 impl<'a> JITCompiler<'a> {
@@ -71,6 +72,7 @@ impl<'a> JITCompiler<'a> {
                 ));
                 pass_mgr
             },
+            phi_map: FxHashMap::default(),
         }
     }
 
@@ -133,6 +135,8 @@ impl<'a> JITCompiler<'a> {
         let params_len = f.ty.get_function_ty().unwrap().params_ty.len() as i32;
         let f_entry = self.get_function_entry_label(id);
 
+        self.collect_phi(f);
+
         dynasm!(self.asm
             ; => f_entry
             ; push rbp
@@ -163,6 +167,7 @@ impl<'a> JITCompiler<'a> {
                     Opcode::Alloca(ty) => self.alloca_mgr.allocate(instr.vreg, ty),
                     Opcode::Load(op1) => self.compile_load(&f, &instr, op1),
                     Opcode::Store(op1, op2) => self.compile_store(&f, op1, op2),
+                    Opcode::Phi(_) => {}
                     Opcode::Add(op1, op2) => self.compile_add(&f, &instr, op1, op2),
                     Opcode::Sub(v1, v2) => {
                         let rn = reg!(instr);
@@ -187,6 +192,13 @@ impl<'a> JITCompiler<'a> {
                                 let reg2 = reg!(f; *id2);
                                 dynasm!(self.asm; mov Ra(rn), Ra(reg1));
                                 dynasm!(self.asm; imul Ra(rn), Ra(reg2));
+                            }
+                            (
+                                Value::Instruction(InstructionValue { id: id1, .. }),
+                                Value::Immediate(ImmediateValue::Int32(i)),
+                            ) => {
+                                let reg1 = reg!(f; *id1);
+                                dynasm!(self.asm; imul Ra(rn), Ra(reg1), *i);
                             }
                             _ => unimplemented!(),
                         }
@@ -230,6 +242,9 @@ impl<'a> JITCompiler<'a> {
                             let l2 = *bbs
                                 .entry(*b2)
                                 .or_insert_with(|| self.asm.new_dynamic_label());
+
+                            self.merge_phi(f, bb_id);
+
                             dynasm!(self.asm ; je =>l1 ; jmp =>l2);
                         }
                         _ => unimplemented!(),
@@ -238,6 +253,9 @@ impl<'a> JITCompiler<'a> {
                         let label = *bbs
                             .entry(*bb)
                             .or_insert_with(|| self.asm.new_dynamic_label());
+
+                        self.merge_phi(f, bb_id);
+
                         dynasm!(self.asm; jmp =>label);
                     }
                     Opcode::ICmp(kind, v1, v2) => {
@@ -296,7 +314,6 @@ impl<'a> JITCompiler<'a> {
                         }
                         dynasm!(self.asm ; add rsp, params_len*4; pop rbp; ret);
                     }
-                    e => unimplemented!("{:?}", e),
                 }
             }
         }
@@ -463,6 +480,38 @@ impl<'a> JITCompiler<'a> {
                 }
             }
             _ => unimplemented!(),
+        }
+    }
+
+    fn merge_phi(&mut self, f: &Function, bb_id: BasicBlockId) {
+        some_then!((val, asgn), self.phi_map.get(&bb_id), {
+            match val {
+                Value::Instruction(iv) => {
+                    dynasm!(self.asm; mov Ra(reg!(f; *asgn)), Ra(reg!(f; iv.id) as u8));
+                }
+                Value::Immediate(ImmediateValue::Int32(i)) => {
+                    dynasm!(self.asm; mov Ra(reg!(f; *asgn)),*i);
+                }
+                _ => unimplemented!(),
+            }
+        })
+    }
+
+    fn collect_phi(&mut self, f: &Function) {
+        for (_, bb) in &f.basic_blocks {
+            for val in &*bb.iseq.borrow() {
+                let instr_id = val.get_instr_id().unwrap();
+                let instr = &f.instr_table[instr_id];
+
+                match &instr.opcode {
+                    Opcode::Phi(pairs) => {
+                        for (val, bb) in pairs {
+                            self.phi_map.insert(*bb, (*val, instr_id));
+                        }
+                    }
+                    _ => {}
+                }
+            }
         }
     }
 }

@@ -36,31 +36,6 @@ impl<'a> Builder<'a> {
         self.cur_bb = Some(id);
     }
 
-    pub fn propagate(&self, bb_id: BasicBlockId, instr_id: InstructionId) {
-        let bb = &self.function_ref().basic_blocks[bb_id];
-
-        {
-            let mut bb_liveness = bb.liveness.borrow_mut();
-
-            if bb_liveness.def.contains(&instr_id) {
-                return;
-            }
-
-            if !bb_liveness.live_in.insert(instr_id) {
-                // live_in already had the value instr_id
-                return;
-            }
-        }
-
-        for pred_id in &bb.pred {
-            let pred = &self.function_ref().basic_blocks[*pred_id];
-            if pred.liveness.borrow_mut().live_out.insert(instr_id) {
-                // live_out didn't have the value instr_id
-                self.propagate(*pred_id, instr_id);
-            }
-        }
-    }
-
     pub fn build_alloca(&mut self, ty: Type) -> Value {
         let ptr_ty = ty.get_pointer_ty();
         let instr = self.create_instr_value(Opcode::Alloca(ty), ptr_ty);
@@ -72,7 +47,7 @@ impl<'a> Builder<'a> {
         some_then!(
             id,
             v.get_instr_id(),
-            self.propagate(self.cur_bb.unwrap(), id)
+            self.propagate_instr(self.cur_bb.unwrap(), id)
         );
 
         let instr = self.create_instr_value(
@@ -85,8 +60,8 @@ impl<'a> Builder<'a> {
 
     pub fn build_store(&mut self, src: Value, dst: Value) -> Value {
         let cur_bb_id = self.cur_bb.unwrap();
-        some_then!(id, src.get_instr_id(), self.propagate(cur_bb_id, id));
-        some_then!(id, dst.get_instr_id(), self.propagate(cur_bb_id, id));
+        some_then!(id, src.get_instr_id(), self.propagate_instr(cur_bb_id, id));
+        some_then!(id, dst.get_instr_id(), self.propagate_instr(cur_bb_id, id));
 
         let instr = self.create_instr_value(Opcode::Store(src, dst), Type::Void);
         self.append_instr_to_cur_bb(instr, false);
@@ -99,8 +74,8 @@ impl<'a> Builder<'a> {
         }
 
         let cur_bb_id = self.cur_bb.unwrap();
-        some_then!(id, v1.get_instr_id(), self.propagate(cur_bb_id, id));
-        some_then!(id, v2.get_instr_id(), self.propagate(cur_bb_id, id));
+        some_then!(id, v1.get_instr_id(), self.propagate_instr(cur_bb_id, id));
+        some_then!(id, v2.get_instr_id(), self.propagate_instr(cur_bb_id, id));
 
         let instr = self.create_instr_value(Opcode::Add(v1, v2), v1.get_type(self.module).clone());
         self.append_instr_to_cur_bb(instr, true);
@@ -113,8 +88,8 @@ impl<'a> Builder<'a> {
         }
 
         let cur_bb_id = self.cur_bb.unwrap();
-        some_then!(id, v1.get_instr_id(), self.propagate(cur_bb_id, id));
-        some_then!(id, v2.get_instr_id(), self.propagate(cur_bb_id, id));
+        some_then!(id, v1.get_instr_id(), self.propagate_instr(cur_bb_id, id));
+        some_then!(id, v2.get_instr_id(), self.propagate_instr(cur_bb_id, id));
 
         let instr = self.create_instr_value(Opcode::Sub(v1, v2), v1.get_type(self.module).clone());
         self.append_instr_to_cur_bb(instr, true);
@@ -127,8 +102,8 @@ impl<'a> Builder<'a> {
         }
 
         let cur_bb_id = self.cur_bb.unwrap();
-        some_then!(id, v1.get_instr_id(), self.propagate(cur_bb_id, id));
-        some_then!(id, v2.get_instr_id(), self.propagate(cur_bb_id, id));
+        some_then!(id, v1.get_instr_id(), self.propagate_instr(cur_bb_id, id));
+        some_then!(id, v2.get_instr_id(), self.propagate_instr(cur_bb_id, id));
 
         let instr = self.create_instr_value(Opcode::Mul(v1, v2), v1.get_type(self.module).clone());
         self.append_instr_to_cur_bb(instr, true);
@@ -141,8 +116,8 @@ impl<'a> Builder<'a> {
         }
 
         let cur_bb_id = self.cur_bb.unwrap();
-        some_then!(id, v1.get_instr_id(), self.propagate(cur_bb_id, id));
-        some_then!(id, v2.get_instr_id(), self.propagate(cur_bb_id, id));
+        some_then!(id, v1.get_instr_id(), self.propagate_instr(cur_bb_id, id));
+        some_then!(id, v2.get_instr_id(), self.propagate_instr(cur_bb_id, id));
 
         let instr = self.create_instr_value(Opcode::Rem(v1, v2), v1.get_type(self.module).clone());
         self.append_instr_to_cur_bb(instr, true);
@@ -151,8 +126,8 @@ impl<'a> Builder<'a> {
 
     pub fn build_icmp(&mut self, kind: ICmpKind, v1: Value, v2: Value) -> Value {
         let cur_bb_id = self.cur_bb.unwrap();
-        some_then!(id, v1.get_instr_id(), self.propagate(cur_bb_id, id));
-        some_then!(id, v2.get_instr_id(), self.propagate(cur_bb_id, id));
+        some_then!(id, v1.get_instr_id(), self.propagate_instr(cur_bb_id, id));
+        some_then!(id, v2.get_instr_id(), self.propagate_instr(cur_bb_id, id));
 
         let instr = self.create_instr_value(Opcode::ICmp(kind, v1, v2), Type::Int1);
         self.append_instr_to_cur_bb(instr, true);
@@ -178,7 +153,7 @@ impl<'a> Builder<'a> {
 
     pub fn build_cond_br(&mut self, cond: Value, bb1: BasicBlockId, bb2: BasicBlockId) -> Value {
         let cur_bb_id = self.cur_bb.unwrap();
-        some_then!(id, cond.get_instr_id(), self.propagate(cur_bb_id, id));
+        some_then!(id, cond.get_instr_id(), self.propagate_instr(cur_bb_id, id));
 
         let instr = self.create_instr_value(Opcode::CondBr(cond, bb1, bb2), Type::Void);
         self.append_instr_to_cur_bb(instr, false);
@@ -202,7 +177,7 @@ impl<'a> Builder<'a> {
     pub fn build_phi(&mut self, pairs: Vec<(Value, BasicBlockId)>) -> Value {
         let cur_bb_id = self.cur_bb.unwrap();
         for (val, _) in &pairs {
-            some_then!(id, val.get_instr_id(), self.propagate(cur_bb_id, id));
+            some_then!(id, val.get_instr_id(), self.propagate_instr(cur_bb_id, id));
         }
 
         let ty = pairs.get(0).unwrap().0.get_type(self.module).clone();
@@ -213,9 +188,9 @@ impl<'a> Builder<'a> {
 
     pub fn build_call(&mut self, f: Value, args: Vec<Value>) -> Value {
         let cur_bb_id = self.cur_bb.unwrap();
-        some_then!(id, f.get_instr_id(), self.propagate(cur_bb_id, id));
+        some_then!(id, f.get_instr_id(), self.propagate_instr(cur_bb_id, id));
         for arg in &args {
-            some_then!(id, arg.get_instr_id(), self.propagate(cur_bb_id, id));
+            some_then!(id, arg.get_instr_id(), self.propagate_instr(cur_bb_id, id));
         }
 
         let ret_ty = f
@@ -234,7 +209,7 @@ impl<'a> Builder<'a> {
         some_then!(
             id,
             v.get_instr_id(),
-            self.propagate(self.cur_bb.unwrap(), id)
+            self.propagate_instr(self.cur_bb.unwrap(), id)
         );
 
         let instr = self.create_instr_value(Opcode::Ret(v), Type::Void);
@@ -260,6 +235,31 @@ impl<'a> Builder<'a> {
         if set_def {
             if let Value::Instruction(InstructionValue { id, .. }) = &instr {
                 bb.liveness.borrow_mut().def.insert(*id);
+            }
+        }
+    }
+
+    fn propagate_instr(&self, bb_id: BasicBlockId, instr_id: InstructionId) {
+        let bb = &self.function_ref().basic_blocks[bb_id];
+
+        {
+            let mut bb_liveness = bb.liveness.borrow_mut();
+
+            if bb_liveness.def.contains(&instr_id) {
+                return;
+            }
+
+            if !bb_liveness.live_in.insert(instr_id) {
+                // live_in already had the value instr_id
+                return;
+            }
+        }
+
+        for pred_id in &bb.pred {
+            let pred = &self.function_ref().basic_blocks[*pred_id];
+            if pred.liveness.borrow_mut().live_out.insert(instr_id) {
+                // live_out didn't have the value instr_id
+                self.propagate_instr(*pred_id, instr_id);
             }
         }
     }
