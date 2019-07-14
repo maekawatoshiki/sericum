@@ -555,10 +555,7 @@ impl TypeSize for Type {
     }
 }
 
-use libc;
 // Internal function cilk.println.i32
 pub extern "C" fn cilk_println_i32(i: i32) {
-    unsafe {
-        libc::printf("%d\n\0".as_ptr() as *const i8, i);
-    }
+    println!("{}", i);
 }
