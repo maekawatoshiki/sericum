@@ -41,11 +41,17 @@ pub struct AllocaManager {
     cur_size: usize,
 }
 
+#[derive(Debug)]
+pub struct ArgumentManager {
+    idx_to_offset: FxHashMap<usize, i32>,
+}
+
 pub struct JITCompiler<'a> {
     module: &'a Module,
     asm: x64::Assembler,
     function_map: FxHashMap<FunctionId, DynamicLabel>,
     alloca_mgr: AllocaManager,
+    args_mgr: ArgumentManager,
     internal_func: FxHashMap<String, u64>, // fn
     pass_mgr: PassManager,
     phi_map: FxHashMap<BasicBlockId, (Value, InstructionId)>,
@@ -72,6 +78,7 @@ impl<'a> JITCompiler<'a> {
                 ));
                 pass_mgr
             },
+            args_mgr: ArgumentManager::new(),
             phi_map: FxHashMap::default(),
         }
     }
@@ -140,6 +147,7 @@ impl<'a> JITCompiler<'a> {
     fn compile_function(&mut self, id: FunctionId) {
         let f = self.module.function_ref(id);
         let f_entry = self.get_function_entry_label(id);
+        self.args_mgr.init(f);
 
         self.collect_phi(f);
         self.collect_alloca(f);
@@ -172,21 +180,7 @@ impl<'a> JITCompiler<'a> {
                     Opcode::Load(op1) => self.compile_load(&f, &instr, op1),
                     Opcode::Store(op1, op2) => self.compile_store(&f, op1, op2),
                     Opcode::Add(op1, op2) => self.compile_add(&f, &instr, op1, op2),
-                    Opcode::Sub(v1, v2) => {
-                        let rn = reg!(instr);
-                        match (v1, v2) {
-                            (
-                                Value::Argument(ArgumentValue { index, .. }),
-                                Value::Immediate(ImmediateValue::Int32(i)),
-                            ) => dynasm!(self.asm
-                                    ; mov Ra(rn), [rbp+8*(2+*index as i32)]
-                                    ; sub Ra(rn), *i),
-                            (Value::Argument(a1), Value::Argument(a2)) => dynasm!(self.asm
-                                    ; mov Ra(rn), [rbp+8*(2+a1.index as i32)]
-                                    ; sub Ra(rn), [rbp+8*(2+a2.index as i32)]),
-                            _ => unimplemented!(),
-                        }
-                    }
+                    Opcode::Sub(op1, op2) => self.compile_sub(f, instr, op1, op2),
                     Opcode::Mul(v1, v2) => {
                         let rn = reg!(instr);
                         match (v1, v2) {
@@ -196,15 +190,15 @@ impl<'a> JITCompiler<'a> {
                             ) => {
                                 let reg1 = reg!(f; *id1);
                                 let reg2 = reg!(f; *id2);
-                                dynasm!(self.asm; mov Ra(rn), Ra(reg1));
-                                dynasm!(self.asm; imul Ra(rn), Ra(reg2));
+                                dynasm!(self.asm; mov Rd(rn), Rd(reg1));
+                                dynasm!(self.asm; imul Rd(rn), Rd(reg2));
                             }
                             (
                                 Value::Instruction(InstructionValue { id: id1, .. }),
                                 Value::Immediate(ImmediateValue::Int32(i)),
                             ) => {
                                 let reg1 = reg!(f; *id1);
-                                dynasm!(self.asm; imul Ra(rn), Ra(reg1), *i);
+                                dynasm!(self.asm; imul Rd(rn), Rd(reg1), *i);
                             }
                             _ => unimplemented!(),
                         }
@@ -213,26 +207,23 @@ impl<'a> JITCompiler<'a> {
                         let rn = reg!(instr);
                         match (v1, v2) {
                             (
-                                Value::Argument(ArgumentValue { index, .. }),
+                                Value::Argument(a),
                                 Value::Instruction(InstructionValue { id: id1, .. }),
                             ) => {
                                 let reg1 = reg!(f; *id1);
                                 dynasm!(self.asm
-                                    ; mov rax, [rbp+8*(2+*index as i32)]
-                                    ; mov rdx, 0
-                                    ; idiv Ra(reg1)
-                                    ; mov Ra(rn), rdx);
+                                    ; mov eax, [rbp+8+self.args_mgr.get_offset(a.index).unwrap()]
+                                    ; mov edx, 0
+                                    ; idiv Rd(reg1)
+                                    ; mov Rd(rn), edx);
                             }
-                            (
-                                Value::Argument(ArgumentValue { index, .. }),
-                                Value::Immediate(ImmediateValue::Int32(i)),
-                            ) => {
+                            (Value::Argument(a), Value::Immediate(ImmediateValue::Int32(i))) => {
                                 dynasm!(self.asm
-                                    ; mov rax, [rbp+8*(2+*index as i32)]
-                                    ; mov Ra(rn), *i
-                                    ; mov rdx, 0
-                                    ; idiv Ra(rn)
-                                    ; mov Ra(rn), rdx);
+                                    ; mov eax, [rbp+8+self.args_mgr.get_offset(a.index).unwrap()]
+                                    ; mov Rd(rn), *i
+                                    ; mov edx, 0
+                                    ; idiv Rd(rn)
+                                    ; mov Rd(rn), edx);
                             }
                             _ => unimplemented!(),
                         }
@@ -270,13 +261,13 @@ impl<'a> JITCompiler<'a> {
                             ICmpKind::Le => match (v1, v2) {
                                 (Value::Argument(arg), Value::Immediate(n)) => {
                                     dynasm!(self.asm
-                                            ; cmp QWORD [rbp+8*(2+arg.index as i32)], n.as_int32());
+                                            ; cmp QWORD [rbp+8+self.args_mgr.get_offset(arg.index).unwrap()], n.as_int32());
                                     dynasm!(self.asm; setle Rb(reg_num));
                                 }
                                 (Value::Instruction(iv), Value::Argument(arg)) => {
                                     let rn = reg!(f; iv.id);
                                     dynasm!(self.asm
-                                            ; cmp Rd(rn), [rbp+8*(2+arg.index as i32)]
+                                            ; cmp Rd(rn), [rbp+8+self.args_mgr.get_offset(arg.index).unwrap()]
                                             ; setle Rb(reg_num as u8));
                                 }
                                 (
@@ -293,7 +284,7 @@ impl<'a> JITCompiler<'a> {
                             ICmpKind::Eq => match (v1, v2) {
                                 (Value::Argument(arg), Value::Immediate(n)) => {
                                     dynasm!(self.asm
-                                        ; cmp QWORD [rbp+8*(2+arg.index as i32)], n.as_int32()
+                                        ; cmp QWORD [rbp+8+self.args_mgr.get_offset(arg.index).unwrap()], n.as_int32()
                                         ; sete Rb(reg_num as u8));
                                 }
                                 (Value::Instruction(instr), Value::Immediate(n)) => {
@@ -325,6 +316,7 @@ impl<'a> JITCompiler<'a> {
         }
 
         self.alloca_mgr.reset();
+        self.args_mgr.reset();
     }
 
     fn get_function_entry_label(&mut self, f_id: FunctionId) -> DynamicLabel {
@@ -337,19 +329,20 @@ impl<'a> JITCompiler<'a> {
         f_entry
     }
 
-    fn push_args(&mut self, f: &Function, args: &[Value]) {
+    fn push_args(&mut self, f: &Function, args: &[Value]) -> usize {
         for arg in args.iter().rev() {
             match arg {
                 Value::Instruction(InstructionValue { id, .. }) => {
                     dynasm!(self.asm; push Ra(reg!(f; *id)))
                 }
-                Value::Immediate(ImmediateValue::Int32(i)) => {
-                    dynasm!(self.asm; mov rax, *i; push rax)
+                Value::Immediate(ImmediateValue::Int32(i)) => dynasm!(self.asm; push *i),
+                Value::Argument(arg) => {
+                    dynasm!(self.asm; push QWORD [rbp+8+self.args_mgr.get_offset(arg.index).unwrap()])
                 }
-                Value::Argument(arg) => dynasm!(self.asm; push AWORD [rbp+8*(2+arg.index as i32)]),
                 _ => unimplemented!(),
             }
         }
+        args.len() * 8 // TODO
     }
 
     fn assign_args_to_regs(&mut self, caller: &Function, args: &[Value]) {
@@ -363,9 +356,9 @@ impl<'a> JITCompiler<'a> {
                 Value::Instruction(InstructionValue { id, .. }) => {
                     dynasm!(self.asm; mov Ra(r), Ra(reg!(caller; *id)))
                 }
-                Value::Immediate(ImmediateValue::Int32(i)) => dynasm!(self.asm; mov Ra(r), *i),
+                Value::Immediate(ImmediateValue::Int32(i)) => dynasm!(self.asm; mov Rd(r), *i),
                 Value::Argument(arg) => {
-                    dynasm!(self.asm; mov Ra(r), AWORD [rbp+8*(2+arg.index as i32)])
+                    dynasm!(self.asm; mov Ra(r), AWORD [rbp+8+self.args_mgr.get_offset(arg.index).unwrap()])
                 }
                 _ => unimplemented!(),
             }
@@ -406,19 +399,41 @@ impl<'a> JITCompiler<'a> {
         let rn = reg!(instr);
         match (op1, op2) {
             (Value::Argument(a), Value::Immediate(ImmediateValue::Int32(i))) => {
-                dynasm!(self.asm; mov Ra(rn), [rbp+8*(2+a.index as i32)]; add Ra(rn), *i)
+                dynasm!(self.asm; mov Rd(rn), [rbp+8+self.args_mgr.get_offset(a.index).unwrap()]; add Rd(rn), *i)
             }
             (Value::Instruction(v), Value::Argument(a)) => {
-                dynasm!(self.asm; mov Ra(rn), Ra(reg!(f; v.id)); add Ra(rn), [rbp+8*(2+a.index as i32)])
+                dynasm!(self.asm; mov Rd(rn), Rd(reg!(f; v.id)); add Rd(rn), [rbp+8+self.args_mgr.get_offset(a.index).unwrap()])
             }
             (Value::Instruction(v1), Value::Instruction(v2)) => {
-                dynasm!(self.asm; mov Ra(rn), Ra(reg!(f; v1.id)); add Ra(rn), Ra(reg!(f; v2.id)))
+                dynasm!(self.asm; mov Rd(rn), Rd(reg!(f; v1.id)); add Rd(rn), Rd(reg!(f; v2.id)))
             }
             (Value::Instruction(v), Value::Immediate(ImmediateValue::Int32(i))) => {
-                dynasm!(self.asm; mov Ra(rn), Ra(reg!(f; v.id)); add Ra(rn), *i)
+                dynasm!(self.asm; mov Rd(rn), Rd(reg!(f; v.id)); add Rd(rn), *i)
             }
-            (Value::Argument(a1), Value::Argument(a2)) => {
-                dynasm!(self.asm; mov Ra(rn), [rbp+8*(2+a1.index as i32)]; add Ra(rn), [rbp+8*(2+a2.index as i32)])
+            (Value::Argument(a1), Value::Argument(a2)) => dynasm!(self.asm
+                        ; mov Rd(rn), [rbp+8+self.args_mgr.get_offset(a1.index).unwrap()]
+                        ; add Rd(rn), [rbp+8+self.args_mgr.get_offset(a2.index).unwrap()]),
+            _ => unimplemented!(),
+        }
+    }
+
+    fn compile_sub(&mut self, f: &Function, instr: &Instruction, op1: &Value, op2: &Value) {
+        let rn = reg!(instr);
+        match (op1, op2) {
+            (Value::Argument(a), Value::Immediate(ImmediateValue::Int32(i))) => dynasm!(self.asm
+                                    ; mov Rd(rn), [rbp+8 + self.args_mgr.get_offset(a.index).unwrap()]
+                                    ; sub Rd(rn), *i),
+            (Value::Argument(a1), Value::Argument(a2)) => dynasm!(self.asm
+                                    ; mov Rd(rn), [rbp+8+self.args_mgr.get_offset(a1.index).unwrap()]
+                                    ; sub Rd(rn), [rbp+8+self.args_mgr.get_offset(a2.index).unwrap()]),
+            (Value::Instruction(v), Value::Argument(a)) => {
+                dynasm!(self.asm; mov Rd(rn), Rd(reg!(f; v.id)); sub Rd(rn), [rbp+8+self.args_mgr.get_offset(a.index).unwrap()])
+            }
+            (Value::Instruction(v1), Value::Instruction(v2)) => {
+                dynasm!(self.asm; mov Rd(rn), Rd(reg!(f; v1.id)); sub Rd(rn), Rd(reg!(f; v2.id)))
+            }
+            (Value::Instruction(v), Value::Immediate(ImmediateValue::Int32(i))) => {
+                dynasm!(self.asm; mov Rd(rn), Rd(reg!(f; v.id)); sub Rd(rn), *i)
             }
             _ => unimplemented!(),
         }
@@ -460,8 +475,7 @@ impl<'a> JITCompiler<'a> {
                 }
 
                 if !callee_entity.internal {
-                    rsp_offset += args.len() * 8;
-                    self.push_args(f, args);
+                    rsp_offset += self.push_args(f, args);
                 }
 
                 if callee_entity.internal {
@@ -512,14 +526,10 @@ impl<'a> JITCompiler<'a> {
             for val in &*bb.iseq.borrow() {
                 let instr_id = val.get_instr_id().unwrap();
                 let instr = &f.instr_table[instr_id];
-
-                match &instr.opcode {
-                    Opcode::Phi(pairs) => {
-                        for (val, bb) in pairs {
-                            self.phi_map.insert(*bb, (*val, instr_id));
-                        }
+                if let Opcode::Phi(pairs) = &instr.opcode {
+                    for (val, bb) in pairs {
+                        self.phi_map.insert(*bb, (*val, instr_id));
                     }
-                    _ => {}
                 }
             }
         }
@@ -564,6 +574,31 @@ impl AllocaManager {
 
     pub fn local_size(&self) -> usize {
         self.cur_size
+    }
+}
+
+impl ArgumentManager {
+    pub fn new() -> Self {
+        Self {
+            idx_to_offset: FxHashMap::default(),
+        }
+    }
+
+    pub fn reset(&mut self) {
+        self.idx_to_offset.clear();
+    }
+
+    pub fn init(&mut self, f: &Function) {
+        let params_ty = &f.ty.get_function_ty().unwrap().params_ty;
+        let mut offset = 0;
+        for (i, param_ty) in params_ty.iter().enumerate() {
+            offset += roundup(param_ty.size_in_byte() as i32, 8); // TODO
+            self.idx_to_offset.insert(i, offset);
+        }
+    }
+
+    pub fn get_offset(&self, idx: usize) -> Option<i32> {
+        self.idx_to_offset.get(&idx).map(|x| *x)
     }
 }
 
