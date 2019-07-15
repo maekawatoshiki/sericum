@@ -123,15 +123,6 @@ impl<'a> RegisterAllocator<'a> {
                                 f.instr_table[id].set_last_use(Some(instr_id))
                             );
                         }
-                        // if func
-                        //     .get_type(&self.module)
-                        //     .get_function_ty()
-                        //     .unwrap()
-                        //     .ret_ty
-                        //     != Type::Void
-                        // {
-                        //     instr.set_last_use(Some(instr_id));
-                        // }
                     }
                     Opcode::CondBr(ref v, _, _) | Opcode::Ret(ref v) | Opcode::Load(ref v) => {
                         some_then!(

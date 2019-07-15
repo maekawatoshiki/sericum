@@ -84,6 +84,13 @@ impl<'a> JITCompiler<'a> {
         let f_entry = self.get_function_entry_label(id);
         let entry = self.asm.offset();
 
+        let rsp_offset = if args.len() % 2 != 0 {
+            dynasm!(self.asm; sub rsp, 8);
+            8
+        } else {
+            0
+        };
+
         for arg in args.iter().rev() {
             match arg {
                 GenericValue::Int32(i) => {
@@ -97,7 +104,7 @@ impl<'a> JITCompiler<'a> {
 
         dynasm!(self.asm
                 ; call =>f_entry
-                ; add rsp, 8*(args.len() as i32)
+                ; add rsp, 8*(args.len() as i32)+rsp_offset
                 ; ret);
 
         self.asm.commit();
@@ -132,16 +139,18 @@ impl<'a> JITCompiler<'a> {
 
     fn compile_function(&mut self, id: FunctionId) {
         let f = self.module.function_ref(id);
-        let params_len = f.ty.get_function_ty().unwrap().params_ty.len() as i32;
         let f_entry = self.get_function_entry_label(id);
 
         self.collect_phi(f);
+        self.collect_alloca(f);
+
+        let local_size = self.alloca_mgr.local_size() as i32;
 
         dynasm!(self.asm
             ; => f_entry
             ; push rbp
             ; mov rbp, rsp
-            ; sub rsp, params_len*4
+            ; sub rsp, roundup(local_size + 8, 16) - 8
         );
 
         let mut bbs: FxHashMap<BasicBlockId, DynamicLabel> = FxHashMap::default();
@@ -158,16 +167,10 @@ impl<'a> JITCompiler<'a> {
                 let instr_id = val.get_instr_id().unwrap();
                 let instr = &f.instr_table[instr_id];
 
-                // TODO: Need something like dead code elimination pass
-                // if instr.can_be_eliminated() {
-                //     continue;
-                // }
-
                 match &instr.opcode {
-                    Opcode::Alloca(ty) => self.alloca_mgr.allocate(instr.vreg, ty),
+                    Opcode::Alloca(_) | Opcode::Phi(_) => {}
                     Opcode::Load(op1) => self.compile_load(&f, &instr, op1),
                     Opcode::Store(op1, op2) => self.compile_store(&f, op1, op2),
-                    Opcode::Phi(_) => {}
                     Opcode::Add(op1, op2) => self.compile_add(&f, &instr, op1, op2),
                     Opcode::Sub(v1, v2) => {
                         let rn = reg!(instr);
@@ -178,6 +181,9 @@ impl<'a> JITCompiler<'a> {
                             ) => dynasm!(self.asm
                                     ; mov Ra(rn), [rbp+8*(2+*index as i32)]
                                     ; sub Ra(rn), *i),
+                            (Value::Argument(a1), Value::Argument(a2)) => dynasm!(self.asm
+                                    ; mov Ra(rn), [rbp+8*(2+a1.index as i32)]
+                                    ; sub Ra(rn), [rbp+8*(2+a2.index as i32)]),
                             _ => unimplemented!(),
                         }
                     }
@@ -312,14 +318,16 @@ impl<'a> JITCompiler<'a> {
                             Value::None => {}
                             _ => unimplemented!(),
                         }
-                        dynasm!(self.asm ; add rsp, params_len*4; pop rbp; ret);
+                        dynasm!(self.asm; mov rsp, rbp; pop rbp; ret);
                     }
                 }
             }
         }
+
+        self.alloca_mgr.reset();
     }
 
-    pub fn get_function_entry_label(&mut self, f_id: FunctionId) -> DynamicLabel {
+    fn get_function_entry_label(&mut self, f_id: FunctionId) -> DynamicLabel {
         if self.function_map.contains_key(&f_id) {
             return *self.function_map.get(&f_id).unwrap();
         }
@@ -329,20 +337,22 @@ impl<'a> JITCompiler<'a> {
         f_entry
     }
 
-    pub fn push_args(&mut self, f: &Function, args: &[Value]) {
-        for arg in args {
+    fn push_args(&mut self, f: &Function, args: &[Value]) {
+        for arg in args.iter().rev() {
             match arg {
                 Value::Instruction(InstructionValue { id, .. }) => {
                     dynasm!(self.asm; push Ra(reg!(f; *id)))
                 }
-                Value::Immediate(ImmediateValue::Int32(i)) => dynasm!(self.asm; push *i),
+                Value::Immediate(ImmediateValue::Int32(i)) => {
+                    dynasm!(self.asm; mov rax, *i; push rax)
+                }
                 Value::Argument(arg) => dynasm!(self.asm; push AWORD [rbp+8*(2+arg.index as i32)]),
                 _ => unimplemented!(),
             }
         }
     }
 
-    pub fn assign_args_to_regs(&mut self, caller: &Function, args: &[Value]) {
+    fn assign_args_to_regs(&mut self, caller: &Function, args: &[Value]) {
         let pregs = vec![7, 6, 2, 1, 8, 9]; // rdi, rsi, rdx, rcx, r8, r9
         for (i, arg) in args.iter().enumerate() {
             let r = match pregs.get(i) {
@@ -362,7 +372,7 @@ impl<'a> JITCompiler<'a> {
         }
     }
 
-    pub fn compile_load(&mut self, func: &Function, instr: &Instruction, op1: &Value) {
+    fn compile_load(&mut self, func: &Function, instr: &Instruction, op1: &Value) {
         match op1 {
             Value::Instruction(v) => {
                 let n = self.alloca_mgr.get_local_offset(vreg!(func; v.id)).unwrap() as i32;
@@ -372,7 +382,7 @@ impl<'a> JITCompiler<'a> {
         }
     }
 
-    pub fn compile_store(&mut self, func: &Function, op1: &Value, op2: &Value) {
+    fn compile_store(&mut self, func: &Function, op1: &Value, op2: &Value) {
         match (op1, op2) {
             (Value::Instruction(src), Value::Instruction(dst)) => {
                 let n = self
@@ -392,7 +402,7 @@ impl<'a> JITCompiler<'a> {
         }
     }
 
-    pub fn compile_add(&mut self, f: &Function, instr: &Instruction, op1: &Value, op2: &Value) {
+    fn compile_add(&mut self, f: &Function, instr: &Instruction, op1: &Value, op2: &Value) {
         let rn = reg!(instr);
         match (op1, op2) {
             (Value::Argument(a), Value::Immediate(ImmediateValue::Int32(i))) => {
@@ -407,17 +417,14 @@ impl<'a> JITCompiler<'a> {
             (Value::Instruction(v), Value::Immediate(ImmediateValue::Int32(i))) => {
                 dynasm!(self.asm; mov Ra(rn), Ra(reg!(f; v.id)); add Ra(rn), *i)
             }
+            (Value::Argument(a1), Value::Argument(a2)) => {
+                dynasm!(self.asm; mov Ra(rn), [rbp+8*(2+a1.index as i32)]; add Ra(rn), [rbp+8*(2+a2.index as i32)])
+            }
             _ => unimplemented!(),
         }
     }
 
-    pub fn compile_call(
-        &mut self,
-        f: &Function,
-        instr: &Instruction,
-        callee: &Value,
-        args: &[Value],
-    ) {
+    fn compile_call(&mut self, f: &Function, instr: &Instruction, callee: &Value, args: &[Value]) {
         let returns = callee
             .get_type(&self.module)
             .get_function_ty()
@@ -427,6 +434,7 @@ impl<'a> JITCompiler<'a> {
         match callee {
             Value::Function(callee_id) => {
                 let callee_entity = self.module.function_ref(*callee_id);
+                let mut rsp_offset = 0;
 
                 let mut save_regs = vec![];
                 for (_, i) in &f.instr_table {
@@ -434,7 +442,6 @@ impl<'a> JITCompiler<'a> {
                     if i.reg.borrow().reg.is_none() {
                         continue;
                     }
-
                     let bgn = i.vreg;
                     let end = match i.reg.borrow().last_use {
                         Some(last_use) => vreg!(f; last_use),
@@ -449,18 +456,23 @@ impl<'a> JITCompiler<'a> {
 
                 for save_reg in &save_regs {
                     dynasm!(self.asm; push Ra(*save_reg));
+                    rsp_offset += 8;
                 }
 
                 if !callee_entity.internal {
+                    rsp_offset += args.len() * 8;
                     self.push_args(f, args);
                 }
 
                 if callee_entity.internal {
                     self.assign_args_to_regs(f, args);
                     let callee = self.internal_func.get(&callee_entity.name).unwrap();
+                    let rsp_adjust = roundup(rsp_offset as i32, 16) - rsp_offset as i32; // rsp is 16-byte aligned
                     dynasm!(self.asm
+                        ; sub rsp, rsp_adjust
                         ; mov rax, QWORD *callee as _
                         ; call rax
+                        ; add rsp, rsp_adjust
                     );
                 } else {
                     let f_entry = self.get_function_entry_label(*callee_id);
@@ -483,18 +495,16 @@ impl<'a> JITCompiler<'a> {
         }
     }
 
-    fn merge_phi(&mut self, f: &Function, bb_id: BasicBlockId) {
-        some_then!((val, asgn), self.phi_map.get(&bb_id), {
-            match val {
-                Value::Instruction(iv) => {
-                    dynasm!(self.asm; mov Ra(reg!(f; *asgn)), Ra(reg!(f; iv.id) as u8));
+    fn collect_alloca(&mut self, f: &Function) {
+        for (_, bb) in &f.basic_blocks {
+            for val in &*bb.iseq.borrow() {
+                let instr_id = val.get_instr_id().unwrap();
+                let instr = &f.instr_table[instr_id];
+                if let Opcode::Alloca(ty) = &instr.opcode {
+                    self.alloca_mgr.allocate(instr.vreg, ty);
                 }
-                Value::Immediate(ImmediateValue::Int32(i)) => {
-                    dynasm!(self.asm; mov Ra(reg!(f; *asgn)),*i);
-                }
-                _ => unimplemented!(),
             }
-        })
+        }
     }
 
     fn collect_phi(&mut self, f: &Function) {
@@ -513,6 +523,20 @@ impl<'a> JITCompiler<'a> {
                 }
             }
         }
+    }
+
+    fn merge_phi(&mut self, f: &Function, bb_id: BasicBlockId) {
+        some_then!((val, asgn), self.phi_map.get(&bb_id), {
+            match val {
+                Value::Instruction(iv) => {
+                    dynasm!(self.asm; mov Ra(reg!(f; *asgn)), Ra(reg!(f; iv.id) as u8));
+                }
+                Value::Immediate(ImmediateValue::Int32(i)) => {
+                    dynasm!(self.asm; mov Ra(reg!(f; *asgn)),*i);
+                }
+                _ => unimplemented!(),
+            }
+        })
     }
 }
 
@@ -537,6 +561,10 @@ impl AllocaManager {
     pub fn get_local_offset(&self, vreg: VirtualRegister) -> Option<usize> {
         self.locals.get(&vreg).map(|x| *x)
     }
+
+    pub fn local_size(&self) -> usize {
+        self.cur_size
+    }
 }
 
 trait TypeSize {
@@ -555,7 +583,12 @@ impl TypeSize for Type {
     }
 }
 
+fn roundup(n: i32, align: i32) -> i32 {
+    (n + align - 1) & !(align - 1)
+}
+
 // Internal function cilk.println.i32
+#[no_mangle]
 pub extern "C" fn cilk_println_i32(i: i32) {
     println!("{}", i);
 }
