@@ -91,27 +91,29 @@ impl<'a> JITCompiler<'a> {
         let f_entry = self.get_function_entry_label(id);
         let entry = self.asm.offset();
 
-        let rsp_offset = if args.len() % 2 != 0 {
-            dynasm!(self.asm; sub rsp, 8);
-            8
+        let args_size = roundup(
+            args.iter().fold(0, |acc, x| acc + x.size_in_byte()) as i32,
+            8,
+        ); // minimum byte = 8
+        let rsp_adjust = if args_size % 16 != 0 {
+            // 16 byte alignment
+            let r = roundup(args_size, 16) - args_size;
+            dynasm!(self.asm; sub rsp, r);
+            r
         } else {
             0
         };
 
         for arg in args.iter().rev() {
             match arg {
-                GenericValue::Int32(i) => {
-                    dynasm!(self.asm
-                        ; mov r11, *i
-                        ; push r11);
-                }
+                GenericValue::Int32(i) => dynasm!(self.asm; push *i),
                 GenericValue::None => unreachable!(),
             }
         }
 
         dynasm!(self.asm
                 ; call =>f_entry
-                ; add rsp, 8*(args.len() as i32)+rsp_offset
+                ; add rsp, args_size + rsp_adjust
                 ; ret);
 
         self.asm.commit();
@@ -178,56 +180,11 @@ impl<'a> JITCompiler<'a> {
                 match &instr.opcode {
                     Opcode::Alloca(_) | Opcode::Phi(_) => {}
                     Opcode::Load(op1) => self.compile_load(&f, &instr, op1),
-                    Opcode::Store(op1, op2) => self.compile_store(&f, op1, op2),
-                    Opcode::Add(op1, op2) => self.compile_add(&f, &instr, op1, op2),
+                    Opcode::Store(op1, op2) => self.compile_store(f, op1, op2),
+                    Opcode::Add(op1, op2) => self.compile_add(f, instr, op1, op2),
                     Opcode::Sub(op1, op2) => self.compile_sub(f, instr, op1, op2),
-                    Opcode::Mul(v1, v2) => {
-                        let rn = reg!(instr);
-                        match (v1, v2) {
-                            (
-                                Value::Instruction(InstructionValue { id: id1, .. }),
-                                Value::Instruction(InstructionValue { id: id2, .. }),
-                            ) => {
-                                let reg1 = reg!(f; *id1);
-                                let reg2 = reg!(f; *id2);
-                                dynasm!(self.asm; mov Rd(rn), Rd(reg1));
-                                dynasm!(self.asm; imul Rd(rn), Rd(reg2));
-                            }
-                            (
-                                Value::Instruction(InstructionValue { id: id1, .. }),
-                                Value::Immediate(ImmediateValue::Int32(i)),
-                            ) => {
-                                let reg1 = reg!(f; *id1);
-                                dynasm!(self.asm; imul Rd(rn), Rd(reg1), *i);
-                            }
-                            _ => unimplemented!(),
-                        }
-                    }
-                    Opcode::Rem(v1, v2) => {
-                        let rn = reg!(instr);
-                        match (v1, v2) {
-                            (
-                                Value::Argument(a),
-                                Value::Instruction(InstructionValue { id: id1, .. }),
-                            ) => {
-                                let reg1 = reg!(f; *id1);
-                                dynasm!(self.asm
-                                    ; mov eax, [rbp+8+self.args_mgr.get_offset(a.index).unwrap()]
-                                    ; mov edx, 0
-                                    ; idiv Rd(reg1)
-                                    ; mov Rd(rn), edx);
-                            }
-                            (Value::Argument(a), Value::Immediate(ImmediateValue::Int32(i))) => {
-                                dynasm!(self.asm
-                                    ; mov eax, [rbp+8+self.args_mgr.get_offset(a.index).unwrap()]
-                                    ; mov Rd(rn), *i
-                                    ; mov edx, 0
-                                    ; idiv Rd(rn)
-                                    ; mov Rd(rn), edx);
-                            }
-                            _ => unimplemented!(),
-                        }
-                    }
+                    Opcode::Mul(op1, op2) => self.compile_mul(f, instr, op1, op2),
+                    Opcode::Rem(op1, op2) => self.compile_rem(f, instr, op1, op2),
                     Opcode::Call(callee, args) => self.compile_call(&f, &instr, callee, args),
                     Opcode::CondBr(cond, b1, b2) => match cond {
                         Value::Instruction(iv) => {
@@ -398,21 +355,25 @@ impl<'a> JITCompiler<'a> {
     fn compile_add(&mut self, f: &Function, instr: &Instruction, op1: &Value, op2: &Value) {
         let rn = reg!(instr);
         match (op1, op2) {
-            (Value::Argument(a), Value::Immediate(ImmediateValue::Int32(i))) => {
-                dynasm!(self.asm; mov Rd(rn), [rbp+8+self.args_mgr.get_offset(a.index).unwrap()]; add Rd(rn), *i)
-            }
-            (Value::Instruction(v), Value::Argument(a)) => {
-                dynasm!(self.asm; mov Rd(rn), Rd(reg!(f; v.id)); add Rd(rn), [rbp+8+self.args_mgr.get_offset(a.index).unwrap()])
-            }
-            (Value::Instruction(v1), Value::Instruction(v2)) => {
-                dynasm!(self.asm; mov Rd(rn), Rd(reg!(f; v1.id)); add Rd(rn), Rd(reg!(f; v2.id)))
-            }
-            (Value::Instruction(v), Value::Immediate(ImmediateValue::Int32(i))) => {
-                dynasm!(self.asm; mov Rd(rn), Rd(reg!(f; v.id)); add Rd(rn), *i)
-            }
-            (Value::Argument(a1), Value::Argument(a2)) => dynasm!(self.asm
+            (Value::Instruction(v), op2) => match op2 {
+                Value::Argument(a) => dynasm!(self.asm
+                        ; mov Rd(rn), Rd(reg!(f; v.id))
+                        ; add Rd(rn), [rbp+8+self.args_mgr.get_offset(a.index).unwrap()]),
+                Value::Instruction(v2) => dynasm!(self.asm
+                            ; mov Rd(rn), Rd(reg!(f; v.id)); add Rd(rn), Rd(reg!(f; v2.id))),
+                Value::Immediate(ImmediateValue::Int32(i)) => dynasm!(self.asm
+                            ; mov Rd(rn), Rd(reg!(f; v.id)); add Rd(rn), *i),
+                _ => unimplemented!(),
+            },
+            (Value::Argument(a1), op2) => match op2 {
+                Value::Argument(a2) => dynasm!(self.asm
                         ; mov Rd(rn), [rbp+8+self.args_mgr.get_offset(a1.index).unwrap()]
                         ; add Rd(rn), [rbp+8+self.args_mgr.get_offset(a2.index).unwrap()]),
+                Value::Immediate(ImmediateValue::Int32(i)) => dynasm!(self.asm
+                        ; mov Rd(rn), [rbp+8+self.args_mgr.get_offset(a1.index).unwrap()]
+                        ; add Rd(rn), *i),
+                _ => unimplemented!(),
+            },
             _ => unimplemented!(),
         }
     }
@@ -420,20 +381,61 @@ impl<'a> JITCompiler<'a> {
     fn compile_sub(&mut self, f: &Function, instr: &Instruction, op1: &Value, op2: &Value) {
         let rn = reg!(instr);
         match (op1, op2) {
-            (Value::Argument(a), Value::Immediate(ImmediateValue::Int32(i))) => dynasm!(self.asm
-                                    ; mov Rd(rn), [rbp+8 + self.args_mgr.get_offset(a.index).unwrap()]
-                                    ; sub Rd(rn), *i),
-            (Value::Argument(a1), Value::Argument(a2)) => dynasm!(self.asm
-                                    ; mov Rd(rn), [rbp+8+self.args_mgr.get_offset(a1.index).unwrap()]
-                                    ; sub Rd(rn), [rbp+8+self.args_mgr.get_offset(a2.index).unwrap()]),
-            (Value::Instruction(v), Value::Argument(a)) => {
-                dynasm!(self.asm; mov Rd(rn), Rd(reg!(f; v.id)); sub Rd(rn), [rbp+8+self.args_mgr.get_offset(a.index).unwrap()])
+            (Value::Instruction(v), op2) => match op2 {
+                Value::Argument(a) => dynasm!(self.asm
+                        ; mov Rd(rn), Rd(reg!(f; v.id))
+                        ; sub Rd(rn), [rbp+8+self.args_mgr.get_offset(a.index).unwrap()]),
+                Value::Instruction(v2) => dynasm!(self.asm
+                            ; mov Rd(rn), Rd(reg!(f; v.id)); sub Rd(rn), Rd(reg!(f; v2.id))),
+                Value::Immediate(ImmediateValue::Int32(i)) => dynasm!(self.asm
+                            ; mov Rd(rn), Rd(reg!(f; v.id)); sub Rd(rn), *i),
+                _ => unimplemented!(),
+            },
+            (Value::Argument(a1), op2) => match op2 {
+                Value::Argument(a2) => dynasm!(self.asm
+                        ; mov Rd(rn), [rbp+8+self.args_mgr.get_offset(a1.index).unwrap()]
+                        ; sub Rd(rn), [rbp+8+self.args_mgr.get_offset(a2.index).unwrap()]),
+                Value::Immediate(ImmediateValue::Int32(i)) => dynasm!(self.asm
+                        ; mov Rd(rn), [rbp+8+self.args_mgr.get_offset(a1.index).unwrap()]
+                        ; sub Rd(rn), *i),
+                _ => unimplemented!(),
+            },
+            _ => unimplemented!(),
+        }
+    }
+
+    fn compile_mul(&mut self, f: &Function, instr: &Instruction, op1: &Value, op2: &Value) {
+        let rn = reg!(instr);
+        match (op1, op2) {
+            (Value::Instruction(iv1), Value::Instruction(iv2)) => {
+                dynasm!(self.asm
+                        ; mov Rd(rn), Rd(reg!(f; iv1.id))
+                        ; imul Rd(rn), Rd(reg!(f; iv2.id)));
             }
-            (Value::Instruction(v1), Value::Instruction(v2)) => {
-                dynasm!(self.asm; mov Rd(rn), Rd(reg!(f; v1.id)); sub Rd(rn), Rd(reg!(f; v2.id)))
+            (Value::Instruction(iv), Value::Immediate(ImmediateValue::Int32(i))) => {
+                dynasm!(self.asm; imul Rd(rn), Rd(reg!(f; iv.id)), *i);
             }
-            (Value::Instruction(v), Value::Immediate(ImmediateValue::Int32(i))) => {
-                dynasm!(self.asm; mov Rd(rn), Rd(reg!(f; v.id)); sub Rd(rn), *i)
+            _ => unimplemented!(),
+        }
+    }
+
+    fn compile_rem(&mut self, f: &Function, instr: &Instruction, op1: &Value, op2: &Value) {
+        let rn = reg!(instr);
+        match (op1, op2) {
+            (Value::Argument(a), Value::Instruction(iv)) => {
+                dynasm!(self.asm
+                        ; mov eax, [rbp+8+self.args_mgr.get_offset(a.index).unwrap()]
+                        ; mov edx, 0
+                        ; idiv Rd(reg!(f; iv.id))
+                        ; mov Rd(rn), edx);
+            }
+            (Value::Argument(a), Value::Immediate(ImmediateValue::Int32(i))) => {
+                dynasm!(self.asm
+                        ; mov eax, [rbp+8+self.args_mgr.get_offset(a.index).unwrap()]
+                        ; mov Rd(rn), *i
+                        ; mov edx, 0
+                        ; idiv Rd(rn)
+                        ; mov Rd(rn), edx);
             }
             _ => unimplemented!(),
         }
@@ -614,6 +616,15 @@ impl TypeSize for Type {
             Type::Pointer(_) => 8,
             Type::Function(_) => unimplemented!(),
             Type::Void => 0,
+        }
+    }
+}
+
+impl TypeSize for GenericValue {
+    fn size_in_byte(&self) -> usize {
+        match self {
+            GenericValue::Int32(_) => 4,
+            GenericValue::None => 0,
         }
     }
 }

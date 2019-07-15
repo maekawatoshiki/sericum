@@ -13,6 +13,7 @@ pub use ir::*;
 extern crate dynasm;
 extern crate dynasmrt;
 extern crate id_arena;
+extern crate quote;
 extern crate rustc_hash;
 
 pub use rustc_hash::{FxHashMap, FxHashSet};
