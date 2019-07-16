@@ -5,6 +5,7 @@ pub struct Builder<'a> {
     pub module: &'a mut Module,
     func_id: FunctionId,
     cur_bb: Option<BasicBlockId>,
+    insert_point: usize,
 }
 
 impl<'a> Builder<'a> {
@@ -13,6 +14,7 @@ impl<'a> Builder<'a> {
             module,
             func_id,
             cur_bb: None,
+            insert_point: 0,
         }
     }
 
@@ -34,6 +36,14 @@ impl<'a> Builder<'a> {
 
     pub fn set_insert_point(&mut self, id: BasicBlockId) {
         self.cur_bb = Some(id);
+        let iseq_len = self.function_ref().basic_block_ref(id).iseq_ref().len();
+        self.insert_point = iseq_len;
+    }
+
+    pub fn set_insert_point_at(&mut self, pt: usize, id: BasicBlockId) {
+        self.cur_bb = Some(id);
+        let iseq_len = self.function_ref().basic_block_ref(id).iseq_ref().len();
+        self.insert_point = pt;
     }
 
     pub fn build_alloca(&mut self, ty: Type) -> Value {
@@ -230,8 +240,12 @@ impl<'a> Builder<'a> {
 
     fn append_instr_to_cur_bb(&mut self, instr: Value, set_def: bool) {
         let bb_id = self.cur_bb.unwrap();
-        let bb = self.function_ref_mut().basic_block_ref_mut(bb_id);
-        bb.iseq_ref_mut().push(instr);
+        let insert_point = self.insert_point;
+        self.insert_point += 1;
+
+        let bb = self.function_ref().basic_block_ref(bb_id);
+        bb.iseq_ref_mut().insert(insert_point, instr);
+
         if set_def {
             if let Value::Instruction(InstructionValue { id, .. }) = &instr {
                 bb.liveness.borrow_mut().def.insert(*id);

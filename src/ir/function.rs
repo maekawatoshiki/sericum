@@ -80,19 +80,6 @@ impl Function {
             }
         }
     }
-
-    pub fn find_instruction_by_vreg(&self, idx: VirtualRegister) -> Option<&Instruction> {
-        for (_, bb) in &self.basic_blocks {
-            for instr_val in &*bb.iseq_ref() {
-                let instr_id = instr_val.get_instr_id().unwrap();
-                let instr = &self.instr_table[instr_id];
-                if vreg!(instr) == idx {
-                    return Some(instr);
-                }
-            }
-        }
-        None
-    }
 }
 
 impl Function {
