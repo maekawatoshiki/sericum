@@ -12,20 +12,14 @@ impl<'a> RegisterAllocator<'a> {
 
     pub fn analyze(&mut self) {
         for (_, f) in &self.module.functions {
+            f.renumber_vreg();
             self.collect_regs(f);
-            // for (_, instr) in &f.instr_table {
-            //     println!(
-            //         "  vreg:{} - last_use:{:?}",
-            //         instr.vreg,
-            //         instr.reg.borrow().last_use
-            //     );
-            // }
             self.scan(f);
 
             when_debug!(for (_, instr) in &f.instr_table {
                 println!(
                     "vreg:{}\treg:{:?}\tspill:{:?}",
-                    instr.vreg,
+                    vreg!(instr),
                     instr.reg.borrow().reg,
                     instr.reg.borrow().spill
                 );
@@ -59,8 +53,8 @@ impl<'a> RegisterAllocator<'a> {
                             .borrow()
                             .last_use
                             .unwrap();
-                        let target_last_use = f.instr_table[target_last_use_id].vreg;
-                        if instr.vreg < target_last_use {
+                        let target_last_use = vreg!(f; target_last_use_id);
+                        if vreg!(instr) < target_last_use {
                             continue;
                         }
                     }

@@ -19,9 +19,6 @@ pub struct Function {
 
     /// True if internal function
     pub internal: bool,
-
-    /// Unique index for SSA
-    vreg_counter: VirtualRegister,
 }
 
 impl Function {
@@ -36,7 +33,6 @@ impl Function {
                 "cilk.println.i32" => true,
                 _ => false,
             },
-            vreg_counter: 1,
         }
     }
 
@@ -74,19 +70,15 @@ impl Function {
         self.instr_table.alloc(instr)
     }
 
-    pub fn renumber_vreg(&mut self) {
+    pub fn renumber_vreg(&self) {
         let mut n = 1;
-        for (_, bb) in &mut self.basic_blocks {
+        for (_, bb) in &self.basic_blocks {
             for instr_val in &mut *bb.iseq_ref_mut() {
                 let id = instr_val.get_instr_id().unwrap();
-                self.instr_table[id].vreg = n;
+                self.instr_table[id].set_vreg(n);
                 n += 1
             }
         }
-    }
-
-    pub fn instr_id_to_vreg(&self, id: InstructionId) -> VirtualRegister {
-        self.instr_table[id].vreg
     }
 
     pub fn find_instruction_by_vreg(&self, idx: VirtualRegister) -> Option<&Instruction> {
@@ -94,18 +86,12 @@ impl Function {
             for instr_val in &*bb.iseq_ref() {
                 let instr_id = instr_val.get_instr_id().unwrap();
                 let instr = &self.instr_table[instr_id];
-                if instr.vreg == idx {
+                if vreg!(instr) == idx {
                     return Some(instr);
                 }
             }
         }
         None
-    }
-
-    pub fn next_vreg(&mut self) -> VirtualRegister {
-        let n = self.vreg_counter;
-        self.vreg_counter += 1;
-        n
     }
 }
 
@@ -145,28 +131,19 @@ impl Function {
                     .borrow()
                     .def
                     .iter()
-                    .fold("".to_string(), |s, x| format!(
-                        "{}{},",
-                        s, self.instr_table[*x].vreg
-                    ))
+                    .fold("".to_string(), |s, x| format!("{}{},", s, x.index()))
                     .trim_matches(','),
                 &b.liveness
                     .borrow()
                     .live_in
                     .iter()
-                    .fold("".to_string(), |s, x| format!(
-                        "{}{},",
-                        s, self.instr_table[*x].vreg
-                    ))
+                    .fold("".to_string(), |s, x| format!("{}{},", s, x.index()))
                     .trim_matches(','),
                 &b.liveness
                     .borrow()
                     .live_out
                     .iter()
-                    .fold("".to_string(), |s, x| format!(
-                        "{}{},",
-                        s, self.instr_table[*x].vreg
-                    ))
+                    .fold("".to_string(), |s, x| format!("{}{},", s, x.index()))
                     .trim_matches(','),
                 b.to_string(m)
             )

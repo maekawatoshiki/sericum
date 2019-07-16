@@ -14,12 +14,12 @@ pub struct Register(usize);
 pub struct Instruction {
     pub opcode: Opcode,
     pub ty: Type,
-    pub vreg: VirtualRegister,
     pub reg: RegisterAllocInfoRef,
 }
 
 #[derive(Debug, Clone)]
 pub struct RegisterAllocInfo {
+    pub vreg: VirtualRegister,
     pub reg: Option<Register>,
     pub spill: bool,
     pub last_use: Option<InstructionId>,
@@ -50,11 +50,10 @@ pub enum ICmpKind {
 }
 
 impl Instruction {
-    pub fn new(opcode: Opcode, ty: Type, vreg: VirtualRegister) -> Self {
+    pub fn new(opcode: Opcode, ty: Type) -> Self {
         Self {
             opcode,
             ty,
-            vreg,
             reg: Rc::new(RefCell::new(RegisterAllocInfo::new())),
         }
     }
@@ -73,6 +72,11 @@ impl Instruction {
         reg_info.spill = spill;
     }
 
+    pub fn set_vreg(&self, vreg: usize) {
+        let mut reg_info = self.reg.borrow_mut();
+        reg_info.vreg = vreg;
+    }
+
     pub fn can_be_eliminated(&self) -> bool {
         let no_phy_reg = self.reg.borrow().reg.is_none();
         let no_last_use = self.reg.borrow().last_use.is_none();
@@ -87,6 +91,7 @@ impl RegisterAllocInfo {
             reg: None,
             spill: false,
             last_use: None,
+            vreg: 0,
         }
     }
 }

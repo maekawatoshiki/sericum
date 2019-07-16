@@ -1,4 +1,3 @@
-#[macro_export]
 macro_rules! some_then {
     ($x:pat, $e:expr, $t:expr) => {{
         if let Some($x) = $e {
@@ -7,7 +6,6 @@ macro_rules! some_then {
     }};
 }
 
-#[macro_export]
 macro_rules! when_debug {
     ($($arg:tt)*) => {
         #[cfg(debug_assertions)]
@@ -17,7 +15,6 @@ macro_rules! when_debug {
     };
 }
 
-#[macro_export]
 macro_rules! matches {
     ($e:expr, $p:pat) => {
         match $e {
@@ -26,6 +23,29 @@ macro_rules! matches {
         }
     };
 }
+
+#[rustfmt::skip]
+macro_rules! reg {
+    ($f:expr; $instr_id:expr) => {{
+        $f.instr_table[$instr_id].reg.borrow().reg.unwrap()
+            .shift(REGISTER_OFFSET).as_u8()
+    }};
+    ($instr:expr) => {{
+        $instr.reg.borrow().reg.unwrap()
+            .shift(REGISTER_OFFSET).as_u8()
+    }};
+}
+
+#[rustfmt::skip]
+macro_rules! vreg {
+    ($f:expr ; $instr_id:expr) => {{
+        $f.instr_table[$instr_id].reg.borrow().vreg
+    }};
+    ($instr:expr) => {{
+        $instr.reg.borrow().vreg
+    }};
+}
+
 
 #[macro_export]
 macro_rules! cilk_parse_ty {

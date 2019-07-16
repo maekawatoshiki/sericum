@@ -220,7 +220,7 @@ impl<'a> Builder<'a> {
     // Utils
 
     fn create_instr_value(&mut self, opcode: Opcode, ret_ty: Type) -> Value {
-        let instr = Instruction::new(opcode, ret_ty, self.function_ref_mut().next_vreg());
+        let instr = Instruction::new(opcode, ret_ty);
         let instr_id = self.function_ref_mut().instr_id(instr);
         Value::Instruction(InstructionValue {
             func_id: self.func_id,

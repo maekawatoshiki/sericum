@@ -89,20 +89,12 @@ impl Value {
                 if instr.ty == Type::Void {
                     format!("    {}", instr.to_string(module))
                 } else {
-                    format!(
-                        "    %{} = {}",
-                        f.instr_id_to_vreg(*id),
-                        instr.to_string(module)
-                    )
+                    format!("    %{} = {}", id.index(), instr.to_string(module))
                 }
             }
             Value::Instruction(InstructionValue { func_id, id }) => {
                 let f = module.function_ref(*func_id);
-                format!(
-                    "{} %{}",
-                    f.instr_table[*id].ty.to_string(),
-                    f.instr_id_to_vreg(*id)
-                )
+                format!("{} %{}", f.instr_table[*id].ty.to_string(), id.index())
             }
             Value::Function(id) if instr => {
                 let f = module.function_ref(*id);

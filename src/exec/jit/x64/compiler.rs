@@ -10,25 +10,6 @@ use rustc_hash::FxHashMap;
 
 const REGISTER_OFFSET: usize = 10; // Instruction.reg.reg=0 means r10
 
-#[rustfmt::skip]
-macro_rules! reg {
-    ($f:expr; $instr_id:expr) => {{
-        $f.instr_table[$instr_id].reg.borrow().reg.unwrap()
-            .shift(REGISTER_OFFSET).as_u8()
-    }};
-    ($instr:expr) => {{
-        $instr.reg.borrow().reg.unwrap()
-            .shift(REGISTER_OFFSET).as_u8()
-    }};
-}
-
-#[rustfmt::skip]
-macro_rules! vreg {
-    ($f:expr ; $instr_id:expr) => {{
-        $f.instr_table[$instr_id].vreg
-    }};
-}
-
 #[derive(Debug, Clone, PartialEq)]
 pub enum GenericValue {
     Int32(i32),
@@ -459,12 +440,12 @@ impl<'a> JITCompiler<'a> {
                     if i.reg.borrow().reg.is_none() {
                         continue;
                     }
-                    let bgn = i.vreg;
+                    let bgn = vreg!(i);
                     let end = match i.reg.borrow().last_use {
                         Some(last_use) => vreg!(f; last_use),
                         None => continue,
                     };
-                    if bgn < instr.vreg && instr.vreg < end {
+                    if bgn < vreg!(instr) && vreg!(instr) < end {
                         save_regs.push(reg!(i));
                     }
                 }
@@ -517,7 +498,7 @@ impl<'a> JITCompiler<'a> {
                 let instr_id = val.get_instr_id().unwrap();
                 let instr = &f.instr_table[instr_id];
                 if let Opcode::Alloca(ty) = &instr.opcode {
-                    self.alloca_mgr.allocate(instr.vreg, ty);
+                    self.alloca_mgr.allocate(vreg!(instr), ty);
                 }
             }
         }
