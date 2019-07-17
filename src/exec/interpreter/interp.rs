@@ -48,7 +48,7 @@ impl<'a> Interpreter<'a> {
                     ImmediateValue::Int32(i) => ConcreteValue::Int32(*i),
                 },
                 Value::Function(_id) => unimplemented!(),
-                Value::None => unimplemented!(),
+                Value::None => ConcreteValue::Void,
             }
         }
 
@@ -89,7 +89,11 @@ impl<'a> Interpreter<'a> {
                                 Type::Pointer(_) => unimplemented!(),
                                 Type::Void => unreachable!(),
                                 Type::Function(_) => unimplemented!(),
-                                Type::Array(_) => unimplemented!(),
+                                Type::Array(a) => unsafe {
+                                    let mut vec = Vec::<u8>::with_capacity(a.len);
+                                    vec.set_len(a.len);
+                                    Box::into_raw(vec.into_boxed_slice()) as *mut u8
+                                },
                             }),
                         );
                     }
