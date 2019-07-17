@@ -4,6 +4,7 @@ pub enum Type {
     Int1,
     Int32,
     Pointer(Box<Type>),
+    Array(Box<ArrayType>),
     Function(Box<FunctionType>),
 }
 
@@ -11,6 +12,12 @@ pub enum Type {
 pub struct FunctionType {
     pub ret_ty: Type,
     pub params_ty: Vec<Type>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ArrayType {
+    pub elem_ty: Type,
+    pub len: usize,
 }
 
 impl Type {
@@ -42,6 +49,7 @@ impl Type {
             Type::Int1 => "i1".to_string(),
             Type::Int32 => "i32".to_string(),
             Type::Pointer(e) => format!("{}*", e.to_string()),
+            Type::Array(a) => a.to_string(),
             Type::Function(f) => f.to_string(),
         }
     }
@@ -61,5 +69,15 @@ impl FunctionType {
                 s
             }),
         )
+    }
+}
+
+impl ArrayType {
+    pub fn new(elem_ty: Type, len: usize) -> Self {
+        Self { elem_ty, len }
+    }
+
+    pub fn to_string(&self) -> String {
+        format!("[{} x {}]", self.len, self.elem_ty.to_string(),)
     }
 }

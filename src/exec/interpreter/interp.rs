@@ -89,6 +89,7 @@ impl<'a> Interpreter<'a> {
                                 Type::Pointer(_) => unimplemented!(),
                                 Type::Void => unreachable!(),
                                 Type::Function(_) => unimplemented!(),
+                                Type::Array(_) => unimplemented!(),
                             }),
                         );
                     }

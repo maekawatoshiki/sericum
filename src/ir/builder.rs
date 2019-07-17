@@ -42,7 +42,7 @@ impl<'a> Builder<'a> {
 
     pub fn set_insert_point_at(&mut self, pt: usize, id: BasicBlockId) {
         self.cur_bb = Some(id);
-        let iseq_len = self.function_ref().basic_block_ref(id).iseq_ref().len();
+        self.function_ref().basic_block_ref(id).iseq_ref().len();
         self.insert_point = pt;
     }
 
