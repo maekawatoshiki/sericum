@@ -1,3 +1,5 @@
+use super::value::Value;
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Type {
     Void,
@@ -40,6 +42,25 @@ impl Type {
         match self {
             Type::Pointer(e) => Some(&**e),
             _ => None,
+        }
+    }
+
+    pub fn get_element_ty_with_indices(&self, indices: &[Value]) -> Option<&Type> {
+        match self {
+            Type::Void | Type::Int1 | Type::Int32 | Type::Function(_) => None,
+            Type::Pointer(p) => {
+                match indices.len() {
+                    0 => Some(self),
+                    1 => Some(&**p),
+                    _ => p.get_element_ty_with_indices(&indices[1..]),
+                }
+                // p.get_element_ty_with_indices(
+            }
+            Type::Array(a) => match indices.len() {
+                0 => Some(self),
+                1 => Some(&a.elem_ty),
+                _ => a.elem_ty.get_element_ty_with_indices(&indices[1..]),
+            },
         }
     }
 

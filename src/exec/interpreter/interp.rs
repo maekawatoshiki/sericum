@@ -6,7 +6,7 @@ pub enum ConcreteValue {
     Void,
     Int1(bool),
     Int32(i32),
-    Mem(*mut u8),
+    Mem(*mut u8, Type),
 }
 
 pub struct Interpreter<'a> {
@@ -83,18 +83,32 @@ impl<'a> Interpreter<'a> {
                     Opcode::Alloca(ty) => {
                         mem.insert(
                             instr_id,
-                            ConcreteValue::Mem(match ty {
-                                Type::Int1 => Box::into_raw(Box::new(0u8)) as *mut u8,
-                                Type::Int32 => Box::into_raw(Box::new(0u32)) as *mut u8,
-                                Type::Pointer(_) => unimplemented!(),
-                                Type::Void => unreachable!(),
-                                Type::Function(_) => unimplemented!(),
-                                Type::Array(a) => unsafe {
-                                    let mut vec = Vec::<u8>::with_capacity(a.len);
-                                    vec.set_len(a.len);
-                                    Box::into_raw(vec.into_boxed_slice()) as *mut u8
+                            ConcreteValue::Mem(
+                                match ty {
+                                    Type::Int1 => Box::into_raw(Box::new(0u8)) as *mut u8,
+                                    Type::Int32 => Box::into_raw(Box::new(0u32)) as *mut u8,
+                                    Type::Pointer(_) => unimplemented!(),
+                                    Type::Void => unreachable!(),
+                                    Type::Function(_) => unimplemented!(),
+                                    Type::Array(a) => unsafe {
+                                        let mut vec = match a.elem_ty {
+                                            Type::Int32 => {
+                                                let mut v = Vec::<*mut i32>::with_capacity(a.len);
+                                                for _ in 0..a.len {
+                                                    v.push(
+                                                        Box::into_raw(Box::new(0i32)) as *mut i32
+                                                    );
+                                                }
+                                                v
+                                            }
+                                            _ => unimplemented!(),
+                                        };
+                                        vec.set_len(a.len);
+                                        Box::into_raw(vec.into_boxed_slice()) as *mut u8
+                                    },
                                 },
-                            }),
+                                ty.get_pointer_ty(),
+                            ),
                         );
                     }
                     Opcode::ICmp(kind, v1, v2) => {
@@ -147,7 +161,7 @@ impl<'a> Interpreter<'a> {
                     },
                     Opcode::Load(v) => {
                         let ptr = match get_value(&v, &args, &mut mem) {
-                            ConcreteValue::Mem(ptr) => ptr,
+                            ConcreteValue::Mem(ptr, _) => ptr,
                             _ => unreachable!(),
                         };
                         let val = match v.get_type(&self.module).get_element_ty().unwrap() {
@@ -165,7 +179,7 @@ impl<'a> Interpreter<'a> {
                     }
                     Opcode::Store(src, dst) => {
                         let dst_ptr = match get_value(&dst, &args, &mut mem) {
-                            ConcreteValue::Mem(ptr) => ptr,
+                            ConcreteValue::Mem(ptr, _) => ptr,
                             _ => unreachable!(),
                         };
                         match get_value(&src, &args, &mut mem) {
@@ -175,16 +189,38 @@ impl<'a> Interpreter<'a> {
                             _ => unimplemented!(),
                         }
                     }
+                    Opcode::GetElementPtr(ptrval, indices) => {
+                        let ptr = match get_value(&ptrval, &args, &mut mem) {
+                            ConcreteValue::Mem(ptr, ref ty) => {
+                                let mut v = ptr;
+                                let mut t = ty;
+                                for idx in indices {
+                                    match t {
+                                        Type::Pointer(_) => {}
+                                        Type::Array(_a) => unsafe {
+                                            // TODO: assume _a.elem_ty is Int32 for now
+                                            v = *((v as *mut *mut i32).add(
+                                                match get_value(&idx, &args, &mut mem) {
+                                                    ConcreteValue::Int32(i) => i as usize,
+                                                    _ => unimplemented!(),
+                                                },
+                                            ))
+                                                as *mut u8
+                                        },
+                                        _ => unimplemented!(),
+                                    }
+                                    t = t.get_element_ty_with_indices(&vec![*idx]).unwrap();
+                                }
+                                v
+                            }
+                            _ => unreachable!(),
+                        };
+                        mem.insert(instr_id, ConcreteValue::Mem(ptr, instr.ty.clone()));
+                    }
                     Opcode::Ret(v) => break 'main get_value(&v, &args, &mut mem),
                 }
             }
         };
-
-        for (_, cv) in mem {
-            if let ConcreteValue::Mem(m) = cv {
-                unsafe { Box::from_raw(m) };
-            }
-        }
 
         ret
     }

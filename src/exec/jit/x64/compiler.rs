@@ -2,6 +2,7 @@
 
 use super::regalloc;
 use crate::{
+    exec::TypeSize,
     ir::{basic_block::*, function::*, module::*, opcode::*, types::*, value::*},
     pass::*,
 };
@@ -162,6 +163,7 @@ impl<'a> JITCompiler<'a> {
                     Opcode::Alloca(_) | Opcode::Phi(_) => {}
                     Opcode::Load(op1) => self.compile_load(&f, &instr, op1),
                     Opcode::Store(op1, op2) => self.compile_store(f, op1, op2),
+                    Opcode::GetElementPtr(_, _) => unimplemented!(),
                     Opcode::Add(op1, op2) => self.compile_add(f, instr, op1, op2),
                     Opcode::Sub(op1, op2) => self.compile_sub(f, instr, op1, op2),
                     Opcode::Mul(op1, op2) => self.compile_mul(f, instr, op1, op2),
@@ -583,10 +585,6 @@ impl ArgumentManager {
     pub fn get_offset(&self, idx: usize) -> Option<i32> {
         self.idx_to_offset.get(&idx).map(|x| *x)
     }
-}
-
-trait TypeSize {
-    fn size_in_byte(&self) -> usize;
 }
 
 impl TypeSize for Type {

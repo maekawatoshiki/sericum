@@ -134,6 +134,20 @@ impl<'a> RegisterAllocator<'a> {
                             );
                         }
                     }
+                    Opcode::GetElementPtr(ptrval, ref indices) => {
+                        some_then!(
+                            id,
+                            ptrval.get_instr_id(),
+                            f.instr_table[id].set_last_use(Some(instr_id))
+                        );
+                        for idx in indices {
+                            some_then!(
+                                id,
+                                idx.get_instr_id(),
+                                f.instr_table[id].set_last_use(Some(instr_id))
+                            );
+                        }
+                    }
                     Opcode::Store(v1, v2)
                     | Opcode::ICmp(_, v1, v2)
                     | Opcode::Add(v1, v2)

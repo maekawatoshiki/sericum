@@ -53,6 +53,23 @@ impl<'a> Builder<'a> {
         instr
     }
 
+    pub fn build_gep(&mut self, v: Value, indices: Vec<Value>) -> Value {
+        let cur_bb_id = self.cur_bb.unwrap();
+        some_then!(id, v.get_instr_id(), self.prop_liveness(cur_bb_id, id));
+        for idx in &indices {
+            some_then!(id, idx.get_instr_id(), self.prop_liveness(cur_bb_id, id));
+        }
+
+        let ty = v
+            .get_type(self.module)
+            .get_element_ty_with_indices(&indices)
+            .unwrap()
+            .get_pointer_ty();
+        let instr = self.create_instr_value(Opcode::GetElementPtr(v, indices), ty);
+        self.append_instr_to_cur_bb(instr, true);
+        instr
+    }
+
     pub fn build_load(&mut self, v: Value) -> Value {
         some_then!(
             id,

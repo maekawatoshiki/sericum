@@ -30,6 +30,7 @@ pub enum Opcode {
     Alloca(Type),
     Load(Value),
     Store(Value, Value),
+    GetElementPtr(Value, Vec<Value>), // ptr val, indices
     Add(Value, Value),
     Sub(Value, Value),
     Mul(Value, Value),
@@ -113,6 +114,15 @@ impl Opcode {
                 "store {}, {}",
                 src.to_string(m, false),
                 dst.to_string(m, false)
+            ),
+            Opcode::GetElementPtr(ptrval, indices) => format!(
+                "getelementptr {}{}",
+                ptrval.to_string(m, false),
+                indices.iter().fold("".to_string(), |mut s, idx| {
+                    s += ", ";
+                    s += idx.to_string(m, false).as_str();
+                    s
+                })
             ),
             Opcode::Add(v1, v2) => {
                 format!("add {}, {}", v1.to_string(m, false), v2.to_string(m, false))
