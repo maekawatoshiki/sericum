@@ -1,7 +1,6 @@
 use cilk::{
     exec::{interpreter::interp, jit::x64::compiler},
     ir::{builder, function, module, types, value},
-    *,
 };
 
 #[test]
@@ -40,4 +39,10 @@ fn array1() {
     let mut interp = interp::Interpreter::new(&m);
     let ret = interp.run_function(func, vec![]);
     assert_eq!(ret, interp::ConcreteValue::Int32(123));
+
+    let mut jit = compiler::JITCompiler::new(&m);
+    jit.compile_module();
+
+    let ret = jit.run(func, vec![]);
+    println!("{:?}", ret);
 }

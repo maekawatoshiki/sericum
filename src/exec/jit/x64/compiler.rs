@@ -163,7 +163,9 @@ impl<'a> JITCompiler<'a> {
                     Opcode::Alloca(_) | Opcode::Phi(_) => {}
                     Opcode::Load(op1) => self.compile_load(&f, &instr, op1),
                     Opcode::Store(op1, op2) => self.compile_store(f, op1, op2),
-                    Opcode::GetElementPtr(_, _) => unimplemented!(),
+                    Opcode::GetElementPtr(ptrval, indices) => {
+                        self.compile_gep(f, instr, ptrval, indices)
+                    }
                     Opcode::Add(op1, op2) => self.compile_add(f, instr, op1, op2),
                     Opcode::Sub(op1, op2) => self.compile_sub(f, instr, op1, op2),
                     Opcode::Mul(op1, op2) => self.compile_mul(f, instr, op1, op2),
@@ -259,57 +261,19 @@ impl<'a> JITCompiler<'a> {
         self.args_mgr.reset();
     }
 
-    fn get_function_entry_label(&mut self, f_id: FunctionId) -> DynamicLabel {
-        if self.function_map.contains_key(&f_id) {
-            return *self.function_map.get(&f_id).unwrap();
-        }
-
-        let f_entry = self.asm.new_dynamic_label();
-        self.function_map.insert(f_id, f_entry);
-        f_entry
-    }
-
-    fn push_args(&mut self, f: &Function, args: &[Value]) -> usize {
-        for arg in args.iter().rev() {
-            match arg {
-                Value::Instruction(InstructionValue { id, .. }) => {
-                    dynasm!(self.asm; push Ra(reg!(f; *id)))
-                }
-                Value::Immediate(ImmediateValue::Int32(i)) => dynasm!(self.asm; push *i),
-                Value::Argument(arg) => {
-                    dynasm!(self.asm; push QWORD [rbp+8+self.args_mgr.get_offset(arg.index).unwrap()])
-                }
-                _ => unimplemented!(),
-            }
-        }
-        args.len() * 8 // TODO
-    }
-
-    fn assign_args_to_regs(&mut self, caller: &Function, args: &[Value]) {
-        let pregs = vec![7, 6, 2, 1, 8, 9]; // rdi, rsi, rdx, rcx, r8, r9
-        for (i, arg) in args.iter().enumerate() {
-            let r = match pregs.get(i) {
-                Some(r) => *r as u8,
-                None => unimplemented!("too many arguments for internal function"),
-            }; // TODO
-            match arg {
-                Value::Instruction(InstructionValue { id, .. }) => {
-                    dynasm!(self.asm; mov Ra(r), Ra(reg!(caller; *id)))
-                }
-                Value::Immediate(ImmediateValue::Int32(i)) => dynasm!(self.asm; mov Rd(r), *i),
-                Value::Argument(arg) => {
-                    dynasm!(self.asm; mov Ra(r), AWORD [rbp+8+self.args_mgr.get_offset(arg.index).unwrap()])
-                }
-                _ => unimplemented!(),
-            }
-        }
-    }
-
     fn compile_load(&mut self, func: &Function, instr: &Instruction, op1: &Value) {
         match op1 {
             Value::Instruction(v) => {
-                let n = self.alloca_mgr.get_local_offset(vreg!(func; v.id)).unwrap() as i32;
-                dynasm!(self.asm; mov Rd(reg!(instr)), [rbp-n]);
+                // op1 is local var
+                if let Some(n) = self.alloca_mgr.get_local_offset(vreg!(func; v.id)) {
+                    dynasm!(self.asm; mov Ra(reg!(instr)), [rbp-(n as i32)]);
+                    return;
+                }
+
+                match instr.ty {
+                    Type::Int32 => dynasm!(self.asm; mov Rd(reg!(instr)), [Ra(reg!(func; v.id))]),
+                    _ => unimplemented!(),
+                }
             }
             e => unimplemented!("{:?}", e),
         }
@@ -318,20 +282,65 @@ impl<'a> JITCompiler<'a> {
     fn compile_store(&mut self, func: &Function, op1: &Value, op2: &Value) {
         match (op1, op2) {
             (Value::Instruction(src), Value::Instruction(dst)) => {
-                let n = self
-                    .alloca_mgr
-                    .get_local_offset(vreg!(func; dst.id))
-                    .unwrap() as i32;
-                dynasm!(self.asm; mov DWORD [rbp-n], Rd(reg!(func; src.id)));
+                if let Some(n) = self.alloca_mgr.get_local_offset(vreg!(func; dst.id)) {
+                    match op1.get_type(self.module) {
+                        Type::Int32 => {
+                            dynasm!(self.asm; mov DWORD [rbp-(n as i32)], Rd(reg!(func; src.id)))
+                        }
+                        _ => unimplemented!(),
+                    }
+                    return;
+                }
+
+                match op1.get_type(self.module) {
+                    Type::Int32 => {
+                        dynasm!(self.asm; mov DWORD [Ra(reg!(func; dst.id))], Rd(reg!(func; src.id)))
+                    }
+                    _ => unimplemented!(),
+                }
             }
             (Value::Immediate(ImmediateValue::Int32(i)), Value::Instruction(dst)) => {
-                let n = self
-                    .alloca_mgr
-                    .get_local_offset(vreg!(func; dst.id))
-                    .unwrap() as i32;
-                dynasm!(self.asm; mov DWORD [rbp-n], *i);
+                if let Some(n) = self.alloca_mgr.get_local_offset(vreg!(func; dst.id)) {
+                    dynasm!(self.asm; mov DWORD [rbp-(n as i32)], *i);
+                    return;
+                }
+
+                dynasm!(self.asm; mov DWORD [Ra(reg!(func; dst.id))], *i);
             }
             e => unimplemented!("{:?}", e),
+        }
+    }
+
+    fn compile_gep(
+        &mut self,
+        func: &Function,
+        instr: &Instruction,
+        ptrval: &Value,
+        indices: &[Value],
+    ) {
+        match ptrval {
+            Value::Instruction(iv) => {
+                let rn = reg!(instr);
+                if let Some(n) = self.alloca_mgr.get_local_offset(vreg!(func; iv.id)) {
+                    let ety = ptrval
+                        .get_type(self.module)
+                        .get_element_ty_with_indices(indices)
+                        .unwrap();
+                    match indices[1] {
+                        Value::Immediate(ImmediateValue::Int32(idx)) => {
+                            dynasm!(self.asm; lea Ra(rn), [rbp + (ety.size_in_byte() as i32)*idx - (n as i32)])
+                        }
+                        Value::Instruction(iv) => match ety {
+                            Type::Int32 => dynasm!(self.asm
+                                    ; lea Ra(rn), [rbp + 4*Ra(reg!(func; iv.id)) - (n as i32)]),
+                            _ => unimplemented!(),
+                        },
+                        _ => unimplemented!(),
+                    }
+                    return;
+                }
+            }
+            _ => unimplemented!(),
         }
     }
 
@@ -491,6 +500,52 @@ impl<'a> JITCompiler<'a> {
                 }
             }
             _ => unimplemented!(),
+        }
+    }
+
+    fn get_function_entry_label(&mut self, f_id: FunctionId) -> DynamicLabel {
+        if self.function_map.contains_key(&f_id) {
+            return *self.function_map.get(&f_id).unwrap();
+        }
+
+        let f_entry = self.asm.new_dynamic_label();
+        self.function_map.insert(f_id, f_entry);
+        f_entry
+    }
+
+    fn push_args(&mut self, f: &Function, args: &[Value]) -> usize {
+        for arg in args.iter().rev() {
+            match arg {
+                Value::Instruction(InstructionValue { id, .. }) => {
+                    dynasm!(self.asm; push Ra(reg!(f; *id)))
+                }
+                Value::Immediate(ImmediateValue::Int32(i)) => dynasm!(self.asm; push *i),
+                Value::Argument(arg) => {
+                    dynasm!(self.asm; push QWORD [rbp+8+self.args_mgr.get_offset(arg.index).unwrap()])
+                }
+                _ => unimplemented!(),
+            }
+        }
+        args.len() * 8 // TODO
+    }
+
+    fn assign_args_to_regs(&mut self, caller: &Function, args: &[Value]) {
+        let pregs = vec![7, 6, 2, 1, 8, 9]; // rdi, rsi, rdx, rcx, r8, r9
+        for (i, arg) in args.iter().enumerate() {
+            let r = match pregs.get(i) {
+                Some(r) => *r as u8,
+                None => unimplemented!("too many arguments for internal function"),
+            }; // TODO
+            match arg {
+                Value::Instruction(InstructionValue { id, .. }) => {
+                    dynasm!(self.asm; mov Ra(r), Ra(reg!(caller; *id)))
+                }
+                Value::Immediate(ImmediateValue::Int32(i)) => dynasm!(self.asm; mov Rd(r), *i),
+                Value::Argument(arg) => {
+                    dynasm!(self.asm; mov Ra(r), AWORD [rbp+8+self.args_mgr.get_offset(arg.index).unwrap()])
+                }
+                _ => unimplemented!(),
+            }
         }
     }
 
