@@ -41,6 +41,7 @@ impl Type {
     pub fn get_element_ty(&self) -> Option<&Type> {
         match self {
             Type::Pointer(e) => Some(&**e),
+            Type::Array(a) => Some(&a.elem_ty),
             _ => None,
         }
     }

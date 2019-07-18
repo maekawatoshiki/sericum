@@ -46,7 +46,6 @@ macro_rules! vreg {
     }};
 }
 
-
 #[macro_export]
 macro_rules! cilk_parse_ty {
     (i32) => {
@@ -54,6 +53,20 @@ macro_rules! cilk_parse_ty {
     };
     (void) => {
         types::Type::Void
+    };
+    ([$n:expr; $ty:ident]) => {
+        types::Type::Array(
+            Box::new(
+                types::ArrayType::new(cilk_parse_ty!($ty), $n)
+            )
+        )
+    };
+    ([$n:expr; $($elem:tt)*]) => {
+        types::Type::Array(
+            Box::new(
+                types::ArrayType::new(cilk_parse_ty!($($elem)*), $n)
+            )
+        )
     };
 }
 
@@ -94,6 +107,10 @@ macro_rules! cilk_expr {
         let $x = $builder.build_alloca(cilk_parse_ty!($ty));
         cilk_expr!($builder; $bb_map; $( $remain )*);
     };
+    ($builder:expr; $bb_map:expr; $x:ident = alloca_ ($($ty:tt)*); $($remain:tt)*) => {
+        let $x = $builder.build_alloca(cilk_parse_ty!($( $ty )*));
+        cilk_expr!($builder; $bb_map; $( $remain )*);
+    };
     ($builder:expr; $bb_map:expr; $x:ident = load ($($val:tt)*); $($remain:tt)*) => {
         let val= cilk_value!($builder; $( $val )*);
         let $x = $builder.build_load(val);
@@ -127,6 +144,12 @@ macro_rules! cilk_expr {
         let val1 = cilk_value!($builder; $( $val1 )*);
         let val2 = cilk_value!($builder; $( $val2 )*);
         let $x = $builder.build_rem(val1, val2);
+        cilk_expr!($builder; $bb_map; $( $remain )*);
+    };
+    ($builder:expr; $bb_map:expr; $x:ident = gep ($($val:tt)*), [$( ( $($idx:tt)* ) ),*] ; $($remain:tt)*) => {
+        let val = cilk_value!($builder; $( $val )*);
+        let indices = vec![$( cilk_value!($builder; $( $idx )*) ),*];
+        let $x = $builder.build_gep(val, indices);
         cilk_expr!($builder; $bb_map; $( $remain )*);
     };
     ($builder:expr; $bb_map:expr; $x:ident = phi [$( [ ($($arg:tt)*), $bb:ident ] ),*] ; $($remain:tt)*) => {

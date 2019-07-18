@@ -322,20 +322,21 @@ impl<'a> JITCompiler<'a> {
             Value::Instruction(iv) => {
                 let rn = reg!(instr);
                 if let Some(n) = self.alloca_mgr.get_local_offset(vreg!(func; iv.id)) {
-                    let ety = ptrval
-                        .get_type(self.module)
-                        .get_element_ty_with_indices(indices)
-                        .unwrap();
-                    match indices[1] {
-                        Value::Immediate(ImmediateValue::Int32(idx)) => {
-                            dynasm!(self.asm; lea Ra(rn), [rbp + (ety.size_in_byte() as i32)*idx - (n as i32)])
-                        }
-                        Value::Instruction(iv) => match ety {
-                            Type::Int32 => dynasm!(self.asm
-                                    ; lea Ra(rn), [rbp + 4*Ra(reg!(func; iv.id)) - (n as i32)]),
+                    let mut ety = ptrval.get_type(self.module);
+                    dynasm!(self.asm; lea Ra(rn), [rbp - (n as i32)]);
+                    for idx in indices {
+                        ety = ety.get_element_ty().unwrap();
+                        match idx {
+                            Value::Immediate(ImmediateValue::Int32(idx)) => {
+                                dynasm!(self.asm; lea Ra(rn), [Ra(rn) + (ety.size_in_byte() as i32)*idx ])
+                            }
+                            // Value::Instruction(iv) => match ety {
+                            //     Type::Int32 => dynasm!(self.asm
+                            //         ; lea Ra(rn), [rbp + 4*Ra(reg!(func; iv.id)) - (n as i32)]),
+                            //     _ => unimplemented!(),
+                            // },
                             _ => unimplemented!(),
-                        },
-                        _ => unimplemented!(),
+                        };
                     }
                     return;
                 }
