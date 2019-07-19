@@ -19,5 +19,5 @@ fn dag1() {
 
     println!("{}", m.function_ref(func).to_string(&m));
 
-    dag::ConvertToDAG::new(&m);
+    dag::ConvertToDAG::new(&m).construct_dag(func);
 }
