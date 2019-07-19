@@ -6,6 +6,7 @@ pub mod macros;
 pub mod exec;
 pub mod ir;
 pub mod pass;
+pub mod codegen;
 
 pub use ir::*;
 
