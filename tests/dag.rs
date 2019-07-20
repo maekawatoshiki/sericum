@@ -13,11 +13,14 @@ fn dag1() {
         entry:
             i = alloca i32;
             store (%arg.0), (%i);
-            br l1;
+            c = icmp eq (%i), (i32 1);
+            br (%c) l1, l2;
         l1:
             x = load (%i);
             y = add (%x), (i32 1);
             ret (%y);
+        l2:
+            ret (i32 1);
     });
 
     println!("{}", m.function_ref(func).to_string(&m));

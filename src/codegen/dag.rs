@@ -1,6 +1,6 @@
 use crate::ir::{basic_block::*, function::*, module::*, opcode::*, types::*, value::*};
 use id_arena::*;
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 pub type DAGNodeId = Id<DAGNode>;
 
@@ -17,9 +17,11 @@ pub enum DAGNodeKind {
     Load(DAGNodeId),
     Store(DAGNodeId, DAGNodeId), // dst, src
     Add(DAGNodeId, DAGNodeId),
+    // ICmp(ICmpKind),
+    BrCond(DAGNodeId, BasicBlockId),
     Br(BasicBlockId),
     Ret(DAGNodeId),
-    CopyToReg(RegisterKind, DAGNodeId), // reg, val
+
     FrameIndex(i32),
     Register(RegisterKind),
     Constant(ConstantKind),
@@ -58,8 +60,8 @@ impl<'a> ConvertToDAG<'a> {
         let func = self.module.function_ref(func_id);
 
         for (_, bb) in &func.basic_blocks {
-            let _id = self.construct_dag_from_basic_block(func, bb);
-            // println!("{}", self.dag_arena[id].to_dot(id, &self.dag_arena));
+            let id = self.construct_dag_from_basic_block(func, bb);
+            println!("{}", self.dag_arena[id].to_dot(id, &self.dag_arena));
         }
     }
 
@@ -106,6 +108,14 @@ impl<'a> ConvertToDAG<'a> {
                 }
             };
         }
+        macro_rules! entry_chain {
+            ($dag_id:expr) => {{
+                let entry_node = &mut self.dag_arena[entry_node];
+                if entry_node.next.is_none() {
+                    entry_node.next = Some($dag_id);
+                }
+            }};
+        }
 
         for instr_val in bb.iseq_ref().iter() {
             let instr_id = instr_val.get_instr_id().unwrap();
@@ -128,14 +138,8 @@ impl<'a> ConvertToDAG<'a> {
                         ty: Some(instr.ty.clone()),
                         next: None,
                     });
-                    let vreg_id = self.dag_arena.alloc(DAGNode {
-                        kind: DAGNodeKind::CopyToReg(RegisterKind::VReg(1), load_id),
-                        ty: Some(instr.ty.clone()),
-                        next: None,
-                    });
-                    make_chain!(load_id);
-                    last_dag_id = Some(load_id);
-                    self.instr_id_to_dag_node_id.insert(instr_id, vreg_id);
+                    entry_chain!(load_id);
+                    self.instr_id_to_dag_node_id.insert(instr_id, load_id);
                 }
                 Opcode::Store(ref src, ref dst) => {
                     let dst_id = self.get_dag_id_from_value(dst);
@@ -145,6 +149,7 @@ impl<'a> ConvertToDAG<'a> {
                         ty: None,
                         next: None,
                     });
+                    entry_chain!(id);
                     make_chain!(id);
                     last_dag_id = Some(id);
                 }
@@ -156,14 +161,8 @@ impl<'a> ConvertToDAG<'a> {
                         ty: Some(instr.ty.clone()),
                         next: None,
                     });
-                    let vreg_id = self.dag_arena.alloc(DAGNode {
-                        kind: DAGNodeKind::CopyToReg(RegisterKind::VReg(1), add_id),
-                        ty: Some(instr.ty.clone()),
-                        next: None,
-                    });
-                    make_chain!(add_id);
-                    last_dag_id = Some(add_id);
-                    self.instr_id_to_dag_node_id.insert(instr_id, vreg_id);
+                    entry_chain!(add_id);
+                    self.instr_id_to_dag_node_id.insert(instr_id, add_id);
                 }
                 Opcode::Br(bb) => {
                     let id = self.dag_arena.alloc(DAGNode {
@@ -171,7 +170,35 @@ impl<'a> ConvertToDAG<'a> {
                         ty: None,
                         next: None,
                     });
+                    entry_chain!(id);
                     make_chain!(id);
+                }
+                Opcode::CondBr(ref v, then_, else_) => {
+                    let v_id = self.get_dag_id_from_value(v);
+                    let id = self.dag_arena.alloc(DAGNode {
+                        kind: DAGNodeKind::BrCond(v_id, then_),
+                        ty: None,
+                        next: None,
+                    });
+                    entry_chain!(id);
+                    make_chain!(id);
+                    let id = self.dag_arena.alloc(DAGNode {
+                        kind: DAGNodeKind::Br(else_),
+                        ty: None,
+                        next: None,
+                    });
+                    make_chain!(id);
+                }
+                Opcode::ICmp(ref c, ref v1, ref v2) => {
+                    // let v1_id = self.get_dag_id_from_value(v1);
+                    // let v2_id = self.get_dag_id_from_value(v2);
+                    // let id = self.dag_arena.alloc(DAGNode {
+                    //     kind: DAGNodeKind::Add(v1_id, v2_id),
+                    //     ty: Some(instr.ty.clone()),
+                    //     next: None,
+                    // });
+                    // entry_chain!(id);
+                    // self.instr_id_to_dag_node_id.insert(instr_id, id);
                 }
                 Opcode::Ret(ref v) => {
                     let v_id = self.get_dag_id_from_value(v);
@@ -180,6 +207,7 @@ impl<'a> ConvertToDAG<'a> {
                         ty: None,
                         next: None,
                     });
+                    entry_chain!(id);
                     make_chain!(id);
                 }
                 ref e => unimplemented!("{:?}", e),
@@ -192,33 +220,142 @@ impl<'a> ConvertToDAG<'a> {
     }
 }
 
-// impl DAGNode {
-//     pub fn to_dot(&self, self_id: DAGNodeId, arena: &Arena<DAGNode>) -> String {
-//         format!("digraph graph {{ {} }}", self.to_dot_sub(self_id, arena))
-//     }
-//
-//     fn to_dot_sub(&self, self_id: DAGNodeId, arena: &Arena<DAGNode>) -> String {
-//         match self.kind {
-//             DAGNodeKind::Entry => format!(
-//                 "\nEntry [shape=record,shape=Mrecord,label=\"{{Entry}}\"];\n{}",
-//                 match self.next {
-//                     Some(next) => {
-//                         format!("Entry -> {}"
-//                         arena[next].to_dot_sub(next, arena)
-//                     }
-//                     None => "".to_string(),
-//                 }
-//             ),
-//             DAGNodeKind::Load(dagid) => format!(
-//                 "\nLoad{} [shape=record,shape=Mrecord,label=\"{{Load|{}}}\"];\n{}",
-//                 self_id.index(),
-//                 self.ty.as_ref().unwrap().to_string(),
-//                 match self.next {
-//                     Some(next) => arena[next].to_dot_sub(next, arena),
-//                     None => "".to_string(),
-//                 }
-//             ),
-//             _ => "".to_string(),
-//         }
-//     }
-// }
+impl DAGNode {
+    pub fn to_dot(&self, self_id: DAGNodeId, arena: &Arena<DAGNode>) -> String {
+        let mut head = FxHashSet::default();
+        self.to_dot_sub(&mut head, self_id, arena);
+        format!(
+            "digraph g {{ {} }}",
+            head.iter().fold("".to_string(), |mut s, x| {
+                s += x;
+                s.push('\n');
+                s
+            })
+        )
+    }
+
+    fn to_dot_sub(&self, head: &mut FxHashSet<String>, self_id: DAGNodeId, arena: &Arena<DAGNode>) {
+        match self.kind {
+            DAGNodeKind::Entry => {
+                head.insert(format!(
+                    "instr{} [shape=record,shape=Mrecord,label=\"{{Entry}}\"];",
+                    self_id.index()
+                ));
+            }
+            DAGNodeKind::Load(dagid) => {
+                head.insert(format!(
+                    "instr{} [shape=record,shape=Mrecord,label=\"{{Load|{}}}\"];",
+                    self_id.index(),
+                    self.ty.as_ref().unwrap().to_string(),
+                ));
+                head.insert(format!(
+                    "instr{} -> instr{} [color=\"#1E92FF\"];",
+                    self_id.index(),
+                    dagid.index(),
+                ));
+                arena[dagid].to_dot_sub(head, dagid, arena);
+            }
+            DAGNodeKind::Store(op1, op2) => {
+                head.insert(format!(
+                    "instr{} [shape=record,shape=Mrecord,label=\"{{Store}}\"];",
+                    self_id.index(),
+                ));
+                head.insert(format!(
+                    "instr{} -> instr{} [color=\"#1E92FF\"];instr{} -> instr{} [color=\"#1E92FF\"];",
+                    self_id.index(),
+                    op1.index(),
+                    self_id.index(),
+                    op2.index(),
+                ));
+                arena[op1].to_dot_sub(head, op1, arena);
+                arena[op2].to_dot_sub(head, op2, arena);
+            }
+            DAGNodeKind::Add(op1, op2) => {
+                head.insert(format!(
+                    "instr{} [shape=record,shape=Mrecord,label=\"{{Add|{}}}\"];",
+                    self_id.index(),
+                    self.ty.as_ref().unwrap().to_string(),
+                ));
+                head.insert(format!(
+                    "instr{} -> instr{} [color=\"#1E92FF\"];
+                    instr{} -> instr{} [color=\"#1E92FF\"];",
+                    self_id.index(),
+                    op1.index(),
+                    self_id.index(),
+                    op2.index(),
+                ));
+                arena[op1].to_dot_sub(head, op1, arena);
+                arena[op2].to_dot_sub(head, op2, arena);
+            }
+            DAGNodeKind::BrCond(v, bb) => {
+                head.insert(format!(
+                    "instr{} [shape=record,shape=Mrecord,label=\"{{BrCond}}\"];",
+                    self_id.index(),
+                ));
+                head.insert(format!(
+                    "instr{} -> instr{} [color=\"#1E92FF\"];",
+                    self_id.index(),
+                    v.index()
+                ));
+                head.insert(format!(
+                    "instr{} -> branch{} [color=\"#fe8833\"];",
+                    self_id.index(),
+                    bb.index()
+                ));
+            }
+            DAGNodeKind::Br(bb) => {
+                head.insert(format!(
+                    "instr{} [shape=record,shape=Mrecord,label=\"{{Br}}\"];",
+                    self_id.index(),
+                ));
+                head.insert(format!(
+                    "instr{} -> branch{} [color=\"#fe8833\"];",
+                    self_id.index(),
+                    bb.index()
+                ));
+            }
+            DAGNodeKind::Ret(v) => {
+                head.insert(format!(
+                    "instr{} [shape=record,shape=Mrecord,label=\"{{Ret}}\"];",
+                    self_id.index(),
+                ));
+                head.insert(format!(
+                    "instr{} -> instr{} [color=\"#1E92FF\"];",
+                    self_id.index(),
+                    v.index()
+                ));
+                arena[v].to_dot_sub(head, v, arena);
+            }
+            DAGNodeKind::FrameIndex(i) => {
+                head.insert(format!(
+                    "instr{} [shape=record,shape=Mrecord,label=\"{{FrameIndex:{}}}\"];",
+                    self_id.index(),
+                    i
+                ));
+            }
+            DAGNodeKind::Register(ref r) => {
+                head.insert(format!(
+                    "instr{} [shape=record,shape=Mrecord,label=\"{{Register:{:?}}}\"];",
+                    self_id.index(),
+                    r
+                ));
+            }
+            DAGNodeKind::Constant(ref c) => {
+                head.insert(format!(
+                    "instr{} [shape=record,shape=Mrecord,label=\"{{Constant:{:?}}}\"];",
+                    self_id.index(),
+                    c
+                ));
+            }
+        }
+
+        some_then!(next, self.next, {
+            head.insert(format!(
+                "instr{} -> instr{};",
+                self_id.index(),
+                next.index(),
+            ));
+            arena[next].to_dot_sub(head, next, arena)
+        });
+    }
+}
