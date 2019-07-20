@@ -9,12 +9,15 @@ use cilk::{
 fn dag1() {
     let mut m = module::Module::new("cilk");
 
-    let func = cilk_ir!(m; define [i32] func () {
+    let func = cilk_ir!(m; define [i32] func (i32) {
         entry:
             i = alloca i32;
-            store (i32 123), (%i);
-            l = load (%i);
-            ret (%l);
+            store (%arg.0), (%i);
+            br l1;
+        l1:
+            x = load (%i);
+            y = add (%x), (i32 1);
+            ret (%y);
     });
 
     println!("{}", m.function_ref(func).to_string(&m));

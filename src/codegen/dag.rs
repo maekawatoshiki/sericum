@@ -15,7 +15,10 @@ pub struct DAGNode {
 pub enum DAGNodeKind {
     Entry,
     Load(DAGNodeId),
-    Store(DAGNodeId, DAGNodeId),     // dst, src
+    Store(DAGNodeId, DAGNodeId), // dst, src
+    Add(DAGNodeId, DAGNodeId),
+    Br(BasicBlockId),
+    Ret(DAGNodeId),
     CopyToReg(DAGNodeId, DAGNodeId), // reg, val
     FrameIndex(i32),
     Register(RegisterKind),
@@ -25,6 +28,7 @@ pub enum DAGNodeKind {
 #[derive(Debug, Clone, PartialEq)]
 pub enum RegisterKind {
     VReg(VirtualRegister),
+    Reg(usize),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -137,9 +141,37 @@ impl<'a> ConvertToDAG<'a> {
                     });
                     make_chain!(id);
                     last_dag_id = Some(id);
+                }
+                Opcode::Add(ref v1, ref v2) => {
+                    let v1_id = self.get_dag_id_from_value(v1);
+                    let v2_id = self.get_dag_id_from_value(v2);
+                    let id = self.dag_arena.alloc(DAGNode {
+                        kind: DAGNodeKind::Add(v1_id, v2_id),
+                        ty: Some(instr.ty.clone()),
+                        next: None,
+                    });
+                    make_chain!(id);
+                    last_dag_id = Some(id);
                     self.instr_id_to_dag_node_id.insert(instr_id, id);
                 }
-                _ => {}
+                Opcode::Br(bb) => {
+                    let id = self.dag_arena.alloc(DAGNode {
+                        kind: DAGNodeKind::Br(bb),
+                        ty: None,
+                        next: None,
+                    });
+                    make_chain!(id);
+                }
+                Opcode::Ret(ref v) => {
+                    let v_id = self.get_dag_id_from_value(v);
+                    let id = self.dag_arena.alloc(DAGNode {
+                        kind: DAGNodeKind::Ret(v_id),
+                        ty: None,
+                        next: None,
+                    });
+                    make_chain!(id);
+                }
+                ref e => unimplemented!("{:?}", e),
             }
         }
 
@@ -148,3 +180,4 @@ impl<'a> ConvertToDAG<'a> {
         entry_node
     }
 }
+
