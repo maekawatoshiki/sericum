@@ -63,6 +63,11 @@ impl DAGNode {
         }
     }
 
+    pub fn set_next(mut self, next: DAGNodeId) -> Self {
+        self.next = Some(next);
+        self
+    }
+
     pub fn to_dot(&self, self_id: DAGNodeId, arena: &Arena<DAGNode>) -> String {
         let mut s = "".to_string();
         let mut mark = FxHashSet::default();

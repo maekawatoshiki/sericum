@@ -5,8 +5,6 @@ use rustc_hash::FxHashMap;
 
 pub struct SelectInstruction<'a> {
     pub module: &'a Module,
-    // pub dag_arena: Arena<DAGNode>,
-    // pub instr_id_to_dag_node_id: FxHashMap<InstructionId, DAGNodeId>,
 }
 
 impl<'a> SelectInstruction<'a> {
@@ -15,17 +13,31 @@ impl<'a> SelectInstruction<'a> {
     }
 
     pub fn select_function(&mut self, dag_func: &DAGFunction) {
+        let mut dag_arena = Arena::new();
         for (_, node) in &dag_func.bb_to_node {
-            self.select_dag(&dag_func, *node);
+            self.select_dag(&dag_func, &mut dag_arena, *node);
         }
     }
 
-    pub fn select_dag(&mut self, dag_func: &DAGFunction, node_id: DAGNodeId) {
+    pub fn select_dag(
+        &mut self,
+        dag_func: &DAGFunction,
+        dag_arena: &mut Arena<DAGNode>,
+        node_id: DAGNodeId,
+    ) -> DAGNodeId {
         let node = &dag_func.dag_arena[node_id];
 
-        // let new_kind = match node.kind {
-        //     DAGNodeKind::Entry => DAGNodeKind::Entry,
-        //     DAGNodeKind::Load(nid) => {}
-        // };
+        match node.kind {
+            DAGNodeKind::Entry => {
+                let node = DAGNode::new(DAGNodeKind::Entry, None).set_next(self.select_dag(
+                    dag_func,
+                    dag_arena,
+                    node.next.unwrap(),
+                ));
+                dag_arena.alloc(node)
+            }
+            // DAGNodeKind::Load(v) => {}
+            _ => unimplemented!(),
+        }
     }
 }
