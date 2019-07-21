@@ -43,7 +43,7 @@ pub enum Opcode {
     Ret(Value),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Copy, PartialEq)]
 pub enum ICmpKind {
     Eq,
     Le,
