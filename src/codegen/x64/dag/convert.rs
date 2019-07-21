@@ -102,7 +102,7 @@ impl<'a> ConvertToDAG<'a> {
 
             match instr.opcode {
                 Opcode::Alloca(ref ty) => {
-                    local_count += 1;
+                    local_count += ty.size_in_byte() as i32;
                     let id = dag_arena.alloc(DAGNode::new(
                         DAGNodeKind::FrameIndex(local_count),
                         Some(ty.clone()),

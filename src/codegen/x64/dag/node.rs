@@ -9,6 +9,7 @@ pub struct DAGNode {
     pub kind: DAGNodeKind,
     pub ty: Option<Type>,
     pub next: Option<DAGNodeId>,
+    pub operation: Option<&'static str>, // Machine opcode. TODO
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -60,11 +61,17 @@ impl DAGNode {
             kind,
             ty,
             next: None,
+            operation: None,
         }
     }
 
     pub fn set_next(mut self, next: DAGNodeId) -> Self {
         self.next = Some(next);
+        self
+    }
+
+    pub fn set_operation(mut self, op: &'static str) -> Self {
+        self.operation = Some(op);
         self
     }
 

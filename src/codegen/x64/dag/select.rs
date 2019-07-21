@@ -36,7 +36,18 @@ impl<'a> SelectInstruction<'a> {
                 ));
                 dag_arena.alloc(node)
             }
-            // DAGNodeKind::Load(v) => {}
+            DAGNodeKind::Load(v_id) => {
+                let v = &dag_arena[v_id];
+                let node = match v.kind {
+                    DAGNodeKind::FrameIndex(i) => {
+                        DAGNode::new(DAGNodeKind::Load(v_id), node.ty.clone())
+                            .set_operation("mov")
+                            .set_next(self.select_dag(dag_func, dag_arena, node.next.unwrap()))
+                    }
+                    _ => unimplemented!(),
+                };
+                dag_arena.alloc(node)
+            }
             _ => unimplemented!(),
         }
     }
