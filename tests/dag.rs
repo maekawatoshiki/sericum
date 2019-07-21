@@ -1,5 +1,5 @@
 use cilk::{
-    codegen::dag,
+    codegen::x64::dag,
     // exec::{interpreter::interp, jit::x64::compiler},
     ir::{builder, function, module, types, value},
     *,
@@ -25,5 +25,5 @@ fn dag1() {
 
     println!("{}", m.function_ref(func).to_string(&m));
 
-    dag::ConvertToDAG::new(&m).construct_dag(func);
+    dag::convert::ConvertToDAG::new(&m).construct_dag(func);
 }
