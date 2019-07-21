@@ -2,7 +2,6 @@
 
 use super::regalloc;
 use crate::{
-    exec::TypeSize,
     ir::{basic_block::*, function::*, module::*, opcode::*, types::*, value::*},
     pass::*,
 };

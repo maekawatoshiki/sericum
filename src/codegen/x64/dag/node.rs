@@ -55,6 +55,14 @@ impl Into<CondKind> for ICmpKind {
 }
 
 impl DAGNode {
+    pub fn new(kind: DAGNodeKind, ty: Option<Type>) -> Self {
+        Self {
+            kind,
+            ty,
+            next: None,
+        }
+    }
+
     pub fn to_dot(&self, self_id: DAGNodeId, arena: &Arena<DAGNode>) -> String {
         let mut s = "".to_string();
         let mut mark = FxHashSet::default();

@@ -10,6 +10,10 @@ pub enum Type {
     Function(Box<FunctionType>),
 }
 
+pub trait TypeSize {
+    fn size_in_byte(&self) -> usize;
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct FunctionType {
     pub ret_ty: Type,
