@@ -1,6 +1,6 @@
 use super::{basic_block::*, convert::*, node::*};
 // use super::{convert::*, node::*};
-use crate::ir::{basic_block::*, function::*, module::*, opcode::*, types::*, value::*};
+use crate::ir::module::*;
 // use id_arena::*;
 // use rustc_hash::FxHashMap;
 
@@ -50,6 +50,7 @@ impl<'a> LivenessAnalysis<'a> {
 
     fn visit_node(&mut self, cur_func: &DAGFunction, bb_id: DAGBasicBlockId, node_id: DAGNodeId) {
         let node = &cur_func.dag_arena[node_id];
+
         match node.kind {
             DAGNodeKind::Add(op1, op2)
             | DAGNodeKind::Setcc(_, op1, op2)
@@ -65,6 +66,8 @@ impl<'a> LivenessAnalysis<'a> {
             | DAGNodeKind::Br(_)
             | DAGNodeKind::Constant(_) => {}
         }
+
+        some_then!(next, node.next, self.visit_node(cur_func, bb_id, next));
     }
 
     fn propagate(&self, cur_func: &DAGFunction, bb_id: DAGBasicBlockId, node_id: DAGNodeId) {
