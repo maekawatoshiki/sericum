@@ -1,4 +1,4 @@
-use super::node::*;
+use super::{basic_block::*, node::*};
 use crate::ir::{basic_block::*, function::*, module::*, opcode::*, types::*, value::*};
 use id_arena::*;
 use rustc_hash::FxHashMap;
@@ -6,8 +6,8 @@ use rustc_hash::FxHashMap;
 #[derive(Debug, Clone)]
 pub struct DAGFunction {
     pub func_id: FunctionId,
-    pub bb_to_node: FxHashMap<BasicBlockId, DAGNodeId>,
     pub dag_arena: Arena<DAGNode>,
+    pub dag_basic_blocks: Arena<DAGBasicBlock>,
 }
 
 pub struct ConvertToDAG<'a> {
@@ -18,13 +18,13 @@ pub struct ConvertToDAG<'a> {
 impl DAGFunction {
     pub fn new(
         func_id: FunctionId,
-        bb_to_node: FxHashMap<BasicBlockId, DAGNodeId>,
         dag_arena: Arena<DAGNode>,
+        dag_basic_blocks: Arena<DAGBasicBlock>,
     ) -> Self {
         Self {
             func_id,
-            bb_to_node,
             dag_arena,
+            dag_basic_blocks,
         }
     }
 }
@@ -40,16 +40,23 @@ impl<'a> ConvertToDAG<'a> {
     pub fn construct_dag(&mut self, func_id: FunctionId) -> DAGFunction {
         let func = self.module.function_ref(func_id);
         // let mut dag_func = DAGFunction::new(func_id);
-        let mut bb_to_node: FxHashMap<BasicBlockId, DAGNodeId> = FxHashMap::default();
         let mut dag_arena: Arena<DAGNode> = Arena::new();
+        let mut dag_bb_arena: Arena<DAGBasicBlock> = Arena::new();
+        let mut bb_to_dag_bb: FxHashMap<BasicBlockId, DAGBasicBlockId> = FxHashMap::default();
 
-        for (bb_id, bb) in &func.basic_blocks {
-            let id = self.construct_dag_from_basic_block(&mut dag_arena, func, bb);
-            bb_to_node.insert(bb_id, id);
-            println!("{}", dag_arena[id].to_dot(id, &dag_arena));
+        for (bb_id, _) in &func.basic_blocks {
+            bb_to_dag_bb
+                .entry(bb_id)
+                .or_insert_with(|| dag_bb_arena.alloc(DAGBasicBlock::new()));
         }
 
-        DAGFunction::new(func_id, bb_to_node, dag_arena)
+        for (bb_id, bb) in &func.basic_blocks {
+            let id = self.construct_dag_from_basic_block(&mut dag_arena, &bb_to_dag_bb, func, bb);
+            dag_bb_arena[*bb_to_dag_bb.get(&bb_id).unwrap()].set_entry(id);
+            when_debug!(println!("{}", dag_arena[id].to_dot(id, &dag_arena)));
+        }
+
+        DAGFunction::new(func_id, dag_arena, dag_bb_arena)
     }
 
     pub fn get_dag_id_from_value(
@@ -63,16 +70,17 @@ impl<'a> ConvertToDAG<'a> {
                 DAGNodeKind::Constant(ConstantKind::Int32(*i)),
                 Some(Type::Int32),
             )),
-            Value::Argument(av) => dag_arena.alloc(DAGNode::new(
-                DAGNodeKind::FrameIndex(-(av.index as i32 + 1)),
-                Some(
-                    self.module
-                        .function_ref(av.func_id)
-                        .get_param_type(av.index)
-                        .unwrap()
-                        .clone(),
-                ),
-            )),
+            Value::Argument(av) => {
+                let ty = self
+                    .module
+                    .function_ref(av.func_id)
+                    .get_param_type(av.index)
+                    .unwrap();
+                dag_arena.alloc(DAGNode::new(
+                    DAGNodeKind::FrameIndex(-(av.index as i32 + 1), ty.clone()),
+                    Some(ty.clone()),
+                ))
+            }
             _ => unimplemented!(),
         }
     }
@@ -80,6 +88,7 @@ impl<'a> ConvertToDAG<'a> {
     pub fn construct_dag_from_basic_block(
         &mut self,
         dag_arena: &mut Arena<DAGNode>,
+        bb_to_dag_bb: &FxHashMap<BasicBlockId, DAGBasicBlockId>,
         func: &Function,
         bb: &BasicBlock,
     ) -> DAGNodeId {
@@ -104,7 +113,7 @@ impl<'a> ConvertToDAG<'a> {
                 Opcode::Alloca(ref ty) => {
                     local_count += 1;
                     let id = dag_arena.alloc(DAGNode::new(
-                        DAGNodeKind::FrameIndex(local_count),
+                        DAGNodeKind::FrameIndex(local_count, ty.clone()),
                         Some(ty.clone()),
                     ));
                     self.instr_id_to_dag_node_id.insert(instr_id, id);
@@ -133,15 +142,22 @@ impl<'a> ConvertToDAG<'a> {
                     self.instr_id_to_dag_node_id.insert(instr_id, add_id);
                 }
                 Opcode::Br(bb) => {
-                    let id = dag_arena.alloc(DAGNode::new(DAGNodeKind::Br(bb), None));
+                    let id = dag_arena.alloc(DAGNode::new(
+                        DAGNodeKind::Br(*bb_to_dag_bb.get(&bb).unwrap()),
+                        None,
+                    ));
                     make_chain!(id);
                 }
                 Opcode::CondBr(ref v, then_, else_) => {
                     let v_id = self.get_dag_id_from_value(dag_arena, v);
-                    make_chain!(
-                        dag_arena.alloc(DAGNode::new(DAGNodeKind::BrCond(v_id, then_), None,))
-                    );
-                    make_chain!(dag_arena.alloc(DAGNode::new(DAGNodeKind::Br(else_), None,)))
+                    make_chain!(dag_arena.alloc(DAGNode::new(
+                        DAGNodeKind::BrCond(v_id, *bb_to_dag_bb.get(&then_).unwrap()),
+                        None,
+                    )));
+                    make_chain!(dag_arena.alloc(DAGNode::new(
+                        DAGNodeKind::Br(*bb_to_dag_bb.get(&else_).unwrap()),
+                        None,
+                    )))
                 }
                 Opcode::ICmp(ref c, ref v1, ref v2) => {
                     let v1_id = self.get_dag_id_from_value(dag_arena, v1);

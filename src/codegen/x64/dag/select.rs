@@ -1,7 +1,8 @@
+// TODO: dirty code
+
 use super::super::lower::instr::*;
 use super::{convert::*, node::*};
-use crate::ir::{basic_block::*, function::*, module::*, opcode::*, types::*, value::*};
-use id_arena::*;
+use crate::ir::module::*;
 use rustc_hash::FxHashMap;
 
 pub struct SelectInstruction<'a> {
@@ -25,10 +26,10 @@ impl<'a> SelectInstruction<'a> {
     }
 
     pub fn select_function(&mut self, dag_func: &DAGFunction) {
-        for (_, node) in &dag_func.bb_to_node {
+        for (id, node) in &dag_func.dag_basic_blocks {
             let mut iseq = vec![];
-            self.select_dag(&dag_func, &mut iseq, *node);
-            println!("iseq:\n{:?}", iseq);
+            self.select_dag(&dag_func, &mut iseq, node.entry.unwrap());
+            println!("iseq{}:\n{:?}", id.index(), iseq);
         }
     }
 
@@ -46,38 +47,35 @@ impl<'a> SelectInstruction<'a> {
                 let op1 = &dag_func.dag_arena[op1id];
                 let vreg = self.next_vreg();
                 self.dag_id_to_vreg.insert(node_id, vreg);
-                match op1.kind {
-                    DAGNodeKind::FrameIndex(i) => {
-                        iseq.push(LowerInstr::new(
-                            LowerOpcode::Load,
-                            vec![LowerOprand::FrameIndex(FrameIndexInfo::new(
-                                node.ty.as_ref().unwrap().clone(),
-                                i,
-                            ))],
-                            node.ty.as_ref().unwrap().clone(),
-                            vreg,
-                        ));
+                let new_op1 = match op1.kind {
+                    DAGNodeKind::FrameIndex(i, ref ty) => {
+                        LowerOprand::FrameIndex(FrameIndexInfo::new(ty.clone(), i))
                     }
-                    _ => self.select_dag(dag_func, iseq, op1id),
-                }
+                    _ => {
+                        self.select_dag(dag_func, iseq, op1id);
+                        LowerOprand::VReg(VRegInfo::new(
+                            op1.ty.clone().unwrap(),
+                            *self.dag_id_to_vreg.get(&op1id).unwrap(),
+                        ))
+                    }
+                };
+                iseq.push(LowerInstr::new(
+                    LowerOpcode::Load,
+                    vec![new_op1],
+                    node.ty.clone(),
+                    vreg,
+                ));
             }
             DAGNodeKind::Store(dstid, srcid) => {
                 let dst = &dag_func.dag_arena[dstid];
-                let src = &dag_func.dag_arena[srcid];
-                match dst.kind {
-                    DAGNodeKind::FrameIndex(i) => {
-                        iseq.push(LowerInstr::new(
-                            LowerOpcode::Load,
-                            vec![LowerOprand::FrameIndex(FrameIndexInfo::new(
-                                node.ty.as_ref().unwrap().clone(),
-                                i,
-                            ))],
-                            node.ty.as_ref().unwrap().clone(),
-                            0,
-                        ));
+                let _src = &dag_func.dag_arena[srcid];
+                let new_dst = match dst.kind {
+                    DAGNodeKind::FrameIndex(i, ref ty) => {
+                        LowerOprand::FrameIndex(FrameIndexInfo::new(ty.clone(), i))
                     }
-                    _ => self.select_dag(dag_func, iseq, op1id),
-                }
+                    _ => unimplemented!(),
+                };
+                iseq.push(LowerInstr::new(LowerOpcode::Store, vec![new_dst], None, 0));
             }
             _ => {}
         }

@@ -9,7 +9,7 @@ pub type RegisterInfoRef = Rc<RefCell<RegisterInfo>>;
 pub struct LowerInstr {
     pub opcode: LowerOpcode,
     pub oprand: Vec<LowerOprand>,
-    pub ty: Type,
+    pub ty: Option<Type>,
     pub reg: RegisterInfoRef,
 }
 
@@ -24,6 +24,7 @@ pub struct RegisterInfo {
 #[derive(Debug, Clone)]
 pub enum LowerOpcode {
     Load,
+    Store,
 }
 
 #[derive(Debug, Clone)]
@@ -51,7 +52,12 @@ pub struct VRegInfo {
 }
 
 impl LowerInstr {
-    pub fn new(opcode: LowerOpcode, oprand: Vec<LowerOprand>, ty: Type, vreg: usize) -> Self {
+    pub fn new(
+        opcode: LowerOpcode,
+        oprand: Vec<LowerOprand>,
+        ty: Option<Type>,
+        vreg: usize,
+    ) -> Self {
         Self {
             opcode,
             oprand,
@@ -64,6 +70,12 @@ impl LowerInstr {
 impl FrameIndexInfo {
     pub fn new(ty: Type, idx: i32) -> Self {
         Self { ty, idx }
+    }
+}
+
+impl VRegInfo {
+    pub fn new(ty: Type, vreg: usize) -> Self {
+        Self { ty, vreg }
     }
 }
 

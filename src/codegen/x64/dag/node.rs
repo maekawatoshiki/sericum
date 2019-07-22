@@ -1,14 +1,27 @@
+use super::basic_block::*;
 use crate::ir::{basic_block::*, opcode::*, types::*};
 use id_arena::*;
 use rustc_hash::FxHashSet;
+use std::{cell::RefCell, rc::Rc};
 
 pub type DAGNodeId = Id<DAGNode>;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct DAGNode {
     pub kind: DAGNodeKind,
     pub ty: Option<Type>,
     pub next: Option<DAGNodeId>,
+    pub reg: RegisterInfoRef,
+}
+
+pub type RegisterInfoRef = Rc<RefCell<RegisterInfo>>;
+
+#[derive(Debug, Clone)]
+pub struct RegisterInfo {
+    pub vreg: usize,
+    pub reg: Option<usize>,
+    pub spill: bool,
+    // pub last_use: Option<InstructionId>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -19,20 +32,20 @@ pub enum DAGNodeKind {
     Store(DAGNodeId, DAGNodeId), // dst, src
     Add(DAGNodeId, DAGNodeId),
     Setcc(CondKind, DAGNodeId, DAGNodeId),
-    BrCond(DAGNodeId, BasicBlockId),
-    Br(BasicBlockId),
+    BrCond(DAGNodeId, DAGBasicBlockId),
+    Br(DAGBasicBlockId),
     Ret(DAGNodeId),
 
-    FrameIndex(i32),
-    Register(RegisterKind),
+    FrameIndex(i32, Type),
+    // Register(RegisterKind),
     Constant(ConstantKind),
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum RegisterKind {
-    VReg(VirtualRegister),
-    Reg(usize),
-}
+// #[derive(Debug, Clone, PartialEq)]
+// pub enum RegisterKind {
+//     VReg(VirtualRegister),
+//     Reg(usize),
+// }
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ConstantKind {
@@ -60,6 +73,7 @@ impl DAGNode {
             kind,
             ty,
             next: None,
+            reg: Rc::new(RefCell::new(RegisterInfo::new(0))),
         }
     }
 
@@ -207,26 +221,27 @@ impl DAGNode {
                 );
                 arena[v].to_dot_sub(s, mark, v, arena);
             }
-            DAGNodeKind::FrameIndex(i) => {
+            DAGNodeKind::FrameIndex(i, ref ty) => {
                 s.push_str(
                     format!(
-                        "\ninstr{} [shape=record,shape=Mrecord,label=\"{{FrameIndex:{}}}\"];",
+                        "\ninstr{} [shape=record,shape=Mrecord,label=\"{{FrameIndex:{}|{}}}\"];",
                         self_id.index(),
-                        i
+                        i,
+                        ty.to_string()
                     )
                     .as_str(),
                 );
             }
-            DAGNodeKind::Register(ref r) => {
-                s.push_str(
-                    format!(
-                        "\ninstr{} [shape=record,shape=Mrecord,label=\"{{Register:{:?}}}\"];",
-                        self_id.index(),
-                        r
-                    )
-                    .as_str(),
-                );
-            }
+            // DAGNodeKind::Register(ref r) => {
+            //     s.push_str(
+            //         format!(
+            //             "\ninstr{} [shape=record,shape=Mrecord,label=\"{{Register:{:?}}}\"];",
+            //             self_id.index(),
+            //             r
+            //         )
+            //         .as_str(),
+            //     );
+            // }
             DAGNodeKind::Constant(ref c) => {
                 s.push_str(
                     format!(
@@ -250,5 +265,15 @@ impl DAGNode {
             );
             arena[next].to_dot_sub(s, mark, next, arena)
         });
+    }
+}
+
+impl RegisterInfo {
+    pub fn new(vreg: usize) -> Self {
+        Self {
+            vreg,
+            reg: None,
+            spill: false,
+        }
     }
 }
