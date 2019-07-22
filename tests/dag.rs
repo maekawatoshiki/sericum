@@ -26,5 +26,6 @@ fn dag1() {
     println!("{}", m.function_ref(func).to_string(&m));
 
     let dag_func = dag::convert::ConvertToDAG::new(&m).construct_dag(func);
+    dag::liveness::LivenessAnalysis::new(&m).analyze_function(&dag_func);
     dag::select::SelectInstruction::new(&m).select_function(&dag_func);
 }

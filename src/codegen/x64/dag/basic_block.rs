@@ -1,10 +1,7 @@
 use super::node::DAGNodeId;
 use id_arena::*;
 use rustc_hash::FxHashSet;
-use std::{
-    cell::{Ref, RefCell, RefMut},
-    rc::Rc,
-};
+use std::{cell::RefCell, rc::Rc};
 
 pub type DAGBasicBlockId = Id<DAGBasicBlock>;
 

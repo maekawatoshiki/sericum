@@ -47,6 +47,19 @@ impl<'a> ConvertToDAG<'a> {
             bb_to_dag_bb.insert(bb_id, dag_bb_arena.alloc(DAGBasicBlock::new()));
         }
 
+        for (bb, dag_bb) in &bb_to_dag_bb {
+            dag_bb_arena[*dag_bb].pred = func.basic_blocks[*bb]
+                .pred
+                .iter()
+                .map(|bb| *bb_to_dag_bb.get(bb).unwrap())
+                .collect();
+            dag_bb_arena[*dag_bb].succ = func.basic_blocks[*bb]
+                .succ
+                .iter()
+                .map(|bb| *bb_to_dag_bb.get(bb).unwrap())
+                .collect();
+        }
+
         for (bb_id, bb) in &func.basic_blocks {
             let id = self.construct_dag_from_basic_block(&mut dag_arena, &bb_to_dag_bb, func, bb);
             dag_bb_arena[*bb_to_dag_bb.get(&bb_id).unwrap()].set_entry(id);
