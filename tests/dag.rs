@@ -25,5 +25,6 @@ fn dag1() {
 
     println!("{}", m.function_ref(func).to_string(&m));
 
-    dag::convert::ConvertToDAG::new(&m).construct_dag(func);
+    let dag_func = dag::convert::ConvertToDAG::new(&m).construct_dag(func);
+    dag::select::SelectInstruction::new(&m).select_function(&dag_func);
 }
