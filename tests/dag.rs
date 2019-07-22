@@ -27,5 +27,12 @@ fn dag1() {
 
     let dag_func = dag::convert::ConvertToDAG::new(&m).construct_dag(func);
     dag::liveness::LivenessAnalysis::new(&m).analyze_function(&dag_func);
-    dag::select::SelectInstruction::new(&m).select_function(&dag_func);
+    // dag::select::SelectInstruction::new(&m).select_function(&dag_func);
+
+    for (id, bb) in &dag_func.dag_basic_blocks {
+        println!("{}: {:?}", id.index(), bb);
+    }
+    for (id, dag) in &dag_func.dag_arena {
+        println!("{}: {:?}", id.index(), dag);
+    }
 }

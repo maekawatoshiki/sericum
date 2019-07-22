@@ -2,17 +2,21 @@ use super::{basic_block::*, convert::*, node::*};
 // use super::{convert::*, node::*};
 use crate::ir::module::*;
 // use id_arena::*;
-// use rustc_hash::FxHashMap;
+use rustc_hash::FxHashSet;
 
 pub struct LivenessAnalysis<'a> {
     pub module: &'a Module,
+    vreg_count: usize,
     // pub dag_id_to_vreg: FxHashMap<DAGNodeId, usize>,
     // pub vreg_count: usize,
 }
 
 impl<'a> LivenessAnalysis<'a> {
     pub fn new(module: &'a Module) -> Self {
-        Self { module }
+        Self {
+            module,
+            vreg_count: 0,
+        }
     }
 
     pub fn analyze_function(&mut self, dag_func: &DAGFunction) {
@@ -20,26 +24,60 @@ impl<'a> LivenessAnalysis<'a> {
         self.visit(dag_func);
     }
 
+    fn next_vreg(&mut self) -> usize {
+        self.vreg_count += 1;
+        self.vreg_count
+    }
+
     fn set_def(&mut self, cur_func: &DAGFunction) {
         for (_, bb) in &cur_func.dag_basic_blocks {
-            self.set_def_node(cur_func, bb, bb.entry.unwrap());
+            let mut marked = FxHashSet::default();
+            self.set_def_node(&mut marked, cur_func, bb, bb.entry.unwrap());
         }
     }
 
-    fn set_def_node(&mut self, cur_func: &DAGFunction, bb: &DAGBasicBlock, node_id: DAGNodeId) {
+    fn set_def_node(
+        &mut self,
+        marked: &mut FxHashSet<DAGNodeId>,
+        cur_func: &DAGFunction,
+        bb: &DAGBasicBlock,
+        node_id: DAGNodeId,
+    ) {
+        if !marked.insert(node_id) {
+            return;
+        }
+
         let node = &cur_func.dag_arena[node_id];
+        node.set_vreg(self.next_vreg());
+
         match &node.kind {
-            DAGNodeKind::Add(_, _) | DAGNodeKind::Setcc(_, _, _) | DAGNodeKind::Load(_) => {
+            DAGNodeKind::Store(op1, op2) => {
+                self.set_def_node(marked, cur_func, bb, *op1);
+                self.set_def_node(marked, cur_func, bb, *op2);
+            }
+            DAGNodeKind::Add(op1, op2) | DAGNodeKind::Setcc(_, op1, op2) => {
+                self.set_def_node(marked, cur_func, bb, *op1);
+                self.set_def_node(marked, cur_func, bb, *op2);
                 bb.liveness.borrow_mut().def.insert(node_id);
             }
-            DAGNodeKind::Store(_, _)
-            | DAGNodeKind::Entry
-            | DAGNodeKind::Ret(_)
+            DAGNodeKind::Ret(op1) | DAGNodeKind::BrCond(op1, _) => {
+                self.set_def_node(marked, cur_func, bb, *op1);
+            }
+            DAGNodeKind::Load(op1) => {
+                self.set_def_node(marked, cur_func, bb, *op1);
+                bb.liveness.borrow_mut().def.insert(node_id);
+            }
+            DAGNodeKind::Entry
             | DAGNodeKind::FrameIndex(_, _)
             | DAGNodeKind::Br(_)
-            | DAGNodeKind::BrCond(_, _)
             | DAGNodeKind::Constant(_) => {}
         }
+
+        some_then!(
+            next,
+            node.next,
+            self.set_def_node(marked, cur_func, bb, next)
+        );
     }
 
     fn visit(&mut self, cur_func: &DAGFunction) {
@@ -71,6 +109,14 @@ impl<'a> LivenessAnalysis<'a> {
     }
 
     fn propagate(&self, cur_func: &DAGFunction, bb_id: DAGBasicBlockId, node_id: DAGNodeId) {
+        match cur_func.dag_arena[node_id].kind {
+            DAGNodeKind::Entry
+            | DAGNodeKind::FrameIndex(_, _)
+            | DAGNodeKind::Br(_)
+            | DAGNodeKind::Constant(_) => return,
+            _ => {}
+        }
+
         let bb = &cur_func.dag_basic_blocks[bb_id];
 
         {
