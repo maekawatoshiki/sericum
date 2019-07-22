@@ -11,6 +11,7 @@ pub type BasicBlockId = Id<BasicBlock>;
 #[derive(Clone, Debug)]
 pub struct BasicBlock {
     /// Information for liveness analysis
+    // TODO: Will be removed
     pub liveness: Rc<RefCell<LivenessInfo>>,
 
     /// Predecessors

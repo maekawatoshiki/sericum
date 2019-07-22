@@ -39,15 +39,12 @@ impl<'a> ConvertToDAG<'a> {
 
     pub fn construct_dag(&mut self, func_id: FunctionId) -> DAGFunction {
         let func = self.module.function_ref(func_id);
-        // let mut dag_func = DAGFunction::new(func_id);
         let mut dag_arena: Arena<DAGNode> = Arena::new();
         let mut dag_bb_arena: Arena<DAGBasicBlock> = Arena::new();
         let mut bb_to_dag_bb: FxHashMap<BasicBlockId, DAGBasicBlockId> = FxHashMap::default();
 
         for (bb_id, _) in &func.basic_blocks {
-            bb_to_dag_bb
-                .entry(bb_id)
-                .or_insert_with(|| dag_bb_arena.alloc(DAGBasicBlock::new()));
+            bb_to_dag_bb.insert(bb_id, dag_bb_arena.alloc(DAGBasicBlock::new()));
         }
 
         for (bb_id, bb) in &func.basic_blocks {
