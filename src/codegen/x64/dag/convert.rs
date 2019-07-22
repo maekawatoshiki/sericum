@@ -108,8 +108,8 @@ impl<'a> ConvertToDAG<'a> {
 
         macro_rules! make_chain {
             ($dag_id:expr) => {
-                if let Some(dag_id) = last_dag_id {
-                    dag_arena[dag_id].next = Some($dag_id);
+                if let Some(id_) = last_dag_id {
+                    dag_arena[id_].next = Some($dag_id);
                     last_dag_id = Some($dag_id);
                 }
             };

@@ -48,7 +48,6 @@ impl<'a> LivenessAnalysis<'a> {
         }
 
         let node = &cur_func.dag_arena[node_id];
-        node.set_vreg(self.next_vreg());
 
         match &node.kind {
             DAGNodeKind::Store(op1, op2) => {
@@ -72,6 +71,8 @@ impl<'a> LivenessAnalysis<'a> {
             | DAGNodeKind::Br(_)
             | DAGNodeKind::Constant(_) => {}
         }
+
+        node.set_vreg(self.next_vreg());
 
         some_then!(
             next,

@@ -77,6 +77,20 @@ impl DAGNode {
         }
     }
 
+    pub fn use_vreg(&self) -> bool {
+        use DAGNodeKind::*;
+        match self.kind {
+            Entry
+            | Store(_, _)
+            | BrCond(_, _)
+            | Br(_)
+            | Ret(_)
+            | FrameIndex(_, _)
+            | Constant(_) => false,
+            Load(_) | Add(_, _) | Setcc(_, _, _) => true,
+        }
+    }
+
     pub fn set_vreg(&self, vreg: usize) {
         self.reg.borrow_mut().vreg = vreg;
     }
