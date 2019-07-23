@@ -1,5 +1,5 @@
 use super::basic_block::*;
-use crate::ir::{basic_block::*, opcode::*, types::*};
+use crate::ir::{opcode::*, types::*};
 use id_arena::*;
 use rustc_hash::FxHashSet;
 use std::{cell::RefCell, rc::Rc};

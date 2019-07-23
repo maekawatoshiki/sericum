@@ -41,14 +41,6 @@ impl PhysicalRegisterAllocator {
         let node = &cur_func.dag_arena[node_id];
         let num_reg = 4;
 
-        if node.kind == DAGNodeKind::Entry {
-            match node.next {
-                Some(next) => self.scan_on_node(marked, cur_func, used, next),
-                None => {}
-            }
-            return;
-        }
-
         match node.kind {
             DAGNodeKind::Store(op1, op2)
             | DAGNodeKind::Add(op1, op2)
@@ -65,16 +57,8 @@ impl PhysicalRegisterAllocator {
             | DAGNodeKind::Constant(_) => {}
         }
 
-        if node.reg.borrow().last_use.is_none() {
-            match node.next {
-                Some(next) => self.scan_on_node(marked, cur_func, used, next),
-                None => {}
-            }
-            return;
-        }
-
-        if node.use_vreg() {
-            let mut found = false;
+        if node.reg.borrow().last_use.is_some() && node.use_vreg() {
+            let mut _found = false;
             for i in 0..num_reg - 1 {
                 if used.contains_key(&i) {
                     let target_last_use_id = cur_func.dag_arena[*used.get(&i).unwrap()]
@@ -90,7 +74,7 @@ impl PhysicalRegisterAllocator {
 
                 node.set_phy_reg(i, false);
                 used.insert(i, node_id);
-                found = true;
+                _found = true;
                 break;
             }
             // if found {
@@ -98,10 +82,11 @@ impl PhysicalRegisterAllocator {
             // }
         }
 
-        match node.next {
-            Some(next) => self.scan_on_node(marked, cur_func, used, next),
-            None => {}
-        }
+        some_then!(
+            next,
+            node.next,
+            self.scan_on_node(marked, cur_func, used, next)
+        );
     }
 
     fn collect_regs(&mut self, cur_func: &DAGFunction) {

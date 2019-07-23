@@ -1,14 +1,16 @@
+use super::basic_block::*;
 use crate::ir::types::*;
-// use id_arena::*;
+use id_arena::*;
 // use rustc_hash::{FxHashMap, FxHashSet};
 use std::{cell::RefCell, rc::Rc};
 
 pub type RegisterInfoRef = Rc<RefCell<RegisterInfo>>;
+pub type MachineInstrId = Id<MachineInstr>;
 
 #[derive(Debug, Clone)]
-pub struct LowerInstr {
-    pub opcode: LowerOpcode,
-    pub oprand: Vec<LowerOprand>,
+pub struct MachineInstr {
+    pub opcode: MachineOpcode,
+    pub oprand: Vec<MachineOprand>,
     pub ty: Option<Type>,
     pub reg: RegisterInfoRef,
 }
@@ -22,20 +24,36 @@ pub struct RegisterInfo {
 }
 
 #[derive(Debug, Clone)]
-pub enum LowerOpcode {
+pub enum MachineOpcode {
+    // Memory
     Load,
     Store,
+
+    // Binary arithmetics
+    Add,
+
+    // Comparison
+    Seteq,
+    Setle,
+
+    // Branch
+    BrCond,
+    Br,
+
+    // Return
+    Ret,
 }
 
 #[derive(Debug, Clone)]
-pub enum LowerOprand {
-    VReg(VRegInfo),
-    Constant(ConstantKind),
+pub enum MachineOprand {
+    Instr(MachineInstrId),
+    Constant(MachineConstant),
     FrameIndex(FrameIndexInfo),
+    Branch(MachineBasicBlockId),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub enum ConstantKind {
+pub enum MachineConstant {
     Int32(i32),
 }
 
@@ -51,10 +69,10 @@ pub struct VRegInfo {
     pub vreg: usize,
 }
 
-impl LowerInstr {
+impl MachineInstr {
     pub fn new(
-        opcode: LowerOpcode,
-        oprand: Vec<LowerOprand>,
+        opcode: MachineOpcode,
+        oprand: Vec<MachineOprand>,
         ty: Option<Type>,
         vreg: usize,
     ) -> Self {

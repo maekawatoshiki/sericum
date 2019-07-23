@@ -1,5 +1,5 @@
 pub mod dag;
-pub mod lower;
+pub mod machine;
 
 use crate::ir::types::*;
 

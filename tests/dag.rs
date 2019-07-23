@@ -17,7 +17,8 @@ fn dag1() {
             br (%c) l1, l2;
         l1:
             x = load (%i);
-            y = add (%x), (i32 1);
+            x2 = load (%i);
+            y = add (%x), (%x2);
             ret (%y);
         l2:
             ret (i32 1);
@@ -26,8 +27,11 @@ fn dag1() {
     println!("{}", m.function_ref(func).to_string(&m));
 
     let dag_func = dag::convert::ConvertToDAG::new(&m).construct_dag(func);
+
+    dag::convert_machine::ConvertToMachine::new(&m).convert_function(&dag_func);
+
     dag::liveness::LivenessAnalysis::new(&m).analyze_function(&dag_func);
-    // dag::select::SelectInstruction::new(&m).select_function(&dag_func);
+    dag::regalloc::PhysicalRegisterAllocator::new().run_on_function(&dag_func);
 
     for (id, bb) in &dag_func.dag_basic_blocks {
         println!("{}: {:?}", id.index(), bb);
