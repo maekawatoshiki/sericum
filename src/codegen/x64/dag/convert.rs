@@ -47,13 +47,21 @@ impl<'a> ConvertToDAG<'a> {
                 .collect();
         }
 
+        let mut locals_ty = vec![];
+
         for (bb_id, bb) in &func.basic_blocks {
-            let id = self.construct_dag_from_basic_block(&mut dag_arena, &bb_to_dag_bb, func, bb);
+            let id = self.construct_dag_from_basic_block(
+                &mut dag_arena,
+                &mut locals_ty,
+                &bb_to_dag_bb,
+                func,
+                bb,
+            );
             dag_bb_arena[*bb_to_dag_bb.get(&bb_id).unwrap()].set_entry(id);
             when_debug!(println!("{}", dag_arena[id].to_dot(id, &dag_arena)));
         }
 
-        DAGFunction::new(func, dag_arena, dag_bb_arena)
+        DAGFunction::new(func, dag_arena, dag_bb_arena, locals_ty)
     }
 
     pub fn get_dag_id_from_value(
@@ -85,6 +93,7 @@ impl<'a> ConvertToDAG<'a> {
     pub fn construct_dag_from_basic_block(
         &mut self,
         dag_arena: &mut Arena<DAGNode>,
+        locals_ty: &mut Vec<Type>,
         bb_to_dag_bb: &FxHashMap<BasicBlockId, DAGBasicBlockId>,
         func: &Function,
         bb: &BasicBlock,
@@ -108,6 +117,7 @@ impl<'a> ConvertToDAG<'a> {
 
             match instr.opcode {
                 Opcode::Alloca(ref ty) => {
+                    locals_ty.push(ty.clone());
                     local_count += 1;
                     let id = dag_arena.alloc(DAGNode::new(
                         DAGNodeKind::FrameIndex(local_count, ty.clone()),

@@ -20,6 +20,8 @@ pub struct DAGFunction {
 
     /// True if internal function
     pub internal: bool,
+
+    pub locals_ty: Vec<Type>,
 }
 
 impl DAGFunction {
@@ -27,6 +29,7 @@ impl DAGFunction {
         func: &Function,
         dag_arena: Arena<DAGNode>,
         dag_basic_blocks: Arena<DAGBasicBlock>,
+        locals_ty: Vec<Type>,
     ) -> Self {
         Self {
             name: func.name.clone(),
@@ -34,6 +37,7 @@ impl DAGFunction {
             dag_basic_blocks,
             dag_arena,
             internal: func.internal,
+            locals_ty,
         }
     }
 }

@@ -1,4 +1,4 @@
-use super::super::dag::function::DAGFunction;
+use super::super::dag::function::*;
 use super::{basic_block::*, instr::*};
 use crate::ir::types::*;
 use id_arena::*;
@@ -21,6 +21,9 @@ pub struct MachineFunction {
 
     /// True if internal function
     pub internal: bool,
+
+    /// Objects on stack
+    pub locals_ty: Vec<Type>,
 }
 
 impl MachineFunction {
@@ -35,6 +38,7 @@ impl MachineFunction {
             instr_arena,
             basic_blocks,
             internal: f.internal,
+            locals_ty: f.locals_ty.clone(),
         }
     }
 }

@@ -70,17 +70,12 @@ pub struct VRegInfo {
 }
 
 impl MachineInstr {
-    pub fn new(
-        opcode: MachineOpcode,
-        oprand: Vec<MachineOprand>,
-        ty: Option<Type>,
-        vreg: usize,
-    ) -> Self {
+    pub fn new(opcode: MachineOpcode, oprand: Vec<MachineOprand>, ty: Option<Type>) -> Self {
         Self {
             opcode,
             oprand,
             ty,
-            reg: Rc::new(RefCell::new(RegisterInfo::new(vreg))),
+            reg: Rc::new(RefCell::new(RegisterInfo::new(0))),
         }
     }
 

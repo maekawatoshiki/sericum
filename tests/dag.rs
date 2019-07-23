@@ -9,10 +9,10 @@ use cilk::{
 fn dag1() {
     let mut m = module::Module::new("cilk");
 
-    let func = cilk_ir!(m; define [i32] func (i32) {
+    let func = cilk_ir!(m; define [i32] func () {
         entry:
             i = alloca i32;
-            store (%arg.0), (%i);
+            store (i32 1), (%i);
             c = icmp eq (%i), (i32 1);
             br (%c) l1, l2;
         l1:

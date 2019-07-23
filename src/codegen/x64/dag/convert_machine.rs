@@ -98,23 +98,15 @@ impl<'a> ConvertToMachine<'a> {
                     MachineOpcode::Load,
                     vec![new_op1],
                     node.ty.clone(),
-                    self.next_vreg(),
                 )))
             }
             DAGNodeKind::Store(dstid, srcid) => {
-                let dst = &cur_func.dag_arena[dstid];
-                let new_dst = match dst.kind {
-                    DAGNodeKind::FrameIndex(i, ref ty) => {
-                        MachineOprand::FrameIndex(FrameIndexInfo::new(ty.clone(), i))
-                    }
-                    _ => unimplemented!(),
-                };
+                let new_dst = usual_oprand!(dstid);
                 let new_src = usual_oprand!(srcid);
                 Some(machine_instr_arena.alloc(MachineInstr::new(
                     MachineOpcode::Store,
                     vec![new_dst, new_src],
                     None,
-                    0,
                 )))
             }
             DAGNodeKind::Add(op1, op2) => {
@@ -124,7 +116,6 @@ impl<'a> ConvertToMachine<'a> {
                     MachineOpcode::Add,
                     vec![new_op1, new_op2],
                     node.ty.clone(),
-                    self.next_vreg(),
                 )))
             }
             DAGNodeKind::Setcc(kind, op1, op2) => {
@@ -137,14 +128,12 @@ impl<'a> ConvertToMachine<'a> {
                     },
                     vec![new_op1, new_op2],
                     node.ty.clone(),
-                    self.next_vreg(),
                 )))
             }
             DAGNodeKind::Br(dag_bb_id) => Some(machine_instr_arena.alloc(MachineInstr::new(
                 MachineOpcode::Br,
                 vec![MachineOprand::Branch(self.get_machine_bb(dag_bb_id))],
                 None,
-                0,
             ))),
             DAGNodeKind::BrCond(cond, dag_bb_id) => {
                 let new_cond = usual_oprand!(cond);
@@ -155,7 +144,6 @@ impl<'a> ConvertToMachine<'a> {
                         MachineOprand::Branch(self.get_machine_bb(dag_bb_id)),
                     ],
                     None,
-                    0,
                 )))
             }
             DAGNodeKind::Ret(op1) => {
@@ -164,7 +152,6 @@ impl<'a> ConvertToMachine<'a> {
                     MachineOpcode::Ret,
                     vec![new_op1],
                     None,
-                    0,
                 )))
             }
             _ => None,
