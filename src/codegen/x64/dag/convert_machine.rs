@@ -10,6 +10,7 @@ pub struct ConvertToMachine<'a> {
     pub module: &'a Module,
     pub vreg_count: usize,
     pub dag_node_id_to_machine_instr_id: FxHashMap<DAGNodeId, Option<MachineInstrId>>,
+    pub dag_bb_to_machine_bb: FxHashMap<DAGBasicBlockId, MachineBasicBlockId>,
 }
 
 impl<'a> ConvertToMachine<'a> {
@@ -18,6 +19,7 @@ impl<'a> ConvertToMachine<'a> {
             module,
             vreg_count: 0,
             dag_node_id_to_machine_instr_id: FxHashMap::default(),
+            dag_bb_to_machine_bb: FxHashMap::default(),
         }
     }
 
@@ -27,25 +29,26 @@ impl<'a> ConvertToMachine<'a> {
     }
 
     pub fn convert_function(&mut self, dag_func: &DAGFunction) -> MachineFunction {
+        self.dag_node_id_to_machine_instr_id.clear();
+        self.dag_bb_to_machine_bb.clear();
+
         let mut machine_bb_arena: Arena<MachineBasicBlock> = Arena::new();
-        let mut dag_bb_to_machine_bb: FxHashMap<DAGBasicBlockId, MachineBasicBlockId> =
-            FxHashMap::default();
 
         for (dag_bb_id, _) in &dag_func.dag_basic_blocks {
-            dag_bb_to_machine_bb
+            self.dag_bb_to_machine_bb
                 .insert(dag_bb_id, machine_bb_arena.alloc(MachineBasicBlock::new()));
         }
 
-        for (dag_bb, machine_bb) in &dag_bb_to_machine_bb {
+        for (dag_bb, machine_bb) in &self.dag_bb_to_machine_bb {
             machine_bb_arena[*machine_bb].pred = dag_func.dag_basic_blocks[*dag_bb]
                 .pred
                 .iter()
-                .map(|bb| *dag_bb_to_machine_bb.get(bb).unwrap())
+                .map(|bb| self.get_machine_bb(*bb))
                 .collect();
             machine_bb_arena[*machine_bb].succ = dag_func.dag_basic_blocks[*dag_bb]
                 .succ
                 .iter()
-                .map(|bb| *dag_bb_to_machine_bb.get(bb).unwrap())
+                .map(|bb| self.get_machine_bb(*bb))
                 .collect();
         }
 
@@ -56,7 +59,6 @@ impl<'a> ConvertToMachine<'a> {
             self.convert_dag(
                 &dag_func,
                 &mut machine_instr_arena,
-                &dag_bb_to_machine_bb,
                 &mut iseq,
                 node.entry.unwrap(),
             );
@@ -68,19 +70,16 @@ impl<'a> ConvertToMachine<'a> {
                 }
             });
 
-            machine_bb_arena[*dag_bb_to_machine_bb.get(&dag_bb_id).unwrap()].iseq = iseq;
+            machine_bb_arena[self.get_machine_bb(dag_bb_id)].iseq = iseq;
         }
-
-        self.dag_node_id_to_machine_instr_id.clear();
 
         MachineFunction::new(self.module.function_ref(dag_func.func_id), machine_bb_arena)
     }
 
     pub fn convert_dag(
         &mut self,
-        dag_func: &DAGFunction,
+        cur_func: &DAGFunction,
         machine_instr_arena: &mut Arena<MachineInstr>,
-        dag_bb_to_machine_bb: &FxHashMap<DAGBasicBlockId, MachineBasicBlockId>,
         iseq: &mut Vec<MachineInstrId>,
         node_id: DAGNodeId,
     ) -> Option<MachineInstrId> {
@@ -90,17 +89,11 @@ impl<'a> ConvertToMachine<'a> {
 
         macro_rules! usual_oprand {
             ($e:expr) => {
-                self.usual_oprand(
-                    dag_func,
-                    machine_instr_arena,
-                    dag_bb_to_machine_bb,
-                    iseq,
-                    $e,
-                )
+                self.usual_oprand(cur_func, machine_instr_arena, iseq, $e)
             };
         }
 
-        let node = &dag_func.dag_arena[node_id];
+        let node = &cur_func.dag_arena[node_id];
 
         let machine_instr_id = match node.kind {
             DAGNodeKind::Entry => None,
@@ -114,7 +107,7 @@ impl<'a> ConvertToMachine<'a> {
                 )))
             }
             DAGNodeKind::Store(dstid, srcid) => {
-                let dst = &dag_func.dag_arena[dstid];
+                let dst = &cur_func.dag_arena[dstid];
                 let new_dst = match dst.kind {
                     DAGNodeKind::FrameIndex(i, ref ty) => {
                         MachineOprand::FrameIndex(FrameIndexInfo::new(ty.clone(), i))
@@ -154,9 +147,7 @@ impl<'a> ConvertToMachine<'a> {
             }
             DAGNodeKind::Br(dag_bb_id) => Some(machine_instr_arena.alloc(MachineInstr::new(
                 MachineOpcode::Br,
-                vec![MachineOprand::Branch(
-                    *dag_bb_to_machine_bb.get(&dag_bb_id).unwrap(),
-                )],
+                vec![MachineOprand::Branch(self.get_machine_bb(dag_bb_id))],
                 None,
                 0,
             ))),
@@ -166,7 +157,7 @@ impl<'a> ConvertToMachine<'a> {
                     MachineOpcode::BrCond,
                     vec![
                         new_cond,
-                        MachineOprand::Branch(*dag_bb_to_machine_bb.get(&dag_bb_id).unwrap()),
+                        MachineOprand::Branch(self.get_machine_bb(dag_bb_id)),
                     ],
                     None,
                     0,
@@ -189,13 +180,7 @@ impl<'a> ConvertToMachine<'a> {
             .insert(node_id, machine_instr_id);
 
         some_then!(next, node.next, {
-            self.convert_dag(
-                dag_func,
-                machine_instr_arena,
-                dag_bb_to_machine_bb,
-                iseq,
-                next,
-            );
+            self.convert_dag(cur_func, machine_instr_arena, iseq, next);
         });
 
         machine_instr_id
@@ -203,13 +188,12 @@ impl<'a> ConvertToMachine<'a> {
 
     fn usual_oprand(
         &mut self,
-        dag_func: &DAGFunction,
+        cur_func: &DAGFunction,
         machine_instr_arena: &mut Arena<MachineInstr>,
-        dag_bb_to_machine_bb: &FxHashMap<DAGBasicBlockId, MachineBasicBlockId>,
         iseq: &mut Vec<MachineInstrId>,
         node_id: DAGNodeId,
     ) -> MachineOprand {
-        let node = &dag_func.dag_arena[node_id];
+        let node = &cur_func.dag_arena[node_id];
         match node.kind {
             DAGNodeKind::Constant(ConstantKind::Int32(i)) => {
                 MachineOprand::Constant(MachineConstant::Int32(i))
@@ -218,15 +202,13 @@ impl<'a> ConvertToMachine<'a> {
                 MachineOprand::FrameIndex(FrameIndexInfo::new(ty.clone(), i))
             }
             _ => MachineOprand::Instr(
-                self.convert_dag(
-                    dag_func,
-                    machine_instr_arena,
-                    dag_bb_to_machine_bb,
-                    iseq,
-                    node_id,
-                )
-                .unwrap(),
+                self.convert_dag(cur_func, machine_instr_arena, iseq, node_id)
+                    .unwrap(),
             ),
         }
+    }
+
+    fn get_machine_bb(&self, dag_bb_id: DAGBasicBlockId) -> MachineBasicBlockId {
+        *self.dag_bb_to_machine_bb.get(&dag_bb_id).unwrap()
     }
 }
