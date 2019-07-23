@@ -1,20 +1,20 @@
 // TODO: dirty code
 
-use super::super::machine::{basic_block::*, function::*, instr::*};
-use super::{basic_block::*, convert::*, node::*};
+use super::super::machine::{basic_block::*, function::*, instr::*, module::*};
+use super::{basic_block::*, convert::*, module::*, node::*};
 use crate::ir::module::*;
 use id_arena::*;
 use rustc_hash::FxHashMap;
 
 pub struct ConvertToMachine<'a> {
-    pub module: &'a Module,
+    pub module: &'a DAGModule,
     pub vreg_count: usize,
     pub dag_node_id_to_machine_instr_id: FxHashMap<DAGNodeId, Option<MachineInstrId>>,
     pub dag_bb_to_machine_bb: FxHashMap<DAGBasicBlockId, MachineBasicBlockId>,
 }
 
 impl<'a> ConvertToMachine<'a> {
-    pub fn new(module: &'a Module) -> Self {
+    pub fn new(module: &'a DAGModule) -> Self {
         Self {
             module,
             vreg_count: 0,
@@ -23,9 +23,12 @@ impl<'a> ConvertToMachine<'a> {
         }
     }
 
-    pub fn next_vreg(&mut self) -> usize {
-        self.vreg_count += 1;
-        self.vreg_count
+    pub fn convert_module(&mut self) -> MachineModule {
+        let mut machine_module = MachineModule::new(self.module.name.as_str());
+        for (_, func) in &self.module.functions {
+            machine_module.add_function(self.convert_function(func));
+        }
+        machine_module
     }
 
     pub fn convert_function(&mut self, dag_func: &DAGFunction) -> MachineFunction {
@@ -66,11 +69,7 @@ impl<'a> ConvertToMachine<'a> {
             machine_bb_arena[self.get_machine_bb(dag_bb_id)].iseq = iseq;
         }
 
-        MachineFunction::new(
-            self.module.function_ref(dag_func.func_id),
-            machine_bb_arena,
-            machine_instr_arena,
-        )
+        MachineFunction::new(dag_func, machine_bb_arena, machine_instr_arena)
     }
 
     pub fn convert_dag(
@@ -207,5 +206,10 @@ impl<'a> ConvertToMachine<'a> {
 
     fn get_machine_bb(&self, dag_bb_id: DAGBasicBlockId) -> MachineBasicBlockId {
         *self.dag_bb_to_machine_bb.get(&dag_bb_id).unwrap()
+    }
+
+    pub fn next_vreg(&mut self) -> usize {
+        self.vreg_count += 1;
+        self.vreg_count
     }
 }

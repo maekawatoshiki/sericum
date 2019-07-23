@@ -26,24 +26,29 @@ fn dag1() {
 
     println!("{}", m.function_ref(func).to_string(&m));
 
-    let dag_func = dag::convert::ConvertToDAG::new(&m).construct_dag(func);
-
-    for (id, bb) in &dag_func.dag_basic_blocks {
-        println!("{}: {:?}", id.index(), bb);
-    }
-    for (id, dag) in &dag_func.dag_arena {
-        println!("{}: {:?}", id.index(), dag);
-    }
-
-    let machine_func = dag::convert_machine::ConvertToMachine::new(&m).convert_function(&dag_func);
-    machine::liveness::LivenessAnalysis::new(&m).analyze_function(&machine_func);
-    machine::regalloc::PhysicalRegisterAllocator::new().run_on_function(&machine_func);
-
-    for (_, bb) in &machine_func.basic_blocks {
-        println!("Machine basic block: {:?}", bb);
-        for instr in &bb.iseq {
-            println!("{}: {:?}", instr.index(), machine_func.instr_arena[*instr]);
+    // let dag_func = dag::convert::ConvertToDAG::new(&m).construct_dag(func);
+    let dag_module = dag::convert::ConvertToDAG::new(&m).convert_module();
+    println!("DAG:");
+    for (_, dag_func) in &dag_module.functions {
+        for (id, bb) in &dag_func.dag_basic_blocks {
+            println!("{}: {:?}", id.index(), bb);
         }
-        println!()
+        for (id, dag) in &dag_func.dag_arena {
+            println!("{}: {:?}", id.index(), dag);
+        }
+    }
+
+    let machine_module = dag::convert_machine::ConvertToMachine::new(&dag_module).convert_module();
+    machine::liveness::LivenessAnalysis::new(&machine_module).analyze_module();
+    machine::regalloc::PhysicalRegisterAllocator::new(&machine_module).run_on_module();
+
+    for (_, machine_func) in &machine_module.functions {
+        for (_, bb) in &machine_func.basic_blocks {
+            println!("Machine basic block: {:?}", bb);
+            for instr in &bb.iseq {
+                println!("{}: {:?}", instr.index(), machine_func.instr_arena[*instr]);
+            }
+            println!()
+        }
     }
 }

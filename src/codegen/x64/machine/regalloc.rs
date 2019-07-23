@@ -1,13 +1,21 @@
-use super::{function::*, instr::*};
+use super::{function::*, instr::*, module::*};
 // use super::{convert::*, node::*};
 // use crate::ir::{basic_block::*, function::*, module::*, opcode::*, types::*, value::*};
 use rustc_hash::{FxHashMap, FxHashSet};
 
-pub struct PhysicalRegisterAllocator {}
+pub struct PhysicalRegisterAllocator<'a> {
+    pub module: &'a MachineModule,
+}
 
-impl PhysicalRegisterAllocator {
-    pub fn new() -> Self {
-        Self {}
+impl<'a> PhysicalRegisterAllocator<'a> {
+    pub fn new(module: &'a MachineModule) -> Self {
+        Self { module }
+    }
+
+    pub fn run_on_module(&mut self) {
+        for (_, func) in &self.module.functions {
+            self.run_on_function(func);
+        }
     }
 
     pub fn run_on_function(&mut self, cur_func: &MachineFunction) {
@@ -30,6 +38,8 @@ impl PhysicalRegisterAllocator {
         used: &mut FxHashMap<usize, MachineInstrId>,
         instr_id: MachineInstrId,
     ) {
+        // TODO: Refactor
+
         let instr = &cur_func.instr_arena[instr_id];
         let num_reg = 4;
 
@@ -42,12 +52,10 @@ impl PhysicalRegisterAllocator {
         for i in 0..num_reg - 1 {
             if used.contains_key(&i) {
                 let target_last_use_id = cur_func.instr_arena[*used.get(&i).unwrap()]
-                    .reg
-                    .borrow()
-                    .last_use
+                    .get_last_use()
                     .unwrap();
-                let target_last_use = cur_func.instr_arena[target_last_use_id].reg.borrow().vreg;
-                if instr.reg.borrow().vreg < target_last_use {
+                let target_last_use = cur_func.instr_arena[target_last_use_id].get_vreg();
+                if instr.get_vreg() < target_last_use {
                     continue;
                 }
             }
@@ -62,7 +70,25 @@ impl PhysicalRegisterAllocator {
             return;
         }
 
-        // TODO: Spill
+        used.insert(num_reg - 1, instr_id);
+
+        let mut k = 0;
+        for i in 1..num_reg {
+            let l1 = cur_func.instr_arena[*used.get(&k).unwrap()]
+                .get_last_use()
+                .unwrap();
+            let l2 = cur_func.instr_arena[*used.get(&i).unwrap()]
+                .get_last_use()
+                .unwrap();
+            if l1 < l2 {
+                k = i;
+            }
+        }
+
+        instr.set_phy_reg(k, false);
+        cur_func.instr_arena[*used.get(&k).unwrap()].set_phy_reg(num_reg - 1, true);
+
+        *used.get_mut(&k).unwrap() = instr_id;
     }
 
     fn collect_regs(&mut self, cur_func: &MachineFunction) {

@@ -1,16 +1,19 @@
-use super::{basic_block::*, function::*, instr::*};
+use super::{basic_block::*, function::*, instr::*, module::*};
 // use super::{convert::*, node::*};
-use crate::ir::module::*;
 // use id_arena::*;
 
 pub struct LivenessAnalysis<'a> {
-    pub module: &'a Module, // TODO: Will be used to get type
+    pub module: &'a MachineModule, // TODO: Will be used to get type
 }
 
 impl<'a> LivenessAnalysis<'a> {
-    pub fn new(module: &'a Module) -> Self {
-        Self {
-            module,
+    pub fn new(module: &'a MachineModule) -> Self {
+        Self { module }
+    }
+
+    pub fn analyze_module(&mut self) {
+        for (_, func) in &self.module.functions {
+            self.analyze_function(func);
         }
     }
 

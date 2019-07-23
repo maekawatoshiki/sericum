@@ -1,6 +1,9 @@
+use super::super::dag::convert::DAGFunction;
 use super::{basic_block::*, instr::*};
 use crate::ir::{function::*, types::*};
 use id_arena::*;
+
+pub type MachineFunctionId = Id<MachineFunction>;
 
 #[derive(Debug, Clone)]
 pub struct MachineFunction {
@@ -22,7 +25,7 @@ pub struct MachineFunction {
 
 impl MachineFunction {
     pub fn new(
-        f: &Function,
+        f: &DAGFunction,
         basic_blocks: Arena<MachineBasicBlock>,
         instr_arena: Arena<MachineInstr>,
     ) -> Self {
@@ -30,8 +33,8 @@ impl MachineFunction {
             name: f.name.clone(),
             ty: f.ty.clone(),
             instr_arena,
-            internal: f.internal,
             basic_blocks,
+            internal: f.internal,
         }
     }
 }

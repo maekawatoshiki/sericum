@@ -97,6 +97,14 @@ impl MachineInstr {
         reg_info.reg = Some(reg);
         reg_info.spill = spill;
     }
+
+    pub fn get_last_use(&self) -> Option<MachineInstrId> {
+        self.reg.borrow().last_use
+    }
+
+    pub fn get_vreg(&self) -> usize {
+        self.reg.borrow().vreg
+    }
 }
 
 impl FrameIndexInfo {
