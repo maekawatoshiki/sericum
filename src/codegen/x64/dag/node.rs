@@ -2,7 +2,6 @@ use super::basic_block::*;
 use crate::ir::{opcode::*, types::*};
 use id_arena::*;
 use rustc_hash::FxHashSet;
-use std::{cell::RefCell, rc::Rc};
 
 pub type DAGNodeId = Id<DAGNode>;
 
@@ -11,17 +10,6 @@ pub struct DAGNode {
     pub kind: DAGNodeKind,
     pub ty: Option<Type>,
     pub next: Option<DAGNodeId>,
-    pub reg: RegisterInfoRef,
-}
-
-pub type RegisterInfoRef = Rc<RefCell<RegisterInfo>>;
-
-#[derive(Debug, Clone)]
-pub struct RegisterInfo {
-    pub vreg: usize,
-    pub reg: Option<usize>,
-    pub spill: bool,
-    pub last_use: Option<DAGNodeId>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -73,36 +61,7 @@ impl DAGNode {
             kind,
             ty,
             next: None,
-            reg: Rc::new(RefCell::new(RegisterInfo::new(0))),
         }
-    }
-
-    pub fn use_vreg(&self) -> bool {
-        use DAGNodeKind::*;
-        match self.kind {
-            Entry
-            | Store(_, _)
-            | BrCond(_, _)
-            | Br(_)
-            | Ret(_)
-            | FrameIndex(_, _)
-            | Constant(_) => false,
-            Load(_) | Add(_, _) | Setcc(_, _, _) => true,
-        }
-    }
-
-    pub fn set_vreg(&self, vreg: usize) {
-        self.reg.borrow_mut().vreg = vreg;
-    }
-
-    pub fn set_last_use(&self, last_use: Option<DAGNodeId>) {
-        self.reg.borrow_mut().last_use = last_use;
-    }
-
-    pub fn set_phy_reg(&self, reg: usize, spill: bool) {
-        let mut reg_info = self.reg.borrow_mut();
-        reg_info.reg = Some(reg);
-        reg_info.spill = spill;
     }
 
     pub fn set_next(mut self, next: DAGNodeId) -> Self {
@@ -293,16 +252,5 @@ impl DAGNode {
             );
             arena[next].to_dot_sub(s, mark, next, arena)
         });
-    }
-}
-
-impl RegisterInfo {
-    pub fn new(vreg: usize) -> Self {
-        Self {
-            vreg,
-            reg: None,
-            spill: false,
-            last_use: None,
-        }
     }
 }

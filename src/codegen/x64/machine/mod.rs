@@ -4,3 +4,4 @@ pub mod function;
 pub mod liveness;
 pub mod regalloc;
 pub mod module;
+pub mod jit;

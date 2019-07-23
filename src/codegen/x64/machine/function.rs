@@ -1,6 +1,6 @@
-use super::super::dag::convert::DAGFunction;
+use super::super::dag::function::DAGFunction;
 use super::{basic_block::*, instr::*};
-use crate::ir::{function::*, types::*};
+use crate::ir::types::*;
 use id_arena::*;
 
 pub type MachineFunctionId = Id<MachineFunction>;

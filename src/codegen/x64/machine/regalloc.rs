@@ -1,7 +1,5 @@
 use super::{function::*, instr::*, module::*};
-// use super::{convert::*, node::*};
-// use crate::ir::{basic_block::*, function::*, module::*, opcode::*, types::*, value::*};
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::FxHashMap;
 
 pub struct PhysicalRegisterAllocator<'a> {
     pub module: &'a MachineModule,

@@ -1,8 +1,7 @@
 // TODO: dirty code
 
 use super::super::machine::{basic_block::*, function::*, instr::*, module::*};
-use super::{basic_block::*, convert::*, module::*, node::*};
-use crate::ir::module::*;
+use super::{basic_block::*, function::*, module::*, node::*};
 use id_arena::*;
 use rustc_hash::FxHashMap;
 
