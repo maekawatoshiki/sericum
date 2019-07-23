@@ -63,17 +63,14 @@ impl<'a> ConvertToMachine<'a> {
                 node.entry.unwrap(),
             );
 
-            when_debug!({
-                println!("dag bb id({})", dag_bb_id.index());
-                for instr in &iseq {
-                    println!("{}: {:?}", instr.index(), machine_instr_arena[*instr]);
-                }
-            });
-
             machine_bb_arena[self.get_machine_bb(dag_bb_id)].iseq = iseq;
         }
 
-        MachineFunction::new(self.module.function_ref(dag_func.func_id), machine_bb_arena)
+        MachineFunction::new(
+            self.module.function_ref(dag_func.func_id),
+            machine_bb_arena,
+            machine_instr_arena,
+        )
     }
 
     pub fn convert_dag(

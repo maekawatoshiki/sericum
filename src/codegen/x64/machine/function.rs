@@ -21,11 +21,15 @@ pub struct MachineFunction {
 }
 
 impl MachineFunction {
-    pub fn new(f: &Function, basic_blocks: Arena<MachineBasicBlock>) -> Self {
+    pub fn new(
+        f: &Function,
+        basic_blocks: Arena<MachineBasicBlock>,
+        instr_arena: Arena<MachineInstr>,
+    ) -> Self {
         Self {
             name: f.name.clone(),
             ty: f.ty.clone(),
-            instr_arena: Arena::new(),
+            instr_arena,
             internal: f.internal,
             basic_blocks,
         }

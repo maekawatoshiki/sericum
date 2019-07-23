@@ -83,6 +83,10 @@ impl MachineInstr {
             reg: Rc::new(RefCell::new(RegisterInfo::new(vreg))),
         }
     }
+
+    pub fn set_vreg(&self, vreg: usize) {
+        self.reg.borrow_mut().vreg = vreg;
+    }
 }
 
 impl FrameIndexInfo {

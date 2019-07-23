@@ -6,6 +6,14 @@ macro_rules! some_then {
     }};
 }
 
+macro_rules! match_then {
+    ($x:pat, $e:expr, $t:expr) => {{
+        if let $x = $e {
+            $t
+        }
+    }};
+}
+
 macro_rules! when_debug {
     ($($arg:tt)*) => {
         #[cfg(debug_assertions)]
