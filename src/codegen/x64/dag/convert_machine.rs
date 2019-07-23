@@ -4,7 +4,7 @@ use super::super::machine::{basic_block::*, function::*, instr::*};
 use super::{basic_block::*, convert::*, node::*};
 use crate::ir::module::*;
 use id_arena::*;
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::FxHashMap;
 
 pub struct ConvertToMachine<'a> {
     pub module: &'a Module,

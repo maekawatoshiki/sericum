@@ -5,25 +5,29 @@ use crate::ir::module::*;
 
 pub struct LivenessAnalysis<'a> {
     pub module: &'a Module, // TODO: Will be used to get type
-    vreg_count: usize,
 }
 
 impl<'a> LivenessAnalysis<'a> {
     pub fn new(module: &'a Module) -> Self {
         Self {
             module,
-            vreg_count: 0,
         }
     }
 
     pub fn analyze_function(&mut self, cur_func: &MachineFunction) {
+        self.number_vreg(cur_func);
         self.set_def(cur_func);
         self.visit(cur_func);
     }
 
-    fn next_vreg(&mut self) -> usize {
-        self.vreg_count += 1;
-        self.vreg_count
+    fn number_vreg(&mut self, cur_func: &MachineFunction) {
+        let mut vreg = 1;
+        for (_, bb) in &cur_func.basic_blocks {
+            for instr_id in &bb.iseq {
+                cur_func.instr_arena[*instr_id].set_vreg(vreg);
+                vreg += 1;
+            }
+        }
     }
 
     fn set_def(&mut self, cur_func: &MachineFunction) {
@@ -41,7 +45,6 @@ impl<'a> LivenessAnalysis<'a> {
         instr_id: MachineInstrId,
     ) {
         let instr = &cur_func.instr_arena[instr_id];
-        instr.set_vreg(self.next_vreg());
 
         for operand in &instr.oprand {
             match_then!(

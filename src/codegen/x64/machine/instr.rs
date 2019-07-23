@@ -20,7 +20,7 @@ pub struct RegisterInfo {
     pub vreg: usize,
     pub reg: Option<usize>,
     pub spill: bool,
-    // pub last_use: Option<InstructionId>,
+    pub last_use: Option<MachineInstrId>,
 }
 
 #[derive(Debug, Clone)]
@@ -87,6 +87,16 @@ impl MachineInstr {
     pub fn set_vreg(&self, vreg: usize) {
         self.reg.borrow_mut().vreg = vreg;
     }
+
+    pub fn set_last_use(&self, last_use: Option<MachineInstrId>) {
+        self.reg.borrow_mut().last_use = last_use;
+    }
+
+    pub fn set_phy_reg(&self, reg: usize, spill: bool) {
+        let mut reg_info = self.reg.borrow_mut();
+        reg_info.reg = Some(reg);
+        reg_info.spill = spill;
+    }
 }
 
 impl FrameIndexInfo {
@@ -107,6 +117,7 @@ impl RegisterInfo {
             vreg,
             reg: None,
             spill: false,
+            last_use: None,
         }
     }
 }
