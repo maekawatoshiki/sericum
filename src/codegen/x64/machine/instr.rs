@@ -100,6 +100,10 @@ impl MachineInstr {
     pub fn get_vreg(&self) -> usize {
         self.reg.borrow().vreg
     }
+
+    pub fn get_reg(&self) -> Option<usize> {
+        self.reg.borrow().reg
+    }
 }
 
 impl FrameIndexInfo {

@@ -26,13 +26,13 @@ impl MachineModule {
     pub fn function_ref_mut(&mut self, id: MachineFunctionId) -> &mut MachineFunction {
         &mut self.functions[id]
     }
-    //
-    // pub fn find_function_by_name(&self, name: &str) -> Option<MachineFunctionId> {
-    //     for (id, func) in &self.functions {
-    //         if func.name == name {
-    //             return Some(id);
-    //         }
-    //     }
-    //     None
-    // }
+
+    pub fn find_function_by_name(&self, name: &str) -> Option<MachineFunctionId> {
+        for (id, func) in &self.functions {
+            if func.name == name {
+                return Some(id);
+            }
+        }
+        None
+    }
 }

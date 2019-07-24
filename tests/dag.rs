@@ -12,16 +12,20 @@ fn dag1() {
     let func = cilk_ir!(m; define [i32] func () {
         entry:
             i = alloca i32;
-            store (i32 1), (%i);
-            c = icmp eq (%i), (i32 1);
-            br (%c) l1, l2;
-        l1:
-            x = load (%i);
-            x2 = load (%i);
-            y = add (%x), (%x2);
-            ret (%y);
-        l2:
-            ret (i32 1);
+            store (i32 123), (%i);
+            li = load (%i);
+            ret (%li);
+        //     i = alloca i32;
+        //     store (i32 1), (%i);
+        //     c = icmp eq (%i), (i32 1);
+        //     br (%c) l1, l2;
+        // l1:
+        //     x = load (%i);
+        //     x2 = load (%i);
+        //     y = add (%x), (%x2);
+        //     ret (%y);
+        // l2:
+        //     ret (i32 1);
     });
 
     println!("{}", m.function_ref(func).to_string(&m));
@@ -51,4 +55,9 @@ fn dag1() {
             println!()
         }
     }
+
+    let mut jit = machine::jit::JITCompiler::new(&machine_module);
+    jit.compile_module();
+    let func = machine_module.find_function_by_name("func").unwrap();
+    println!("ret: {:?}", jit.run(func, vec![]));
 }
