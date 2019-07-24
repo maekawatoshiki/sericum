@@ -21,6 +21,7 @@ pub enum DAGNodeKind {
     Add(DAGNodeId, DAGNodeId),
     Setcc(CondKind, DAGNodeId, DAGNodeId),
     BrCond(DAGNodeId, DAGBasicBlockId),
+    Brcc(CondKind, DAGNodeId, DAGNodeId, DAGBasicBlockId),
     Br(DAGBasicBlockId),
     Ret(DAGNodeId),
 
@@ -184,6 +185,24 @@ impl DAGNode {
                     .as_str(),
                 );
                 arena[v].to_dot_sub(s, mark, v, arena);
+            }
+            DAGNodeKind::Brcc(c, op0, op1, bb) => {
+                s.push_str(
+                    format!(
+                        "\ninstr{0} [shape=record,shape=Mrecord,label=\"{{Br_cc|{1:?}}}\"];
+                        instr{0} -> instr{2} [label=\"0\" color=\"#1E92FF\"];
+                        instr{0} -> instr{3} [label=\"0\" color=\"#1E92FF\"];
+                        instr{0} -> branch{4} [color=\"#fe8833\"];",
+                        self_id.index(),
+                        c,
+                        op0.index(),
+                        op1.index(),
+                        bb.index(),
+                    )
+                    .as_str(),
+                );
+                arena[op0].to_dot_sub(s, mark, op0, arena);
+                arena[op1].to_dot_sub(s, mark, op1, arena);
             }
             DAGNodeKind::Br(bb) => {
                 s.push_str(

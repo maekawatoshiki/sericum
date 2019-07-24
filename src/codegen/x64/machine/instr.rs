@@ -39,6 +39,8 @@ pub enum MachineOpcode {
     // Branch
     BrCond,
     Br,
+    BrccEq,
+    BrccLe,
 
     // Return
     Ret,

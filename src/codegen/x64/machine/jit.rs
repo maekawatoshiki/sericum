@@ -13,6 +13,17 @@ macro_rules! register {
         ($instr.get_reg().unwrap() + REGISTER_OFFSET) as u8
     }};
 }
+
+#[rustfmt::skip]
+macro_rules! typ {
+    ($f:expr; $instr_id:expr) => {{
+        $f.instr_arena[$instr_id].ty.as_ref().unwrap()
+    }};
+    ($instr:expr) => {{
+        $instr.ty.as_ref().unwrap()
+    }};
+}
+
 //
 // #[rustfmt::skip]
 // macro_rules! vreg {
@@ -132,11 +143,44 @@ impl<'a> JITCompiler<'a> {
                     MachineOpcode::Add => self.compile_add(f, &frame_objects, instr),
                     MachineOpcode::Load => self.compile_load(&frame_objects, instr),
                     MachineOpcode::Store => self.compile_store(f, &frame_objects, instr),
+                    MachineOpcode::BrccEq | MachineOpcode::BrccLe => self.compile_brcc(f, instr),
                     MachineOpcode::Br => self.compile_br(instr),
                     MachineOpcode::Ret => self.compile_return(f, &frame_objects, instr),
                     _ => unimplemented!(),
                 }
             }
+        }
+    }
+
+    fn compile_brcc(&mut self, f: &MachineFunction, instr: &MachineInstr) {
+        let op0 = &instr.oprand[0];
+        let op1 = &instr.oprand[1];
+        let br = &instr.oprand[2];
+        match op0 {
+            MachineOprand::Instr(i0) => match op1 {
+                MachineOprand::Constant(c) => match c {
+                    MachineConstant::Int32(x) => dynasm!(self.asm; cmp Rd(register!(f; *i0)), *x),
+                },
+                MachineOprand::Instr(i1) => match typ!(f; *i0) {
+                    Type::Int32 => {
+                        dynasm!(self.asm; cmp Rd(register!(f; *i0)), Rd(register!(f; *i1)))
+                    }
+                    _ => unimplemented!(),
+                },
+                _ => unimplemented!(),
+            },
+            e => unimplemented!("{:?}", e),
+        }
+        match br {
+            MachineOprand::Branch(bb) => {
+                let l = self.get_label_of_bb(*bb);
+                match instr.opcode {
+                    MachineOpcode::BrccEq => dynasm!(self.asm; jz => l),
+                    MachineOpcode::BrccLe => dynasm!(self.asm; jle => l),
+                    _ => unreachable!(),
+                }
+            }
+            _ => unimplemented!(),
         }
     }
 

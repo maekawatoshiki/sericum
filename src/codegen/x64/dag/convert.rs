@@ -108,12 +108,13 @@ impl<'a> ConvertToDAG<'a> {
         let mut last_dag_id = Some(entry_node);
 
         macro_rules! make_chain {
-            ($dag_id:expr) => {
-                if let Some(id_) = last_dag_id {
-                    dag_arena[id_].next = Some($dag_id);
-                    last_dag_id = Some($dag_id);
+            ($dag_id:expr) => {{
+                if let Some(last_dag_id_) = last_dag_id {
+                    let dag_id = $dag_id;
+                    dag_arena[last_dag_id_].next = Some(dag_id);
+                    last_dag_id = Some(dag_id);
                 }
-            };
+            }};
         }
 
         for instr_val in bb.iseq_ref().iter() {

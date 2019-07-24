@@ -10,14 +10,16 @@ fn dag1() {
     let mut m = module::Module::new("cilk");
 
     let func = cilk_ir!(m; define [i32] func (i32) {
-        entry:
-            i = alloca i32;
-            store (i32 10), (%i);
-            x1 = load (%i);
-            x2 = add (%x1), (%arg.0);
-            br l1;
-        l1:
-            ret (%x2);
+        // entry:
+        //     i = alloca i32;
+        //     store (i32 10), (%i);
+        //     x1 = load (%i);
+        //     x2 = add (%x1), (%arg.0);
+        //     br l1;
+        // l1:
+        //     ret (%x2);
+
+        // entry:
         //     i = alloca i32;
         //     store (i32 1), (%i);
         //     c = icmp eq (%i), (i32 1);
@@ -29,12 +31,24 @@ fn dag1() {
         //     ret (%y);
         // l2:
         //     ret (i32 1);
+
+        entry:
+            // i = alloca i32;
+            // store (i32 10), (%i);
+            // li = load (%i);
+            // c = icmp eq (%li), (%arg.0);
+            c = icmp eq (%arg.0), (i32 10);
+            br (%c) l1, l2;
+        l1:
+            ret (i32 0);
+        l2:
+            ret (i32 1);
     });
 
     println!("{}", m.function_ref(func).to_string(&m));
 
-    // let dag_func = dag::convert::ConvertToDAG::new(&m).construct_dag(func);
-    let dag_module = dag::convert::ConvertToDAG::new(&m).convert_module();
+    let mut dag_module = dag::convert::ConvertToDAG::new(&m).convert_module();
+    dag::combine::Combine::new().combine_module(&mut dag_module);
     println!("DAG:");
     for (_, dag_func) in &dag_module.functions {
         for (id, bb) in &dag_func.dag_basic_blocks {
@@ -65,5 +79,9 @@ fn dag1() {
     println!(
         "ret: {:?}",
         jit.run(func, vec![machine::jit::GenericValue::Int32(2)])
+    );
+    println!(
+        "ret: {:?}",
+        jit.run(func, vec![machine::jit::GenericValue::Int32(10)])
     );
 }

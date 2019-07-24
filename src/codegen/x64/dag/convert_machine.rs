@@ -7,7 +7,6 @@ use rustc_hash::FxHashMap;
 
 pub struct ConvertToMachine<'a> {
     pub module: &'a DAGModule,
-    pub vreg_count: usize,
     pub dag_node_id_to_machine_instr_id: FxHashMap<DAGNodeId, Option<MachineInstrId>>,
     pub dag_bb_to_machine_bb: FxHashMap<DAGBasicBlockId, MachineBasicBlockId>,
 }
@@ -16,7 +15,6 @@ impl<'a> ConvertToMachine<'a> {
     pub fn new(module: &'a DAGModule) -> Self {
         Self {
             module,
-            vreg_count: 0,
             dag_node_id_to_machine_instr_id: FxHashMap::default(),
             dag_bb_to_machine_bb: FxHashMap::default(),
         }
@@ -146,6 +144,22 @@ impl<'a> ConvertToMachine<'a> {
                     None,
                 )))
             }
+            DAGNodeKind::Brcc(cond, op0, op1, dag_bb_id) => {
+                let new_op0 = usual_oprand!(op0);
+                let new_op1 = usual_oprand!(op1);
+                Some(machine_instr_arena.alloc(MachineInstr::new(
+                    match cond {
+                        CondKind::Eq => MachineOpcode::BrccEq,
+                        CondKind::Le => MachineOpcode::BrccLe,
+                    },
+                    vec![
+                        new_op0,
+                        new_op1,
+                        MachineOprand::Branch(self.get_machine_bb(dag_bb_id)),
+                    ],
+                    None,
+                )))
+            }
             DAGNodeKind::Ret(op1) => {
                 let new_op1 = usual_oprand!(op1);
                 Some(machine_instr_arena.alloc(MachineInstr::new(
@@ -154,7 +168,7 @@ impl<'a> ConvertToMachine<'a> {
                     None,
                 )))
             }
-            _ => None,
+            DAGNodeKind::Constant(_) | DAGNodeKind::FrameIndex(_, _) => None,
         };
 
         some_then!(id, machine_instr_id, { iseq.push(id) });
@@ -192,10 +206,5 @@ impl<'a> ConvertToMachine<'a> {
 
     fn get_machine_bb(&self, dag_bb_id: DAGBasicBlockId) -> MachineBasicBlockId {
         *self.dag_bb_to_machine_bb.get(&dag_bb_id).unwrap()
-    }
-
-    pub fn next_vreg(&mut self) -> usize {
-        self.vreg_count += 1;
-        self.vreg_count
     }
 }
