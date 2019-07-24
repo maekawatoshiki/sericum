@@ -24,16 +24,15 @@ macro_rules! typ {
     }};
 }
 
-//
-// #[rustfmt::skip]
-// macro_rules! vreg {
-//     ($f:expr ; $instr_id:expr) => {{
-//         $f.instr_arena[$instr_id].reg.borrow().vreg
-//     }};
-//     ($instr:expr) => {{
-//         $instr.reg.borrow().vreg
-//     }};
-// }
+#[rustfmt::skip]
+macro_rules! vregister {
+    ($f:expr ; $instr_id:expr) => {{
+        $f.instr_arena[$instr_id].reg.borrow().vreg
+    }};
+    ($instr:expr) => {{
+        $instr.reg.borrow().vreg
+    }};
+}
 
 const REGISTER_OFFSET: usize = 10; // Instruction.reg.reg=0 means r10
 
@@ -141,8 +140,10 @@ impl<'a> JITCompiler<'a> {
                 let instr = &f.instr_arena[*instr];
                 match instr.opcode {
                     MachineOpcode::Add => self.compile_add(f, &frame_objects, instr),
+                    MachineOpcode::Sub => self.compile_sub(f, &frame_objects, instr),
                     MachineOpcode::Load => self.compile_load(&frame_objects, instr),
                     MachineOpcode::Store => self.compile_store(f, &frame_objects, instr),
+                    MachineOpcode::Call => self.compile_call(f, &frame_objects, instr),
                     MachineOpcode::BrccEq | MachineOpcode::BrccLe => self.compile_brcc(f, instr),
                     MachineOpcode::Br => self.compile_br(instr),
                     MachineOpcode::Ret => self.compile_return(f, &frame_objects, instr),
@@ -196,7 +197,9 @@ impl<'a> JITCompiler<'a> {
                 }
             }
             MachineOprand::Instr(_) => unimplemented!(),
-            MachineOprand::Constant(_) | MachineOprand::Branch(_) => unreachable!(),
+            MachineOprand::GlobalAddress(_)
+            | MachineOprand::Constant(_)
+            | MachineOprand::Branch(_) => unreachable!(),
         }
     }
 
@@ -214,10 +217,85 @@ impl<'a> JITCompiler<'a> {
                         Type::Int32 => dynasm!(self.asm; mov [rbp - off], Rd(register!(f; *i))),
                         _ => unimplemented!(),
                     },
-                    MachineOprand::FrameIndex(_) | MachineOprand::Branch(_) => unreachable!(),
+                    MachineOprand::GlobalAddress(_)
+                    | MachineOprand::FrameIndex(_)
+                    | MachineOprand::Branch(_) => unreachable!(),
                 }
             }
             _ => unimplemented!(),
+        }
+    }
+
+    fn compile_call(&mut self, f: &MachineFunction, fo: &FrameObjectsInfo, instr: &MachineInstr) {
+        let callee_id = self
+            .module
+            .find_function_by_name(match &instr.oprand[0] {
+                MachineOprand::GlobalAddress(GlobalValueInfo::FunctionName(n)) => n.as_str(),
+                _ => unimplemented!(),
+            })
+            .unwrap();
+
+        let callee_entity = self.module.function_ref(callee_id);
+        let mut rsp_offset = 0;
+
+        let mut save_regs = vec![];
+        for (_, i) in &f.instr_arena {
+            // TODO
+            if i.reg.borrow().reg.is_none() {
+                continue;
+            }
+            let bgn = vregister!(i);
+            let end = match i.reg.borrow().last_use {
+                Some(last_use) => vregister!(f; last_use),
+                None => continue,
+            };
+            if bgn < vregister!(instr) && vregister!(instr) < end {
+                save_regs.push(register!(i));
+            }
+        }
+
+        when_debug!(println!("saved register: {:?}", save_regs));
+
+        for save_reg in &save_regs {
+            dynasm!(self.asm; push Ra(*save_reg));
+            rsp_offset += 8;
+        }
+
+        if !callee_entity.internal {
+            // rsp_offset += self.push_args(f, args);
+            match instr.oprand[1] {
+                MachineOprand::Instr(instr_id) => {
+                    dynasm!(self.asm; mov rdi, Ra(register!(f; instr_id)));
+                }
+                _ => {}
+            }
+        }
+
+        if callee_entity.internal {
+            // self.assign_args_to_regs(f, args);
+            // let callee = self.internal_func.get(&callee_entity.name).unwrap();
+            // let rsp_adjust = roundup(rsp_offset as i32, 16) - rsp_offset as i32; // rsp is 16-byte aligned
+            // dynasm!(self.asm
+            //     ; sub rsp, rsp_adjust
+            //     ; mov rax, QWORD *callee as _
+            //     ; call rax
+            //     ; add rsp, rsp_adjust
+            // );
+        } else {
+            let f_entry = self.get_function_entry_label(callee_id);
+            dynasm!(self.asm; call => f_entry);
+        }
+
+        // if returns {
+        dynasm!(self.asm; mov Ra(register!(instr)), rax);
+        // }
+
+        if !callee_entity.internal {
+            // dynasm!(self.asm; add rsp, 8*(args.len() as i32));
+        }
+
+        for save_reg in save_regs.iter().rev() {
+            dynasm!(self.asm; pop Ra(*save_reg));
         }
     }
 
@@ -239,8 +317,34 @@ impl<'a> JITCompiler<'a> {
                             ; mov Ra(rn), Ra(register!(f; *i0))
                             ; add Ra(rn), Ra(register!(f; *i1)));
                 }
+                MachineOprand::FrameIndex(_)
+                | MachineOprand::GlobalAddress(_)
+                | MachineOprand::Branch(_) => unimplemented!(),
+            },
+            _ => unimplemented!(),
+        }
+    }
+
+    fn compile_sub(&mut self, f: &MachineFunction, _fo: &FrameObjectsInfo, instr: &MachineInstr) {
+        let rn = register!(instr);
+        let op0 = &instr.oprand[0];
+        let op1 = &instr.oprand[1];
+        match op0 {
+            MachineOprand::FrameIndex(_) => unimplemented!(), // TODO: Address
+            MachineOprand::Instr(i0) => match op1 {
+                MachineOprand::Constant(c) => {
+                    dynasm!(self.asm; mov Ra(rn), Ra(register!(f; *i0)));
+                    match c {
+                        MachineConstant::Int32(x) => dynasm!(self.asm; sub Ra(rn), *x),
+                    }
+                }
+                MachineOprand::Instr(i1) => {
+                    dynasm!(self.asm
+                            ; mov Ra(rn), Ra(register!(f; *i0))
+                            ; sub Ra(rn), Ra(register!(f; *i1)));
+                }
                 MachineOprand::FrameIndex(_) => unimplemented!(),
-                MachineOprand::Branch(_) => unimplemented!(),
+                MachineOprand::GlobalAddress(_) | MachineOprand::Branch(_) => unimplemented!(),
             },
             _ => unimplemented!(),
         }
@@ -265,7 +369,7 @@ impl<'a> JITCompiler<'a> {
             MachineOprand::FrameIndex(fi) => {
                 dynasm!(self.asm; mov rax, [rbp - fo.offset(fi.idx).unwrap()])
             }
-            MachineOprand::Branch(_) => unreachable!(),
+            MachineOprand::GlobalAddress(_) | MachineOprand::Branch(_) => unreachable!(),
         }
         dynasm!(self.asm; mov rsp, rbp; pop rbp; ret);
     }

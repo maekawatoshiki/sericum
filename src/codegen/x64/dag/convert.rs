@@ -91,6 +91,13 @@ impl<'a> ConvertToDAG<'a> {
                 make_chain(dag_arena, last_dag_id, load_id);
                 load_id
             }
+            Value::Function(fid) => {
+                let f = self.module.function_ref(*fid);
+                dag_arena.alloc(DAGNode::new(
+                    DAGNodeKind::GlobalAddress(GlobalValueKind::FunctionName(f.name.to_string())),
+                    Some(f.ty.get_pointer_ty()),
+                ))
+            }
             _ => unimplemented!(),
         }
     }
@@ -145,11 +152,33 @@ impl<'a> ConvertToDAG<'a> {
                         dag_arena.alloc(DAGNode::new(DAGNodeKind::Store(dst_id, src_id), None));
                     make_chain!(id);
                 }
+                Opcode::Call(ref f, ref args) => {
+                    let f_id = self.get_dag_id_from_value(dag_arena, &mut last_dag_id, f);
+                    let args_id = args
+                        .iter()
+                        .map(|a| self.get_dag_id_from_value(dag_arena, &mut last_dag_id, a))
+                        .collect();
+                    let id = dag_arena.alloc(DAGNode::new(
+                        DAGNodeKind::Call(f_id, args_id),
+                        Some(instr.ty.clone()),
+                    ));
+                    make_chain!(id);
+                    self.instr_id_to_dag_node_id.insert(instr_id, id);
+                }
                 Opcode::Add(ref v1, ref v2) => {
                     let v1_id = self.get_dag_id_from_value(dag_arena, &mut last_dag_id, v1);
                     let v2_id = self.get_dag_id_from_value(dag_arena, &mut last_dag_id, v2);
                     let add_id = dag_arena.alloc(DAGNode::new(
                         DAGNodeKind::Add(v1_id, v2_id),
+                        Some(instr.ty.clone()),
+                    ));
+                    self.instr_id_to_dag_node_id.insert(instr_id, add_id);
+                }
+                Opcode::Sub(ref v1, ref v2) => {
+                    let v1_id = self.get_dag_id_from_value(dag_arena, &mut last_dag_id, v1);
+                    let v2_id = self.get_dag_id_from_value(dag_arena, &mut last_dag_id, v2);
+                    let add_id = dag_arena.alloc(DAGNode::new(
+                        DAGNodeKind::Sub(v1_id, v2_id),
                         Some(instr.ty.clone()),
                     ));
                     self.instr_id_to_dag_node_id.insert(instr_id, add_id);

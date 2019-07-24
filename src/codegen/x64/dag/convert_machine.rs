@@ -107,11 +107,31 @@ impl<'a> ConvertToMachine<'a> {
                     None,
                 )))
             }
+            DAGNodeKind::Call(f, ref args) => {
+                let mut operands = vec![usual_oprand!(f)];
+                for arg in args {
+                    operands.push(usual_oprand!(*arg));
+                }
+                Some(machine_instr_arena.alloc(MachineInstr::new(
+                    MachineOpcode::Call,
+                    operands,
+                    node.ty.clone(),
+                )))
+            }
             DAGNodeKind::Add(op1, op2) => {
                 let new_op1 = usual_oprand!(op1);
                 let new_op2 = usual_oprand!(op2);
                 Some(machine_instr_arena.alloc(MachineInstr::new(
                     MachineOpcode::Add,
+                    vec![new_op1, new_op2],
+                    node.ty.clone(),
+                )))
+            }
+            DAGNodeKind::Sub(op1, op2) => {
+                let new_op1 = usual_oprand!(op1);
+                let new_op2 = usual_oprand!(op2);
+                Some(machine_instr_arena.alloc(MachineInstr::new(
+                    MachineOpcode::Sub,
                     vec![new_op1, new_op2],
                     node.ty.clone(),
                 )))
@@ -168,7 +188,9 @@ impl<'a> ConvertToMachine<'a> {
                     None,
                 )))
             }
-            DAGNodeKind::Constant(_) | DAGNodeKind::FrameIndex(_, _) => None,
+            DAGNodeKind::GlobalAddress(_)
+            | DAGNodeKind::Constant(_)
+            | DAGNodeKind::FrameIndex(_, _) => None,
         };
 
         some_then!(id, machine_instr_id, { iseq.push(id) });
@@ -197,6 +219,9 @@ impl<'a> ConvertToMachine<'a> {
             DAGNodeKind::FrameIndex(i, ref ty) => {
                 MachineOprand::FrameIndex(FrameIndexInfo::new(ty.clone(), i))
             }
+            DAGNodeKind::GlobalAddress(ref g) => MachineOprand::GlobalAddress(match g {
+                GlobalValueKind::FunctionName(n) => GlobalValueInfo::FunctionName(n.clone()),
+            }),
             _ => MachineOprand::Instr(
                 self.convert_dag(cur_func, machine_instr_arena, iseq, node_id)
                     .unwrap(),

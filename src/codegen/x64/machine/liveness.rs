@@ -1,4 +1,5 @@
 use super::{basic_block::*, function::*, instr::*, module::*};
+use crate::ir::types::*;
 // use super::{convert::*, node::*};
 // use id_arena::*;
 
@@ -58,10 +59,15 @@ impl<'a> LivenessAnalysis<'a> {
         }
 
         if let MachineOpcode::Add
+        | MachineOpcode::Sub
         | MachineOpcode::Seteq
         | MachineOpcode::Setle
         | MachineOpcode::Load = instr.opcode
         {
+            bb.liveness.borrow_mut().def.insert(instr_id);
+        }
+
+        if instr.opcode == MachineOpcode::Call && instr.ty.as_ref().unwrap() != &Type::Void {
             bb.liveness.borrow_mut().def.insert(instr_id);
         }
     }

@@ -23,14 +23,18 @@ pub struct RegisterInfo {
     pub last_use: Option<MachineInstrId>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Copy)]
 pub enum MachineOpcode {
     // Memory
     Load,
     Store,
 
+    // Call
+    Call,
+
     // Binary arithmetics
     Add,
+    Sub,
 
     // Comparison
     Seteq,
@@ -51,12 +55,18 @@ pub enum MachineOprand {
     Instr(MachineInstrId),
     Constant(MachineConstant),
     FrameIndex(FrameIndexInfo),
+    GlobalAddress(GlobalValueInfo),
     Branch(MachineBasicBlockId),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum MachineConstant {
     Int32(i32),
+}
+
+#[derive(Debug, Clone)]
+pub enum GlobalValueInfo {
+    FunctionName(String),
 }
 
 #[derive(Debug, Clone)]

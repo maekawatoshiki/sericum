@@ -19,6 +19,8 @@ pub enum DAGNodeKind {
     Load(DAGNodeId),
     Store(DAGNodeId, DAGNodeId), // dst, src
     Add(DAGNodeId, DAGNodeId),
+    Sub(DAGNodeId, DAGNodeId),
+    Call(DAGNodeId, Vec<DAGNodeId>),
     Setcc(CondKind, DAGNodeId, DAGNodeId),
     BrCond(DAGNodeId, DAGBasicBlockId),
     Brcc(CondKind, DAGNodeId, DAGNodeId, DAGBasicBlockId),
@@ -28,6 +30,7 @@ pub enum DAGNodeKind {
     FrameIndex(i32, Type),
     // Register(RegisterKind),
     Constant(ConstantKind),
+    GlobalAddress(GlobalValueKind),
 }
 
 // #[derive(Debug, Clone, PartialEq)]
@@ -45,6 +48,11 @@ pub enum ConstantKind {
 pub enum CondKind {
     Eq,
     Le,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum GlobalValueKind {
+    FunctionName(String),
 }
 
 impl Into<CondKind> for ICmpKind {
@@ -126,11 +134,47 @@ impl DAGNode {
                 arena[op1].to_dot_sub(s, mark, op1, arena);
                 arena[op2].to_dot_sub(s, mark, op2, arena);
             }
-            DAGNodeKind::Add(op1, op2) => {
+            DAGNodeKind::Call(f, ref args) => {
                 s.push_str(
                     format!(
-                        "\ninstr{} [shape=record,shape=Mrecord,label=\"{{Add|{}}}\"];",
+                        "\ninstr{} [shape=record,shape=Mrecord,label=\"{{Call|{}}}\"];",
                         self_id.index(),
+                        self.ty.as_ref().unwrap().to_string(),
+                    )
+                    .as_str(),
+                );
+                s.push_str(
+                    format!(
+                        "\ninstr{} -> instr{} [label=\"callee\" color=\"#1E92FF\"];",
+                        self_id.index(),
+                        f.index(),
+                    )
+                    .as_str(),
+                );
+                arena[f].to_dot_sub(s, mark, f, arena);
+                for (i, arg) in args.iter().enumerate() {
+                    s.push_str(
+                        format!(
+                            "\ninstr{} -> instr{} [label=\"{}\" color=\"#1E92FF\"];",
+                            self_id.index(),
+                            arg.index(),
+                            i + 1
+                        )
+                        .as_str(),
+                    );
+                    arena[*arg].to_dot_sub(s, mark, *arg, arena);
+                }
+            }
+            DAGNodeKind::Add(op1, op2) | DAGNodeKind::Sub(op1, op2) => {
+                s.push_str(
+                    format!(
+                        "\ninstr{} [shape=record,shape=Mrecord,label=\"{{{}|{}}}\"];",
+                        self_id.index(),
+                        match self.kind {
+                            DAGNodeKind::Add(_, _) => "Add",
+                            DAGNodeKind::Sub(_, _) => "Sub",
+                            _ => "",
+                        },
                         self.ty.as_ref().unwrap().to_string(),
                     )
                     .as_str(),
@@ -254,6 +298,16 @@ impl DAGNode {
                         "\ninstr{} [shape=record,shape=Mrecord,label=\"{{Constant:{:?}}}\"];",
                         self_id.index(),
                         c
+                    )
+                    .as_str(),
+                );
+            }
+            DAGNodeKind::GlobalAddress(ref g) => {
+                s.push_str(
+                    format!(
+                        "\ninstr{} [shape=record,shape=Mrecord,label=\"{{GlobalAddress:{:?}}}\"];",
+                        self_id.index(),
+                        g
                     )
                     .as_str(),
                 );

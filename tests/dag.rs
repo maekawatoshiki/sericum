@@ -32,17 +32,31 @@ fn dag1() {
         // l2:
         //     ret (i32 1);
 
+        // entry:
+        //     // i = alloca i32;
+        //     // store (i32 10), (%i);
+        //     // li = load (%i);
+        //     // c = icmp eq (%li), (%arg.0);
+        //     x = sub (%arg.0), (i32 3);
+        //     c = icmp eq (%x), (i32 10);
+        //     br (%c) l1, l2;
+        // l1:
+        //     ret (i32 0);
+        // l2:
+        //     ret (i32 1);
+
         entry:
-            // i = alloca i32;
-            // store (i32 10), (%i);
-            // li = load (%i);
-            // c = icmp eq (%li), (%arg.0);
-            c = icmp eq (%arg.0), (i32 10);
-            br (%c) l1, l2;
+            cond = icmp le (%arg.0), (i32 2);
+            br (%cond) l1, l2;
         l1:
-            ret (i32 0);
-        l2:
             ret (i32 1);
+        l2:
+            a1 = sub (%arg.0), (i32 1);
+            r1 = call func [(%a1)];
+            a2 = sub (%arg.0), (i32 2);
+            r2 = call func [(%a2)];
+            r3 = add (%r1), (%r2);
+            ret (%r3);
     });
 
     println!("{}", m.function_ref(func).to_string(&m));
@@ -82,6 +96,6 @@ fn dag1() {
     );
     println!(
         "ret: {:?}",
-        jit.run(func, vec![machine::jit::GenericValue::Int32(10)])
+        jit.run(func, vec![machine::jit::GenericValue::Int32(40)])
     );
 }
