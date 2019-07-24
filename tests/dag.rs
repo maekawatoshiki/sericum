@@ -9,12 +9,15 @@ use cilk::{
 fn dag1() {
     let mut m = module::Module::new("cilk");
 
-    let func = cilk_ir!(m; define [i32] func () {
+    let func = cilk_ir!(m; define [i32] func (i32) {
         entry:
             i = alloca i32;
-            store (i32 123), (%i);
-            li = load (%i);
-            ret (%li);
+            store (i32 10), (%i);
+            x1 = load (%i);
+            x2 = add (%x1), (%arg.0);
+            br l1;
+        l1:
+            ret (%x2);
         //     i = alloca i32;
         //     store (i32 1), (%i);
         //     c = icmp eq (%i), (i32 1);
@@ -59,5 +62,8 @@ fn dag1() {
     let mut jit = machine::jit::JITCompiler::new(&machine_module);
     jit.compile_module();
     let func = machine_module.find_function_by_name("func").unwrap();
-    println!("ret: {:?}", jit.run(func, vec![]));
+    println!(
+        "ret: {:?}",
+        jit.run(func, vec![machine::jit::GenericValue::Int32(2)])
+    );
 }

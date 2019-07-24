@@ -59,7 +59,12 @@ impl<'a> JITCompiler<'a> {
         let f_entry = self.get_function_entry_label(id);
         let entry = self.asm.offset();
 
-        // TODO: arguments
+        for (idx, arg) in args.iter().enumerate() {
+            match arg {
+                GenericValue::Int32(i) => dynasm!(self.asm; mov Ra(reg4arg(idx).unwrap()), *i),
+                GenericValue::None => unreachable!(),
+            }
+        }
 
         dynasm!(self.asm
                 ; call =>f_entry
@@ -102,7 +107,18 @@ impl<'a> JITCompiler<'a> {
             ; push rbp
             ; mov rbp, rsp
             ; sub rsp, roundup(frame_objects.total_size() + /*push rbp=*/8, 16) - 8
+            ; mov [rbp - 4], edi
         );
+
+        for (i, ty) in f.ty.get_function_ty().unwrap().params_ty.iter().enumerate() {
+            match ty {
+                Type::Int32 => {
+                    let off = frame_objects.offset(-(i as i32 + 1)).unwrap();
+                    dynasm!(self.asm; mov [rbp - off], Rd(reg4arg(i).unwrap()));
+                }
+                _ => unimplemented!(),
+            }
+        }
 
         for (bb_id, bb) in &f.basic_blocks {
             if bb_id.index() != 0 {
@@ -116,6 +132,7 @@ impl<'a> JITCompiler<'a> {
                     MachineOpcode::Add => self.compile_add(f, &frame_objects, instr),
                     MachineOpcode::Load => self.compile_load(&frame_objects, instr),
                     MachineOpcode::Store => self.compile_store(f, &frame_objects, instr),
+                    MachineOpcode::Br => self.compile_br(instr),
                     MachineOpcode::Ret => self.compile_return(f, &frame_objects, instr),
                     _ => unimplemented!(),
                 }
@@ -185,6 +202,16 @@ impl<'a> JITCompiler<'a> {
         }
     }
 
+    fn compile_br(&mut self, instr: &MachineInstr) {
+        match &instr.oprand[0] {
+            MachineOprand::Branch(bb) => {
+                let label = self.get_label_of_bb(*bb);
+                dynasm!(self.asm; jmp =>label)
+            }
+            _ => unimplemented!(),
+        }
+    }
+
     fn compile_return(&mut self, f: &MachineFunction, fo: &FrameObjectsInfo, instr: &MachineInstr) {
         match &instr.oprand[0] {
             MachineOprand::Constant(c) => match c {
@@ -246,6 +273,11 @@ impl FrameObjectsInfo {
     pub fn total_size(&self) -> i32 {
         self.total_size as i32
     }
+}
+
+fn reg4arg(idx: usize) -> Option<u8> {
+    let regs = [7, 6, 2, 1, 8, 9]; // rdi, rsi, rdx, rcx, r8, r9
+    regs.get(idx).map(|x| *x as u8)
 }
 
 fn roundup(n: i32, align: i32) -> i32 {
