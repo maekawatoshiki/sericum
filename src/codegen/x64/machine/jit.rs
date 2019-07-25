@@ -117,7 +117,6 @@ impl<'a> JITCompiler<'a> {
             ; push rbp
             ; mov rbp, rsp
             ; sub rsp, roundup(frame_objects.total_size() + /*push rbp=*/8, 16) - 8
-            ; mov [rbp - 4], edi
         );
 
         for (i, ty) in f.ty.get_function_ty().unwrap().params_ty.iter().enumerate() {
@@ -192,7 +191,7 @@ impl<'a> JITCompiler<'a> {
             MachineOprand::FrameIndex(fi) => {
                 let off = fo.offset(fi.idx).unwrap();
                 match fi.ty {
-                    Type::Int32 => dynasm!(self.asm; mov Ra(rn), [rbp - off]),
+                    Type::Int32 => dynasm!(self.asm; mov Rd(rn), [rbp - off]),
                     _ => unimplemented!(),
                 }
             }
@@ -264,9 +263,10 @@ impl<'a> JITCompiler<'a> {
         if !callee_entity.internal {
             // rsp_offset += self.push_args(f, args);
             match instr.oprand[1] {
-                MachineOprand::Instr(instr_id) => {
-                    dynasm!(self.asm; mov rdi, Ra(register!(f; instr_id)));
-                }
+                MachineOprand::Instr(instr_id) => match typ!(f; instr_id) {
+                    Type::Int32 => dynasm!(self.asm; mov edi, Rd(register!(f; instr_id))),
+                    _ => unimplemented!(),
+                },
                 _ => {}
             }
         }
@@ -299,28 +299,36 @@ impl<'a> JITCompiler<'a> {
         }
     }
 
+    fn reg_copy(&mut self, ty: &Type, r0: u8, r1: u8) {
+        if r0 == r1 {
+            return;
+        }
+
+        match ty {
+            Type::Int32 => dynasm!(self.asm; mov Rd(r0), Rd(r1)),
+            _ => unimplemented!(),
+        }
+    }
+
     fn compile_add(&mut self, f: &MachineFunction, _fo: &FrameObjectsInfo, instr: &MachineInstr) {
         let rn = register!(instr);
         let op0 = &instr.oprand[0];
         let op1 = &instr.oprand[1];
         match op0 {
             MachineOprand::FrameIndex(_) => unimplemented!(), // TODO: Address
-            MachineOprand::Instr(i0) => match op1 {
-                MachineOprand::Constant(c) => {
-                    dynasm!(self.asm; mov Ra(rn), Ra(register!(f; *i0)));
-                    match c {
-                        MachineConstant::Int32(x) => dynasm!(self.asm; add Ra(rn), *x),
-                    }
-                }
-                MachineOprand::Instr(i1) => {
-                    dynasm!(self.asm
-                            ; mov Ra(rn), Ra(register!(f; *i0))
-                            ; add Ra(rn), Ra(register!(f; *i1)));
-                }
-                MachineOprand::FrameIndex(_)
-                | MachineOprand::GlobalAddress(_)
-                | MachineOprand::Branch(_) => unimplemented!(),
-            },
+            MachineOprand::Instr(i0) => {
+                self.reg_copy(typ!(f; *i0), rn, register!(f; *i0));
+                match op1 {
+                    MachineOprand::Constant(c) => match c {
+                        MachineConstant::Int32(x) => dynasm!(self.asm; add Rd(rn), *x),
+                    },
+                    MachineOprand::Instr(i1) => match typ!(f; *i1) {
+                        Type::Int32 => dynasm!(self.asm; add Rd(rn), Rd(register!(f; *i1))),
+                        _ => unimplemented!(),
+                    },
+                    _ => unimplemented!(),
+                };
+            }
             _ => unimplemented!(),
         }
     }
@@ -331,21 +339,19 @@ impl<'a> JITCompiler<'a> {
         let op1 = &instr.oprand[1];
         match op0 {
             MachineOprand::FrameIndex(_) => unimplemented!(), // TODO: Address
-            MachineOprand::Instr(i0) => match op1 {
-                MachineOprand::Constant(c) => {
-                    dynasm!(self.asm; mov Ra(rn), Ra(register!(f; *i0)));
-                    match c {
-                        MachineConstant::Int32(x) => dynasm!(self.asm; sub Ra(rn), *x),
+            MachineOprand::Instr(i0) => {
+                self.reg_copy(typ!(f; *i0), rn, register!(f; *i0));
+                match op1 {
+                    MachineOprand::Constant(MachineConstant::Int32(x)) => {
+                        dynasm!(self.asm; sub Rd(rn), *x)
                     }
-                }
-                MachineOprand::Instr(i1) => {
-                    dynasm!(self.asm
-                            ; mov Ra(rn), Ra(register!(f; *i0))
-                            ; sub Ra(rn), Ra(register!(f; *i1)));
-                }
-                MachineOprand::FrameIndex(_) => unimplemented!(),
-                MachineOprand::GlobalAddress(_) | MachineOprand::Branch(_) => unimplemented!(),
-            },
+                    MachineOprand::Instr(i1) => match typ!(f; *i1) {
+                        Type::Int32 => dynasm!(self.asm; sub Rd(rn), Rd(register!(f; *i1))),
+                        _ => unimplemented!(),
+                    },
+                    _ => unimplemented!(),
+                };
+            }
             _ => unimplemented!(),
         }
     }
