@@ -233,10 +233,11 @@ impl<'a> JITCompiler<'a> {
                 _ => unimplemented!(),
             })
             .unwrap();
-
         let callee_entity = self.module.function_ref(callee_id);
-        let mut rsp_offset = 0;
+        let ret_ty = &callee_entity.ty.get_function_ty().unwrap().ret_ty;
+        // let mut rsp_offset = 0;
 
+        // TODO
         let mut save_regs = vec![];
         for (_, i) in &f.instr_arena {
             // TODO
@@ -257,18 +258,12 @@ impl<'a> JITCompiler<'a> {
 
         for save_reg in &save_regs {
             dynasm!(self.asm; push Ra(*save_reg));
-            rsp_offset += 8;
+            // rsp_offset += 8;
         }
 
         if !callee_entity.internal {
             // rsp_offset += self.push_args(f, args);
-            match instr.oprand[1] {
-                MachineOprand::Instr(instr_id) => match typ!(f; instr_id) {
-                    Type::Int32 => dynasm!(self.asm; mov edi, Rd(register!(f; instr_id))),
-                    _ => unimplemented!(),
-                },
-                _ => {}
-            }
+            self.assign_args_to_regs(f, &instr.oprand[1..]);
         }
 
         if callee_entity.internal {
@@ -286,9 +281,10 @@ impl<'a> JITCompiler<'a> {
             dynasm!(self.asm; call => f_entry);
         }
 
-        // if returns {
-        dynasm!(self.asm; mov Ra(register!(instr)), rax);
-        // }
+        match ret_ty {
+            Type::Int32 => self.reg_copy(ret_ty, register!(instr), 0),
+            _ => {}
+        }
 
         if !callee_entity.internal {
             // dynasm!(self.asm; add rsp, 8*(args.len() as i32));
@@ -296,17 +292,6 @@ impl<'a> JITCompiler<'a> {
 
         for save_reg in save_regs.iter().rev() {
             dynasm!(self.asm; pop Ra(*save_reg));
-        }
-    }
-
-    fn reg_copy(&mut self, ty: &Type, r0: u8, r1: u8) {
-        if r0 == r1 {
-            return;
-        }
-
-        match ty {
-            Type::Int32 => dynasm!(self.asm; mov Rd(r0), Rd(r1)),
-            _ => unimplemented!(),
         }
     }
 
@@ -378,6 +363,31 @@ impl<'a> JITCompiler<'a> {
             MachineOprand::GlobalAddress(_) | MachineOprand::Branch(_) => unreachable!(),
         }
         dynasm!(self.asm; mov rsp, rbp; pop rbp; ret);
+    }
+
+    fn assign_args_to_regs(&mut self, f: &MachineFunction, args: &[MachineOprand]) {
+        for (idx, arg) in args.iter().enumerate() {
+            match arg {
+                MachineOprand::Constant(MachineConstant::Int32(i)) => {
+                    dynasm!(self.asm; mov Rd(reg4arg(idx).unwrap()), *i)
+                }
+                MachineOprand::Instr(id) => {
+                    self.reg_copy(typ!(f; *id), reg4arg(idx).unwrap(), register!(f; *id))
+                }
+                _ => unimplemented!(),
+            }
+        }
+    }
+
+    fn reg_copy(&mut self, ty: &Type, r0: u8, r1: u8) {
+        if r0 == r1 {
+            return;
+        }
+
+        match ty {
+            Type::Int32 => dynasm!(self.asm; mov Rd(r0), Rd(r1)),
+            _ => unimplemented!(),
+        }
     }
 
     fn get_label_of_bb(&mut self, bb_id: MachineBasicBlockId) -> DynamicLabel {
