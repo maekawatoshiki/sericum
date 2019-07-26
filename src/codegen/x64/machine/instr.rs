@@ -19,6 +19,7 @@ pub struct MachineInstr {
 pub struct RegisterInfo {
     pub vreg: usize,
     pub reg: Option<usize>,
+    pub ty: Type,
     pub spill: bool,
     pub last_use: Option<MachineInstrId>,
 }
@@ -46,6 +47,9 @@ pub enum MachineOpcode {
     BrccEq,
     BrccLe,
 
+    // Phi
+    Phi,
+
     // Return
     Ret,
 }
@@ -53,6 +57,7 @@ pub enum MachineOpcode {
 #[derive(Debug, Clone)]
 pub enum MachineOprand {
     Instr(MachineInstrId),
+    Register(MachineRegister),
     Constant(MachineConstant),
     FrameIndex(FrameIndexInfo),
     GlobalAddress(GlobalValueInfo),
@@ -76,9 +81,10 @@ pub struct FrameIndexInfo {
 }
 
 #[derive(Debug, Clone)]
-pub struct VRegInfo {
-    pub ty: Type,
-    pub vreg: usize,
+pub struct MachineRegister {
+    pub reg_info: RegisterInfoRef,
+    // pub vreg: usize,
+    // pub phy_reg: usize
 }
 
 impl MachineInstr {
@@ -86,8 +92,10 @@ impl MachineInstr {
         Self {
             opcode,
             oprand,
+            reg: Rc::new(RefCell::new(RegisterInfo::new(
+                ty.clone().unwrap_or(Type::Int32),
+            ))),
             ty,
-            reg: Rc::new(RefCell::new(RegisterInfo::new(0))),
         }
     }
 
@@ -124,16 +132,17 @@ impl FrameIndexInfo {
     }
 }
 
-impl VRegInfo {
-    pub fn new(ty: Type, vreg: usize) -> Self {
-        Self { ty, vreg }
+impl MachineRegister {
+    pub fn new(reg_info: RegisterInfoRef) -> Self {
+        Self { reg_info }
     }
 }
 
 impl RegisterInfo {
-    pub fn new(vreg: usize) -> Self {
+    pub fn new(ty: Type) -> Self {
         Self {
-            vreg,
+            ty,
+            vreg: 0,
             reg: None,
             spill: false,
             last_use: None,

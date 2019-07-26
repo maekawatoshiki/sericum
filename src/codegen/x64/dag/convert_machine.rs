@@ -118,6 +118,18 @@ impl<'a> ConvertToMachine<'a> {
                     node.ty.clone(),
                 )))
             }
+            DAGNodeKind::Phi(ref pairs) => {
+                let mut operands = vec![];
+                for (val, bb) in pairs {
+                    operands.push(usual_oprand!(*val));
+                    operands.push(MachineOprand::Branch(self.get_machine_bb(*bb)));
+                }
+                Some(machine_instr_arena.alloc(MachineInstr::new(
+                    MachineOpcode::Phi,
+                    operands,
+                    node.ty.clone(),
+                )))
+            }
             DAGNodeKind::Add(op1, op2) => {
                 let new_op1 = usual_oprand!(op1);
                 let new_op2 = usual_oprand!(op2);

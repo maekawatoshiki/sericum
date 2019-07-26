@@ -21,6 +21,7 @@ pub enum DAGNodeKind {
     Add(DAGNodeId, DAGNodeId),
     Sub(DAGNodeId, DAGNodeId),
     Call(DAGNodeId, Vec<DAGNodeId>),
+    Phi(Vec<(DAGNodeId, DAGBasicBlockId)>),
     Setcc(CondKind, DAGNodeId, DAGNodeId),
     BrCond(DAGNodeId, DAGBasicBlockId),
     Brcc(CondKind, DAGNodeId, DAGNodeId, DAGBasicBlockId),
@@ -216,6 +217,7 @@ impl DAGNode {
                 arena[op1].to_dot_sub(s, mark, op1, arena);
                 arena[op2].to_dot_sub(s, mark, op2, arena);
             }
+            DAGNodeKind::Phi(_) => {} // TODO
             DAGNodeKind::BrCond(v, bb) => {
                 s.push_str(
                     format!(

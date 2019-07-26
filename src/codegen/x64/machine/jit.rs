@@ -196,9 +196,7 @@ impl<'a> JITCompiler<'a> {
                 }
             }
             MachineOprand::Instr(_) => unimplemented!(),
-            MachineOprand::GlobalAddress(_)
-            | MachineOprand::Constant(_)
-            | MachineOprand::Branch(_) => unreachable!(),
+            _ => unreachable!(),
         }
     }
 
@@ -216,16 +214,14 @@ impl<'a> JITCompiler<'a> {
                         Type::Int32 => dynasm!(self.asm; mov [rbp - off], Rd(register!(f; *i))),
                         _ => unimplemented!(),
                     },
-                    MachineOprand::GlobalAddress(_)
-                    | MachineOprand::FrameIndex(_)
-                    | MachineOprand::Branch(_) => unreachable!(),
+                    _ => unreachable!(),
                 }
             }
             _ => unimplemented!(),
         }
     }
 
-    fn compile_call(&mut self, f: &MachineFunction, fo: &FrameObjectsInfo, instr: &MachineInstr) {
+    fn compile_call(&mut self, f: &MachineFunction, _fo: &FrameObjectsInfo, instr: &MachineInstr) {
         let callee_id = self
             .module
             .find_function_by_name(match &instr.oprand[0] {
@@ -360,7 +356,7 @@ impl<'a> JITCompiler<'a> {
             MachineOprand::FrameIndex(fi) => {
                 dynasm!(self.asm; mov rax, [rbp - fo.offset(fi.idx).unwrap()])
             }
-            MachineOprand::GlobalAddress(_) | MachineOprand::Branch(_) => unreachable!(),
+            _ => unreachable!(),
         }
         dynasm!(self.asm; mov rsp, rbp; pop rbp; ret);
     }

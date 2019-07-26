@@ -50,14 +50,6 @@ impl<'a> LivenessAnalysis<'a> {
     ) {
         let instr = &cur_func.instr_arena[instr_id];
 
-        for operand in &instr.oprand {
-            match_then!(
-                MachineOprand::Instr(id),
-                operand,
-                self.set_def_instr(cur_func, bb, *id)
-            );
-        }
-
         if let MachineOpcode::Add
         | MachineOpcode::Sub
         | MachineOpcode::Seteq

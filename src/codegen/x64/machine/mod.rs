@@ -5,3 +5,4 @@ pub mod liveness;
 pub mod regalloc;
 pub mod module;
 pub mod jit;
+pub mod phi_elimination;

@@ -210,6 +210,22 @@ impl<'a> ConvertToDAG<'a> {
                     ));
                     self.instr_id_to_dag_node_id.insert(instr_id, id);
                 }
+                Opcode::Phi(ref pairs) => {
+                    let new_pairs = pairs
+                        .iter()
+                        .map(|(val, bb)| {
+                            let new_val =
+                                self.get_dag_id_from_value(dag_arena, &mut last_dag_id, val);
+                            let dag_bb = bb_to_dag_bb.get(bb).unwrap();
+                            (new_val, *dag_bb)
+                        })
+                        .collect();
+                    let id = dag_arena.alloc(DAGNode::new(
+                        DAGNodeKind::Phi(new_pairs),
+                        Some(instr.ty.clone()),
+                    ));
+                    self.instr_id_to_dag_node_id.insert(instr_id, id);
+                }
                 Opcode::Ret(ref v) => {
                     let v_id = self.get_dag_id_from_value(dag_arena, &mut last_dag_id, v);
                     let id = dag_arena.alloc(DAGNode::new(DAGNodeKind::Ret(v_id), None));
