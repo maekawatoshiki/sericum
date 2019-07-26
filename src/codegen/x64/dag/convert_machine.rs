@@ -4,10 +4,11 @@ use super::super::machine::{basic_block::*, function::*, instr::*, module::*};
 use super::{basic_block::*, function::*, module::*, node::*};
 use id_arena::*;
 use rustc_hash::FxHashMap;
+use std::{cell::RefCell, rc::Rc};
 
 pub struct ConvertToMachine<'a> {
     pub module: &'a DAGModule,
-    pub dag_node_id_to_machine_instr_id: FxHashMap<DAGNodeId, Option<MachineInstrId>>,
+    pub dag_node_id_to_machine_register: FxHashMap<DAGNodeId, Option<MachineRegister>>,
     pub dag_bb_to_machine_bb: FxHashMap<DAGBasicBlockId, MachineBasicBlockId>,
 }
 
@@ -15,7 +16,7 @@ impl<'a> ConvertToMachine<'a> {
     pub fn new(module: &'a DAGModule) -> Self {
         Self {
             module,
-            dag_node_id_to_machine_instr_id: FxHashMap::default(),
+            dag_node_id_to_machine_register: FxHashMap::default(),
             dag_bb_to_machine_bb: FxHashMap::default(),
         }
     }
@@ -29,7 +30,7 @@ impl<'a> ConvertToMachine<'a> {
     }
 
     pub fn convert_function(&mut self, dag_func: &DAGFunction) -> MachineFunction {
-        self.dag_node_id_to_machine_instr_id.clear();
+        self.dag_node_id_to_machine_register.clear();
         self.dag_bb_to_machine_bb.clear();
 
         let mut machine_bb_arena: Arena<MachineBasicBlock> = Arena::new();
@@ -63,7 +64,7 @@ impl<'a> ConvertToMachine<'a> {
                 node.entry.unwrap(),
             );
 
-            machine_bb_arena[self.get_machine_bb(dag_bb_id)].iseq = iseq;
+            machine_bb_arena[self.get_machine_bb(dag_bb_id)].iseq = Rc::new(RefCell::new(iseq));
         }
 
         MachineFunction::new(dag_func, machine_bb_arena, machine_instr_arena)
@@ -75,9 +76,9 @@ impl<'a> ConvertToMachine<'a> {
         machine_instr_arena: &mut Arena<MachineInstr>,
         iseq: &mut Vec<MachineInstrId>,
         node_id: DAGNodeId,
-    ) -> Option<MachineInstrId> {
-        if let Some(machine_instr_id) = self.dag_node_id_to_machine_instr_id.get(&node_id) {
-            return *machine_instr_id;
+    ) -> Option<MachineRegister> {
+        if let Some(machine_register) = self.dag_node_id_to_machine_register.get(&node_id) {
+            return machine_register.clone();
         }
 
         macro_rules! usual_oprand {
@@ -206,14 +207,18 @@ impl<'a> ConvertToMachine<'a> {
         };
 
         some_then!(id, machine_instr_id, { iseq.push(id) });
-        self.dag_node_id_to_machine_instr_id
-            .insert(node_id, machine_instr_id);
+        let machine_register = match machine_instr_id {
+            Some(id) => Some(MachineRegister::new(machine_instr_arena[id].reg.clone())),
+            None => None,
+        };
+        self.dag_node_id_to_machine_register
+            .insert(node_id, machine_register.clone());
 
         some_then!(next, node.next, {
             self.convert_dag(cur_func, machine_instr_arena, iseq, next);
         });
 
-        machine_instr_id
+        machine_register
     }
 
     fn usual_oprand(
@@ -234,7 +239,7 @@ impl<'a> ConvertToMachine<'a> {
             DAGNodeKind::GlobalAddress(ref g) => MachineOprand::GlobalAddress(match g {
                 GlobalValueKind::FunctionName(n) => GlobalValueInfo::FunctionName(n.clone()),
             }),
-            _ => MachineOprand::Instr(
+            _ => MachineOprand::Register(
                 self.convert_dag(cur_func, machine_instr_arena, iseq, node_id)
                     .unwrap(),
             ),

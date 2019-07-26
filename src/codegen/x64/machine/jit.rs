@@ -9,8 +9,8 @@ macro_rules! register {
         ($f.instr_arena[$instr_id].get_reg().unwrap()
          + REGISTER_OFFSET) as u8
     }};
-    ($instr:expr) => {{
-        ($instr.get_reg().unwrap() + REGISTER_OFFSET) as u8
+    ($reg:expr) => {{
+        ($reg.get_reg().unwrap() + REGISTER_OFFSET) as u8
     }};
 }
 
@@ -19,8 +19,8 @@ macro_rules! typ {
     ($f:expr; $instr_id:expr) => {{
         $f.instr_arena[$instr_id].ty.as_ref().unwrap()
     }};
-    ($instr:expr) => {{
-        $instr.ty.as_ref().unwrap()
+    ($reg:expr) => {{
+        &$reg.info_ref().ty
     }};
 }
 
@@ -135,7 +135,7 @@ impl<'a> JITCompiler<'a> {
                 dynasm!(self.asm; =>label);
             }
 
-            for instr in &bb.iseq {
+            for instr in &*bb.iseq_ref() {
                 let instr = &f.instr_arena[*instr];
                 match instr.opcode {
                     MachineOpcode::Add => self.compile_add(f, &frame_objects, instr),
@@ -143,6 +143,7 @@ impl<'a> JITCompiler<'a> {
                     MachineOpcode::Load => self.compile_load(&frame_objects, instr),
                     MachineOpcode::Store => self.compile_store(f, &frame_objects, instr),
                     MachineOpcode::Call => self.compile_call(f, &frame_objects, instr),
+                    MachineOpcode::CopyToReg => self.compile_copy2reg(f, instr),
                     MachineOpcode::BrccEq | MachineOpcode::BrccLe => self.compile_brcc(f, instr),
                     MachineOpcode::Br => self.compile_br(instr),
                     MachineOpcode::Ret => self.compile_return(f, &frame_objects, instr),
@@ -152,19 +153,26 @@ impl<'a> JITCompiler<'a> {
         }
     }
 
+    fn compile_copy2reg(&mut self, f: &MachineFunction, instr: &MachineInstr) {
+        let rn = register!(instr);
+        let op0 = &instr.oprand[0];
+        match op0 {
+            MachineOprand::Register(reg) => self.reg_copy(typ!(reg), rn, register!(reg)),
+            _ => unimplemented!(),
+        }
+    }
+
     fn compile_brcc(&mut self, f: &MachineFunction, instr: &MachineInstr) {
         let op0 = &instr.oprand[0];
         let op1 = &instr.oprand[1];
         let br = &instr.oprand[2];
         match op0 {
-            MachineOprand::Instr(i0) => match op1 {
+            MachineOprand::Register(i0) => match op1 {
                 MachineOprand::Constant(c) => match c {
-                    MachineConstant::Int32(x) => dynasm!(self.asm; cmp Rd(register!(f; *i0)), *x),
+                    MachineConstant::Int32(x) => dynasm!(self.asm; cmp Rd(register!(i0)), *x),
                 },
-                MachineOprand::Instr(i1) => match typ!(f; *i0) {
-                    Type::Int32 => {
-                        dynasm!(self.asm; cmp Rd(register!(f; *i0)), Rd(register!(f; *i1)))
-                    }
+                MachineOprand::Register(i1) => match typ!(i0) {
+                    Type::Int32 => dynasm!(self.asm; cmp Rd(register!(i0)), Rd(register!(i1))),
                     _ => unimplemented!(),
                 },
                 _ => unimplemented!(),
@@ -195,7 +203,7 @@ impl<'a> JITCompiler<'a> {
                     _ => unimplemented!(),
                 }
             }
-            MachineOprand::Instr(_) => unimplemented!(),
+            MachineOprand::Register(_) => unimplemented!(),
             _ => unreachable!(),
         }
     }
@@ -210,8 +218,8 @@ impl<'a> JITCompiler<'a> {
                     MachineOprand::Constant(c) => match c {
                         MachineConstant::Int32(i) => dynasm!(self.asm; mov DWORD [rbp - off], *i),
                     },
-                    MachineOprand::Instr(i) => match fi.ty {
-                        Type::Int32 => dynasm!(self.asm; mov [rbp - off], Rd(register!(f; *i))),
+                    MachineOprand::Register(i) => match fi.ty {
+                        Type::Int32 => dynasm!(self.asm; mov [rbp - off], Rd(register!(i))),
                         _ => unimplemented!(),
                     },
                     _ => unreachable!(),
@@ -297,14 +305,14 @@ impl<'a> JITCompiler<'a> {
         let op1 = &instr.oprand[1];
         match op0 {
             MachineOprand::FrameIndex(_) => unimplemented!(), // TODO: Address
-            MachineOprand::Instr(i0) => {
-                self.reg_copy(typ!(f; *i0), rn, register!(f; *i0));
+            MachineOprand::Register(i0) => {
+                self.reg_copy(typ!(i0), rn, register!(i0));
                 match op1 {
                     MachineOprand::Constant(c) => match c {
                         MachineConstant::Int32(x) => dynasm!(self.asm; add Rd(rn), *x),
                     },
-                    MachineOprand::Instr(i1) => match typ!(f; *i1) {
-                        Type::Int32 => dynasm!(self.asm; add Rd(rn), Rd(register!(f; *i1))),
+                    MachineOprand::Register(i1) => match typ!(i1) {
+                        Type::Int32 => dynasm!(self.asm; add Rd(rn), Rd(register!(i1))),
                         _ => unimplemented!(),
                     },
                     _ => unimplemented!(),
@@ -320,14 +328,14 @@ impl<'a> JITCompiler<'a> {
         let op1 = &instr.oprand[1];
         match op0 {
             MachineOprand::FrameIndex(_) => unimplemented!(), // TODO: Address
-            MachineOprand::Instr(i0) => {
-                self.reg_copy(typ!(f; *i0), rn, register!(f; *i0));
+            MachineOprand::Register(i0) => {
+                self.reg_copy(typ!(i0), rn, register!(i0));
                 match op1 {
                     MachineOprand::Constant(MachineConstant::Int32(x)) => {
                         dynasm!(self.asm; sub Rd(rn), *x)
                     }
-                    MachineOprand::Instr(i1) => match typ!(f; *i1) {
-                        Type::Int32 => dynasm!(self.asm; sub Rd(rn), Rd(register!(f; *i1))),
+                    MachineOprand::Register(i1) => match typ!(i1) {
+                        Type::Int32 => dynasm!(self.asm; sub Rd(rn), Rd(register!(i1))),
                         _ => unimplemented!(),
                     },
                     _ => unimplemented!(),
@@ -352,7 +360,7 @@ impl<'a> JITCompiler<'a> {
             MachineOprand::Constant(c) => match c {
                 MachineConstant::Int32(i) => dynasm!(self.asm; mov rax, *i),
             },
-            MachineOprand::Instr(i) => dynasm!(self.asm; mov rax, Ra(register!(f; *i))),
+            MachineOprand::Register(i) => dynasm!(self.asm; mov rax, Ra(register!(i))),
             MachineOprand::FrameIndex(fi) => {
                 dynasm!(self.asm; mov rax, [rbp - fo.offset(fi.idx).unwrap()])
             }
@@ -367,8 +375,8 @@ impl<'a> JITCompiler<'a> {
                 MachineOprand::Constant(MachineConstant::Int32(i)) => {
                     dynasm!(self.asm; mov Rd(reg4arg(idx).unwrap()), *i)
                 }
-                MachineOprand::Instr(id) => {
-                    self.reg_copy(typ!(f; *id), reg4arg(idx).unwrap(), register!(f; *id))
+                MachineOprand::Register(id) => {
+                    self.reg_copy(typ!(id), reg4arg(idx).unwrap(), register!(id))
                 }
                 _ => unimplemented!(),
             }

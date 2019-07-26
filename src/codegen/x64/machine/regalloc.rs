@@ -24,7 +24,7 @@ impl<'a> PhysicalRegisterAllocator<'a> {
     fn scan(&mut self, cur_func: &MachineFunction) {
         let mut used = FxHashMap::default();
         for (_, bb) in &cur_func.basic_blocks {
-            for instr_id in &bb.iseq {
+            for instr_id in &*bb.iseq_ref() {
                 self.scan_on_instr(cur_func, &mut used, *instr_id);
             }
         }
@@ -93,13 +93,13 @@ impl<'a> PhysicalRegisterAllocator<'a> {
         for (_, bb) in &cur_func.basic_blocks {
             let mut last_instr = None;
 
-            for instr_id in &bb.iseq {
+            for instr_id in &*bb.iseq_ref() {
                 self.collect_regs_on_instr(cur_func, *instr_id);
                 last_instr = Some(*instr_id);
             }
 
             for out in &bb.liveness.borrow().live_out {
-                cur_func.instr_arena[*out].set_last_use(last_instr);
+                out.set_last_use(last_instr);
             }
         }
     }
@@ -108,9 +108,9 @@ impl<'a> PhysicalRegisterAllocator<'a> {
         let instr = &cur_func.instr_arena[instr_id];
         for operand in &instr.oprand {
             match_then!(
-                MachineOprand::Instr(id),
+                MachineOprand::Register(reg),
                 operand,
-                cur_func.instr_arena[*id].set_last_use(Some(instr_id))
+                reg.set_last_use(Some(instr_id))
             );
         }
     }

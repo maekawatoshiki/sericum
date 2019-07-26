@@ -2,7 +2,10 @@ use super::basic_block::*;
 use crate::ir::types::*;
 use id_arena::*;
 // use rustc_hash::{FxHashMap, FxHashSet};
-use std::{cell::RefCell, rc::Rc};
+use std::{
+    cell::{Ref, RefCell},
+    rc::Rc,
+};
 
 pub type RegisterInfoRef = Rc<RefCell<RegisterInfo>>;
 pub type MachineInstrId = Id<MachineInstr>;
@@ -15,7 +18,7 @@ pub struct MachineInstr {
     pub reg: RegisterInfoRef,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct RegisterInfo {
     pub vreg: usize,
     pub reg: Option<usize>,
@@ -29,6 +32,7 @@ pub enum MachineOpcode {
     // Memory
     Load,
     Store,
+    CopyToReg,
 
     // Call
     Call,
@@ -56,7 +60,7 @@ pub enum MachineOpcode {
 
 #[derive(Debug, Clone)]
 pub enum MachineOprand {
-    Instr(MachineInstrId),
+    // Instr(MachineInstrId),
     Register(MachineRegister),
     Constant(MachineConstant),
     FrameIndex(FrameIndexInfo),
@@ -80,11 +84,18 @@ pub struct FrameIndexInfo {
     pub idx: i32,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct MachineRegister {
-    pub reg_info: RegisterInfoRef,
+    pub info: RegisterInfoRef,
     // pub vreg: usize,
     // pub phy_reg: usize
+}
+
+impl ::std::cmp::Eq for MachineRegister {}
+impl ::std::hash::Hash for MachineRegister {
+    fn hash<H: ::std::hash::Hasher>(&self, state: &mut H) {
+        state.write_usize(self.info.borrow().vreg)
+    }
 }
 
 impl MachineInstr {
@@ -133,8 +144,38 @@ impl FrameIndexInfo {
 }
 
 impl MachineRegister {
-    pub fn new(reg_info: RegisterInfoRef) -> Self {
-        Self { reg_info }
+    pub fn new(info: RegisterInfoRef) -> Self {
+        Self { info }
+    }
+
+    pub fn set_vreg(&self, vreg: usize) {
+        self.info.borrow_mut().vreg = vreg;
+    }
+
+    pub fn set_last_use(&self, last_use: Option<MachineInstrId>) {
+        self.info.borrow_mut().last_use = last_use;
+    }
+
+    pub fn set_phy_reg(&self, reg: usize, spill: bool) {
+        let mut reg_info = self.info.borrow_mut();
+        reg_info.reg = Some(reg);
+        reg_info.spill = spill;
+    }
+
+    pub fn get_last_use(&self) -> Option<MachineInstrId> {
+        self.info.borrow().last_use
+    }
+
+    pub fn get_vreg(&self) -> usize {
+        self.info.borrow().vreg
+    }
+
+    pub fn get_reg(&self) -> Option<usize> {
+        self.info.borrow().reg
+    }
+
+    pub fn info_ref(&self) -> Ref<RegisterInfo> {
+        self.info.borrow()
     }
 }
 

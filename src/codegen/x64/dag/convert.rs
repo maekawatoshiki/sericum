@@ -25,6 +25,8 @@ impl<'a> ConvertToDAG<'a> {
     }
 
     pub fn construct_dag(&mut self, func_id: FunctionId) -> DAGFunction {
+        self.instr_id_to_dag_node_id.clear();
+
         let func = self.module.function_ref(func_id);
         let mut dag_arena: Arena<DAGNode> = Arena::new();
         let mut dag_bb_arena: Arena<DAGBasicBlock> = Arena::new();
@@ -173,15 +175,21 @@ impl<'a> ConvertToDAG<'a> {
                         Some(instr.ty.clone()),
                     ));
                     self.instr_id_to_dag_node_id.insert(instr_id, add_id);
+                    if bb.liveness.borrow().live_out.contains(&instr_id) {
+                        make_chain!(add_id);
+                    }
                 }
                 Opcode::Sub(ref v1, ref v2) => {
                     let v1_id = self.get_dag_id_from_value(dag_arena, &mut last_dag_id, v1);
                     let v2_id = self.get_dag_id_from_value(dag_arena, &mut last_dag_id, v2);
-                    let add_id = dag_arena.alloc(DAGNode::new(
+                    let sub_id = dag_arena.alloc(DAGNode::new(
                         DAGNodeKind::Sub(v1_id, v2_id),
                         Some(instr.ty.clone()),
                     ));
-                    self.instr_id_to_dag_node_id.insert(instr_id, add_id);
+                    self.instr_id_to_dag_node_id.insert(instr_id, sub_id);
+                    if bb.liveness.borrow().live_out.contains(&instr_id) {
+                        make_chain!(sub_id);
+                    }
                 }
                 Opcode::Br(bb) => {
                     let id = dag_arena.alloc(DAGNode::new(

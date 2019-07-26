@@ -2,7 +2,10 @@
 use super::instr::*;
 use id_arena::*;
 use rustc_hash::FxHashSet;
-use std::{cell::RefCell, rc::Rc};
+use std::{
+    cell::{Ref, RefCell, RefMut},
+    rc::Rc,
+};
 
 pub type MachineBasicBlockId = Id<MachineBasicBlock>;
 
@@ -19,24 +22,32 @@ pub struct MachineBasicBlock {
     pub succ: Vec<MachineBasicBlockId>,
 
     /// Instruction list
-    pub iseq: Vec<MachineInstrId>,
+    pub iseq: Rc<RefCell<Vec<MachineInstrId>>>,
 }
 
 #[derive(Clone, Debug)]
 pub struct LivenessInfo {
-    pub def: FxHashSet<MachineInstrId>,
-    pub live_in: FxHashSet<MachineInstrId>,
-    pub live_out: FxHashSet<MachineInstrId>,
+    pub def: FxHashSet<MachineRegister>,
+    pub live_in: FxHashSet<MachineRegister>,
+    pub live_out: FxHashSet<MachineRegister>,
 }
 
 impl MachineBasicBlock {
     pub fn new() -> Self {
         Self {
-            iseq: vec![],
+            iseq: Rc::new(RefCell::new(vec![])),
             pred: vec![],
             succ: vec![],
             liveness: Rc::new(RefCell::new(LivenessInfo::new())),
         }
+    }
+
+    pub fn iseq_ref(& self) -> Ref<Vec<MachineInstrId>> {
+        self.iseq.borrow()
+    }
+
+    pub fn iseq_ref_mut(&self) -> RefMut<Vec<MachineInstrId>> {
+        self.iseq.borrow_mut()
     }
 }
 

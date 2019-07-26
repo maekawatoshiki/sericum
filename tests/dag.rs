@@ -46,17 +46,30 @@ fn dag1() {
         //     ret (i32 1);
 
         entry:
-            cond = icmp le (%arg.0), (i32 2);
-            br (%cond) l1, l2;
+            c = icmp eq (%arg.0), (i32 8);
+            br (%c) l1, l2;
         l1:
-            ret (i32 1);
+            a = add (%arg.0), (i32 2);
+            br merge;
         l2:
-            a1 = sub (%arg.0), (i32 1);
-            r1 = call func [(%a1)];
-            a2 = sub (%arg.0), (i32 2);
-            r2 = call func [(%a2)];
-            r3 = add (%r1), (%r2);
-            ret (%r3);
+            s = sub (%arg.0), (i32 1);
+            br merge;
+        merge:
+            p = phi [ [(%a), l1], [(%s), l2] ];
+            ret (%p);
+
+        // entry:
+        //     cond = icmp le (%arg.0), (i32 2);
+        //     br (%cond) l1, l2;
+        // l1:
+        //     ret (i32 1);
+        // l2:
+        //     a1 = sub (%arg.0), (i32 1);
+        //     r1 = call func [(%a1)];
+        //     a2 = sub (%arg.0), (i32 2);
+        //     r2 = call func [(%a2)];
+        //     r3 = add (%r1), (%r2);
+        //     ret (%r3);
     });
 
     println!("{}", m.function_ref(func).to_string(&m));
@@ -73,14 +86,16 @@ fn dag1() {
         }
     }
 
-    let machine_module = dag::convert_machine::ConvertToMachine::new(&dag_module).convert_module();
+    let mut machine_module =
+        dag::convert_machine::ConvertToMachine::new(&dag_module).convert_module();
     machine::liveness::LivenessAnalysis::new(&machine_module).analyze_module();
     machine::regalloc::PhysicalRegisterAllocator::new(&machine_module).run_on_module();
+    machine::phi_elimination::PhiElimination::new().run_on_module(&mut machine_module);
 
     for (_, machine_func) in &machine_module.functions {
         for (_, bb) in &machine_func.basic_blocks {
             println!("Machine basic block: {:?}", bb);
-            for instr in &bb.iseq {
+            for instr in &*bb.iseq_ref() {
                 println!("{}: {:?}", instr.index(), machine_func.instr_arena[*instr]);
             }
             println!()
@@ -92,7 +107,7 @@ fn dag1() {
     let func = machine_module.find_function_by_name("func").unwrap();
     println!(
         "ret: {:?}",
-        jit.run(func, vec![machine::jit::GenericValue::Int32(2)])
+        jit.run(func, vec![machine::jit::GenericValue::Int32(8)])
     );
     println!(
         "ret: {:?}",
