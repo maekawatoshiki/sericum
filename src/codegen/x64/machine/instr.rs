@@ -13,7 +13,7 @@ pub type MachineInstrId = Id<MachineInstr>;
 #[derive(Debug, Clone)]
 pub struct MachineInstr {
     pub opcode: MachineOpcode,
-    pub oprand: Vec<MachineOprand>,
+    pub operand: Vec<MachineOperand>,
     pub ty: Option<Type>,
     pub reg: RegisterInfoRef,
 }
@@ -59,7 +59,7 @@ pub enum MachineOpcode {
 }
 
 #[derive(Debug, Clone)]
-pub enum MachineOprand {
+pub enum MachineOperand {
     // Instr(MachineInstrId),
     Register(MachineRegister),
     Constant(MachineConstant),
@@ -99,10 +99,10 @@ impl ::std::hash::Hash for MachineRegister {
 }
 
 impl MachineInstr {
-    pub fn new(opcode: MachineOpcode, oprand: Vec<MachineOprand>, ty: Option<Type>) -> Self {
+    pub fn new(opcode: MachineOpcode, operand: Vec<MachineOperand>, ty: Option<Type>) -> Self {
         Self {
             opcode,
-            oprand,
+            operand,
             reg: Rc::new(RefCell::new(RegisterInfo::new(
                 ty.clone().unwrap_or(Type::Int32),
             ))),

@@ -85,9 +85,9 @@ impl<'a> LivenessAnalysis<'a> {
         instr_id: MachineInstrId,
     ) {
         let instr = &cur_func.instr_arena[instr_id];
-        for operand in &instr.oprand {
+        for operand in &instr.operand {
             match_then!(
-                MachineOprand::Register(reg),
+                MachineOperand::Register(reg),
                 operand,
                 self.propagate(cur_func, bb, reg)
             );

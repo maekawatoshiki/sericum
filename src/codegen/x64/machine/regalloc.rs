@@ -106,9 +106,9 @@ impl<'a> PhysicalRegisterAllocator<'a> {
 
     fn collect_regs_on_instr(&mut self, cur_func: &MachineFunction, instr_id: MachineInstrId) {
         let instr = &cur_func.instr_arena[instr_id];
-        for operand in &instr.oprand {
+        for operand in &instr.operand {
             match_then!(
-                MachineOprand::Register(reg),
+                MachineOperand::Register(reg),
                 operand,
                 reg.set_last_use(Some(instr_id))
             );

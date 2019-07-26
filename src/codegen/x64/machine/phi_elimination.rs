@@ -24,10 +24,10 @@ impl PhiElimination {
                 continue;
             };
             let mut i = 0;
-            while i < phi.oprand.len() {
-                let val = &phi.oprand[i + 0];
-                let bb = match phi.oprand[i + 1] {
-                    MachineOprand::Branch(bb) => bb,
+            while i < phi.operand.len() {
+                let val = &phi.operand[i + 0];
+                let bb = match phi.operand[i + 1] {
+                    MachineOperand::Branch(bb) => bb,
                     _ => unreachable!(),
                 };
 

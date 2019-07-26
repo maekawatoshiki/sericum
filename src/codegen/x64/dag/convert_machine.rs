@@ -123,7 +123,7 @@ impl<'a> ConvertToMachine<'a> {
                 let mut operands = vec![];
                 for (val, bb) in pairs {
                     operands.push(usual_oprand!(*val));
-                    operands.push(MachineOprand::Branch(self.get_machine_bb(*bb)));
+                    operands.push(MachineOperand::Branch(self.get_machine_bb(*bb)));
                 }
                 Some(machine_instr_arena.alloc(MachineInstr::new(
                     MachineOpcode::Phi,
@@ -163,7 +163,7 @@ impl<'a> ConvertToMachine<'a> {
             }
             DAGNodeKind::Br(dag_bb_id) => Some(machine_instr_arena.alloc(MachineInstr::new(
                 MachineOpcode::Br,
-                vec![MachineOprand::Branch(self.get_machine_bb(dag_bb_id))],
+                vec![MachineOperand::Branch(self.get_machine_bb(dag_bb_id))],
                 None,
             ))),
             DAGNodeKind::BrCond(cond, dag_bb_id) => {
@@ -172,7 +172,7 @@ impl<'a> ConvertToMachine<'a> {
                     MachineOpcode::BrCond,
                     vec![
                         new_cond,
-                        MachineOprand::Branch(self.get_machine_bb(dag_bb_id)),
+                        MachineOperand::Branch(self.get_machine_bb(dag_bb_id)),
                     ],
                     None,
                 )))
@@ -188,7 +188,7 @@ impl<'a> ConvertToMachine<'a> {
                     vec![
                         new_op0,
                         new_op1,
-                        MachineOprand::Branch(self.get_machine_bb(dag_bb_id)),
+                        MachineOperand::Branch(self.get_machine_bb(dag_bb_id)),
                     ],
                     None,
                 )))
@@ -227,19 +227,19 @@ impl<'a> ConvertToMachine<'a> {
         machine_instr_arena: &mut Arena<MachineInstr>,
         iseq: &mut Vec<MachineInstrId>,
         node_id: DAGNodeId,
-    ) -> MachineOprand {
+    ) -> MachineOperand {
         let node = &cur_func.dag_arena[node_id];
         match node.kind {
             DAGNodeKind::Constant(ConstantKind::Int32(i)) => {
-                MachineOprand::Constant(MachineConstant::Int32(i))
+                MachineOperand::Constant(MachineConstant::Int32(i))
             }
             DAGNodeKind::FrameIndex(i, ref ty) => {
-                MachineOprand::FrameIndex(FrameIndexInfo::new(ty.clone(), i))
+                MachineOperand::FrameIndex(FrameIndexInfo::new(ty.clone(), i))
             }
-            DAGNodeKind::GlobalAddress(ref g) => MachineOprand::GlobalAddress(match g {
+            DAGNodeKind::GlobalAddress(ref g) => MachineOperand::GlobalAddress(match g {
                 GlobalValueKind::FunctionName(n) => GlobalValueInfo::FunctionName(n.clone()),
             }),
-            _ => MachineOprand::Register(
+            _ => MachineOperand::Register(
                 self.convert_dag(cur_func, machine_instr_arena, iseq, node_id)
                     .unwrap(),
             ),
