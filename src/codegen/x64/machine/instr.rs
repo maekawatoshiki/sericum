@@ -60,12 +60,12 @@ pub enum MachineOpcode {
 
 #[derive(Debug, Clone)]
 pub enum MachineOperand {
-    // Instr(MachineInstrId),
     Register(MachineRegister),
     Constant(MachineConstant),
     FrameIndex(FrameIndexInfo),
     GlobalAddress(GlobalValueInfo),
     Branch(MachineBasicBlockId),
+    None,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -134,6 +134,19 @@ impl MachineInstr {
 
     pub fn get_reg(&self) -> Option<usize> {
         self.reg.borrow().reg
+    }
+}
+
+impl MachineOpcode {
+    pub fn is_terminator(&self) -> bool {
+        match self {
+            MachineOpcode::Ret
+            | MachineOpcode::Br
+            | MachineOpcode::BrCond
+            | MachineOpcode::BrccEq
+            | MachineOpcode::BrccLe => true,
+            _ => false,
+        }
     }
 }
 

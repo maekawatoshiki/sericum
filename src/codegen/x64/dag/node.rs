@@ -32,6 +32,7 @@ pub enum DAGNodeKind {
     // Register(RegisterKind),
     Constant(ConstantKind),
     GlobalAddress(GlobalValueKind),
+    None,
 }
 
 // #[derive(Debug, Clone, PartialEq)]
@@ -310,6 +311,15 @@ impl DAGNode {
                         "\ninstr{} [shape=record,shape=Mrecord,label=\"{{GlobalAddress:{:?}}}\"];",
                         self_id.index(),
                         g
+                    )
+                    .as_str(),
+                );
+            }
+            DAGNodeKind::None => {
+                s.push_str(
+                    format!(
+                        "\ninstr{} [shape=record,shape=Mrecord,label=\"{{None}}\"];",
+                        self_id.index(),
                     )
                     .as_str(),
                 );

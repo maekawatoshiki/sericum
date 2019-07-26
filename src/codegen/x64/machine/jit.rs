@@ -193,6 +193,7 @@ impl<'a> JITCompiler<'a> {
     }
 
     fn compile_load(&mut self, fo: &FrameObjectsInfo, instr: &MachineInstr) {
+        println!("{:?}", instr);
         let rn = register!(instr);
         let op0 = &instr.operand[0];
         match op0 {
@@ -364,6 +365,7 @@ impl<'a> JITCompiler<'a> {
             MachineOperand::FrameIndex(fi) => {
                 dynasm!(self.asm; mov rax, [rbp - fo.offset(fi.idx).unwrap()])
             }
+            MachineOperand::None => {}
             _ => unreachable!(),
         }
         dynasm!(self.asm; mov rsp, rbp; pop rbp; ret);

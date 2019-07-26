@@ -16,7 +16,6 @@ impl PhiElimination {
 
     pub fn run_on_function(&mut self, f: &mut MachineFunction) {
         let phi_pos = self.collect_phi(f);
-        // let mut bb_to_phi_val = FxHashMap::default();
         for (bb_id, bb) in &f.basic_blocks {
             let (phi, pos) = if let Some(phi_pos) = phi_pos.get(&bb_id) {
                 (f.instr_arena[bb.iseq_ref()[*phi_pos]].clone(), *phi_pos)
@@ -33,24 +32,20 @@ impl PhiElimination {
 
                 let mut iseq = f.basic_blocks[bb].iseq_ref_mut();
                 for k in 0..iseq.len() {
-                    match f.instr_arena[iseq[iseq.len() - 1 - k]].opcode {
-                        MachineOpcode::Ret
-                        | MachineOpcode::Br
-                        | MachineOpcode::BrCond
-                        | MachineOpcode::BrccEq
-                        | MachineOpcode::BrccLe => {}
-                        _ => {
-                            let mut copy = MachineInstr::new(
-                                MachineOpcode::CopyToReg,
-                                vec![val.clone()],
-                                phi.ty.clone(),
-                            );
-                            copy.reg = phi.reg.clone();
-                            let id = f.instr_arena.alloc(copy);
-                            let pt = iseq.len() - k;
-                            iseq.insert(pt, id);
-                            break;
-                        }
+                    if !f.instr_arena[iseq[iseq.len() - 1 - k]]
+                        .opcode
+                        .is_terminator()
+                    {
+                        let mut copy = MachineInstr::new(
+                            MachineOpcode::CopyToReg,
+                            vec![val.clone()],
+                            phi.ty.clone(),
+                        );
+                        copy.reg = phi.reg.clone();
+                        let id = f.instr_arena.alloc(copy);
+                        let pt = iseq.len() - k;
+                        iseq.insert(pt, id);
+                        break;
                     }
                 }
 

@@ -201,7 +201,8 @@ impl<'a> ConvertToMachine<'a> {
                     None,
                 )))
             }
-            DAGNodeKind::GlobalAddress(_)
+            DAGNodeKind::None
+            | DAGNodeKind::GlobalAddress(_)
             | DAGNodeKind::Constant(_)
             | DAGNodeKind::FrameIndex(_, _) => None,
         };
@@ -239,6 +240,7 @@ impl<'a> ConvertToMachine<'a> {
             DAGNodeKind::GlobalAddress(ref g) => MachineOperand::GlobalAddress(match g {
                 GlobalValueKind::FunctionName(n) => GlobalValueInfo::FunctionName(n.clone()),
             }),
+            DAGNodeKind::None => MachineOperand::None,
             _ => MachineOperand::Register(
                 self.convert_dag(cur_func, machine_instr_arena, iseq, node_id)
                     .unwrap(),

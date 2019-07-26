@@ -100,7 +100,7 @@ impl<'a> ConvertToDAG<'a> {
                     Some(f.ty.get_pointer_ty()),
                 ))
             }
-            _ => unimplemented!(),
+            Value::None => dag_arena.alloc(DAGNode::new(DAGNodeKind::None, Some(Type::Void))),
         }
     }
 
