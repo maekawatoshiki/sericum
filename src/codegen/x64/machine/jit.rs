@@ -47,6 +47,7 @@ pub struct JITCompiler<'a> {
     asm: x64::Assembler,
     function_map: FxHashMap<MachineFunctionId, DynamicLabel>,
     bb_to_label: FxHashMap<MachineBasicBlockId, DynamicLabel>,
+    internal_functions: FxHashMap<String, u64>, // name -> fn address
 }
 
 #[derive(Debug)]
@@ -62,6 +63,9 @@ impl<'a> JITCompiler<'a> {
             asm: x64::Assembler::new().unwrap(),
             function_map: FxHashMap::default(),
             bb_to_label: FxHashMap::default(),
+            internal_functions: vec![("cilk.println.i32".to_string(), cilk_println_i32_ as _)]
+                .into_iter()
+                .collect::<FxHashMap<_, _>>(),
         }
     }
 
@@ -240,7 +244,7 @@ impl<'a> JITCompiler<'a> {
             .unwrap();
         let callee_entity = self.module.function_ref(callee_id);
         let ret_ty = &callee_entity.ty.get_function_ty().unwrap().ret_ty;
-        // let mut rsp_offset = 0;
+        let mut rsp_offset = 0;
 
         // TODO
         let mut save_regs = vec![];
@@ -263,24 +267,21 @@ impl<'a> JITCompiler<'a> {
 
         for save_reg in &save_regs {
             dynasm!(self.asm; push Ra(*save_reg));
-            // rsp_offset += 8;
+            rsp_offset += 8;
         }
 
-        if !callee_entity.internal {
-            // rsp_offset += self.push_args(f, args);
-            self.assign_args_to_regs(&instr.operand[1..]);
-        }
+        // rsp_offset += self.push_args(f, args);
+        self.assign_args_to_regs(&instr.operand[1..]);
 
         if callee_entity.internal {
-            // self.assign_args_to_regs(f, args);
-            // let callee = self.internal_func.get(&callee_entity.name).unwrap();
-            // let rsp_adjust = roundup(rsp_offset as i32, 16) - rsp_offset as i32; // rsp is 16-byte aligned
-            // dynasm!(self.asm
-            //     ; sub rsp, rsp_adjust
-            //     ; mov rax, QWORD *callee as _
-            //     ; call rax
-            //     ; add rsp, rsp_adjust
-            // );
+            let callee = self.internal_functions.get(&callee_entity.name).unwrap();
+            let rsp_adjust = roundup(rsp_offset as i32, 16) - rsp_offset as i32; // rsp is 16-byte aligned
+            dynasm!(self.asm
+                ; sub rsp, rsp_adjust
+                ; mov rax, QWORD *callee as _
+                ; call rax
+                ; add rsp, rsp_adjust
+            );
         } else {
             let f_entry = self.get_function_entry_label(callee_id);
             dynasm!(self.asm; call => f_entry);
@@ -289,10 +290,6 @@ impl<'a> JITCompiler<'a> {
         match ret_ty {
             Type::Int32 => self.reg_copy(ret_ty, register!(instr), 0),
             _ => {}
-        }
-
-        if !callee_entity.internal {
-            // dynasm!(self.asm; add rsp, 8*(args.len() as i32));
         }
 
         for save_reg in save_regs.iter().rev() {
@@ -452,4 +449,10 @@ fn reg4arg(idx: usize) -> Option<u8> {
 
 fn roundup(n: i32, align: i32) -> i32 {
     (n + align - 1) & !(align - 1)
+}
+
+// Internal function cilk.println.i32
+#[no_mangle]
+extern "C" fn cilk_println_i32_(i: i32) {
+    println!("{}", i);
 }
