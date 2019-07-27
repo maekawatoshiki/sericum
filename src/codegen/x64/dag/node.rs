@@ -20,6 +20,8 @@ pub enum DAGNodeKind {
     Store(DAGNodeId, DAGNodeId), // dst, src
     Add(DAGNodeId, DAGNodeId),
     Sub(DAGNodeId, DAGNodeId),
+    Mul(DAGNodeId, DAGNodeId),
+    Rem(DAGNodeId, DAGNodeId),
     Call(DAGNodeId, Vec<DAGNodeId>),
     Phi(Vec<(DAGNodeId, DAGBasicBlockId)>),
     Setcc(CondKind, DAGNodeId, DAGNodeId),
@@ -34,12 +36,6 @@ pub enum DAGNodeKind {
     GlobalAddress(GlobalValueKind),
     None,
 }
-
-// #[derive(Debug, Clone, PartialEq)]
-// pub enum RegisterKind {
-//     VReg(VirtualRegister),
-//     Reg(usize),
-// }
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ConstantKind {
@@ -167,7 +163,11 @@ impl DAGNode {
                     arena[*arg].to_dot_sub(s, mark, *arg, arena);
                 }
             }
-            DAGNodeKind::Add(op1, op2) | DAGNodeKind::Sub(op1, op2) => {
+            DAGNodeKind::Add(op1, op2)
+            | DAGNodeKind::Sub(op1, op2)
+            | DAGNodeKind::Mul(op1, op2) 
+            | DAGNodeKind::Rem(op1, op2) 
+            => {
                 s.push_str(
                     format!(
                         "\ninstr{} [shape=record,shape=Mrecord,label=\"{{{}|{}}}\"];",
@@ -175,6 +175,8 @@ impl DAGNode {
                         match self.kind {
                             DAGNodeKind::Add(_, _) => "Add",
                             DAGNodeKind::Sub(_, _) => "Sub",
+                            DAGNodeKind::Mul(_, _) => "Mul",
+                            DAGNodeKind::Rem(_, _) => "Rem",
                             _ => "",
                         },
                         self.ty.as_ref().unwrap().to_string(),

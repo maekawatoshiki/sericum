@@ -52,6 +52,8 @@ impl<'a> LivenessAnalysis<'a> {
 
         if let MachineOpcode::Add
         | MachineOpcode::Sub
+        | MachineOpcode::Mul
+        | MachineOpcode::Rem
         | MachineOpcode::Seteq
         | MachineOpcode::Setle
         | MachineOpcode::Load = instr.opcode

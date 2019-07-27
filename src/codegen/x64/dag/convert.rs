@@ -167,28 +167,25 @@ impl<'a> ConvertToDAG<'a> {
                     make_chain!(id);
                     self.instr_id_to_dag_node_id.insert(instr_id, id);
                 }
-                Opcode::Add(ref v1, ref v2) => {
+                Opcode::Add(ref v1, ref v2)
+                | Opcode::Sub(ref v1, ref v2)
+                | Opcode::Mul(ref v1, ref v2)
+                | Opcode::Rem(ref v1, ref v2) => {
                     let v1_id = self.get_dag_id_from_value(dag_arena, &mut last_dag_id, v1);
                     let v2_id = self.get_dag_id_from_value(dag_arena, &mut last_dag_id, v2);
-                    let add_id = dag_arena.alloc(DAGNode::new(
-                        DAGNodeKind::Add(v1_id, v2_id),
+                    let bin_id = dag_arena.alloc(DAGNode::new(
+                        match instr.opcode {
+                            Opcode::Add(_, _) => DAGNodeKind::Add(v1_id, v2_id),
+                            Opcode::Sub(_, _) => DAGNodeKind::Sub(v1_id, v2_id),
+                            Opcode::Mul(_, _) => DAGNodeKind::Mul(v1_id, v2_id),
+                            Opcode::Rem(_, _) => DAGNodeKind::Rem(v1_id, v2_id),
+                            _ => unreachable!(),
+                        },
                         Some(instr.ty.clone()),
                     ));
-                    self.instr_id_to_dag_node_id.insert(instr_id, add_id);
+                    self.instr_id_to_dag_node_id.insert(instr_id, bin_id);
                     if bb.liveness.borrow().live_out.contains(&instr_id) {
-                        make_chain!(add_id);
-                    }
-                }
-                Opcode::Sub(ref v1, ref v2) => {
-                    let v1_id = self.get_dag_id_from_value(dag_arena, &mut last_dag_id, v1);
-                    let v2_id = self.get_dag_id_from_value(dag_arena, &mut last_dag_id, v2);
-                    let sub_id = dag_arena.alloc(DAGNode::new(
-                        DAGNodeKind::Sub(v1_id, v2_id),
-                        Some(instr.ty.clone()),
-                    ));
-                    self.instr_id_to_dag_node_id.insert(instr_id, sub_id);
-                    if bb.liveness.borrow().live_out.contains(&instr_id) {
-                        make_chain!(sub_id);
+                        make_chain!(bin_id);
                     }
                 }
                 Opcode::Br(bb) => {

@@ -131,20 +131,20 @@ impl<'a> ConvertToMachine<'a> {
                     node.ty.clone(),
                 )))
             }
-            DAGNodeKind::Add(op1, op2) => {
+            DAGNodeKind::Add(op1, op2)
+            | DAGNodeKind::Sub(op1, op2)
+            | DAGNodeKind::Mul(op1, op2)
+            | DAGNodeKind::Rem(op1, op2) => {
                 let new_op1 = usual_oprand!(op1);
                 let new_op2 = usual_oprand!(op2);
                 Some(machine_instr_arena.alloc(MachineInstr::new(
-                    MachineOpcode::Add,
-                    vec![new_op1, new_op2],
-                    node.ty.clone(),
-                )))
-            }
-            DAGNodeKind::Sub(op1, op2) => {
-                let new_op1 = usual_oprand!(op1);
-                let new_op2 = usual_oprand!(op2);
-                Some(machine_instr_arena.alloc(MachineInstr::new(
-                    MachineOpcode::Sub,
+                    match node.kind {
+                        DAGNodeKind::Add(_, _) => MachineOpcode::Add,
+                        DAGNodeKind::Sub(_, _) => MachineOpcode::Sub,
+                        DAGNodeKind::Mul(_, _) => MachineOpcode::Mul,
+                        DAGNodeKind::Rem(_, _) => MachineOpcode::Rem,
+                        _ => unreachable!(),
+                    },
                     vec![new_op1, new_op2],
                     node.ty.clone(),
                 )))

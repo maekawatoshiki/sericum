@@ -98,6 +98,10 @@ impl<'a> JITCompiler<'a> {
             .ret_ty
         {
             Type::Int32 => GenericValue::Int32(f() as i32),
+            Type::Void => {
+                f();
+                GenericValue::None
+            }
             _ => unimplemented!(),
         }
     }
@@ -144,6 +148,8 @@ impl<'a> JITCompiler<'a> {
                 match instr.opcode {
                     MachineOpcode::Add => self.compile_add(&frame_objects, instr),
                     MachineOpcode::Sub => self.compile_sub(&frame_objects, instr),
+                    MachineOpcode::Mul => self.compile_mul(&frame_objects, instr),
+                    MachineOpcode::Rem => self.compile_rem(&frame_objects, instr),
                     MachineOpcode::Load => self.compile_load(&frame_objects, instr),
                     MachineOpcode::Store => self.compile_store(&frame_objects, instr),
                     MachineOpcode::Call => self.compile_call(f, &frame_objects, instr),
@@ -289,7 +295,8 @@ impl<'a> JITCompiler<'a> {
 
         match ret_ty {
             Type::Int32 => self.reg_copy(ret_ty, register!(instr), 0),
-            _ => {}
+            Type::Void => {}
+            _ => unimplemented!(),
         }
 
         for save_reg in save_regs.iter().rev() {
@@ -334,6 +341,59 @@ impl<'a> JITCompiler<'a> {
                     }
                     MachineOperand::Register(i1) => match typ!(i1) {
                         Type::Int32 => dynasm!(self.asm; sub Rd(rn), Rd(register!(i1))),
+                        _ => unimplemented!(),
+                    },
+                    _ => unimplemented!(),
+                };
+            }
+            _ => unimplemented!(),
+        }
+    }
+
+    fn compile_mul(&mut self, _fo: &FrameObjectsInfo, instr: &MachineInstr) {
+        let rn = register!(instr);
+        let op0 = &instr.operand[0];
+        let op1 = &instr.operand[1];
+        match op0 {
+            MachineOperand::Register(i0) => {
+                match op1 {
+                    MachineOperand::Constant(MachineConstant::Int32(x)) => {
+                        dynasm!(self.asm; imul Rd(rn),Rd(register!(i0)), *x)
+                    }
+                    MachineOperand::Register(i1) => match typ!(i1) {
+                        Type::Int32 => {
+                            self.reg_copy(typ!(i0), rn, register!(i0));
+                            dynasm!(self.asm; imul Rd(rn), Rd(register!(i1)))
+                        }
+                        _ => unimplemented!(),
+                    },
+                    _ => unimplemented!(),
+                };
+            }
+            _ => unimplemented!(),
+        }
+    }
+
+    fn compile_rem(&mut self, _fo: &FrameObjectsInfo, instr: &MachineInstr) {
+        let rn = register!(instr);
+        let op0 = &instr.operand[0];
+        let op1 = &instr.operand[1];
+        match op0 {
+            MachineOperand::Register(i0) => {
+                self.reg_copy(typ!(i0), 0, register!(i0));
+                match op1 {
+                    MachineOperand::Constant(MachineConstant::Int32(x)) => dynasm!(self.asm
+                        ; mov Rd(rn), *x
+                        ; mov edx, 0
+                        ; idiv Rd(rn)
+                        ; mov Rd(rn), edx
+                    ),
+                    MachineOperand::Register(i1) => match typ!(i1) {
+                        Type::Int32 => dynasm!(self.asm
+                            ; mov edx, 0
+                            ; idiv Rd(register!(i1))
+                            ; mov Rd(rn), edx
+                        ),
                         _ => unimplemented!(),
                     },
                     _ => unimplemented!(),

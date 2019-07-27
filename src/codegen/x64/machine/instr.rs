@@ -40,6 +40,8 @@ pub enum MachineOpcode {
     // Binary arithmetics
     Add,
     Sub,
+    Mul,
+    Rem,
 
     // Comparison
     Seteq,
