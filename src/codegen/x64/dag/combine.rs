@@ -35,14 +35,28 @@ impl Combine {
 
         // TODO: Macro for pattern matching?
         let replaced_id = match arena[node_id].kind {
-            DAGNodeKind::BrCond(cond_id, br) => match arena[cond_id].kind {
-                DAGNodeKind::Setcc(c, op0, op1) => {
-                    let op0 = self.combine_node(replace, arena, op0);
-                    let op1 = self.combine_node(replace, arena, op1);
-                    arena.alloc(DAGNode::new(DAGNodeKind::Brcc(c, op0, op1, br), None))
+            DAGNodeKind::BrCond => {
+                let cond_id = arena[node_id].operand[0].id();
+                let br = arena[node_id].operand[1].basic_block();
+                match arena[cond_id].kind {
+                    DAGNodeKind::Setcc => {
+                        let c = arena[cond_id].operand[0].cond_kind();
+                        let op0 = self.combine_node(replace, arena, arena[cond_id].operand[1].id());
+                        let op1 = self.combine_node(replace, arena, arena[cond_id].operand[2].id());
+                        arena.alloc(DAGNode::new(
+                            DAGNodeKind::Brcc,
+                            vec![
+                                DAGNodeValue::CondKind(c),
+                                DAGNodeValue::Id(op0),
+                                DAGNodeValue::Id(op1),
+                                DAGNodeValue::BasicBlock(br),
+                            ],
+                            None,
+                        ))
+                    }
+                    _ => node_id,
                 }
-                _ => node_id,
-            },
+            }
             _ => node_id,
         };
         replace.insert(node_id, replaced_id);
