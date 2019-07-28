@@ -13,7 +13,7 @@ pub struct DAGNode {
     pub next: Option<DAGNodeId>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Copy)]
 pub enum DAGNodeKind {
     Entry,
 

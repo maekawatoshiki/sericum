@@ -33,29 +33,57 @@ impl Combine {
             return *replaced;
         }
 
+        let mut updated = false;
+        // let mut new_operands = vec![];
+        let mut new_operands = vec![];
+        for op in arena[node_id].operand.clone() {
+            new_operands.push(match op {
+                DAGNodeValue::Id(id) => {
+                    let new_id = self.combine_node(replace, arena, id);
+                    updated = id != new_id;
+                    DAGNodeValue::Id(new_id)
+                }
+                _ => op,
+            });
+        }
+        // .iter()
+        // .map(|op| match op {
+        //     DAGNodeValue::Id(id) => {
+        //         let new_id = self.combine_node(replace, arena, *id);
+        //         updated = *id != new_id;
+        //         DAGNodeValue::Id(new_id)
+        //     }
+        //     _ => op.clone(),
+        // })
+        // .collect::<Vec<DAGNodeValue>>();
+
         // TODO: Macro for pattern matching?
-        let replaced_id = match arena[node_id].kind {
+        let node = &arena[node_id];
+        let replaced_id = match &node.kind {
             DAGNodeKind::BrCond => {
-                let cond_id = arena[node_id].operand[0].id();
-                let br = arena[node_id].operand[1].basic_block();
+                let cond_id = node.operand[0].id();
+                let br = node.operand[1].clone();
                 match arena[cond_id].kind {
                     DAGNodeKind::Setcc => {
-                        let c = arena[cond_id].operand[0].cond_kind();
                         let op0 = self.combine_node(replace, arena, arena[cond_id].operand[1].id());
                         let op1 = self.combine_node(replace, arena, arena[cond_id].operand[2].id());
                         arena.alloc(DAGNode::new(
                             DAGNodeKind::Brcc,
                             vec![
-                                DAGNodeValue::CondKind(c),
+                                arena[cond_id].operand[0].clone(),
                                 DAGNodeValue::Id(op0),
                                 DAGNodeValue::Id(op1),
-                                DAGNodeValue::BasicBlock(br),
+                                br,
                             ],
                             None,
                         ))
                     }
                     _ => node_id,
                 }
+            }
+            _ if updated => {
+                let a = DAGNode::new(node.kind, new_operands, node.ty.clone());
+                arena.alloc(a)
             }
             _ => node_id,
         };
