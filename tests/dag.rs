@@ -10,13 +10,13 @@ fn dag1() {
     let mut m = module::Module::new("cilk");
 
     // Internal function must be defined when you use it
-    let cilk_println_i32 = m.add_function(ir::function::Function::new(
-        "cilk.println.i32",
-        ir::types::Type::Void,
-        vec![ir::types::Type::Int32],
-    ));
+    // let cilk_println_i32 = m.add_function(ir::function::Function::new(
+    //     "cilk.println.i32",
+    //     ir::types::Type::Void,
+    //     vec![ir::types::Type::Int32],
+    // ));
 
-    let func = cilk_ir!(m; define [i32] prime (i32) {
+    let func = cilk_ir!(m; define [i32] func (i32) {
         // entry:
         //     i = alloca i32;
         //     store (i32 10), (%i);
@@ -65,80 +65,68 @@ fn dag1() {
         //     p = phi [ [(%a), l1], [(%s), l2] ];
         //     ret (%p);
 
-        entry:
-            i = alloca i32;
-            cond = icmp eq (%arg.0), (i32 2);
-            br (%cond) l1, l2;
-        l1:
-            ret (i32 1);
-        l2:
-            r = rem (%arg.0), (i32 2);
-            cond = icmp eq (%r), (i32 0);
-            br (%cond) l3, l4;
-        l3:
-            ret (i32 0);
-        l4:
-            store (i32 3), (%i);
-            br l5;
-        l5:
-            li = load (%i);
-            m = mul (%li), (%li);
-            cond = icmp le (%m), (%arg.0);
-            br (%cond) l6, l7;
-        l6:
-            li = load (%i);
-            r = rem (%arg.0), (%li);
-            cond = icmp eq (%r), (i32 0);
-            br (%cond) l8, l9;
-        l8:
-            ret (i32 0);
-        l9:
-            a = add (%li), (i32 2);
-            store (%a), (%i);
-            br l5;
-        l7:
-            ret (i32 1);
-
         // entry:
-        //     cond = icmp le (%arg.0), (i32 2);
+        //     i = alloca i32;
+        //     cond = icmp eq (%arg.0), (i32 2);
         //     br (%cond) l1, l2;
         // l1:
         //     ret (i32 1);
         // l2:
-        //     a1 = sub (%arg.0), (i32 1);
-        //     r1 = call func [(%a1)];
-        //     a2 = sub (%arg.0), (i32 2);
-        //     r2 = call func [(%a2)];
-        //     r3 = add (%r1), (%r2);
-        //     ret (%r3);
+        //     r = rem (%arg.0), (i32 2);
+        //     cond = icmp eq (%r), (i32 0);
+        //     br (%cond) l3, l4;
+        // l3:
+        //     ret (i32 0);
+        // l4:
+        //     store (i32 3), (%i);
+        //     br l5;
+        // l5:
+        //     li = load (%i);
+        //     m = mul (%li), (%li);
+        //     cond = icmp le (%m), (%arg.0);
+        //     br (%cond) l6, l7;
+        // l6:
+        //     li = load (%i);
+        //     r = rem (%arg.0), (%li);
+        //     cond = icmp eq (%r), (i32 0);
+        //     br (%cond) l8, l9;
+        // l8:
+        //     ret (i32 0);
+        // l9:
+        //     a = add (%li), (i32 2);
+        //     store (%a), (%i);
+        //     br l5;
+        // l7:
+        //     ret (i32 1);
+
+        entry:
+            cond = icmp le (%arg.0), (i32 2);
+            br (%cond) l1, l2;
+        l1:
+            ret (i32 1);
+        l2:
+            a1 = sub (%arg.0), (i32 1);
+            r1 = call func [(%a1)];
+            a2 = sub (%arg.0), (i32 2);
+            r2 = call func [(%a2)];
+            r3 = add (%r1), (%r2);
+            ret (%r3);
     });
 
-    let main = cilk_ir!(m; define [void] main () {
-        entry:
-            i = alloca i32;
-            store (i32 2), (%i);
-            br l1;
-        l1:
-            li = load (%i);
-            c = icmp le (%li), (i32 100);
-            br (%c) l2, l3;
-        l2:
-            p = call prime [(%li)];
-            c = icmp eq (%p), (i32 1);
-            br (%c) l4, l5;
-        l4:
-            __ = call (->cilk_println_i32) [(%li)];
-            br l5;
-        l5:
-            a = add (%li), (i32 1);
-            store (%a), (%i);
-            br l1;
-        l3:
-            ret (void);
-    });
+    // let func = cilk_ir!(m; define [i32] func () {
+    //     entry:
+    //         a = alloca_ ([8; i32]);
+    //
+    //         idx = gep (%a), [(i32 0), (i32 3)];
+    //         store (i32 123), (%idx);
+    //
+    //         // idx = gep (%a), [(i32 0), (i32 3)];
+    //         // l = load (%idx);
+    //         ret (i32 0);
+    // });
 
     println!("{}", m.function_ref(func).to_string(&m));
-    println!("{}", m.function_ref(main).to_string(&m));
+    // println!("{}", m.function_ref(main).to_string(&m));
 
     let mut dag_module = dag::convert::ConvertToDAG::new(&m).convert_module();
     dag::combine::Combine::new().combine_module(&mut dag_module);
@@ -170,8 +158,11 @@ fn dag1() {
 
     let mut jit = machine::jit::JITCompiler::new(&machine_module);
     jit.compile_module();
-    let func = machine_module.find_function_by_name("main").unwrap();
-    println!("ret: {:?}", jit.run(func, vec![]));
+    let func = machine_module.find_function_by_name("func").unwrap();
+    println!(
+        "ret: {:?}",
+        jit.run(func, vec![machine::jit::GenericValue::Int32(10)])
+    );
     // println!(
     //     "ret: {:?}",
     //     jit.run(func, vec![machine::jit::GenericValue::Int32(41)])

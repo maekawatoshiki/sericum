@@ -165,9 +165,8 @@ impl DAGNode {
             }
             DAGNodeKind::Add(op1, op2)
             | DAGNodeKind::Sub(op1, op2)
-            | DAGNodeKind::Mul(op1, op2) 
-            | DAGNodeKind::Rem(op1, op2) 
-            => {
+            | DAGNodeKind::Mul(op1, op2)
+            | DAGNodeKind::Rem(op1, op2) => {
                 s.push_str(
                     format!(
                         "\ninstr{} [shape=record,shape=Mrecord,label=\"{{{}|{}}}\"];",
