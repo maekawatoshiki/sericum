@@ -92,7 +92,7 @@ impl<'a> ConvertToMachine<'a> {
         let machine_instr_id = match node.kind {
             DAGNodeKind::Entry => None,
             DAGNodeKind::Load => {
-                let new_op1 = usual_oprand!(node.operand[0].id());
+                let new_op1 = usual_oprand!(&node.operand[0]);
                 Some(machine_instr_arena.alloc(MachineInstr::new(
                     MachineOpcode::Load,
                     vec![new_op1],
@@ -100,8 +100,8 @@ impl<'a> ConvertToMachine<'a> {
                 )))
             }
             DAGNodeKind::Store => {
-                let new_dst = usual_oprand!(node.operand[0].id());
-                let new_src = usual_oprand!(node.operand[1].id());
+                let new_dst = usual_oprand!(&node.operand[0]);
+                let new_src = usual_oprand!(&node.operand[1]);
                 Some(machine_instr_arena.alloc(MachineInstr::new(
                     MachineOpcode::Store,
                     vec![new_dst, new_src],
@@ -109,10 +109,7 @@ impl<'a> ConvertToMachine<'a> {
                 )))
             }
             DAGNodeKind::Call => {
-                let mut operands = vec![usual_oprand!(node.operand[0].id())];
-                for arg in &node.operand[1..] {
-                    operands.push(usual_oprand!(arg.id()));
-                }
+                let operands = node.operand.iter().map(|a| usual_oprand!(&a)).collect();
                 Some(machine_instr_arena.alloc(MachineInstr::new(
                     MachineOpcode::Call,
                     operands,
@@ -123,7 +120,7 @@ impl<'a> ConvertToMachine<'a> {
                 let mut operands = vec![];
                 let mut i = 0;
                 while i < node.operand.len() {
-                    operands.push(usual_oprand!(node.operand[i].id()));
+                    operands.push(usual_oprand!(&node.operand[i]));
                     operands.push(MachineOperand::Branch(
                         self.get_machine_bb(node.operand[i + 1].basic_block()),
                     ));
@@ -136,8 +133,8 @@ impl<'a> ConvertToMachine<'a> {
                 )))
             }
             DAGNodeKind::Add | DAGNodeKind::Sub | DAGNodeKind::Mul | DAGNodeKind::Rem => {
-                let new_op1 = usual_oprand!(node.operand[0].id());
-                let new_op2 = usual_oprand!(node.operand[1].id());
+                let new_op1 = usual_oprand!(&node.operand[0]);
+                let new_op2 = usual_oprand!(&node.operand[1]);
                 Some(machine_instr_arena.alloc(MachineInstr::new(
                     match node.kind {
                         DAGNodeKind::Add => MachineOpcode::Add,
@@ -151,8 +148,8 @@ impl<'a> ConvertToMachine<'a> {
                 )))
             }
             DAGNodeKind::Setcc => {
-                let new_op1 = usual_oprand!(node.operand[1].id());
-                let new_op2 = usual_oprand!(node.operand[2].id());
+                let new_op1 = usual_oprand!(&node.operand[1]);
+                let new_op2 = usual_oprand!(&node.operand[2]);
                 Some(machine_instr_arena.alloc(MachineInstr::new(
                     match node.operand[0].cond_kind() {
                         CondKind::Eq => MachineOpcode::Seteq,
@@ -170,7 +167,7 @@ impl<'a> ConvertToMachine<'a> {
                 None,
             ))),
             DAGNodeKind::BrCond => {
-                let new_cond = usual_oprand!(node.operand[0].id());
+                let new_cond = usual_oprand!(&node.operand[0]);
                 Some(machine_instr_arena.alloc(MachineInstr::new(
                     MachineOpcode::BrCond,
                     vec![
@@ -181,8 +178,8 @@ impl<'a> ConvertToMachine<'a> {
                 )))
             }
             DAGNodeKind::Brcc => {
-                let new_op0 = usual_oprand!(node.operand[1].id());
-                let new_op1 = usual_oprand!(node.operand[2].id());
+                let new_op0 = usual_oprand!(&node.operand[1]);
+                let new_op1 = usual_oprand!(&node.operand[2]);
                 Some(machine_instr_arena.alloc(MachineInstr::new(
                     match node.operand[0].cond_kind() {
                         CondKind::Eq => MachineOpcode::BrccEq,
@@ -197,7 +194,7 @@ impl<'a> ConvertToMachine<'a> {
                 )))
             }
             DAGNodeKind::Ret => {
-                let new_op1 = usual_oprand!(node.operand[0].id());
+                let new_op1 = usual_oprand!(&node.operand[0]);
                 Some(machine_instr_arena.alloc(MachineInstr::new(
                     MachineOpcode::Ret,
                     vec![new_op1],
@@ -230,27 +227,27 @@ impl<'a> ConvertToMachine<'a> {
         cur_func: &DAGFunction,
         machine_instr_arena: &mut Arena<MachineInstr>,
         iseq: &mut Vec<MachineInstrId>,
-        node_id: DAGNodeId,
+        val: &DAGNodeValue,
     ) -> MachineOperand {
-        let node = &cur_func.dag_arena[node_id];
-        match node.kind {
-            DAGNodeKind::Constant => match node.operand[0].constant() {
-                ConstantKind::Int32(i) => MachineOperand::Constant(MachineConstant::Int32(i)),
+        // let node = &cur_func.dag_arena[node_id];
+        match val {
+            DAGNodeValue::Constant(c) => match c {
+                ConstantKind::Int32(i) => MachineOperand::Constant(MachineConstant::Int32(*i)),
             },
-            DAGNodeKind::FrameIndex => MachineOperand::FrameIndex({
-                let (idx, ty) = node.operand[0].frame_idx();
-                FrameIndexInfo::new(ty.clone(), idx)
-            }),
-            DAGNodeKind::GlobalAddress => {
-                MachineOperand::GlobalAddress(match node.operand[0].global_addr() {
-                    GlobalValueKind::FunctionName(n) => GlobalValueInfo::FunctionName(n.clone()),
-                })
+            DAGNodeValue::FrameIndex(idx, ty) => {
+                MachineOperand::FrameIndex({ FrameIndexInfo::new(ty.clone(), *idx) })
             }
-            DAGNodeKind::None => MachineOperand::None,
-            _ => MachineOperand::Register(
-                self.convert_dag(cur_func, machine_instr_arena, iseq, node_id)
+            DAGNodeValue::GlobalAddress(g) => match g {
+                GlobalValueKind::FunctionName(n) => {
+                    MachineOperand::GlobalAddress(GlobalValueInfo::FunctionName(n.clone()))
+                }
+            },
+            DAGNodeValue::Id(id) => MachineOperand::Register(
+                self.convert_dag(cur_func, machine_instr_arena, iseq, *id)
                     .unwrap(),
             ),
+            DAGNodeValue::None => MachineOperand::None,
+            _ => unimplemented!(),
         }
     }
 

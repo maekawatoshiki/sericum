@@ -1,7 +1,6 @@
 use super::basic_block::*;
 use crate::ir::{opcode::*, types::*};
 use id_arena::*;
-use rustc_hash::FxHashSet;
 
 pub type DAGNodeId = Id<DAGNode>;
 
@@ -18,7 +17,7 @@ pub enum DAGNodeKind {
     Entry,
 
     Load,
-    Store, // dst, src
+    Store,
     Add,
     Sub,
     Mul,
@@ -46,6 +45,7 @@ pub enum DAGNodeValue {
     Constant(ConstantKind),
     GlobalAddress(GlobalValueKind),
     BasicBlock(DAGBasicBlockId),
+    None,
 }
 
 #[derive(Debug, Clone, PartialEq, Copy)]
@@ -74,6 +74,14 @@ impl Into<CondKind> for ICmpKind {
 }
 
 impl DAGNodeValue {
+    pub fn is_id(&self) -> bool {
+        matches!(self, DAGNodeValue::Id(_))
+    }
+
+    pub fn is_constant(&self) -> bool {
+        matches!(self, DAGNodeValue::Constant(_))
+    }
+
     pub fn id(&self) -> DAGNodeId {
         match self {
             DAGNodeValue::Id(id) => *id,
@@ -113,6 +121,14 @@ impl DAGNodeValue {
         match self {
             DAGNodeValue::GlobalAddress(g) => g,
             _ => panic!(),
+        }
+    }
+}
+
+impl ConstantKind {
+    pub fn add(self, n: ConstantKind) -> ConstantKind {
+        match (self, n) {
+            (ConstantKind::Int32(x), ConstantKind::Int32(y)) => ConstantKind::Int32(x + y),
         }
     }
 }
