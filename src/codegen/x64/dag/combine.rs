@@ -62,7 +62,7 @@ impl Combine {
         }
 
         // ((a + C1) + C2) -> (a + (C1 + C2))
-        if !node!().operand[0].is_constant()
+        if node!().operand[0].is_id()
             && arena[node!().operand[0].id()].kind == DAGNodeKind::Add
             && !arena[node!().operand[0].id()].operand[0].is_constant()
             && arena[node!().operand[0].id()].operand[1].is_constant()

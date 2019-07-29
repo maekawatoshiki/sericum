@@ -82,6 +82,10 @@ impl DAGNodeValue {
         matches!(self, DAGNodeValue::Constant(_))
     }
 
+    pub fn is_frame_idx(&self) -> bool {
+        matches!(self, DAGNodeValue::FrameIndex(_, _))
+    }
+
     pub fn id(&self) -> DAGNodeId {
         match self {
             DAGNodeValue::Id(id) => *id,

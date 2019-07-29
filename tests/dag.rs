@@ -10,11 +10,11 @@ fn dag1() {
     let mut m = module::Module::new("cilk");
 
     // Internal function must be defined when you use it
-    // let cilk_println_i32 = m.add_function(ir::function::Function::new(
-    //     "cilk.println.i32",
-    //     ir::types::Type::Void,
-    //     vec![ir::types::Type::Int32],
-    // ));
+    let cilk_println_i32 = m.add_function(ir::function::Function::new(
+        "cilk.println.i32",
+        ir::types::Type::Void,
+        vec![ir::types::Type::Int32],
+    ));
 
     let func = cilk_ir!(m; define [i32] func (i32) {
         // entry:
@@ -100,10 +100,16 @@ fn dag1() {
         //     ret (i32 1);
 
         entry:
-            a = add (%arg.0), (i32 1);
-            b = add (i32 2), (%a);
-            c = add (%b), (i32 3);
-            ret (%c);
+            a = alloca_ ([2; i32]);
+            i1 = gep (%a), [(i32 0), (i32 0)];
+            i2 = gep (%a), [(i32 0), (i32 1)];
+            store (i32 123), (%i1);
+            store (i32 321), (%i2);
+            li = load (%i1);
+            __ = call (->cilk_println_i32) [(%li)];
+            li = load (%i2);
+            __ = call (->cilk_println_i32) [(%li)];
+            ret (i32 0);
 
         // entry:
         //     cond = icmp le (%arg.0), (i32 2);

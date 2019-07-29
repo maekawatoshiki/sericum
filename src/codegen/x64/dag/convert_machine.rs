@@ -92,21 +92,46 @@ impl<'a> ConvertToMachine<'a> {
         let machine_instr_id = match node.kind {
             DAGNodeKind::Entry => None,
             DAGNodeKind::Load => {
-                let new_op1 = usual_oprand!(&node.operand[0]);
-                Some(machine_instr_arena.alloc(MachineInstr::new(
-                    MachineOpcode::Load,
-                    vec![new_op1],
-                    node.ty.clone(),
-                )))
+                // TODO
+                if cur_func.dag_arena[node.operand[0].id()].kind == DAGNodeKind::Add {
+                    let add = &cur_func.dag_arena[node.operand[0].id()];
+                    let fi = usual_oprand!(&add.operand[0]);
+                    let off = usual_oprand!(&add.operand[1]);
+                    Some(machine_instr_arena.alloc(MachineInstr::new(
+                        MachineOpcode::LoadFiOff,
+                        vec![fi, off],
+                        node.ty.clone(),
+                    )))
+                } else {
+                    let new_op1 = usual_oprand!(&node.operand[0]);
+                    Some(machine_instr_arena.alloc(MachineInstr::new(
+                        MachineOpcode::Load,
+                        vec![new_op1],
+                        node.ty.clone(),
+                    )))
+                }
             }
             DAGNodeKind::Store => {
-                let new_dst = usual_oprand!(&node.operand[0]);
-                let new_src = usual_oprand!(&node.operand[1]);
-                Some(machine_instr_arena.alloc(MachineInstr::new(
-                    MachineOpcode::Store,
-                    vec![new_dst, new_src],
-                    None,
-                )))
+                // TODO
+                if cur_func.dag_arena[node.operand[0].id()].kind == DAGNodeKind::Add {
+                    let add = &cur_func.dag_arena[node.operand[0].id()];
+                    let fi = usual_oprand!(&add.operand[0]);
+                    let off = usual_oprand!(&add.operand[1]);
+                    let new_src = usual_oprand!(&node.operand[1]);
+                    Some(machine_instr_arena.alloc(MachineInstr::new(
+                        MachineOpcode::StoreFiOff,
+                        vec![fi, off, new_src],
+                        None,
+                    )))
+                } else {
+                    let new_dst = usual_oprand!(&node.operand[0]);
+                    let new_src = usual_oprand!(&node.operand[1]);
+                    Some(machine_instr_arena.alloc(MachineInstr::new(
+                        MachineOpcode::Store,
+                        vec![new_dst, new_src],
+                        None,
+                    )))
+                }
             }
             DAGNodeKind::Call => {
                 let operands = node.operand.iter().map(|a| usual_oprand!(&a)).collect();

@@ -34,6 +34,9 @@ pub enum MachineOpcode {
     Store,
     CopyToReg,
 
+    LoadFiOff,
+    StoreFiOff,
+
     // Call
     Call,
 
@@ -202,6 +205,15 @@ impl RegisterInfo {
             reg: None,
             spill: false,
             last_use: None,
+        }
+    }
+}
+
+impl MachineOperand {
+    pub fn as_frame_index(&self) -> &FrameIndexInfo {
+        match self {
+            MachineOperand::FrameIndex(fi) => fi,
+            _ => panic!(),
         }
     }
 }

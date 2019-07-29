@@ -151,7 +151,9 @@ impl<'a> JITCompiler<'a> {
                     MachineOpcode::Mul => self.compile_mul(&frame_objects, instr),
                     MachineOpcode::Rem => self.compile_rem(&frame_objects, instr),
                     MachineOpcode::Load => self.compile_load(&frame_objects, instr),
+                    MachineOpcode::LoadFiOff => self.compile_load_fi_off(&frame_objects, instr),
                     MachineOpcode::Store => self.compile_store(&frame_objects, instr),
+                    MachineOpcode::StoreFiOff => self.compile_store_fi_off(&frame_objects, instr),
                     MachineOpcode::Call => self.compile_call(f, &frame_objects, instr),
                     MachineOpcode::CopyToReg => self.compile_copy2reg(instr),
                     MachineOpcode::BrccEq | MachineOpcode::BrccLe => self.compile_brcc(instr),
@@ -203,7 +205,6 @@ impl<'a> JITCompiler<'a> {
     }
 
     fn compile_load(&mut self, fo: &FrameObjectsInfo, instr: &MachineInstr) {
-        println!("{:?}", instr);
         let rn = register!(instr);
         let op0 = &instr.operand[0];
         match op0 {
@@ -216,6 +217,22 @@ impl<'a> JITCompiler<'a> {
             }
             MachineOperand::Register(_) => unimplemented!(),
             _ => unreachable!(),
+        }
+    }
+
+    fn compile_load_fi_off(&mut self, fo: &FrameObjectsInfo, instr: &MachineInstr) {
+        let rn = register!(instr);
+        let fi = instr.operand[0].as_frame_index();
+        let off = &instr.operand[1];
+        match off {
+            MachineOperand::Constant(MachineConstant::Int32(i)) => match instr.ty.as_ref().unwrap()
+            {
+                Type::Int32 => {
+                    dynasm!(self.asm; mov Rd(rn), [rbp - fo.offset(fi.idx).unwrap() + i])
+                }
+                _ => unimplemented!(),
+            },
+            _ => unimplemented!(),
         }
     }
 
@@ -236,6 +253,28 @@ impl<'a> JITCompiler<'a> {
                     _ => unreachable!(),
                 }
             }
+            _ => unimplemented!(),
+        }
+    }
+
+    fn compile_store_fi_off(&mut self, fo: &FrameObjectsInfo, instr: &MachineInstr) {
+        let fi = fo.offset(instr.operand[0].as_frame_index().idx).unwrap();
+        let off = &instr.operand[1];
+        let src = &instr.operand[2];
+        match src {
+            MachineOperand::Constant(MachineConstant::Int32(i)) => match off {
+                MachineOperand::Constant(MachineConstant::Int32(off)) => {
+                    dynasm!(self.asm; mov DWORD [rbp - fi + off], *i)
+                }
+                _ => unimplemented!(),
+            },
+            MachineOperand::Register(r) => match off {
+                MachineOperand::Constant(MachineConstant::Int32(off)) => match r.info_ref().ty {
+                    Type::Int32 => dynasm!(self.asm; mov [rbp - fi + off], Rd(register!(r))),
+                    _ => unimplemented!(),
+                },
+                _ => unimplemented!(),
+            },
             _ => unimplemented!(),
         }
     }
