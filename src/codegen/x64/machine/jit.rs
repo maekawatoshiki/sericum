@@ -151,8 +151,14 @@ impl<'a> JITCompiler<'a> {
                     MachineOpcode::Mul => self.compile_mul(&frame_objects, instr),
                     MachineOpcode::Rem => self.compile_rem(&frame_objects, instr),
                     MachineOpcode::Load => self.compile_load(&frame_objects, instr),
+                    MachineOpcode::LoadFiConstOff => {
+                        self.compile_load_fi_const_off(&frame_objects, instr)
+                    }
                     MachineOpcode::LoadFiOff => self.compile_load_fi_off(&frame_objects, instr),
                     MachineOpcode::Store => self.compile_store(&frame_objects, instr),
+                    MachineOpcode::StoreFiConstOff => {
+                        self.compile_store_fi_const_off(&frame_objects, instr)
+                    }
                     MachineOpcode::StoreFiOff => self.compile_store_fi_off(&frame_objects, instr),
                     MachineOpcode::Call => self.compile_call(f, &frame_objects, instr),
                     MachineOpcode::CopyToReg => self.compile_copy2reg(instr),
@@ -220,7 +226,7 @@ impl<'a> JITCompiler<'a> {
         }
     }
 
-    fn compile_load_fi_off(&mut self, fo: &FrameObjectsInfo, instr: &MachineInstr) {
+    fn compile_load_fi_const_off(&mut self, fo: &FrameObjectsInfo, instr: &MachineInstr) {
         let rn = register!(instr);
         let fi = instr.operand[0].as_frame_index();
         let off = &instr.operand[1];
@@ -229,6 +235,25 @@ impl<'a> JITCompiler<'a> {
             {
                 Type::Int32 => {
                     dynasm!(self.asm; mov Rd(rn), [rbp - fo.offset(fi.idx).unwrap() + i])
+                }
+                _ => unimplemented!(),
+            },
+            _ => unimplemented!(),
+        }
+    }
+
+    fn compile_load_fi_off(&mut self, fo: &FrameObjectsInfo, instr: &MachineInstr) {
+        let rn = register!(instr);
+        let fi = instr.operand[0].as_frame_index();
+        let off = register!(instr.operand[1].as_register());
+        let align = instr.operand[2].as_constant();
+
+        match instr.ty.as_ref().unwrap() {
+            Type::Int32 => match align {
+                MachineConstant::Int32(4) => {
+                    dynasm!(self.asm;
+                    mov Rd(rn), DWORD [rbp + 4*Ra(off) - fo.offset(fi.idx).unwrap()]
+                    );
                 }
                 _ => unimplemented!(),
             },
@@ -257,7 +282,7 @@ impl<'a> JITCompiler<'a> {
         }
     }
 
-    fn compile_store_fi_off(&mut self, fo: &FrameObjectsInfo, instr: &MachineInstr) {
+    fn compile_store_fi_const_off(&mut self, fo: &FrameObjectsInfo, instr: &MachineInstr) {
         let fi = fo.offset(instr.operand[0].as_frame_index().idx).unwrap();
         let off = &instr.operand[1];
         let src = &instr.operand[2];
@@ -273,6 +298,27 @@ impl<'a> JITCompiler<'a> {
                     Type::Int32 => dynasm!(self.asm; mov [rbp - fi + off], Rd(register!(r))),
                     _ => unimplemented!(),
                 },
+                _ => unimplemented!(),
+            },
+            _ => unimplemented!(),
+        }
+    }
+
+    fn compile_store_fi_off(&mut self, fo: &FrameObjectsInfo, instr: &MachineInstr) {
+        println!("{:?}", instr.operand[0]);
+        let fi = fo.offset(instr.operand[0].as_frame_index().idx).unwrap();
+        let off = instr.operand[1].as_register();
+        let align = instr.operand[2].as_constant();
+        let src = &instr.operand[3];
+        match src {
+            MachineOperand::Constant(MachineConstant::Int32(i)) => {
+                assert_eq!(align, &MachineConstant::Int32(4));
+                dynasm!(self.asm; mov DWORD [rbp + 4*Ra(register!(off)) - fi], *i)
+            }
+            MachineOperand::Register(r) => match align {
+                MachineConstant::Int32(4) => {
+                    dynasm!(self.asm; mov DWORD [rbp + 4*Ra(register!(off)) - fi], Rd(register!(r)))
+                }
                 _ => unimplemented!(),
             },
             _ => unimplemented!(),
@@ -517,6 +563,7 @@ impl FrameObjectsInfo {
     pub fn new(f: &MachineFunction) -> Self {
         let mut offset_map = FxHashMap::default();
         let mut offset = 0;
+
         for (i, param_ty) in f.ty.get_function_ty().unwrap().params_ty.iter().enumerate() {
             offset += param_ty.size_in_byte();
             offset_map.insert(-(i as i32 + 1), offset);
@@ -525,6 +572,8 @@ impl FrameObjectsInfo {
             offset += param_ty.size_in_byte();
             offset_map.insert(i as i32 + 1, offset);
         }
+
+        when_debug!(println!("{:?}", offset_map));
 
         Self {
             offset_map,

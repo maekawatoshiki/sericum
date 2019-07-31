@@ -56,7 +56,8 @@ impl<'a> LivenessAnalysis<'a> {
         | MachineOpcode::Rem
         | MachineOpcode::Seteq
         | MachineOpcode::Setle
-        | MachineOpcode::Load = instr.opcode
+        | MachineOpcode::Load
+        | MachineOpcode::LoadFiConstOff = instr.opcode
         {
             bb.liveness
                 .borrow_mut()

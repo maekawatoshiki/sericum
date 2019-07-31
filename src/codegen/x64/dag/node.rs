@@ -7,12 +7,12 @@ pub type DAGNodeId = Id<DAGNode>;
 #[derive(Debug, Clone)]
 pub struct DAGNode {
     pub kind: DAGNodeKind,
-    pub operand: Vec<DAGNodeValue>,
+    pub operand: Vec<DAGNodeId>,
     pub ty: Option<Type>,
     pub next: Option<DAGNodeId>,
 }
 
-#[derive(Debug, Clone, PartialEq, Copy)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum DAGNodeKind {
     Entry,
 
@@ -30,9 +30,19 @@ pub enum DAGNodeKind {
     Br,
     Ret,
 
-    FrameIndex,
-    Constant,
-    GlobalAddress,
+    LoadFiConstOff,
+    LoadFiOff,
+    StoreFiConstOff,
+    StoreFiOff,
+
+    // FrameIndex,
+    // Constant,
+    // GlobalAddress,
+    CondKind(CondKind),
+    FrameIndex(i32, Type), // TODO
+    Constant(ConstantKind),
+    GlobalAddress(GlobalValueKind),
+    BasicBlock(DAGBasicBlockId),
 
     None,
 }
@@ -135,10 +145,23 @@ impl ConstantKind {
             (ConstantKind::Int32(x), ConstantKind::Int32(y)) => ConstantKind::Int32(x + y),
         }
     }
+
+    pub fn get_type(&self) -> Type {
+        match self {
+            ConstantKind::Int32(_) => Type::Int32,
+        }
+    }
+
+    pub fn is_null(&self) -> bool {
+        match self {
+            ConstantKind::Int32(0) => true,
+            _ => false,
+        }
+    }
 }
 
 impl DAGNode {
-    pub fn new(kind: DAGNodeKind, operand: Vec<DAGNodeValue>, ty: Option<Type>) -> Self {
+    pub fn new(kind: DAGNodeKind, operand: Vec<DAGNodeId>, ty: Option<Type>) -> Self {
         Self {
             kind,
             ty,
@@ -150,6 +173,47 @@ impl DAGNode {
     pub fn set_next(mut self, next: DAGNodeId) -> Self {
         self.next = Some(next);
         self
+    }
+
+    pub fn as_basic_block(&self) -> DAGBasicBlockId {
+        match self.kind {
+            DAGNodeKind::BasicBlock(bb) => bb,
+            _ => panic!(),
+        }
+    }
+
+    pub fn as_cond_kind(&self) -> CondKind {
+        match self.kind {
+            DAGNodeKind::CondKind(ck) => ck,
+            _ => panic!(),
+        }
+    }
+
+    pub fn as_constant(&self) -> ConstantKind {
+        match self.kind {
+            DAGNodeKind::Constant(c) => c,
+            _ => panic!(),
+        }
+    }
+
+    pub fn is_constant(&self) -> bool {
+        matches!(self.kind, DAGNodeKind::Constant(_))
+    }
+
+    pub fn is_frame_index(&self) -> bool {
+        matches!(self.kind, DAGNodeKind::FrameIndex(_, _))
+    }
+
+    pub fn is_operation(&self) -> bool {
+        match self.kind {
+            DAGNodeKind::CondKind(_)
+            | DAGNodeKind::FrameIndex(_, _)
+            | DAGNodeKind::Constant(_)
+            | DAGNodeKind::GlobalAddress(_)
+            | DAGNodeKind::BasicBlock(_)
+            | DAGNodeKind::None => false,
+            _ => true,
+        }
     }
 
     // pub fn to_dot(&self, self_id: DAGNodeId, arena: &Arena<DAGNode>) -> String {

@@ -101,13 +101,9 @@ fn dag1() {
 
         entry:
             a = alloca_ ([2; i32]);
-            i1 = gep (%a), [(i32 0), (i32 0)];
-            i2 = gep (%a), [(i32 0), (i32 1)];
-            store (i32 123), (%i1);
-            store (i32 321), (%i2);
-            li = load (%i1);
-            __ = call (->cilk_println_i32) [(%li)];
-            li = load (%i2);
+            i = gep (%a), [(i32 0), (%arg.0)];
+            store (i32 123), (%i);
+            li = load (%i);
             __ = call (->cilk_println_i32) [(%li)];
             ret (i32 0);
 
@@ -173,7 +169,7 @@ fn dag1() {
     let func = machine_module.find_function_by_name("func").unwrap();
     println!(
         "ret: {:?}",
-        jit.run(func, vec![machine::jit::GenericValue::Int32(10)])
+        jit.run(func, vec![machine::jit::GenericValue::Int32(1)])
     );
     // println!(
     //     "ret: {:?}",
