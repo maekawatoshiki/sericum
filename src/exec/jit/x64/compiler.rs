@@ -236,6 +236,7 @@ impl<'a> JITCompiler<'a> {
                                 }
                                 e => unimplemented!("{:?}", e),
                             },
+                            ICmpKind::Lt => {}
                         }
                     }
                     Opcode::Ret(v) => {

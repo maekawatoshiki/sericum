@@ -47,6 +47,7 @@ pub enum Opcode {
 pub enum ICmpKind {
     Eq,
     Le,
+    Lt,
     // Ne,
 }
 
@@ -170,6 +171,7 @@ impl ICmpKind {
     pub fn as_str(&self) -> &'static str {
         match self {
             ICmpKind::Eq => "eq",
+            ICmpKind::Lt => "lt",
             ICmpKind::Le => "le",
         }
     }

@@ -36,8 +36,10 @@ pub enum MachineOpcode {
 
     LoadFiConstOff,
     LoadFiOff,
+    LoadRegOff,
     StoreFiConstOff,
     StoreFiOff,
+    StoreRegOff,
 
     // Call
     Call,
@@ -51,12 +53,14 @@ pub enum MachineOpcode {
     // Comparison
     Seteq,
     Setle,
+    Setlt,
 
     // Branch
     BrCond,
     Br,
     BrccEq,
     BrccLe,
+    BrccLt,
 
     // Phi
     Phi,

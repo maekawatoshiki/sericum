@@ -102,6 +102,9 @@ macro_rules! icmp_kind {
     (eq) => {
         opcode::ICmpKind::Eq
     };
+    (lt) => {
+        opcode::ICmpKind::Lt
+    };
 }
 
 #[macro_export]

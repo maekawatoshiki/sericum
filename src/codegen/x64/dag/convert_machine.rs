@@ -94,6 +94,16 @@ impl<'a> ConvertToMachine<'a> {
 
         let machine_instr_id = match node.kind {
             DAGNodeKind::Entry => None,
+            DAGNodeKind::LoadRegOff => {
+                let fi = usual_oprand!(node.operand[0]);
+                let off = usual_oprand!(node.operand[1]);
+                let align = usual_oprand!(node.operand[2]);
+                Some(machine_instr_arena.alloc(MachineInstr::new(
+                    MachineOpcode::LoadRegOff,
+                    vec![fi, off, align],
+                    node.ty.clone(),
+                )))
+            }
             DAGNodeKind::LoadFiOff => {
                 let fi = usual_oprand!(node.operand[0]);
                 let off = usual_oprand!(node.operand[1]);
@@ -111,6 +121,17 @@ impl<'a> ConvertToMachine<'a> {
                     MachineOpcode::LoadFiConstOff,
                     vec![fi, off],
                     node.ty.clone(),
+                )))
+            }
+            DAGNodeKind::StoreRegOff => {
+                let fi = usual_oprand!(node.operand[0]);
+                let off = usual_oprand!(node.operand[1]);
+                let align = usual_oprand!(node.operand[2]);
+                let new_src = usual_oprand!(node.operand[3]);
+                Some(machine_instr_arena.alloc(MachineInstr::new(
+                    MachineOpcode::StoreRegOff,
+                    vec![fi, off, align, new_src],
+                    None,
                 )))
             }
             DAGNodeKind::StoreFiOff => {
@@ -197,6 +218,7 @@ impl<'a> ConvertToMachine<'a> {
                     match cond_kind!(node.operand[0]) {
                         CondKind::Eq => MachineOpcode::Seteq,
                         CondKind::Le => MachineOpcode::Setle,
+                        CondKind::Lt => MachineOpcode::Setlt,
                     },
                     vec![new_op1, new_op2],
                     node.ty.clone(),
@@ -227,6 +249,7 @@ impl<'a> ConvertToMachine<'a> {
                     match cond_kind!(node.operand[0]) {
                         CondKind::Eq => MachineOpcode::BrccEq,
                         CondKind::Le => MachineOpcode::BrccLe,
+                        CondKind::Lt => MachineOpcode::BrccLt,
                     },
                     vec![
                         new_op0,

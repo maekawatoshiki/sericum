@@ -128,26 +128,37 @@ impl Combine {
             ($id:expr, $i:expr) => { node!(node!($id).operand[$i])};
         }
 
-        if node_op!(0).is_operation() && node!(node!().operand[0]).kind == DAGNodeKind::Add {
+        if node_op!(0).is_operation() && node_op!(0).kind == DAGNodeKind::Add {
             let add = node!(node!().operand[0]).clone();
-            let fi = add.operand[0];
-            let off = add.operand[1];
+            let op0 = add.operand[0];
+            let op1 = add.operand[1];
 
-            if node!(fi).is_frame_index() && node!(off).is_constant() {
+            if node!(op0).is_frame_index() && node!(op1).is_constant() {
                 return arena.alloc(DAGNode::new(
                     DAGNodeKind::LoadFiConstOff,
-                    vec![fi, off],
+                    vec![op0, op1],
                     node!().ty.clone(),
                 ));
             }
 
-            if node!(fi).is_frame_index()
-                && node!(off).kind == DAGNodeKind::Mul
-                && node_op!(off, 1).is_constant()
+            if node!(op0).is_frame_index()
+                && node!(op1).kind == DAGNodeKind::Mul
+                && node_op!(op1, 1).is_constant()
             {
                 return arena.alloc(DAGNode::new(
                     DAGNodeKind::LoadFiOff,
-                    vec![fi, node!(off).operand[0], node!(off).operand[1]],
+                    vec![op0, node!(op1).operand[0], node!(op1).operand[1]],
+                    node!().ty.clone(),
+                ));
+            }
+
+            if node!(op0).is_operation()
+                && node!(op1).kind == DAGNodeKind::Mul
+                && node_op!(op1, 1).is_constant()
+            {
+                return arena.alloc(DAGNode::new(
+                    DAGNodeKind::LoadRegOff,
+                    vec![op0, node!(op1).operand[0], node!(op1).operand[1]],
                     node!().ty.clone(),
                 ));
             }
@@ -188,6 +199,17 @@ impl Combine {
             {
                 return arena.alloc(DAGNode::new(
                     DAGNodeKind::StoreFiOff,
+                    vec![op0, node!(op1).operand[0], node!(op1).operand[1], new_src],
+                    node!().ty.clone(),
+                ));
+            }
+
+            if node!(op0).is_operation()
+                && node!(op1).kind == DAGNodeKind::Mul
+                && node_op!(op1, 1).is_constant()
+            {
+                return arena.alloc(DAGNode::new(
+                    DAGNodeKind::StoreRegOff,
                     vec![op0, node!(op1).operand[0], node!(op1).operand[1], new_src],
                     node!().ty.clone(),
                 ));

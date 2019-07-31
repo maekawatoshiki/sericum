@@ -32,8 +32,10 @@ pub enum DAGNodeKind {
 
     LoadFiConstOff,
     LoadFiOff,
+    LoadRegOff,
     StoreFiConstOff,
     StoreFiOff,
+    StoreRegOff,
 
     // FrameIndex,
     // Constant,
@@ -67,6 +69,7 @@ pub enum ConstantKind {
 pub enum CondKind {
     Eq,
     Le,
+    Lt,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -79,6 +82,7 @@ impl Into<CondKind> for ICmpKind {
         match self {
             ICmpKind::Eq => CondKind::Eq,
             ICmpKind::Le => CondKind::Le,
+            ICmpKind::Lt => CondKind::Lt,
         }
     }
 }

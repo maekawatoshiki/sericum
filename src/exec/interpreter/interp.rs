@@ -118,6 +118,8 @@ impl<'a> Interpreter<'a> {
                                     .eq(get_value(&v2, &args, &mut mem)),
                                 ICmpKind::Le => get_value(&v1, &args, &mut mem)
                                     .le(get_value(&v2, &args, &mut mem)),
+                                ICmpKind::Lt => get_value(&v1, &args, &mut mem)
+                                    .lt(get_value(&v2, &args, &mut mem)),
                             };
                         mem.insert(instr_id, val);
                     }
@@ -266,6 +268,13 @@ impl ConcreteValue {
     pub fn le(self, v: ConcreteValue) -> Self {
         match (self, v) {
             (ConcreteValue::Int32(i1), ConcreteValue::Int32(i2)) => ConcreteValue::Int1(i1 <= i2),
+            _ => unimplemented!(),
+        }
+    }
+
+    pub fn lt(self, v: ConcreteValue) -> Self {
+        match (self, v) {
+            (ConcreteValue::Int32(i1), ConcreteValue::Int32(i2)) => ConcreteValue::Int1(i1 < i2),
             _ => unimplemented!(),
         }
     }

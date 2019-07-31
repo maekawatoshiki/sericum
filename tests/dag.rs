@@ -99,12 +99,39 @@ fn dag1() {
         // l7:
         //     ret (i32 1);
 
+        // for (int i = 0; i < 2; i++)
+        //   for (int k = 0; k < 2; k++)
+        //     a[i][k] = i + k;
         entry:
-            a = alloca_ ([2; i32]);
-            i = gep (%a), [(i32 0), (%arg.0)];
-            store (i32 123), (%i);
+            a = alloca_ ([2; [2; i32]]);
+            i = alloca i32;
+            k = alloca i32;
+            store (i32 0), (%i);
+            store (i32 0), (%k);
+            br l1;
+        l1:
             li = load (%i);
-            __ = call (->cilk_println_i32) [(%li)];
+            c = icmp lt (%li), (i32 2);
+            br (%c) l2, l3;
+        l2:
+            lk = load (%k);
+            c = icmp lt (%lk), (i32 2);
+            br (%c) l4, l5;
+        l4:
+            g = gep (%a), [(i32 0), (%li), (%lk)];
+            a = add (%li), (%lk);
+            store (%a), (%g);
+            a = add (%lk), (i32 1);
+            store (%a), (%k);
+            lg = load (%g);
+            __ = call (->cilk_println_i32) [(%lg)];
+            br l2;
+        l5:
+            store (i32 0), (%k);
+            a = add (%li), (i32 1);
+            store (%a), (%i);
+            br l1;
+        l3:
             ret (i32 0);
 
         // entry:
