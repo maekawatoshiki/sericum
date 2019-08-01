@@ -379,28 +379,28 @@ impl<'a> JITCompiler<'a> {
         let mut rsp_offset = 0;
 
         // TODO
-        let mut save_regs = vec![];
-        for (_, i) in &f.instr_arena {
-            // TODO
-            if i.reg.borrow().reg.is_none() {
-                continue;
-            }
-            let bgn = vregister!(i);
-            let end = match i.reg.borrow().last_use {
-                Some(last_use) => vregister!(f; last_use),
-                None => continue,
-            };
-            if bgn < vregister!(instr) && vregister!(instr) < end {
-                save_regs.push(register!(i));
-            }
-        }
+        // let mut save_regs = vec![];
+        // for (_, i) in &f.instr_arena {
+        //     // TODO
+        //     if i.reg.borrow().reg.is_none() {
+        //         continue;
+        //     }
+        //     let bgn = vregister!(i);
+        //     let end = match i.reg.borrow().last_use {
+        //         Some(last_use) => vregister!(f; last_use),
+        //         None => continue,
+        //     };
+        //     if bgn < vregister!(instr) && vregister!(instr) < end {
+        //         save_regs.push(register!(i));
+        //     }
+        // }
 
-        when_debug!(println!("saved register: {:?}", save_regs));
+        // when_debug!(println!("saved register: {:?}", save_regs));
 
-        for save_reg in &save_regs {
-            dynasm!(self.asm; push Ra(*save_reg));
-            rsp_offset += 8;
-        }
+        // for save_reg in &save_regs {
+        //     dynasm!(self.asm; push Ra(*save_reg));
+        //     rsp_offset += 8;
+        // }
 
         // rsp_offset += self.push_args(f, args);
         self.assign_args_to_regs(&instr.operand[1..]);
@@ -425,9 +425,9 @@ impl<'a> JITCompiler<'a> {
             _ => unimplemented!(),
         }
 
-        for save_reg in save_regs.iter().rev() {
-            dynasm!(self.asm; pop Ra(*save_reg));
-        }
+        // for save_reg in save_regs.iter().rev() {
+        //     dynasm!(self.asm; pop Ra(*save_reg));
+        // }
     }
 
     fn compile_add(&mut self, fo: &FrameObjectsInfo, instr: &MachineInstr) {
