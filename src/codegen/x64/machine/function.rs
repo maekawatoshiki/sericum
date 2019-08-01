@@ -1,5 +1,5 @@
 use super::super::dag::function::*;
-use super::{basic_block::*, instr::*};
+use super::{basic_block::*, frame_object::*, instr::*};
 use crate::ir::types::*;
 use id_arena::*;
 
@@ -22,8 +22,9 @@ pub struct MachineFunction {
     /// True if internal function
     pub internal: bool,
 
-    /// Objects on stack
-    pub locals_ty: Vec<Type>,
+    /// Local variables types
+    // pub locals_ty: Vec<Type>,
+    pub local_mgr: LocalVariableManager,
 }
 
 impl MachineFunction {
@@ -38,7 +39,19 @@ impl MachineFunction {
             instr_arena,
             basic_blocks,
             internal: f.internal,
-            locals_ty: f.locals_ty.clone(),
+            // locals_ty: f.locals_ty.clone(),
+            local_mgr: f.local_mgr.clone(),
         }
     }
+
+    pub fn find_instr_pos(&self, instr_id: MachineInstrId) -> Option<(MachineBasicBlockId, usize)> {
+        for (bb_id, bb) in &self.basic_blocks {
+            if let Some(pos) = bb.find_instr_pos(instr_id) {
+                return Some((bb_id, pos));
+            }
+        }
+        None
+    }
+
+    // pub fn add_
 }

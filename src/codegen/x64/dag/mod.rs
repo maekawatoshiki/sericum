@@ -5,3 +5,4 @@ pub mod basic_block;
 pub mod module;
 pub mod function;
 pub mod combine;
+pub use super::frame_object;

@@ -1,4 +1,4 @@
-use super::{basic_block::*, function::*, module::*, node::*};
+use super::{basic_block::*, frame_object::*, function::*, module::*, node::*};
 use crate::ir::{basic_block::*, function::*, module::*, opcode::*, types::*, value::*};
 use id_arena::*;
 use rustc_hash::FxHashMap;
@@ -11,7 +11,7 @@ pub struct ConvertToDAG<'a> {
 
 pub struct ConversionInfo {
     pub dag_arena: Arena<DAGNode>,
-    pub locals_ty: Vec<Type>,
+    pub local_mgr: LocalVariableManager,
     pub bb_to_dag_bb: FxHashMap<BasicBlockId, DAGBasicBlockId>,
     pub last_chain_node: Option<DAGNodeId>,
 }
@@ -58,7 +58,7 @@ impl<'a> ConvertToDAG<'a> {
         }
 
         let conv_info = ::std::mem::replace(&mut self.cur_conversion_info, None).unwrap();
-        DAGFunction::new(func, conv_info.dag_arena, dag_bb_arena, conv_info.locals_ty)
+        DAGFunction::new(func, conv_info.dag_arena, dag_bb_arena, conv_info.local_mgr)
     }
 
     pub fn get_dag_id_from_value(&mut self, v: &Value, arg_load: bool) -> DAGNodeId {
@@ -115,7 +115,6 @@ impl<'a> ConvertToDAG<'a> {
         func: &Function,
         bb: &BasicBlock,
     ) -> DAGNodeId {
-        let mut local_count = 0i32;
         let entry_node = self.cur_conv_info_mut().dag_arena.alloc(DAGNode::new(
             DAGNodeKind::Entry,
             vec![],
@@ -140,11 +139,10 @@ impl<'a> ConvertToDAG<'a> {
 
             match instr.opcode {
                 Opcode::Alloca(ref ty) => {
-                    local_count += 1;
                     let fi = self.cur_conv_info_mut_with(|c| {
-                        c.locals_ty.push(ty.clone());
+                        let frinfo = c.local_mgr.alloc(ty);
                         c.dag_arena.alloc(DAGNode::new(
-                            DAGNodeKind::FrameIndex(local_count, ty.clone()),
+                            DAGNodeKind::FrameIndex(frinfo.idx, frinfo.ty), // TODO
                             vec![],
                             Some(ty.clone()),
                         ))
@@ -389,7 +387,7 @@ impl ConversionInfo {
     pub fn new() -> Self {
         ConversionInfo {
             dag_arena: Arena::new(),
-            locals_ty: vec![],
+            local_mgr: LocalVariableManager::new(),
             bb_to_dag_bb: FxHashMap::default(),
             last_chain_node: None,
         }

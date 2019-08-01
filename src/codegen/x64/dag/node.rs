@@ -37,26 +37,12 @@ pub enum DAGNodeKind {
     StoreFiOff,
     StoreRegOff,
 
-    // FrameIndex,
-    // Constant,
-    // GlobalAddress,
     CondKind(CondKind),
     FrameIndex(i32, Type), // TODO
     Constant(ConstantKind),
     GlobalAddress(GlobalValueKind),
     BasicBlock(DAGBasicBlockId),
 
-    None,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum DAGNodeValue {
-    Id(DAGNodeId),
-    CondKind(CondKind),
-    FrameIndex(i32, Type), // TODO
-    Constant(ConstantKind),
-    GlobalAddress(GlobalValueKind),
-    BasicBlock(DAGBasicBlockId),
     None,
 }
 
@@ -83,62 +69,6 @@ impl Into<CondKind> for ICmpKind {
             ICmpKind::Eq => CondKind::Eq,
             ICmpKind::Le => CondKind::Le,
             ICmpKind::Lt => CondKind::Lt,
-        }
-    }
-}
-
-impl DAGNodeValue {
-    pub fn is_id(&self) -> bool {
-        matches!(self, DAGNodeValue::Id(_))
-    }
-
-    pub fn is_constant(&self) -> bool {
-        matches!(self, DAGNodeValue::Constant(_))
-    }
-
-    pub fn is_frame_idx(&self) -> bool {
-        matches!(self, DAGNodeValue::FrameIndex(_, _))
-    }
-
-    pub fn id(&self) -> DAGNodeId {
-        match self {
-            DAGNodeValue::Id(id) => *id,
-            _ => panic!(),
-        }
-    }
-
-    pub fn cond_kind(&self) -> CondKind {
-        match self {
-            DAGNodeValue::CondKind(c) => *c,
-            _ => panic!(),
-        }
-    }
-
-    pub fn basic_block(&self) -> DAGBasicBlockId {
-        match self {
-            DAGNodeValue::BasicBlock(id) => *id,
-            _ => panic!(),
-        }
-    }
-
-    pub fn constant(&self) -> ConstantKind {
-        match self {
-            DAGNodeValue::Constant(c) => *c,
-            _ => panic!(),
-        }
-    }
-
-    pub fn frame_idx(&self) -> (i32, &Type) {
-        match self {
-            DAGNodeValue::FrameIndex(idx, ty) => (*idx, ty),
-            _ => panic!(),
-        }
-    }
-
-    pub fn global_addr(&self) -> &GlobalValueKind {
-        match self {
-            DAGNodeValue::GlobalAddress(g) => g,
-            _ => panic!(),
         }
     }
 }

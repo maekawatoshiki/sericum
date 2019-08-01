@@ -1,8 +1,10 @@
-pub mod instr;
 pub mod basic_block;
+pub mod builder;
 pub mod function;
-pub mod liveness;
-pub mod regalloc;
-pub mod module;
+pub mod instr;
 pub mod jit;
+pub mod liveness;
+pub mod module;
 pub mod phi_elimination;
+pub mod regalloc;
+pub use super::frame_object;

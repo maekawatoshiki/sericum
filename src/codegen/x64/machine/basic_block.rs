@@ -42,12 +42,21 @@ impl MachineBasicBlock {
         }
     }
 
-    pub fn iseq_ref(& self) -> Ref<Vec<MachineInstrId>> {
+    pub fn iseq_ref(&self) -> Ref<Vec<MachineInstrId>> {
         self.iseq.borrow()
     }
 
     pub fn iseq_ref_mut(&self) -> RefMut<Vec<MachineInstrId>> {
         self.iseq.borrow_mut()
+    }
+
+    pub fn find_instr_pos(&self, instr_id_to_find: MachineInstrId) -> Option<usize> {
+        for (i, instr_id) in self.iseq_ref().iter().enumerate() {
+            if instr_id == &instr_id_to_find {
+                return Some(i);
+            }
+        }
+        None
     }
 }
 

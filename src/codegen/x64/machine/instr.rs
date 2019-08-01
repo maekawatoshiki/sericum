@@ -1,4 +1,4 @@
-use super::basic_block::*;
+use super::{basic_block::*, frame_object::*};
 use crate::ir::types::*;
 use id_arena::*;
 // use rustc_hash::{FxHashMap, FxHashSet};
@@ -89,12 +89,6 @@ pub enum GlobalValueInfo {
     FunctionName(String),
 }
 
-#[derive(Debug, Clone)]
-pub struct FrameIndexInfo {
-    pub ty: Type,
-    pub idx: i32,
-}
-
 #[derive(Debug, Clone, PartialEq)]
 pub struct MachineRegister {
     pub info: RegisterInfoRef,
@@ -158,12 +152,6 @@ impl MachineOpcode {
             | MachineOpcode::BrccLe => true,
             _ => false,
         }
-    }
-}
-
-impl FrameIndexInfo {
-    pub fn new(ty: Type, idx: i32) -> Self {
-        Self { ty, idx }
     }
 }
 

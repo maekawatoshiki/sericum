@@ -1,4 +1,4 @@
-use super::{basic_block::*, function::*, instr::*, module::*};
+use super::{basic_block::*, frame_object::*, function::*, instr::*, module::*};
 use crate::ir::types::*;
 use dynasmrt::*;
 use rustc_hash::FxHashMap;
@@ -21,16 +21,6 @@ macro_rules! typ {
     }};
     ($reg:expr) => {{
         &$reg.info_ref().ty
-    }};
-}
-
-#[rustfmt::skip]
-macro_rules! vregister {
-    ($f:expr ; $instr_id:expr) => {{
-        $f.instr_arena[$instr_id].reg.borrow().vreg
-    }};
-    ($instr:expr) => {{
-        $instr.reg.borrow().vreg
     }};
 }
 
@@ -162,7 +152,7 @@ impl<'a> JITCompiler<'a> {
                     }
                     MachineOpcode::StoreFiOff => self.compile_store_fi_off(&frame_objects, instr),
                     MachineOpcode::StoreRegOff => self.compile_store_reg_off(&frame_objects, instr),
-                    MachineOpcode::Call => self.compile_call(f, &frame_objects, instr),
+                    MachineOpcode::Call => self.compile_call(&frame_objects, instr),
                     MachineOpcode::CopyToReg => self.compile_copy2reg(instr),
                     MachineOpcode::BrccEq | MachineOpcode::BrccLe | MachineOpcode::BrccLt => {
                         self.compile_brcc(instr)
@@ -366,7 +356,7 @@ impl<'a> JITCompiler<'a> {
         }
     }
 
-    fn compile_call(&mut self, f: &MachineFunction, _fo: &FrameObjectsInfo, instr: &MachineInstr) {
+    fn compile_call(&mut self, _fo: &FrameObjectsInfo, instr: &MachineInstr) {
         let callee_id = self
             .module
             .find_function_by_name(match &instr.operand[0] {
@@ -376,7 +366,7 @@ impl<'a> JITCompiler<'a> {
             .unwrap();
         let callee_entity = self.module.function_ref(callee_id);
         let ret_ty = &callee_entity.ty.get_function_ty().unwrap().ret_ty;
-        let mut rsp_offset = 0;
+        let rsp_offset = 0;
 
         // TODO
         // let mut save_regs = vec![];
@@ -622,9 +612,10 @@ impl FrameObjectsInfo {
             offset += param_ty.size_in_byte();
             offset_map.insert(-(i as i32 + 1), offset);
         }
-        for (i, param_ty) in f.locals_ty.iter().enumerate() {
-            offset += param_ty.size_in_byte();
-            offset_map.insert(i as i32 + 1, offset);
+
+        for FrameIndexInfo { idx, ty } in &f.local_mgr.locals {
+            offset += ty.size_in_byte();
+            offset_map.insert(*idx, offset);
         }
 
         Self {

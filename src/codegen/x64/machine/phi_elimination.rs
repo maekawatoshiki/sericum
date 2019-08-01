@@ -15,6 +15,7 @@ impl PhiElimination {
     }
 
     pub fn run_on_function(&mut self, f: &mut MachineFunction) {
+        // TODO: Rewrite with MachineInstr Builder
         let phi_pos = self.collect_phi(f);
         for (bb_id, bb) in &f.basic_blocks {
             let (phi, pos) = if let Some(phi_pos) = phi_pos.get(&bb_id) {

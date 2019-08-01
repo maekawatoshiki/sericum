@@ -1,4 +1,5 @@
 pub mod dag;
+pub mod frame_object;
 pub mod machine;
 
 use crate::ir::types::*;
