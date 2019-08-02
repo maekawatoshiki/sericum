@@ -6,30 +6,28 @@ use id_arena::*;
 use rustc_hash::FxHashMap;
 use std::{cell::RefCell, rc::Rc};
 
-pub struct ConvertToMachine<'a> {
-    pub module: &'a DAGModule,
+pub struct ConvertToMachine {
     pub dag_node_id_to_machine_register: FxHashMap<DAGNodeId, Option<MachineRegister>>,
     pub dag_bb_to_machine_bb: FxHashMap<DAGBasicBlockId, MachineBasicBlockId>,
 }
 
-impl<'a> ConvertToMachine<'a> {
-    pub fn new(module: &'a DAGModule) -> Self {
+impl ConvertToMachine {
+    pub fn new() -> Self {
         Self {
-            module,
             dag_node_id_to_machine_register: FxHashMap::default(),
             dag_bb_to_machine_bb: FxHashMap::default(),
         }
     }
 
-    pub fn convert_module(&mut self) -> MachineModule {
-        let mut machine_module = MachineModule::new(self.module.name.as_str());
-        for (_, func) in &self.module.functions {
+    pub fn convert_module(&mut self, module: DAGModule) -> MachineModule {
+        let mut machine_module = MachineModule::new(module.name.as_str());
+        for (_, func) in module.functions {
             machine_module.add_function(self.convert_function(func));
         }
         machine_module
     }
 
-    pub fn convert_function(&mut self, dag_func: &DAGFunction) -> MachineFunction {
+    pub fn convert_function(&mut self, dag_func: DAGFunction) -> MachineFunction {
         self.dag_node_id_to_machine_register.clear();
         self.dag_bb_to_machine_bb.clear();
 

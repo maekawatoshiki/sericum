@@ -1,4 +1,6 @@
-use super::{basic_block::*, frame_object::*, function::*, instr::*, module::*};
+use crate::codegen::x64::machine::{
+    basic_block::*, frame_object::*, function::*, instr::*, module::*,
+};
 use crate::ir::types::*;
 use dynasmrt::*;
 use rustc_hash::FxHashMap;
@@ -644,6 +646,6 @@ fn roundup(n: i32, align: i32) -> i32 {
 
 // Internal function cilk.println.i32
 #[no_mangle]
-extern "C" fn cilk_println_i32_(i: i32) {
+pub extern "C" fn cilk_println_i32_(i: i32) {
     println!("{}", i);
 }

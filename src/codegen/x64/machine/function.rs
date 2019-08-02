@@ -22,25 +22,23 @@ pub struct MachineFunction {
     /// True if internal function
     pub internal: bool,
 
-    /// Local variables types
-    // pub locals_ty: Vec<Type>,
+    /// Local variables info
     pub local_mgr: LocalVariableManager,
 }
 
 impl MachineFunction {
     pub fn new(
-        f: &DAGFunction,
+        f: DAGFunction,
         basic_blocks: Arena<MachineBasicBlock>,
         instr_arena: Arena<MachineInstr>,
     ) -> Self {
         Self {
-            name: f.name.clone(),
-            ty: f.ty.clone(),
+            name: f.name,
+            ty: f.ty,
             instr_arena,
             basic_blocks,
             internal: f.internal,
-            // locals_ty: f.locals_ty.clone(),
-            local_mgr: f.local_mgr.clone(),
+            local_mgr: f.local_mgr,
         }
     }
 
