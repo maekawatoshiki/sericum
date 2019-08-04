@@ -102,7 +102,8 @@ impl PhysicalRegisterAllocator {
         let mut used = FxHashMap::default();
         let mut call_instr_id = vec![];
 
-        for (_, bb) in &cur_func.basic_blocks {
+        for bb_id in &cur_func.basic_blocks {
+            let bb = &cur_func.basic_block_arena[*bb_id];
             for instr_id in bb.iseq_ref().iter() {
                 self.scan_on_instr(cur_func, &mut used, *instr_id);
 
@@ -184,7 +185,8 @@ impl PhysicalRegisterAllocator {
     }
 
     fn collect_regs(&mut self, cur_func: &MachineFunction) {
-        for (_, bb) in &cur_func.basic_blocks {
+        for bb_id in &cur_func.basic_blocks {
+            let bb = &cur_func.basic_block_arena[*bb_id];
             let mut last_instr = None;
 
             for instr_id in &*bb.iseq_ref() {

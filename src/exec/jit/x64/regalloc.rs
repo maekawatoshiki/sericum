@@ -31,7 +31,7 @@ impl<'a> RegisterAllocator<'a> {
         let mut used = FxHashMap::default();
         let num_reg = 5;
 
-        for (_, bb) in &f.basic_blocks {
+        for (_, bb) in &f.basic_block_arena {
             for instr_val in &*bb.iseq_ref() {
                 let instr_id = instr_val.get_instr_id().unwrap();
                 let instr = &f.instr_table[instr_id];
@@ -98,7 +98,7 @@ impl<'a> RegisterAllocator<'a> {
     pub fn collect_regs(&mut self, f: &Function) {
         let mut last_instr = None;
 
-        for (_, bb) in &f.basic_blocks {
+        for (_, bb) in &f.basic_block_arena {
             for instr_val in &*bb.iseq_ref() {
                 let instr_id = instr_val.get_instr_id().unwrap();
                 let instr = &f.instr_table[instr_id];

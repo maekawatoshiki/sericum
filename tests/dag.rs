@@ -144,17 +144,37 @@ fn dag1() {
         //     ret (i32 0);
 
         entry:
-            cond = icmp le (%arg.0), (i32 2);
-            br (%cond) l1, l2;
-        l1:
-            ret (i32 1);
+            i = alloca i32;
+            store (i32 1), (%i);
+            li = load (%i);
+            c = icmp eq (%li), (i32 2);
+            br (%c) l1, l2;
         l2:
-            a1 = sub (%arg.0), (i32 1);
-            r1 = call func [(%a1)];
-            a2 = sub (%arg.0), (i32 2);
-            r2 = call func [(%a2)];
-            r3 = add (%r1), (%r2);
-            ret (%r3);
+            b = add (%li), (i32 2);
+            br l3;
+        l1:
+            a = add (%li), (i32 1);
+            br merge;
+        l3:
+            x = add (%b), (i32 3);
+            br merge;
+        merge:
+            p = phi [ [(%a), l1], [(%x), l3] ];
+            __ = call (->cilk_println_i32) [(%p)];
+            ret (i32 0);
+
+        // entry:
+        //     cond = icmp le (%arg.0), (i32 2);
+        //     br (%cond) l1, l2;
+        // l1:
+        //     ret (i32 1);
+        // l2:
+        //     a1 = sub (%arg.0), (i32 1);
+        //     r1 = call func [(%a1)];
+        //     a2 = sub (%arg.0), (i32 2);
+        //     r2 = call func [(%a2)];
+        //     r3 = add (%r1), (%r2);
+        //     ret (%r3);
     });
 
     // let func = cilk_ir!(m; define [i32] func () {
@@ -176,7 +196,8 @@ fn dag1() {
     dag::combine::Combine::new().combine_module(&mut dag_module);
     println!("DAG:");
     for (_, dag_func) in &dag_module.functions {
-        for (id, bb) in &dag_func.dag_basic_blocks {
+        for id in &dag_func.dag_basic_blocks {
+            let bb = &dag_func.dag_basic_block_arena[*id];
             println!("{}: {:?}", id.index(), bb);
         }
         for (id, dag) in &dag_func.dag_arena {
@@ -191,7 +212,8 @@ fn dag1() {
     machine::phi_elimination::PhiElimination::new().run_on_module(&mut machine_module);
 
     for (_, machine_func) in &machine_module.functions {
-        for (_, bb) in &machine_func.basic_blocks {
+        for bb_id in &machine_func.basic_blocks {
+            let bb = &machine_func.basic_block_arena[*bb_id];
             println!("Machine basic block: {:?}", bb);
             for instr in &*bb.iseq_ref() {
                 println!("{}: {:?}", instr.index(), machine_func.instr_arena[*instr]);

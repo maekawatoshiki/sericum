@@ -146,7 +146,7 @@ impl<'a> JITCompiler<'a> {
 
         let mut bbs: FxHashMap<BasicBlockId, DynamicLabel> = FxHashMap::default();
 
-        for (bb_id, bb) in &f.basic_blocks {
+        for (bb_id, bb) in &f.basic_block_arena {
             if bb_id.index() != 0 {
                 let label = *bbs
                     .entry(bb_id)
@@ -551,7 +551,7 @@ impl<'a> JITCompiler<'a> {
     }
 
     fn collect_alloca(&mut self, f: &Function) {
-        for (_, bb) in &f.basic_blocks {
+        for (_, bb) in &f.basic_block_arena {
             for val in &*bb.iseq.borrow() {
                 let instr_id = val.get_instr_id().unwrap();
                 let instr = &f.instr_table[instr_id];
@@ -563,7 +563,7 @@ impl<'a> JITCompiler<'a> {
     }
 
     fn collect_phi(&mut self, f: &Function) {
-        for (_, bb) in &f.basic_blocks {
+        for (_, bb) in &f.basic_block_arena {
             for val in &*bb.iseq.borrow() {
                 let instr_id = val.get_instr_id().unwrap();
                 let instr = &f.instr_table[instr_id];

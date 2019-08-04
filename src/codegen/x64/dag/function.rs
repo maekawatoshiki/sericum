@@ -12,8 +12,11 @@ pub struct DAGFunction {
     /// Function type
     pub ty: Type,
 
-    /// DAG Basic blocks
-    pub dag_basic_blocks: Arena<DAGBasicBlock>,
+    /// DAG Basic block arena
+    pub dag_basic_block_arena: Arena<DAGBasicBlock>,
+
+    /// DAG Basic blocks list
+    pub dag_basic_blocks: Vec<DAGBasicBlockId>,
 
     /// DAG node arena
     pub dag_arena: Arena<DAGNode>,
@@ -28,12 +31,14 @@ impl DAGFunction {
     pub fn new(
         func: &Function,
         dag_arena: Arena<DAGNode>,
-        dag_basic_blocks: Arena<DAGBasicBlock>,
+        dag_basic_block_arena: Arena<DAGBasicBlock>,
+        dag_basic_blocks: Vec<DAGBasicBlockId>,
         local_mgr: LocalVariableManager,
     ) -> Self {
         Self {
             name: func.name.clone(),
             ty: func.ty.clone(),
+            dag_basic_block_arena,
             dag_basic_blocks,
             dag_arena,
             internal: func.internal,

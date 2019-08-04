@@ -15,7 +15,7 @@ impl DeadCodeEliminationPass {
     }
 
     pub fn run_on_function(&mut self, f: &Function) {
-        for (_, bb) in &f.basic_blocks {
+        for (_, bb) in &f.basic_block_arena {
             bb.iseq_ref_mut().drain_filter(|instr_val| {
                 let instr = &f.instr_table[instr_val.get_instr_id().unwrap()];
                 instr.can_be_eliminated()

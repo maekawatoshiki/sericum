@@ -39,26 +39,32 @@ impl<'a> ConvertToDAG<'a> {
 
         let func = self.module.function_ref(func_id);
         let mut dag_bb_arena: Arena<DAGBasicBlock> = Arena::new();
+        let mut dag_bb_list: Vec<DAGBasicBlockId> = vec![];
 
-        for (bb_id, _) in &func.basic_blocks {
+        for bb_id in &func.basic_blocks {
+            let dag_bb_id = dag_bb_arena.alloc(DAGBasicBlock::new());
             self.cur_conv_info_mut()
                 .bb_to_dag_bb
-                .insert(bb_id, dag_bb_arena.alloc(DAGBasicBlock::new()));
+                .insert(*bb_id, dag_bb_id);
+            dag_bb_list.push(dag_bb_id);
         }
 
         self.set_dag_bb_pred_and_succ(func, &mut dag_bb_arena);
 
-        for (bb_id, bb) in &func.basic_blocks {
+        for bb_id in &func.basic_blocks {
+            let bb = &func.basic_block_arena[*bb_id];
             let id = self.construct_dag_from_basic_block(func, bb);
-            dag_bb_arena[self.cur_conv_info_ref().get_dag_bb(bb_id)].set_entry(id);
-            // when_debug!({
-            //     let dag_arena = &self.cur_conv_info_mut().dag_arena;
-            //     println!("{}", dag_arena[id].to_dot(id, dag_arena))
-            // });
+            dag_bb_arena[self.cur_conv_info_ref().get_dag_bb(*bb_id)].set_entry(id);
         }
 
         let conv_info = ::std::mem::replace(&mut self.cur_conversion_info, None).unwrap();
-        DAGFunction::new(func, conv_info.dag_arena, dag_bb_arena, conv_info.local_mgr)
+        DAGFunction::new(
+            func,
+            conv_info.dag_arena,
+            dag_bb_arena,
+            dag_bb_list,
+            conv_info.local_mgr,
+        )
     }
 
     pub fn get_dag_id_from_value(&mut self, v: &Value, arg_load: bool) -> DAGNodeId {
@@ -158,6 +164,9 @@ impl<'a> ConvertToDAG<'a> {
                     ));
                     make_chain!(load_id);
                     self.instr_id_node_id.insert(instr_id, load_id);
+                    if bb.liveness.borrow().live_out.contains(&instr_id) {
+                        make_chain!(load_id);
+                    }
                 }
                 Opcode::Store(ref src, ref dst) => {
                     let dst = self.get_dag_id_from_value(dst, true);
@@ -361,12 +370,12 @@ impl<'a> ConvertToDAG<'a> {
     ) {
         let conv_info = self.cur_conv_info_ref();
         for (bb, dag_bb) in &conv_info.bb_to_dag_bb {
-            dag_bb_arena[*dag_bb].pred = func.basic_blocks[*bb]
+            dag_bb_arena[*dag_bb].pred = func.basic_block_arena[*bb]
                 .pred
                 .iter()
                 .map(|bb| conv_info.get_dag_bb(*bb))
                 .collect();
-            dag_bb_arena[*dag_bb].succ = func.basic_blocks[*bb]
+            dag_bb_arena[*dag_bb].succ = func.basic_block_arena[*bb]
                 .succ
                 .iter()
                 .map(|bb| conv_info.get_dag_bb(*bb))

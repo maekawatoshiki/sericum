@@ -12,7 +12,9 @@ pub struct Function {
     pub ty: Type,
 
     /// Basic blocks
-    pub basic_blocks: Arena<BasicBlock>,
+    pub basic_block_arena: Arena<BasicBlock>,
+
+    pub basic_blocks: Vec<BasicBlockId>,
 
     /// Instruction arena
     pub instr_table: Arena<Instruction>,
@@ -26,7 +28,8 @@ impl Function {
         Self {
             name: name.to_string(),
             ty: Type::func_ty(ret_ty, params_ty),
-            basic_blocks: Arena::new(),
+            basic_block_arena: Arena::new(),
+            basic_blocks: vec![],
             instr_table: Arena::new(),
             // TODO
             internal: match name {
@@ -37,15 +40,21 @@ impl Function {
     }
 
     pub fn append_basic_block(&mut self) -> BasicBlockId {
-        self.basic_blocks.alloc(BasicBlock::new())
+        let id = self.basic_block_arena.alloc(BasicBlock::new());
+        // self.basic_blocks.push(id);
+        id
+    }
+
+    pub fn append_existing_basic_block(&mut self, bb_id: BasicBlockId) {
+        self.basic_blocks.push(bb_id);
     }
 
     pub fn basic_block_ref(&self, id: BasicBlockId) -> &BasicBlock {
-        &self.basic_blocks[id]
+        &self.basic_block_arena[id]
     }
 
     pub fn basic_block_ref_mut(&mut self, id: BasicBlockId) -> &mut BasicBlock {
-        &mut self.basic_blocks[id]
+        &mut self.basic_block_arena[id]
     }
 
     pub fn get_param_value(&self, func_id: FunctionId, idx: usize) -> Option<Value> {
@@ -72,7 +81,7 @@ impl Function {
 
     pub fn renumber_vreg(&self) {
         let mut n = 1;
-        for (_, bb) in &self.basic_blocks {
+        for (_, bb) in &self.basic_block_arena {
             for instr_val in &mut *bb.iseq_ref_mut() {
                 let id = instr_val.get_instr_id().unwrap();
                 self.instr_table[id].set_vreg(n);
@@ -101,39 +110,41 @@ impl Function {
     }
 
     fn basic_blocks_to_string(&self, m: &Module) -> String {
-        self.basic_blocks.iter().fold("".to_string(), |s, (id, b)| {
-            format!(
-                "{}label.{}:\t// pred({}), succ({}), def({}), in({}), out({})\n{}\n",
-                s,
-                id.index(),
-                &b.pred
-                    .iter()
-                    .fold("".to_string(), |s, x| format!("{}{},", s, x.index()))
-                    .trim_matches(','),
-                &b.succ
-                    .iter()
-                    .fold("".to_string(), |s, x| format!("{}{},", s, x.index()))
-                    .trim_matches(','),
-                &b.liveness
-                    .borrow()
-                    .def
-                    .iter()
-                    .fold("".to_string(), |s, x| format!("{}{},", s, x.index()))
-                    .trim_matches(','),
-                &b.liveness
-                    .borrow()
-                    .live_in
-                    .iter()
-                    .fold("".to_string(), |s, x| format!("{}{},", s, x.index()))
-                    .trim_matches(','),
-                &b.liveness
-                    .borrow()
-                    .live_out
-                    .iter()
-                    .fold("".to_string(), |s, x| format!("{}{},", s, x.index()))
-                    .trim_matches(','),
-                b.to_string(m)
-            )
-        })
+        self.basic_block_arena
+            .iter()
+            .fold("".to_string(), |s, (id, b)| {
+                format!(
+                    "{}label.{}:\t// pred({}), succ({}), def({}), in({}), out({})\n{}\n",
+                    s,
+                    id.index(),
+                    &b.pred
+                        .iter()
+                        .fold("".to_string(), |s, x| format!("{}{},", s, x.index()))
+                        .trim_matches(','),
+                    &b.succ
+                        .iter()
+                        .fold("".to_string(), |s, x| format!("{}{},", s, x.index()))
+                        .trim_matches(','),
+                    &b.liveness
+                        .borrow()
+                        .def
+                        .iter()
+                        .fold("".to_string(), |s, x| format!("{}{},", s, x.index()))
+                        .trim_matches(','),
+                    &b.liveness
+                        .borrow()
+                        .live_in
+                        .iter()
+                        .fold("".to_string(), |s, x| format!("{}{},", s, x.index()))
+                        .trim_matches(','),
+                    &b.liveness
+                        .borrow()
+                        .live_out
+                        .iter()
+                        .fold("".to_string(), |s, x| format!("{}{},", s, x.index()))
+                        .trim_matches(','),
+                    b.to_string(m)
+                )
+            })
     }
 }

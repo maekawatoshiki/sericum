@@ -16,7 +16,8 @@ impl Combine {
     }
 
     fn combine_function(&mut self, func: &mut DAGFunction) {
-        for (_, bb) in &func.dag_basic_blocks {
+        for bb_id in &func.dag_basic_blocks {
+            let bb = &func.dag_basic_block_arena[*bb_id];
             some_then!(entry, bb.entry, {
                 self.combine_node(&mut FxHashMap::default(), &mut func.dag_arena, entry);
             })
@@ -74,6 +75,10 @@ impl Combine {
             ($i:expr) => { node!(node!().operand[$i])};
             ($id:expr, $i:expr) => { node!(node!($id).operand[$i])};
         }
+
+        if node!().next.is_some() {
+            return node_id;
+        };
 
         // (C + any) -> (any + C)
         if node_op!(0).is_constant() && !node_op!(1).is_constant() {

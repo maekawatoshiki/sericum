@@ -36,6 +36,7 @@ impl<'a> Builder<'a> {
 
     pub fn set_insert_point(&mut self, id: BasicBlockId) {
         self.cur_bb = Some(id);
+        self.function_ref_mut().append_existing_basic_block(id);
         let iseq_len = self.function_ref().basic_block_ref(id).iseq_ref().len();
         self.insert_point = iseq_len;
     }
@@ -270,7 +271,7 @@ impl<'a> Builder<'a> {
     }
 
     fn prop_liveness(&self, bb_id: BasicBlockId, instr_id: InstructionId) {
-        let bb = &self.function_ref().basic_blocks[bb_id];
+        let bb = &self.function_ref().basic_block_arena[bb_id];
 
         {
             let mut bb_liveness = bb.liveness.borrow_mut();
@@ -286,7 +287,7 @@ impl<'a> Builder<'a> {
         }
 
         for pred_id in &bb.pred {
-            let pred = &self.function_ref().basic_blocks[*pred_id];
+            let pred = &self.function_ref().basic_block_arena[*pred_id];
             if pred.liveness.borrow_mut().live_out.insert(instr_id) {
                 // live_out didn't have the value instr_id
                 self.prop_liveness(*pred_id, instr_id);

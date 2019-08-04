@@ -35,7 +35,7 @@ impl<'a> Builder<'a> {
     pub fn insert_instr_id(&mut self, instr_id: MachineInstrId) {
         let insert_pt = self.insert_point;
         self.insert_point += 1;
-        self.function.basic_blocks[self.cur_bb_id.unwrap()]
+        self.function.basic_block_arena[self.cur_bb_id.unwrap()]
             .iseq_ref_mut()
             .insert(insert_pt, instr_id);
     }

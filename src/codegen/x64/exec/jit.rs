@@ -129,9 +129,11 @@ impl<'a> JITCompiler<'a> {
             }
         }
 
-        for (bb_id, bb) in &f.basic_blocks {
+        for bb_id in &f.basic_blocks {
+            let bb = &f.basic_block_arena[*bb_id];
+
             if bb_id.index() != 0 {
-                let label = self.get_label_of_bb(bb_id);
+                let label = self.get_label_of_bb(*bb_id);
                 dynasm!(self.asm; =>label);
             }
 

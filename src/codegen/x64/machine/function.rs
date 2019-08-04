@@ -13,8 +13,11 @@ pub struct MachineFunction {
     /// Function type
     pub ty: Type,
 
-    /// Machine Basic blocks
-    pub basic_blocks: Arena<MachineBasicBlock>,
+    /// Machine Basic blocks list
+    pub basic_blocks: Vec<MachineBasicBlockId>,
+
+    /// Machine Basic block arena
+    pub basic_block_arena: Arena<MachineBasicBlock>,
 
     /// Instruction arena
     pub instr_arena: Arena<MachineInstr>,
@@ -29,13 +32,15 @@ pub struct MachineFunction {
 impl MachineFunction {
     pub fn new(
         f: DAGFunction,
-        basic_blocks: Arena<MachineBasicBlock>,
+        basic_block_arena: Arena<MachineBasicBlock>,
+        basic_blocks: Vec<MachineBasicBlockId>,
         instr_arena: Arena<MachineInstr>,
     ) -> Self {
         Self {
             name: f.name,
             ty: f.ty,
             instr_arena,
+            basic_block_arena,
             basic_blocks,
             internal: f.internal,
             local_mgr: f.local_mgr,
@@ -43,9 +48,10 @@ impl MachineFunction {
     }
 
     pub fn find_instr_pos(&self, instr_id: MachineInstrId) -> Option<(MachineBasicBlockId, usize)> {
-        for (bb_id, bb) in &self.basic_blocks {
+        for bb_id in &self.basic_blocks {
+            let bb = &self.basic_block_arena[*bb_id];
             if let Some(pos) = bb.find_instr_pos(instr_id) {
-                return Some((bb_id, pos));
+                return Some((*bb_id, pos));
             }
         }
         None

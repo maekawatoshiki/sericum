@@ -52,7 +52,7 @@ impl<'a> Interpreter<'a> {
             }
         }
 
-        let (mut cur_bb_id, mut bb) = f.basic_blocks.iter().next().unwrap();
+        let (mut cur_bb_id, mut bb) = f.basic_block_arena.iter().next().unwrap();
         let mut last_bb_id = cur_bb_id;
 
         let ret = 'main: loop {
