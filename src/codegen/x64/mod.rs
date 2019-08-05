@@ -1,7 +1,8 @@
 pub mod dag;
+pub mod exec;
 pub mod frame_object;
 pub mod machine;
-pub mod exec;
+pub mod register;
 
 use crate::ir::types::*;
 

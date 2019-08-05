@@ -76,10 +76,6 @@ impl Combine {
             ($id:expr, $i:expr) => { node!(node!($id).operand[$i])};
         }
 
-        if node!().next.is_some() {
-            return node_id;
-        };
-
         // (C + any) -> (any + C)
         if node_op!(0).is_constant() && !node_op!(1).is_constant() {
             node!().operand.swap(0, 1);

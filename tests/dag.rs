@@ -145,21 +145,18 @@ fn dag1() {
 
         entry:
             i = alloca i32;
-            store (i32 1), (%i);
+            store (i32 2), (%i);
             li = load (%i);
             c = icmp eq (%li), (i32 2);
             br (%c) l1, l2;
+        l1:
+            a = add (%li), (i32 3);
+            br l3;
         l2:
             b = add (%li), (i32 2);
             br l3;
-        l1:
-            a = add (%li), (i32 1);
-            br merge;
         l3:
-            x = add (%b), (i32 3);
-            br merge;
-        merge:
-            p = phi [ [(%a), l1], [(%x), l3] ];
+            p = phi [ [(%a), l1], [(%b), l2] ];
             __ = call (->cilk_println_i32) [(%p)];
             ret (i32 0);
 

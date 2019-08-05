@@ -1,3 +1,4 @@
+use super::super::machine::instr::*;
 use super::basic_block::*;
 use crate::ir::{opcode::*, types::*};
 use id_arena::*;
@@ -30,6 +31,9 @@ pub enum DAGNodeKind {
     Br,
     Ret,
 
+    CopyToReg,
+    CopyFromReg,
+
     LoadFiConstOff,
     LoadFiOff,
     LoadRegOff,
@@ -42,6 +46,7 @@ pub enum DAGNodeKind {
     Constant(ConstantKind),
     GlobalAddress(GlobalValueKind),
     BasicBlock(DAGBasicBlockId),
+    Register(RegisterInfoRef),
 
     None,
 }

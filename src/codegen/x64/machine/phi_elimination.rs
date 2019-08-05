@@ -38,7 +38,6 @@ impl PhiElimination {
                         .opcode
                         .is_terminator()
                     {
-                        println!(">> PHI >> {:?}", val);
                         let mut copy = MachineInstr::new(
                             MachineOpcode::CopyToReg,
                             vec![val.clone()],

@@ -33,6 +33,7 @@ pub enum MachineOpcode {
     Load,
     Store,
     CopyToReg,
+    CopyFromReg,
 
     LoadFiConstOff,
     LoadFiOff,
@@ -161,7 +162,7 @@ impl MachineRegister {
     }
 
     pub fn set_vreg(&self, vreg: usize) {
-        self.info.borrow_mut().vreg = vreg;
+        self.info.borrow_mut().set_vreg(vreg);
     }
 
     pub fn set_last_use(&self, last_use: Option<MachineInstrId>) {
@@ -200,6 +201,10 @@ impl RegisterInfo {
             spill: false,
             last_use: None,
         }
+    }
+
+    pub fn set_vreg(&mut self, vreg: usize) {
+        self.vreg = vreg;
     }
 }
 

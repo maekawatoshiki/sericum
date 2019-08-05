@@ -100,6 +100,26 @@ impl ConvertToMachine {
 
         let machine_instr_id = match node.kind {
             DAGNodeKind::Entry => None,
+            DAGNodeKind::CopyToReg => {
+                let val = usual_oprand!(node.operand[1]);
+                Some(machine_instr_arena.alloc(MachineInstr {
+                    opcode: MachineOpcode::CopyToReg,
+                    operand: vec![val],
+                    ty: None,
+                    reg: match &cur_func.dag_arena[node.operand[0]].kind {
+                        DAGNodeKind::Register(r) => r.clone(),
+                        _ => unreachable!(),
+                    },
+                }))
+            }
+            DAGNodeKind::CopyFromReg => {
+                let reg = usual_oprand!(node.operand[0]);
+                Some(machine_instr_arena.alloc(MachineInstr::new(
+                    MachineOpcode::CopyFromReg,
+                    vec![reg],
+                    node.ty.clone(),
+                )))
+            }
             DAGNodeKind::LoadRegOff => {
                 let fi = usual_oprand!(node.operand[0]);
                 let off = usual_oprand!(node.operand[1]);
@@ -313,6 +333,9 @@ impl ConvertToMachine {
             },
             DAGNodeKind::None => MachineOperand::None,
             DAGNodeKind::BasicBlock(_) => unimplemented!(),
+            DAGNodeKind::Register(ref r) => {
+                MachineOperand::Register(MachineRegister::new(r.clone()))
+            }
             _ => MachineOperand::Register(
                 self.convert_dag(cur_func, machine_instr_arena, iseq, id)
                     .unwrap(),
