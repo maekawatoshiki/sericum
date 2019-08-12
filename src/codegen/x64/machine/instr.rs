@@ -1,9 +1,10 @@
+use super::super::register::VirtRegGen;
 use super::{basic_block::*, frame_object::*};
 use crate::ir::types::*;
 use id_arena::*;
 // use rustc_hash::{FxHashMap, FxHashSet};
 use std::{
-    cell::{Ref, RefCell},
+    cell::{Ref, RefCell, RefMut},
     fmt,
     rc::Rc,
 };
@@ -15,8 +16,9 @@ pub type MachineInstrId = Id<MachineInstr>;
 pub struct MachineInstr {
     pub opcode: MachineOpcode,
     pub operand: Vec<MachineOperand>,
-    pub ty: Option<Type>,
-    pub reg: RegisterInfoRef,
+    pub ty: Type, // TODO: will be removed
+    // pub reg: RegisterInfoRef, // TODO: will be removed
+    pub def: Vec<MachineRegister>,
 }
 
 #[derive(Clone, PartialEq)]
@@ -106,41 +108,63 @@ impl ::std::hash::Hash for MachineRegister {
 }
 
 impl MachineInstr {
-    pub fn new(opcode: MachineOpcode, operand: Vec<MachineOperand>, ty: Option<Type>) -> Self {
+    pub fn new(
+        vreg_gen: &VirtRegGen,
+        opcode: MachineOpcode,
+        operand: Vec<MachineOperand>,
+        ty: Type,
+    ) -> Self {
         Self {
             opcode,
             operand,
-            reg: Rc::new(RefCell::new(RegisterInfo::new(
-                ty.clone().unwrap_or(Type::Int32),
-            ))),
+            def: match ty.clone() {
+                Type::Void => vec![],
+                ty => vec![vreg_gen.gen_vreg(ty).into_machine_register()],
+            },
+            ty,
+        }
+    }
+
+    pub fn new_with_def_reg(
+        opcode: MachineOpcode,
+        operand: Vec<MachineOperand>,
+        ty: Type,
+        def: Vec<MachineRegister>,
+    ) -> Self {
+        Self {
+            opcode,
+            operand,
+            def,
             ty,
         }
     }
 
     pub fn set_vreg(&self, vreg: usize) {
-        self.reg.borrow_mut().vreg = vreg;
+        let x = &self.def[0];
+        x.info_ref_mut().vreg = vreg;
     }
 
     pub fn set_last_use(&self, last_use: Option<MachineInstrId>) {
-        self.reg.borrow_mut().last_use = last_use;
+        let x = &self.def[0];
+        x.info_ref_mut().last_use = last_use;
     }
 
     pub fn set_phy_reg(&self, reg: usize, spill: bool) {
-        let mut reg_info = self.reg.borrow_mut();
+        let mut reg_info = self.def[0].info_ref_mut();
         reg_info.reg = Some(reg);
         reg_info.spill = spill;
     }
 
     pub fn get_last_use(&self) -> Option<MachineInstrId> {
-        self.reg.borrow().last_use
+        self.def[0].info_ref().last_use
     }
 
     pub fn get_vreg(&self) -> usize {
-        self.reg.borrow().vreg
+        self.def[0].info_ref().vreg
     }
 
     pub fn get_reg(&self) -> Option<usize> {
-        self.reg.borrow().reg
+        self.def[0].info_ref().reg
     }
 }
 
@@ -191,6 +215,14 @@ impl MachineRegister {
     pub fn info_ref(&self) -> Ref<RegisterInfo> {
         self.info.borrow()
     }
+
+    pub fn info_ref_mut(&self) -> RefMut<RegisterInfo> {
+        self.info.borrow_mut()
+    }
+
+    pub fn is_vreg(&self) -> bool {
+        self.info_ref().reg.is_none()
+    }
 }
 
 impl RegisterInfo {
@@ -204,8 +236,30 @@ impl RegisterInfo {
         }
     }
 
+    pub fn new_ref(ty: Type) -> RegisterInfoRef {
+        Rc::new(RefCell::new(Self {
+            ty,
+            vreg: 0,
+            reg: None,
+            spill: false,
+            last_use: None,
+        }))
+    }
+
+    pub fn into_ref(self) -> RegisterInfoRef {
+        Rc::new(RefCell::new(self))
+    }
+
+    pub fn into_machine_register(self) -> MachineRegister {
+        MachineRegister::new(self.into_ref())
+    }
+
     pub fn set_vreg(&mut self, vreg: usize) {
         self.vreg = vreg;
+    }
+
+    pub fn is_vreg(&self) -> bool {
+        self.reg.is_none()
     }
 }
 
@@ -230,12 +284,28 @@ impl MachineOperand {
             _ => panic!(),
         }
     }
+
+    pub fn is_virtual_register(&self) -> bool {
+        match self {
+            MachineOperand::Register(r) => r.is_vreg(),
+            _ => false,
+        }
+    }
 }
 
 impl fmt::Debug for MachineInstr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.reg.borrow().fmt(f)?;
-        write!(f, " = {:?} ", self.opcode)?;
+        for (i, def) in self.def.iter().enumerate() {
+            def.fmt(f)?;
+            if i < self.def.len() - 1 {
+                write!(f, ", ")?;
+            } else {
+                write!(f, " = ")?;
+            }
+        }
+
+        write!(f, "{:?} ", self.opcode)?;
+
         for (i, op) in self.operand.iter().enumerate() {
             op.fmt(f)?;
             if i < self.operand.len() - 1 {

@@ -39,11 +39,12 @@ impl PhiElimination {
                         .is_terminator()
                     {
                         let mut copy = MachineInstr::new(
+                            &f.vreg_gen,
                             MachineOpcode::CopyToReg,
                             vec![val.clone()],
                             phi.ty.clone(),
                         );
-                        copy.reg = phi.reg.clone();
+                        copy.def = phi.def.clone();
                         let id = f.instr_arena.alloc(copy);
                         let pt = iseq.len() - k;
                         iseq.insert(pt, id);

@@ -9,7 +9,7 @@ pub type DAGNodeId = Id<DAGNode>;
 pub struct DAGNode {
     pub kind: DAGNodeKind,
     pub operand: Vec<DAGNodeId>,
-    pub ty: Option<Type>,
+    pub ty: Type,
     pub next: Option<DAGNodeId>,
 }
 
@@ -100,7 +100,7 @@ impl ConstantKind {
 }
 
 impl DAGNode {
-    pub fn new(kind: DAGNodeKind, operand: Vec<DAGNodeId>, ty: Option<Type>) -> Self {
+    pub fn new(kind: DAGNodeKind, operand: Vec<DAGNodeId>, ty: Type) -> Self {
         Self {
             kind,
             ty,

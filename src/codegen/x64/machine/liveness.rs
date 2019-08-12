@@ -23,20 +23,8 @@ impl<'a> LivenessAnalysis<'a> {
     }
 
     pub fn analyze_function(&mut self, cur_func: &MachineFunction) {
-        self.number_vreg(cur_func);
         self.set_def(cur_func);
         self.visit(cur_func);
-    }
-
-    fn number_vreg(&mut self, cur_func: &MachineFunction) {
-        let mut vreg = 1;
-        for bb_id in &cur_func.basic_blocks {
-            let bb = &cur_func.basic_block_arena[*bb_id];
-            for instr_id in &*bb.iseq_ref() {
-                cur_func.instr_arena[*instr_id].set_vreg(vreg);
-                vreg += 1;
-            }
-        }
     }
 
     fn set_def(&mut self, cur_func: &MachineFunction) {
@@ -56,31 +44,8 @@ impl<'a> LivenessAnalysis<'a> {
     ) {
         let instr = &cur_func.instr_arena[instr_id];
 
-        if let MachineOpcode::Add
-        | MachineOpcode::Sub
-        | MachineOpcode::Mul
-        | MachineOpcode::Rem
-        | MachineOpcode::Seteq
-        | MachineOpcode::Setle
-        | MachineOpcode::Setlt
-        | MachineOpcode::Load
-        | MachineOpcode::LoadFiConstOff
-        | MachineOpcode::LoadFiOff
-        | MachineOpcode::LoadRegOff
-        | MachineOpcode::Phi
-        | MachineOpcode::CopyToReg = instr.opcode
-        {
-            bb.liveness
-                .borrow_mut()
-                .def
-                .insert(MachineRegister::new(instr.reg.clone()));
-        }
-
-        if instr.opcode == MachineOpcode::Call && instr.ty.as_ref().unwrap() != &Type::Void {
-            bb.liveness
-                .borrow_mut()
-                .def
-                .insert(MachineRegister::new(instr.reg.clone()));
+        if instr.def.len() > 0 {
+            bb.liveness.borrow_mut().def.insert(instr.def[0].clone());
         }
     }
 
@@ -125,7 +90,7 @@ impl<'a> LivenessAnalysis<'a> {
             }
 
             if !bb_liveness.live_in.insert(reg.clone()) {
-                // live_in already had the value instr_id
+                // live_in already had the value
                 return;
             }
         }

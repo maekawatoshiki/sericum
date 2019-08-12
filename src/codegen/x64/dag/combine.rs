@@ -1,4 +1,5 @@
 use super::{function::*, module::*, node::*};
+use crate::ir::types::*;
 use id_arena::*;
 use rustc_hash::FxHashMap;
 
@@ -105,7 +106,7 @@ impl Combine {
             let c = arena.alloc(DAGNode::new(
                 DAGNodeKind::Constant(const_folded),
                 vec![],
-                Some(const_folded.get_type()),
+                const_folded.get_type(),
             ));
             return arena.alloc(DAGNode::new(
                 DAGNodeKind::Add,
@@ -233,7 +234,7 @@ impl Combine {
                     arena[cond_id].operand[2],
                     br,
                 ],
-                None,
+                Type::Void,
             )),
             _ => node_id,
         }

@@ -1,5 +1,6 @@
 use super::super::frame_object::*;
 use super::{builder::*, function::*, instr::*, module::*};
+use crate::ir::types::*;
 use rustc_hash::{FxHashMap, FxHashSet};
 
 pub struct PhysicalRegisterAllocator {}
@@ -50,7 +51,7 @@ impl PhysicalRegisterAllocator {
 
         // TODO
         for (_, i) in &cur_func.instr_arena {
-            if i.reg.borrow().reg.is_none() {
+            if i.def[0].info_ref().reg.is_none() {
                 continue;
             }
             let bgn = i.get_vreg();
@@ -59,7 +60,7 @@ impl PhysicalRegisterAllocator {
                 None => continue,
             };
             if bgn < call_instr_vreg && call_instr_vreg < end {
-                regs_to_save.push(MachineRegister::new(i.reg.clone()));
+                regs_to_save.push(i.def[0].clone());
             }
         }
 
@@ -74,19 +75,21 @@ impl PhysicalRegisterAllocator {
 
         for (frinfo, reg) in slots_to_save_regs.into_iter().zip(regs_to_save) {
             let store_instr_id = cur_func.instr_arena.alloc(MachineInstr::new(
+                &cur_func.vreg_gen,
                 MachineOpcode::Store,
                 vec![
                     MachineOperand::FrameIndex(frinfo.clone()),
                     MachineOperand::Register(reg.clone()),
                 ],
-                None,
+                Type::Void,
             ));
-            let load_instr_id = cur_func.instr_arena.alloc(MachineInstr {
-                opcode: MachineOpcode::Load,
-                operand: vec![MachineOperand::FrameIndex(frinfo)],
-                ty: Some(reg.info_ref().ty.clone()),
-                reg: reg.info.clone(),
-            });
+
+            let load_instr_id = cur_func.instr_arena.alloc(MachineInstr::new_with_def_reg(
+                MachineOpcode::Load,
+                vec![MachineOperand::FrameIndex(frinfo)],
+                reg.info_ref().ty.clone(),
+                vec![reg.clone()],
+            ));
 
             let mut builder = Builder::new(cur_func);
 
@@ -136,7 +139,7 @@ impl PhysicalRegisterAllocator {
         let instr = &cur_func.instr_arena[instr_id];
         let num_reg = 4;
 
-        if instr.reg.borrow().last_use.is_none() {
+        if instr.def[0].info_ref().last_use.is_none() {
             return;
         }
 

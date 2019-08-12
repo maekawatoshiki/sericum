@@ -147,7 +147,7 @@ fn dag1() {
             i = alloca i32;
             store (i32 2), (%i);
             li = load (%i);
-            c = icmp eq (%li), (i32 2);
+            c = icmp eq (i32 1), (i32 2);
             br (%c) l1, l2;
         l1:
             a = add (%li), (i32 3);
@@ -204,6 +204,7 @@ fn dag1() {
 
     let mut machine_module =
         dag::convert_machine::ConvertToMachine::new().convert_module(dag_module);
+    machine::liveness::LivenessAnalysis::new(&machine_module).analyze_module();
 
     for (_, machine_func) in &machine_module.functions {
         for bb_id in &machine_func.basic_blocks {
@@ -216,7 +217,6 @@ fn dag1() {
         }
     }
 
-    // machine::liveness::LivenessAnalysis::new(&machine_module).analyze_module();
     // machine::regalloc::PhysicalRegisterAllocator::new().run_on_module(&mut machine_module);
     // machine::phi_elimination::PhiElimination::new().run_on_module(&mut machine_module);
     //

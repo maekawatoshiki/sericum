@@ -1,4 +1,5 @@
 use super::super::dag::function::*;
+use super::super::register::*;
 use super::{basic_block::*, frame_object::*, instr::*};
 use crate::ir::types::*;
 use id_arena::*;
@@ -27,6 +28,9 @@ pub struct MachineFunction {
 
     /// Local variables info
     pub local_mgr: LocalVariableManager,
+
+    /// Virtual register generator
+    pub vreg_gen: VirtRegGen,
 }
 
 impl MachineFunction {
@@ -44,6 +48,7 @@ impl MachineFunction {
             basic_blocks,
             internal: f.internal,
             local_mgr: f.local_mgr,
+            vreg_gen: f.vreg_gen,
         }
     }
 
