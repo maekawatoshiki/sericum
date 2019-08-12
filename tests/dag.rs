@@ -204,9 +204,6 @@ fn dag1() {
 
     let mut machine_module =
         dag::convert_machine::ConvertToMachine::new().convert_module(dag_module);
-    machine::liveness::LivenessAnalysis::new(&machine_module).analyze_module();
-    machine::regalloc::PhysicalRegisterAllocator::new().run_on_module(&mut machine_module);
-    machine::phi_elimination::PhiElimination::new().run_on_module(&mut machine_module);
 
     for (_, machine_func) in &machine_module.functions {
         for bb_id in &machine_func.basic_blocks {
@@ -219,18 +216,16 @@ fn dag1() {
         }
     }
 
-    let mut jit = exec::jit::JITCompiler::new(&machine_module);
-    jit.compile_module();
-    let func = machine_module.find_function_by_name("func").unwrap();
-    use std::time::Instant;
-    let now = Instant::now();
-    println!(
-        "ret: {:?}",
-        jit.run(func, vec![exec::jit::GenericValue::Int32(40)])
-    );
-    println!("{:?}", now.elapsed());
+    // machine::liveness::LivenessAnalysis::new(&machine_module).analyze_module();
+    // machine::regalloc::PhysicalRegisterAllocator::new().run_on_module(&mut machine_module);
+    // machine::phi_elimination::PhiElimination::new().run_on_module(&mut machine_module);
+    //
+    //
+    // let mut jit = exec::jit::JITCompiler::new(&machine_module);
+    // jit.compile_module();
+    // let func = machine_module.find_function_by_name("func").unwrap();
     // println!(
     //     "ret: {:?}",
-    //     jit.run(func, vec![machine::jit::GenericValue::Int32(41)])
+    //     jit.run(func, vec![exec::jit::GenericValue::Int32(40)])
     // );
 }

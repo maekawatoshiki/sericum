@@ -4,13 +4,14 @@ use id_arena::*;
 // use rustc_hash::{FxHashMap, FxHashSet};
 use std::{
     cell::{Ref, RefCell},
+    fmt,
     rc::Rc,
 };
 
 pub type RegisterInfoRef = Rc<RefCell<RegisterInfo>>;
 pub type MachineInstrId = Id<MachineInstr>;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct MachineInstr {
     pub opcode: MachineOpcode,
     pub operand: Vec<MachineOperand>,
@@ -18,7 +19,7 @@ pub struct MachineInstr {
     pub reg: RegisterInfoRef,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct RegisterInfo {
     pub vreg: usize,
     pub reg: Option<usize>,
@@ -70,7 +71,7 @@ pub enum MachineOpcode {
     Ret,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub enum MachineOperand {
     Register(MachineRegister),
     Constant(MachineConstant),
@@ -80,17 +81,17 @@ pub enum MachineOperand {
     None,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq)]
 pub enum MachineConstant {
     Int32(i32),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub enum GlobalValueInfo {
     FunctionName(String),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub struct MachineRegister {
     pub info: RegisterInfoRef,
     // pub vreg: usize,
@@ -227,6 +228,64 @@ impl MachineOperand {
         match self {
             MachineOperand::Constant(c) => c,
             _ => panic!(),
+        }
+    }
+}
+
+impl fmt::Debug for MachineInstr {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.reg.borrow().fmt(f)?;
+        write!(f, " = {:?} ", self.opcode)?;
+        for (i, op) in self.operand.iter().enumerate() {
+            op.fmt(f)?;
+            if i < self.operand.len() - 1 {
+                write!(f, ", ")?;
+            }
+        }
+        fmt::Result::Ok(())
+    }
+}
+
+impl fmt::Debug for MachineOperand {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            MachineOperand::Register(r) => r.fmt(f),
+            MachineOperand::Constant(c) => c.fmt(f),
+            MachineOperand::FrameIndex(fi) => fi.fmt(f),
+            MachineOperand::GlobalAddress(g) => g.fmt(f),
+            MachineOperand::Branch(id) => write!(f, "BB#{}", id.index()),
+            MachineOperand::None => write!(f, ""),
+        }
+    }
+}
+
+impl fmt::Debug for MachineRegister {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.info_ref().fmt(f)
+    }
+}
+
+impl fmt::Debug for RegisterInfo {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.reg {
+            Some(phy_reg) => write!(f, "%R{}", phy_reg),
+            None => write!(f, "%vreg{}", self.vreg),
+        }
+    }
+}
+
+impl fmt::Debug for MachineConstant {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            MachineConstant::Int32(i) => write!(f, "i32 {}", i),
+        }
+    }
+}
+
+impl fmt::Debug for GlobalValueInfo {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            GlobalValueInfo::FunctionName(name) => write!(f, "ga<{}>", name),
         }
     }
 }

@@ -1,4 +1,5 @@
 use crate::ir::types::*;
+use std::fmt;
 
 #[derive(Debug, Clone)]
 pub struct LocalVariableManager {
@@ -26,7 +27,7 @@ impl LocalVariableManager {
     // }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct FrameIndexInfo {
     pub ty: Type,
     pub idx: i32,
@@ -35,5 +36,11 @@ pub struct FrameIndexInfo {
 impl FrameIndexInfo {
     pub fn new(ty: Type, idx: i32) -> Self {
         Self { ty, idx }
+    }
+}
+
+impl fmt::Debug for FrameIndexInfo {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "fi<{:?}, {}>", self.ty, self.idx)
     }
 }

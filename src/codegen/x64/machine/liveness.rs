@@ -3,6 +3,10 @@ use crate::ir::types::*;
 // use super::{convert::*, node::*};
 // use id_arena::*;
 
+pub struct LivenessAnalyzer<'a> {
+    pub module: &'a MachineModule,
+}
+
 pub struct LivenessAnalysis<'a> {
     pub module: &'a MachineModule, // TODO: Will be used to get type
 }
