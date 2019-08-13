@@ -58,6 +58,10 @@ impl MachineBasicBlock {
         }
         None
     }
+
+    pub fn liveness_ref(&self) -> Ref<LivenessInfo> {
+        self.liveness.borrow()
+    }
 }
 
 impl LivenessInfo {
