@@ -285,6 +285,13 @@ impl MachineOperand {
         }
     }
 
+    pub fn as_basic_block(&self) -> MachineBasicBlockId {
+        match self {
+            MachineOperand::Branch(id) => *id,
+            _ => panic!(),
+        }
+    }
+
     pub fn is_virtual_register(&self) -> bool {
         match self {
             MachineOperand::Register(r) => r.is_vreg(),

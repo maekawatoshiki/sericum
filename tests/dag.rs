@@ -147,7 +147,7 @@ fn dag1() {
             i = alloca i32;
             store (i32 2), (%i);
             li = load (%i);
-            c = icmp eq (i32 1), (i32 2);
+            c = icmp eq (%li), (i32 2);
             br (%c) l1, l2;
         l1:
             a = add (%li), (i32 3);

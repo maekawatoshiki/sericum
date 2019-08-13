@@ -2,6 +2,41 @@ use super::{basic_block::*, function::*, instr::*, module::*};
 use crate::ir::types::*;
 // use super::{convert::*, node::*};
 // use id_arena::*;
+use std::ops::Range;
+
+pub struct LiveInterval {
+    vreg: usize,
+    range: LiveRange,
+}
+pub struct LiveRange {
+    segments: Vec<LiveSegment>,
+}
+pub struct LiveSegment {
+    start: usize,
+    end: usize,
+}
+
+impl LiveInterval {
+    pub fn new(vreg: usize, range: LiveRange) -> Self {
+        Self { vreg, range }
+    }
+}
+
+impl LiveRange {
+    pub fn new(segments: Vec<LiveSegment>) -> Self {
+        Self { segments }
+    }
+}
+
+impl LiveSegment {
+    pub fn new(start: usize, end: usize) -> Self {
+        Self { start, end }
+    }
+
+    pub fn interference(&self, seg: &LiveSegment) -> bool {
+        self.start < seg.end && self.end > seg.start
+    }
+}
 
 pub struct LivenessAnalyzer<'a> {
     pub module: &'a MachineModule,
@@ -65,12 +100,20 @@ impl<'a> LivenessAnalysis<'a> {
         instr_id: MachineInstrId,
     ) {
         let instr = &cur_func.instr_arena[instr_id];
-        for operand in &instr.operand {
-            match_then!(
-                MachineOperand::Register(reg),
-                operand,
-                self.propagate(cur_func, bb, reg)
-            );
+
+        for (i, operand) in instr.operand.iter().enumerate() {
+            if let MachineOperand::Register(reg) = operand {
+                self.propagate(
+                    cur_func,
+                    bb,
+                    if instr.opcode == MachineOpcode::Phi {
+                        Some(instr.operand[i + 1].as_basic_block())
+                    } else {
+                        None
+                    },
+                    reg,
+                )
+            }
         }
     }
 
@@ -78,6 +121,7 @@ impl<'a> LivenessAnalysis<'a> {
         &self,
         cur_func: &MachineFunction,
         bb: MachineBasicBlockId,
+        pred_bb: Option<MachineBasicBlockId>,
         reg: &MachineRegister,
     ) {
         let bb = &cur_func.basic_block_arena[bb];
@@ -90,16 +134,25 @@ impl<'a> LivenessAnalysis<'a> {
             }
 
             if !bb_liveness.live_in.insert(reg.clone()) {
-                // live_in already had the value
+                // live_in already had the reg
                 return;
             }
+        }
+
+        if let Some(pred_bb) = pred_bb {
+            let pred = &cur_func.basic_block_arena[pred_bb];
+            if pred.liveness.borrow_mut().live_out.insert(reg.clone()) {
+                // live_out didn't have the reg
+                self.propagate(cur_func, pred_bb, None, reg);
+            }
+            return;
         }
 
         for pred_id in &bb.pred {
             let pred = &cur_func.basic_block_arena[*pred_id];
             if pred.liveness.borrow_mut().live_out.insert(reg.clone()) {
-                // live_out didn't have the value instr_id
-                self.propagate(cur_func, *pred_id, reg);
+                // live_out didn't have the reg
+                self.propagate(cur_func, *pred_id, None, reg);
             }
         }
     }
