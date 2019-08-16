@@ -1,7 +1,4 @@
 use super::{basic_block::*, function::*, instr::*, module::*};
-use crate::ir::types::*;
-// use super::{convert::*, node::*};
-// use id_arena::*;
 use rustc_hash::FxHashMap;
 
 #[derive(Debug, Clone)]
@@ -57,17 +54,13 @@ impl LiveSegment {
         Self { start, end }
     }
 
-    pub fn interference(&self, seg: &LiveSegment) -> bool {
+    pub fn interferes(&self, seg: &LiveSegment) -> bool {
         self.start < seg.end && self.end > seg.start
     }
 }
 
-// pub struct LivenessAnalyzer<'a> {
-//     pub module: &'a MachineModule,
-// }
-
 pub struct LivenessAnalysis<'a> {
-    pub module: &'a MachineModule, // TODO: Will be used to get type
+    pub module: &'a MachineModule,
 }
 
 impl<'a> LivenessAnalysis<'a> {

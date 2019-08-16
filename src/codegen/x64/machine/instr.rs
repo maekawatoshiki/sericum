@@ -2,7 +2,7 @@ use super::super::register::VirtRegGen;
 use super::{basic_block::*, frame_object::*};
 use crate::ir::types::*;
 use id_arena::*;
-// use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::FxHashMap;
 use std::{
     cell::{Ref, RefCell, RefMut},
     fmt,
@@ -19,6 +19,7 @@ pub struct MachineInstr {
     pub ty: Type, // TODO: will be removed
     // pub reg: RegisterInfoRef, // TODO: will be removed
     pub def: Vec<MachineRegister>,
+    pub tie: FxHashMap<MachineRegister, MachineRegister>, // def -> use
 }
 
 #[derive(Clone, PartialEq)]
@@ -122,6 +123,7 @@ impl MachineInstr {
                 ty => vec![vreg_gen.gen_vreg(ty).into_machine_register()],
             },
             ty,
+            tie: FxHashMap::default(),
         }
     }
 
@@ -136,7 +138,18 @@ impl MachineInstr {
             operand,
             def,
             ty,
+            tie: FxHashMap::default(),
         }
+    }
+
+    pub fn set_tie(mut self, def: MachineRegister, use_: MachineRegister) -> Self {
+        self.tie.insert(def, use_);
+        self
+    }
+
+    pub fn set_tie_with_def(self, use_: MachineRegister) -> Self {
+        let def = self.def[0].clone();
+        self.set_tie(def, use_)
     }
 
     pub fn set_vreg(&self, vreg: usize) {
@@ -319,6 +332,14 @@ impl fmt::Debug for MachineInstr {
                 write!(f, ", ")?;
             }
         }
+
+        if self.tie.len() != 0 {
+            write!(f, ", tie:")?;
+            for (def, use_) in &self.tie {
+                write!(f, "{:?}->{:?},", def, use_)?;
+            }
+        }
+
         fmt::Result::Ok(())
     }
 }

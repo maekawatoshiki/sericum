@@ -237,9 +237,10 @@ impl ConvertToMachine {
                 )))
             }
             DAGNodeKind::Add | DAGNodeKind::Sub | DAGNodeKind::Mul | DAGNodeKind::Rem => {
-                let new_op1 = usual_oprand!(node.operand[0]);
-                let new_op2 = usual_oprand!(node.operand[1]);
-                Some(machine_instr_arena.alloc(MachineInstr::new(
+                let op1 = usual_oprand!(node.operand[0]);
+                let op2 = usual_oprand!(node.operand[1]);
+                let op1_reg = op1.as_register().clone();
+                let instr = MachineInstr::new(
                     &cur_func.vreg_gen,
                     match node.kind {
                         DAGNodeKind::Add => MachineOpcode::Add,
@@ -248,9 +249,14 @@ impl ConvertToMachine {
                         DAGNodeKind::Rem => MachineOpcode::Rem,
                         _ => unreachable!(),
                     },
-                    vec![new_op1, new_op2],
+                    vec![op1, op2],
                     node.ty.clone(),
-                )))
+                );
+                let instr_tied = match node.kind {
+                    DAGNodeKind::Add | DAGNodeKind::Sub => instr.set_tie_with_def(op1_reg),
+                    _ => instr,
+                };
+                Some(machine_instr_arena.alloc(instr_tied))
             }
             DAGNodeKind::Setcc => {
                 let new_op1 = usual_oprand!(node.operand[1]);
