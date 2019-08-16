@@ -62,9 +62,9 @@ impl LiveSegment {
     }
 }
 
-pub struct LivenessAnalyzer<'a> {
-    pub module: &'a MachineModule,
-}
+// pub struct LivenessAnalyzer<'a> {
+//     pub module: &'a MachineModule,
+// }
 
 pub struct LivenessAnalysis<'a> {
     pub module: &'a MachineModule, // TODO: Will be used to get type

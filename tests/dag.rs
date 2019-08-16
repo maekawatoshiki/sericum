@@ -204,21 +204,23 @@ fn dag1() {
 
     let mut machine_module =
         dag::convert_machine::ConvertToMachine::new().convert_module(dag_module);
+    machine::phi_elimination::PhiElimination::new().run_on_module(&mut machine_module);
     machine::liveness::LivenessAnalysis::new(&machine_module).analyze_module();
 
+    let mut idx = 0;
     for (_, machine_func) in &machine_module.functions {
         for bb_id in &machine_func.basic_blocks {
             let bb = &machine_func.basic_block_arena[*bb_id];
             println!("Machine basic block: {:?}", bb);
             for instr in &*bb.iseq_ref() {
-                println!("{}: {:?}", instr.index(), machine_func.instr_arena[*instr]);
+                println!("{}: {:?}", idx, machine_func.instr_arena[*instr]);
+                idx += 1;
             }
             println!()
         }
     }
 
     // machine::regalloc::PhysicalRegisterAllocator::new().run_on_module(&mut machine_module);
-    // machine::phi_elimination::PhiElimination::new().run_on_module(&mut machine_module);
     //
     //
     // let mut jit = exec::jit::JITCompiler::new(&machine_module);

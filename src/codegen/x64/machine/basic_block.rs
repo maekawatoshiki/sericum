@@ -50,13 +50,12 @@ impl MachineBasicBlock {
         self.iseq.borrow_mut()
     }
 
-    pub fn find_instr_pos(&self, instr_id_to_find: MachineInstrId) -> Option<usize> {
-        for (i, instr_id) in self.iseq_ref().iter().enumerate() {
-            if instr_id == &instr_id_to_find {
-                return Some(i);
-            }
-        }
-        None
+    pub fn find_instr_pos(&self, id2find: MachineInstrId) -> Option<usize> {
+        self.iseq_ref()
+            .iter()
+            .enumerate()
+            .find(|(_, id)| *id == &id2find)
+            .map(|(i, _)| i)
     }
 
     pub fn liveness_ref(&self) -> Ref<LivenessInfo> {
