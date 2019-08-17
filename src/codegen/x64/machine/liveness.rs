@@ -3,12 +3,14 @@ use rustc_hash::FxHashMap;
 
 #[derive(Debug, Clone)]
 pub struct LiveRegMatrix {
-    map: FxHashMap<usize, LiveInterval>,
+    pub map: FxHashMap<usize, LiveInterval>,
+    reg2vreg: FxHashMap<usize, Vec<usize>>,
 }
 
 #[derive(Debug, Clone)]
 pub struct LiveInterval {
     vreg: usize,
+    reg: Option<usize>,
     range: LiveRange,
 }
 
@@ -25,13 +27,50 @@ pub struct LiveSegment {
 
 impl LiveRegMatrix {
     pub fn new(map: FxHashMap<usize, LiveInterval>) -> Self {
-        Self { map }
+        Self {
+            map,
+            reg2vreg: FxHashMap::default(),
+        }
+    }
+
+    /// Return true if cannot allocate reg for vreg
+    pub fn interferes(&mut self, vreg: usize, reg: usize) -> bool {
+        if let Some(may_interfere) = self.reg2vreg.get(&reg) {
+            let interval = self.map.get(&vreg).unwrap();
+            let mut can = true;
+            for x in may_interfere {
+                let i2 = self.map.get(x).unwrap();
+                if interval.interferes(i2) {
+                    can = false;
+                    break;
+                }
+            }
+
+            if can {
+                self.map.get_mut(&vreg).unwrap().reg = Some(reg);
+                self.reg2vreg.entry(reg).or_insert(vec![]).push(vreg);
+            }
+
+            !can
+        } else {
+            self.map.get_mut(&vreg).unwrap().reg = Some(reg);
+            self.reg2vreg.entry(reg).or_insert(vec![]).push(vreg);
+            false
+        }
     }
 }
 
 impl LiveInterval {
     pub fn new(vreg: usize, range: LiveRange) -> Self {
-        Self { vreg, range }
+        Self {
+            vreg,
+            range,
+            reg: None,
+        }
+    }
+
+    pub fn interferes(&self, other: &LiveInterval) -> bool {
+        self.range.interferes(&other.range)
     }
 }
 
@@ -47,6 +86,17 @@ impl LiveRange {
     pub fn add_segment(&mut self, seg: LiveSegment) {
         self.segments.push(seg)
     }
+
+    pub fn interferes(&self, other: &LiveRange) -> bool {
+        for seg1 in &self.segments {
+            for seg2 in &other.segments {
+                if seg1.interferes(seg2) {
+                    return true;
+                }
+            }
+        }
+        false
+    }
 }
 
 impl LiveSegment {
@@ -59,17 +109,15 @@ impl LiveSegment {
     }
 }
 
-pub struct LivenessAnalysis<'a> {
-    pub module: &'a MachineModule,
-}
+pub struct LivenessAnalysis {}
 
-impl<'a> LivenessAnalysis<'a> {
-    pub fn new(module: &'a MachineModule) -> Self {
-        Self { module }
+impl LivenessAnalysis {
+    pub fn new() -> Self {
+        Self {}
     }
 
-    pub fn analyze_module(&mut self) {
-        for (_, func) in &self.module.functions {
+    pub fn analyze_module(&mut self, module: &MachineModule) {
+        for (_, func) in &module.functions {
             self.analyze_function(func);
         }
     }

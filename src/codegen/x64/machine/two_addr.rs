@@ -15,7 +15,7 @@ impl TwoAddressConverter {
     }
 
     pub fn run_on_function(&mut self, f: &mut MachineFunction) {
-        let mut a = vec![];
+        let mut info = vec![];
 
         for bb_id in &f.basic_blocks {
             let bb = &f.basic_block_arena[*bb_id];
@@ -27,15 +27,14 @@ impl TwoAddressConverter {
                     continue;
                 }
 
-                for (def, use_) in &instr.tie {
-                    a.push((*instr_id, def.clone(), use_.clone()));
+                for (def, use_) in &mut instr.tie {
+                    info.push((*instr_id, def.clone(), use_.clone()));
+                    *use_ = def.clone();
                 }
-
-                instr.tie.clear();
             }
         }
 
-        for (instr_id, def, use_) in a {
+        for (instr_id, def, use_) in info {
             let instr = &mut f.instr_arena[instr_id];
             *instr
                 .operand
@@ -44,7 +43,7 @@ impl TwoAddressConverter {
                 .unwrap() = MachineOperand::Register(def.clone());
 
             let instr_copy = f.instr_arena.alloc(MachineInstr::new_with_def_reg(
-                MachineOpcode::CopyToReg,
+                MachineOpcode::Copy,
                 vec![MachineOperand::Register(use_)],
                 Type::Void, // TODO
                 vec![def],

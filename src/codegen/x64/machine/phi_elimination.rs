@@ -40,7 +40,7 @@ impl PhiElimination {
                     {
                         let mut copy = MachineInstr::new(
                             &f.vreg_gen,
-                            MachineOpcode::CopyToReg,
+                            MachineOpcode::Copy,
                             vec![val.clone()],
                             phi.ty.clone(),
                         );

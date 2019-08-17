@@ -109,7 +109,7 @@ impl ConvertToMachine {
 
                 let dst_ty = dst.info_ref().ty.clone();
                 Some(machine_instr_arena.alloc(MachineInstr::new_with_def_reg(
-                    MachineOpcode::CopyToReg,
+                    MachineOpcode::Copy,
                     vec![val],
                     dst_ty,
                     vec![dst],
@@ -119,7 +119,7 @@ impl ConvertToMachine {
                 let reg = usual_oprand!(node.operand[0]);
                 Some(machine_instr_arena.alloc(MachineInstr::new(
                     &cur_func.vreg_gen,
-                    MachineOpcode::CopyFromReg,
+                    MachineOpcode::Copy,
                     vec![reg],
                     node.ty.clone(),
                 )))

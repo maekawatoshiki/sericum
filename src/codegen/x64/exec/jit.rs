@@ -157,8 +157,7 @@ impl<'a> JITCompiler<'a> {
                     MachineOpcode::StoreFiOff => self.compile_store_fi_off(&frame_objects, instr),
                     MachineOpcode::StoreRegOff => self.compile_store_reg_off(&frame_objects, instr),
                     MachineOpcode::Call => self.compile_call(&frame_objects, instr),
-                    MachineOpcode::CopyToReg => self.compile_copy2reg(instr),
-                    MachineOpcode::CopyFromReg => self.compile_copy_from_reg(instr),
+                    MachineOpcode::Copy => self.compile_copy(instr),
                     MachineOpcode::BrccEq | MachineOpcode::BrccLe | MachineOpcode::BrccLt => {
                         self.compile_brcc(instr)
                     }
@@ -170,16 +169,7 @@ impl<'a> JITCompiler<'a> {
         }
     }
 
-    fn compile_copy2reg(&mut self, instr: &MachineInstr) {
-        let rn = register!(instr);
-        let op0 = &instr.operand[0];
-        match op0 {
-            MachineOperand::Register(reg) => self.reg_copy(typ!(reg), rn, register!(reg)),
-            _ => unimplemented!(),
-        }
-    }
-
-    fn compile_copy_from_reg(&mut self, instr: &MachineInstr) {
+    fn compile_copy(&mut self, instr: &MachineInstr) {
         let rn = register!(instr);
         let op0 = &instr.operand[0];
         match op0 {

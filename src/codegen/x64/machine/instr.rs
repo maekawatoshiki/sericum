@@ -36,8 +36,7 @@ pub enum MachineOpcode {
     // Memory
     Load,
     Store,
-    CopyToReg,
-    CopyFromReg,
+    Copy,
 
     LoadFiConstOff,
     LoadFiOff,

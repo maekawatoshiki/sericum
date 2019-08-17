@@ -206,7 +206,9 @@ fn dag1() {
         dag::convert_machine::ConvertToMachine::new().convert_module(dag_module);
     machine::phi_elimination::PhiElimination::new().run_on_module(&mut machine_module);
     machine::two_addr::TwoAddressConverter::new().run_on_module(&mut machine_module);
-    machine::liveness::LivenessAnalysis::new(&machine_module).analyze_module();
+    machine::liveness::LivenessAnalysis::new().analyze_module(&machine_module);
+    // machine::regalloc::PhysicalRegisterAllocator::new().run_on_module(&mut machine_module);
+    machine::regalloc::RegisterAllocator::new().run_on_module(&mut machine_module);
 
     let mut idx = 0;
     for (_, machine_func) in &machine_module.functions {
@@ -221,7 +223,6 @@ fn dag1() {
         }
     }
 
-    // machine::regalloc::PhysicalRegisterAllocator::new().run_on_module(&mut machine_module);
     //
     //
     // let mut jit = exec::jit::JITCompiler::new(&machine_module);

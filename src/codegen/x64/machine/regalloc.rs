@@ -1,7 +1,44 @@
 use super::super::frame_object::*;
-use super::{builder::*, function::*, instr::*, module::*};
+use super::{builder::*, function::*, instr::*, liveness::*, module::*};
 use crate::ir::types::*;
 use rustc_hash::{FxHashMap, FxHashSet};
+
+pub struct RegisterAllocator {}
+
+impl RegisterAllocator {
+    pub fn new() -> Self {
+        Self {}
+    }
+
+    pub fn run_on_module(&mut self, module: &mut MachineModule) {
+        for (_, func) in &mut module.functions {
+            self.run_on_function(func);
+        }
+    }
+
+    pub fn run_on_function(&mut self, cur_func: &mut MachineFunction) {
+        let mut matrix = LivenessAnalysis::new().analyze_function(cur_func);
+
+        let vregs = matrix.map.iter().map(|(vreg, _)| *vreg).collect::<Vec<_>>();
+        for vreg in vregs {
+            for reg in 0..10 {
+                if !matrix.interferes(vreg, reg) {
+                    break;
+                }
+            }
+        }
+
+        for (_, x) in matrix.map {
+            println!("{:?}", x)
+        }
+
+        // self.assign(cur_func, &matrix);
+        // self.collect_regs(cur_func);
+        // self.scan(cur_func);
+    }
+
+    // fn assign(&mut self, cur_func: &mut MachineFunction) {}
+}
 
 pub struct PhysicalRegisterAllocator {}
 
@@ -139,6 +176,9 @@ impl PhysicalRegisterAllocator {
         let instr = &cur_func.instr_arena[instr_id];
         let num_reg = 4;
 
+        if instr.def.len() == 0 {
+            return;
+        }
         if instr.def[0].info_ref().last_use.is_none() {
             return;
         }
