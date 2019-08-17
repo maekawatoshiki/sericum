@@ -20,6 +20,8 @@ pub struct MachineInstr {
     // pub reg: RegisterInfoRef, // TODO: will be removed
     pub def: Vec<MachineRegister>,
     pub tie: FxHashMap<MachineRegister, MachineRegister>, // def -> use
+    pub imp_use: Vec<MachineRegister>,
+    pub imp_def: Vec<MachineRegister>,
 }
 
 #[derive(Clone, PartialEq)]
@@ -123,6 +125,8 @@ impl MachineInstr {
             },
             ty,
             tie: FxHashMap::default(),
+            imp_def: vec![],
+            imp_use: vec![],
         }
     }
 
@@ -138,6 +142,8 @@ impl MachineInstr {
             def,
             ty,
             tie: FxHashMap::default(),
+            imp_def: vec![],
+            imp_use: vec![],
         }
     }
 
