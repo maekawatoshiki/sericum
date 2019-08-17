@@ -23,21 +23,29 @@ impl RegisterAllocator {
         for vreg in vregs {
             for reg in 0..10 {
                 if !matrix.interferes(vreg, reg) {
+                    matrix.map.get_mut(&vreg).unwrap().reg = Some(reg);
+                    matrix.reg2vreg.entry(reg).or_insert(vec![]).push(vreg);
                     break;
                 }
             }
         }
 
-        for (_, x) in matrix.map {
+        when_debug!(for (_, x) in &matrix.map {
             println!("{:?}", x)
+        });
+
+        for bb_id in &cur_func.basic_blocks {
+            let bb = &cur_func.basic_block_arena[*bb_id];
+            for instr_id in &*bb.iseq_ref() {
+                let instr = &cur_func.instr_arena[*instr_id];
+                for def in &instr.def {
+                    let reg = matrix.map.get(&def.get_vreg()).unwrap().reg.unwrap();
+                    def.set_phy_reg(reg, false);
+                }
+                // self.set_def_on_instr(cur_func, bb, *instr_id);
+            }
         }
-
-        // self.assign(cur_func, &matrix);
-        // self.collect_regs(cur_func);
-        // self.scan(cur_func);
     }
-
-    // fn assign(&mut self, cur_func: &mut MachineFunction) {}
 }
 
 pub struct PhysicalRegisterAllocator {}

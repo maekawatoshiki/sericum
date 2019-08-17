@@ -4,14 +4,14 @@ use rustc_hash::FxHashMap;
 #[derive(Debug, Clone)]
 pub struct LiveRegMatrix {
     pub map: FxHashMap<usize, LiveInterval>,
-    reg2vreg: FxHashMap<usize, Vec<usize>>,
+    pub reg2vreg: FxHashMap<usize, Vec<usize>>,
 }
 
 #[derive(Debug, Clone)]
 pub struct LiveInterval {
-    vreg: usize,
-    reg: Option<usize>,
-    range: LiveRange,
+    pub vreg: usize,
+    pub reg: Option<usize>,
+    pub range: LiveRange,
 }
 
 #[derive(Debug, Clone)]
@@ -35,28 +35,20 @@ impl LiveRegMatrix {
 
     /// Return true if cannot allocate reg for vreg
     pub fn interferes(&mut self, vreg: usize, reg: usize) -> bool {
-        if let Some(may_interfere) = self.reg2vreg.get(&reg) {
-            let interval = self.map.get(&vreg).unwrap();
-            let mut can = true;
-            for x in may_interfere {
-                let i2 = self.map.get(x).unwrap();
-                if interval.interferes(i2) {
-                    can = false;
-                    break;
-                }
-            }
-
-            if can {
-                self.map.get_mut(&vreg).unwrap().reg = Some(reg);
-                self.reg2vreg.entry(reg).or_insert(vec![]).push(vreg);
-            }
-
-            !can
-        } else {
-            self.map.get_mut(&vreg).unwrap().reg = Some(reg);
-            self.reg2vreg.entry(reg).or_insert(vec![]).push(vreg);
-            false
+        if !self.reg2vreg.contains_key(&reg) {
+            return false;
         }
+
+        let vregs = self.reg2vreg.get(&reg).unwrap();
+        let i1 = self.map.get(&vreg).unwrap();
+        for vreg in vregs {
+            let i2 = self.map.get(vreg).unwrap();
+            if i1.interferes(i2) {
+                return true;
+            }
+        }
+
+        false
     }
 }
 
