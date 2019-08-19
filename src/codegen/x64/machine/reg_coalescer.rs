@@ -15,8 +15,6 @@ impl RegisterCoalescer {
     }
 
     pub fn run_on_function(&mut self, f: &mut MachineFunction) {
-        let matrix = LivenessAnalysis::new().analyze_function(f);
-
-
+        let _matrix = LivenessAnalysis::new().analyze_function(f);
     }
 }

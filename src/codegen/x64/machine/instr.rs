@@ -35,6 +35,11 @@ pub struct RegisterInfo {
 
 #[derive(Debug, Clone, PartialEq, Copy)]
 pub enum MachineOpcode {
+    // x86_64
+    CDQ,
+    MOV32rX,
+    IDIV,
+
     // Memory
     Load,
     Store,
@@ -105,7 +110,10 @@ pub struct MachineRegister {
 impl ::std::cmp::Eq for MachineRegister {}
 impl ::std::hash::Hash for MachineRegister {
     fn hash<H: ::std::hash::Hasher>(&self, state: &mut H) {
-        state.write_usize(self.info.borrow().vreg)
+        state.write_usize(self.info.borrow().vreg);
+        if let Some(reg) = self.info_ref().reg {
+            state.write_usize(reg)
+        }
     }
 }
 
@@ -130,6 +138,18 @@ impl MachineInstr {
         }
     }
 
+    pub fn new_simple(opcode: MachineOpcode, operand: Vec<MachineOperand>) -> Self {
+        Self {
+            opcode,
+            operand,
+            def: vec![],
+            ty: Type::Void,
+            tie: FxHashMap::default(),
+            imp_def: vec![],
+            imp_use: vec![],
+        }
+    }
+
     pub fn new_with_def_reg(
         opcode: MachineOpcode,
         operand: Vec<MachineOperand>,
@@ -144,6 +164,24 @@ impl MachineInstr {
             tie: FxHashMap::default(),
             imp_def: vec![],
             imp_use: vec![],
+        }
+    }
+
+    pub fn new_with_imp_def_use(
+        opcode: MachineOpcode,
+        operand: Vec<MachineOperand>,
+        ty: Type,
+        imp_def: Vec<MachineRegister>,
+        imp_use: Vec<MachineRegister>,
+    ) -> Self {
+        Self {
+            opcode,
+            operand,
+            def: vec![],
+            ty,
+            tie: FxHashMap::default(),
+            imp_def,
+            imp_use,
         }
     }
 
@@ -254,6 +292,16 @@ impl RegisterInfo {
         }
     }
 
+    pub fn new_phy_reg(ty: Type, reg: usize) -> Self {
+        Self {
+            ty,
+            vreg: 0,
+            reg: Some(reg),
+            spill: false,
+            last_use: None,
+        }
+    }
+
     pub fn new_ref(ty: Type) -> RegisterInfoRef {
         Rc::new(RefCell::new(Self {
             ty,
@@ -316,6 +364,17 @@ impl MachineOperand {
             _ => false,
         }
     }
+
+    pub fn get_type(&self) -> Option<Type> {
+        match self {
+            MachineOperand::Branch(_) => None,
+            MachineOperand::Constant(MachineConstant::Int32(_)) => Some(Type::Int32),
+            MachineOperand::FrameIndex(fi) => Some(fi.ty.clone()),
+            MachineOperand::GlobalAddress(_) => None, // TODO
+            MachineOperand::None => None,
+            MachineOperand::Register(r) => Some(r.info_ref().ty.clone()),
+        }
+    }
 }
 
 impl fmt::Debug for MachineInstr {
@@ -342,6 +401,20 @@ impl fmt::Debug for MachineInstr {
             write!(f, ", tie:")?;
             for (def, use_) in &self.tie {
                 write!(f, "{:?}->{:?},", def, use_)?;
+            }
+        }
+
+        if self.imp_def.len() != 0 {
+            write!(f, ", imp-def:")?;
+            for reg in &self.imp_def {
+                write!(f, "{:?},", reg)?;
+            }
+        }
+
+        if self.imp_use.len() != 0 {
+            write!(f, ", imp-use:")?;
+            for reg in &self.imp_use {
+                write!(f, "{:?},", reg)?;
             }
         }
 

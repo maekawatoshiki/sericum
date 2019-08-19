@@ -87,6 +87,15 @@ impl ConvertToMachine {
             return machine_register.clone();
         }
 
+        fn iseq_push(
+            machine_instr_arena: &mut Arena<MachineInstr>,
+            iseq: &mut Vec<MachineInstrId>,
+            instr: MachineInstr,
+        ) {
+            let instr_id = machine_instr_arena.alloc(instr);
+            iseq.push(instr_id);
+        };
+
         #[rustfmt::skip]
         macro_rules! usual_oprand {($e:expr) => {
             self.usual_oprand(cur_func, machine_instr_arena, dag_to_machine_reg, iseq, $e)
@@ -236,7 +245,68 @@ impl ConvertToMachine {
                     node.ty.clone(),
                 )))
             }
-            DAGNodeKind::Add | DAGNodeKind::Sub | DAGNodeKind::Mul | DAGNodeKind::Rem => {
+            DAGNodeKind::Rem => {
+                let eax = RegisterInfo::new_phy_reg(Type::Int32, 0).into_machine_register();
+                let edx = RegisterInfo::new_phy_reg(Type::Int32, 2).into_machine_register();
+
+                let op1 = usual_oprand!(node.operand[0]);
+                let op2 = usual_oprand!(node.operand[1]);
+
+                iseq_push(
+                    machine_instr_arena,
+                    iseq,
+                    MachineInstr::new_with_def_reg(
+                        MachineOpcode::MOV32rX,
+                        vec![op1],
+                        Type::Int32, // TODO: support other types
+                        vec![eax.clone()],
+                    ),
+                );
+
+                iseq_push(
+                    machine_instr_arena,
+                    iseq,
+                    MachineInstr::new_with_imp_def_use(
+                        MachineOpcode::CDQ,
+                        vec![],
+                        Type::Void,
+                        vec![edx.clone()], //def
+                        vec![eax.clone()], //use
+                    ),
+                );
+
+                assert_eq!(op2.get_type(), Some(Type::Int32));
+                let instr1 = MachineInstr::new(
+                    &cur_func.vreg_gen,
+                    MachineOpcode::Copy,
+                    vec![op2],
+                    Type::Int32, // TODO: support other types
+                );
+                let op2 = MachineOperand::Register(instr1.def[0].clone());
+                iseq_push(machine_instr_arena, iseq, instr1);
+
+                iseq_push(
+                    machine_instr_arena,
+                    iseq,
+                    MachineInstr::new_with_imp_def_use(
+                        MachineOpcode::IDIV,
+                        vec![op2],
+                        Type::Void,
+                        vec![eax.clone(), edx.clone()],
+                        vec![eax],
+                    ),
+                );
+
+                let instr = MachineInstr::new(
+                    &cur_func.vreg_gen,
+                    MachineOpcode::Copy,
+                    vec![MachineOperand::Register(edx)],
+                    Type::Int32, // TODO
+                );
+
+                Some(machine_instr_arena.alloc(instr))
+            }
+            DAGNodeKind::Add | DAGNodeKind::Sub | DAGNodeKind::Mul => {
                 let op1 = usual_oprand!(node.operand[0]);
                 let op2 = usual_oprand!(node.operand[1]);
                 let op1_reg = op1.as_register().clone();

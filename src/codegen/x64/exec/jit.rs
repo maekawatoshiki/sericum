@@ -517,13 +517,13 @@ impl<'a> JITCompiler<'a> {
                     MachineOperand::Constant(MachineConstant::Int32(x)) => dynasm!(self.asm
                         ; mov Rd(rn), *x
                         ; mov edx, 0
-                        ; idiv Rd(rn)
+                        ; div Rd(rn)
                         ; mov Rd(rn), edx
                     ),
                     MachineOperand::Register(i1) => match typ!(i1) {
                         Type::Int32 => dynasm!(self.asm
                             ; mov edx, 0
-                            ; idiv Rd(register!(i1))
+                            ; div Rd(register!(i1))
                             ; mov Rd(rn), edx
                         ),
                         _ => unimplemented!(),
