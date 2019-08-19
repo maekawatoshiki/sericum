@@ -22,9 +22,16 @@ impl RegisterAllocator {
         let vregs = matrix.map.iter().map(|(vreg, _)| *vreg).collect::<Vec<_>>();
         for vreg in vregs {
             for reg in 0..10 {
+                // TODO: ???
                 if !matrix.interferes(vreg, reg) {
                     matrix.map.get_mut(&vreg).unwrap().reg = Some(reg);
-                    matrix.reg2vreg.entry(reg).or_insert(vec![]).push(vreg);
+                    let mut range = matrix.map.get(&vreg).unwrap().range.segments.clone();
+                    matrix
+                        .reg_range
+                        .entry(reg)
+                        .or_insert(LiveRange::new_empty())
+                        .segments
+                        .append(&mut range);
                     break;
                 }
             }
@@ -40,9 +47,10 @@ impl RegisterAllocator {
                 let instr = &cur_func.instr_arena[*instr_id];
                 for def in &instr.def {
                     let reg = matrix.map.get(&def.get_vreg()).unwrap().reg.unwrap();
-                    def.set_phy_reg(reg, false);
+                    if def.get_reg().is_none() {
+                        def.set_phy_reg(reg, false);
+                    }
                 }
-                // self.set_def_on_instr(cur_func, bb, *instr_id);
             }
         }
     }

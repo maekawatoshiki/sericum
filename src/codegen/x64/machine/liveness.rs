@@ -4,7 +4,7 @@ use rustc_hash::FxHashMap;
 #[derive(Debug, Clone)]
 pub struct LiveRegMatrix {
     pub map: FxHashMap<usize, LiveInterval>,
-    pub reg2vreg: FxHashMap<usize, Vec<usize>>,
+    pub reg_range: FxHashMap<usize, LiveRange>,
 }
 
 #[derive(Debug, Clone)]
@@ -16,7 +16,7 @@ pub struct LiveInterval {
 
 #[derive(Debug, Clone)]
 pub struct LiveRange {
-    segments: Vec<LiveSegment>,
+    pub segments: Vec<LiveSegment>,
 }
 
 #[derive(Debug, Clone)]
@@ -26,29 +26,23 @@ pub struct LiveSegment {
 }
 
 impl LiveRegMatrix {
-    pub fn new(map: FxHashMap<usize, LiveInterval>) -> Self {
-        Self {
-            map,
-            reg2vreg: FxHashMap::default(),
-        }
+    pub fn new(
+        map: FxHashMap<usize, LiveInterval>,
+        reg_range: FxHashMap<usize, LiveRange>,
+    ) -> Self {
+        Self { map, reg_range }
     }
 
     /// Return true if cannot allocate reg for vreg
     pub fn interferes(&mut self, vreg: usize, reg: usize) -> bool {
-        if !self.reg2vreg.contains_key(&reg) {
+        if !self.reg_range.contains_key(&reg) {
             return false;
         }
 
-        let vregs = self.reg2vreg.get(&reg).unwrap();
-        let i1 = self.map.get(&vreg).unwrap();
-        for vreg in vregs {
-            let i2 = self.map.get(vreg).unwrap();
-            if i1.interferes(i2) {
-                return true;
-            }
-        }
-
-        false
+        let r1 = self.reg_range.get(&reg).unwrap();
+        println!("{}-> {:?}", reg, r1);
+        let r2 = &self.map.get(&vreg).unwrap().range;
+        r1.interferes(r2)
     }
 }
 
@@ -216,7 +210,8 @@ impl LivenessAnalysis {
     }
 
     pub fn construct_live_reg_matrix(&self, cur_func: &MachineFunction) -> LiveRegMatrix {
-        let mut vreg2range = FxHashMap::default();
+        let mut vreg2range: FxHashMap<usize, LiveRange> = FxHashMap::default();
+        let mut reg2range: FxHashMap<usize, LiveRange> = FxHashMap::default();
 
         let mut index = 0;
 
@@ -224,38 +219,80 @@ impl LivenessAnalysis {
             let bb = &cur_func.basic_block_arena[*bb_id];
             let liveness = bb.liveness_ref();
 
-            let mut vreg2seg = FxHashMap::default();
+            // let mut vreg2seg = FxHashMap::default();
 
             for livein in &liveness.live_in {
-                vreg2seg.insert(livein.get_vreg(), LiveSegment::new(index, 0));
+                vreg2range
+                    .entry(livein.get_vreg())
+                    .or_insert_with(|| LiveRange::new_empty())
+                    .add_segment(LiveSegment::new(index, index))
+                // vreg2seg.insert(livein.get_vreg(), LiveSegment::new(index, index));
             }
 
             for instr_id in &*bb.iseq_ref() {
                 let instr = &cur_func.instr_arena[*instr_id];
 
-                if instr.def.len() > 0 {
-                    vreg2seg.insert(instr.def[0].get_vreg(), LiveSegment::new(index, 0));
-                }
-
                 for operand in &instr.operand {
                     if let MachineOperand::Register(reg) = operand {
-                        vreg2seg.get_mut(&reg.get_vreg()).unwrap().end = index;
+                        if reg.get_reg().is_none() {
+                            vreg2range
+                                .get_mut(&reg.get_vreg())
+                                .unwrap()
+                                .segments
+                                .last_mut()
+                                .unwrap()
+                                .end = index;
+                        }
                     }
+                }
+
+                if instr.def.len() > 0 {
+                    if instr.def[0].get_reg().is_some() {
+                        reg2range
+                            .entry(instr.def[0].get_reg().unwrap())
+                            .or_insert_with(|| LiveRange::new_empty())
+                            .add_segment(LiveSegment::new(index, index));
+                    } else {
+                        vreg2range
+                            .entry(instr.def[0].get_vreg())
+                            .or_insert_with(|| LiveRange::new_empty())
+                            .add_segment(LiveSegment::new(index, index));
+                    }
+                }
+
+                for use_ in &instr.imp_use {
+                    if let Some(range) = reg2range.get_mut(&use_.get_reg().unwrap()) {
+                        range.segments.last_mut().unwrap().end = index;
+                    }
+                }
+
+                for def in &instr.imp_def {
+                    reg2range
+                        .entry(def.get_reg().unwrap())
+                        .or_insert_with(|| LiveRange::new_empty())
+                        .add_segment(LiveSegment::new(index, index))
                 }
 
                 index += 1;
             }
 
             for liveout in &liveness.live_out {
-                vreg2seg.get_mut(&liveout.get_vreg()).unwrap().end = index;
+                vreg2range
+                    .get_mut(&liveout.get_vreg())
+                    .unwrap()
+                    .segments
+                    .last_mut()
+                    .unwrap()
+                    .end = index;
+                // vreg2seg.get_mut(&liveout.get_vreg()).unwrap().end = index;
             }
 
-            for (vreg, seg) in vreg2seg {
-                vreg2range
-                    .entry(vreg)
-                    .or_insert_with(|| LiveRange::new_empty())
-                    .add_segment(seg)
-            }
+            // for (vreg, seg) in vreg2seg {
+            //     vreg2range
+            //         .entry(vreg)
+            //         .or_insert_with(|| LiveRange::new_empty())
+            //         .add_segment(seg)
+            // }
         }
 
         when_debug!(for (vreg, range) in &vreg2range {
@@ -267,6 +304,7 @@ impl LivenessAnalysis {
                 .into_iter()
                 .map(|(vreg, range)| (vreg, LiveInterval::new(vreg, range)))
                 .collect(),
+            reg2range,
         )
     }
 }

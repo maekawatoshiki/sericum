@@ -144,8 +144,10 @@ fn dag1() {
         //     ret (i32 0);
 
         entry:
+            a = add (%arg.0), (i32 2);
             i = rem (%arg.0), (i32 3);
-            ret (%i);
+            a = add (%a), (%i);
+            ret (%a);
 
         // entry:
         //     i = alloca i32;
@@ -210,7 +212,6 @@ fn dag1() {
         dag::convert_machine::ConvertToMachine::new().convert_module(dag_module);
     machine::phi_elimination::PhiElimination::new().run_on_module(&mut machine_module);
     machine::two_addr::TwoAddressConverter::new().run_on_module(&mut machine_module);
-    machine::liveness::LivenessAnalysis::new().analyze_module(&machine_module);
     // machine::regalloc::PhysicalRegisterAllocator::new().run_on_module(&mut machine_module);
     machine::regalloc::RegisterAllocator::new().run_on_module(&mut machine_module);
 

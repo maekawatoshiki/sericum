@@ -293,7 +293,7 @@ impl ConvertToMachine {
                         vec![op2],
                         Type::Void,
                         vec![eax.clone(), edx.clone()],
-                        vec![eax],
+                        vec![eax, edx.clone()],
                     ),
                 );
 

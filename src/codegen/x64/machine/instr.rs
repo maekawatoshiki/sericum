@@ -295,7 +295,7 @@ impl RegisterInfo {
     pub fn new_phy_reg(ty: Type, reg: usize) -> Self {
         Self {
             ty,
-            vreg: 0,
+            vreg: 0xffff,
             reg: Some(reg),
             spill: false,
             last_use: None,
@@ -397,25 +397,33 @@ impl fmt::Debug for MachineInstr {
             }
         }
 
+        if self.tie.len() > 0 || self.imp_def.len() > 0 || self.imp_use.len() > 0 {
+            write!(f, " (")?;
+        }
+
         if self.tie.len() != 0 {
-            write!(f, ", tie:")?;
+            write!(f, "tie:")?;
             for (def, use_) in &self.tie {
                 write!(f, "{:?}->{:?},", def, use_)?;
             }
         }
 
         if self.imp_def.len() != 0 {
-            write!(f, ", imp-def:")?;
+            write!(f, "imp-def:")?;
             for reg in &self.imp_def {
                 write!(f, "{:?},", reg)?;
             }
         }
 
         if self.imp_use.len() != 0 {
-            write!(f, ", imp-use:")?;
+            write!(f, "imp-use:")?;
             for reg in &self.imp_use {
                 write!(f, "{:?},", reg)?;
             }
+        }
+
+        if self.tie.len() > 0 || self.imp_def.len() > 0 || self.imp_use.len() > 0 {
+            write!(f, ")")?;
         }
 
         fmt::Result::Ok(())
