@@ -12,7 +12,7 @@ macro_rules! register {
          + REGISTER_OFFSET) as u8
     }};
     ($reg:expr) => {{
-        ($reg.get_reg().unwrap() + REGISTER_OFFSET) as u8
+        ($reg.get_reg().unwrap().get() + REGISTER_OFFSET) as u8
     }};
 }
 

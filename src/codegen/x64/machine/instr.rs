@@ -1,4 +1,4 @@
-use super::super::register::VirtRegGen;
+use super::super::register::*;
 use super::{basic_block::*, frame_object::*};
 use crate::ir::types::*;
 use id_arena::*;
@@ -26,8 +26,8 @@ pub struct MachineInstr {
 
 #[derive(Clone, PartialEq)]
 pub struct RegisterInfo {
-    pub vreg: usize,
-    pub reg: Option<usize>,
+    pub vreg: VirtReg,
+    pub reg: Option<PhysReg>,
     pub ty: Type,
     pub spill: bool,
     pub last_use: Option<MachineInstrId>,
@@ -110,9 +110,9 @@ pub struct MachineRegister {
 impl ::std::cmp::Eq for MachineRegister {}
 impl ::std::hash::Hash for MachineRegister {
     fn hash<H: ::std::hash::Hasher>(&self, state: &mut H) {
-        state.write_usize(self.info.borrow().vreg);
+        state.write_usize(self.info.borrow().vreg.get());
         if let Some(reg) = self.info_ref().reg {
-            state.write_usize(reg)
+            state.write_usize(reg.get())
         }
     }
 }
@@ -195,7 +195,7 @@ impl MachineInstr {
         self.set_tie(def, use_)
     }
 
-    pub fn set_vreg(&self, vreg: usize) {
+    pub fn set_vreg(&self, vreg: VirtReg) {
         let x = &self.def[0];
         x.info_ref_mut().vreg = vreg;
     }
@@ -205,7 +205,7 @@ impl MachineInstr {
         x.info_ref_mut().last_use = last_use;
     }
 
-    pub fn set_phy_reg(&self, reg: usize, spill: bool) {
+    pub fn set_phy_reg(&self, reg: PhysReg, spill: bool) {
         let mut reg_info = self.def[0].info_ref_mut();
         reg_info.reg = Some(reg);
         reg_info.spill = spill;
@@ -215,11 +215,11 @@ impl MachineInstr {
         self.def[0].info_ref().last_use
     }
 
-    pub fn get_vreg(&self) -> usize {
+    pub fn get_vreg(&self) -> VirtReg {
         self.def[0].info_ref().vreg
     }
 
-    pub fn get_reg(&self) -> Option<usize> {
+    pub fn get_reg(&self) -> Option<PhysReg> {
         self.def[0].info_ref().reg
     }
 }
@@ -242,7 +242,7 @@ impl MachineRegister {
         Self { info }
     }
 
-    pub fn set_vreg(&self, vreg: usize) {
+    pub fn set_vreg(&self, vreg: VirtReg) {
         self.info.borrow_mut().set_vreg(vreg);
     }
 
@@ -250,7 +250,7 @@ impl MachineRegister {
         self.info.borrow_mut().last_use = last_use;
     }
 
-    pub fn set_phy_reg(&self, reg: usize, spill: bool) {
+    pub fn set_phy_reg(&self, reg: PhysReg, spill: bool) {
         let mut reg_info = self.info.borrow_mut();
         reg_info.reg = Some(reg);
         reg_info.spill = spill;
@@ -260,11 +260,11 @@ impl MachineRegister {
         self.info.borrow().last_use
     }
 
-    pub fn get_vreg(&self) -> usize {
+    pub fn get_vreg(&self) -> VirtReg {
         self.info.borrow().vreg
     }
 
-    pub fn get_reg(&self) -> Option<usize> {
+    pub fn get_reg(&self) -> Option<PhysReg> {
         self.info.borrow().reg
     }
 
@@ -285,17 +285,17 @@ impl RegisterInfo {
     pub fn new(ty: Type) -> Self {
         Self {
             ty,
-            vreg: 0,
+            vreg: VirtReg(0),
             reg: None,
             spill: false,
             last_use: None,
         }
     }
 
-    pub fn new_phy_reg(ty: Type, reg: usize) -> Self {
+    pub fn new_phy_reg(ty: Type, reg: PhysReg) -> Self {
         Self {
             ty,
-            vreg: 0xffff,
+            vreg: VirtReg(0xffff),
             reg: Some(reg),
             spill: false,
             last_use: None,
@@ -305,7 +305,7 @@ impl RegisterInfo {
     pub fn new_ref(ty: Type) -> RegisterInfoRef {
         Rc::new(RefCell::new(Self {
             ty,
-            vreg: 0,
+            vreg: VirtReg(0),
             reg: None,
             spill: false,
             last_use: None,
@@ -320,7 +320,7 @@ impl RegisterInfo {
         MachineRegister::new(self.into_ref())
     }
 
-    pub fn set_vreg(&mut self, vreg: usize) {
+    pub fn set_vreg(&mut self, vreg: VirtReg) {
         self.vreg = vreg;
     }
 
@@ -452,8 +452,8 @@ impl fmt::Debug for MachineRegister {
 impl fmt::Debug for RegisterInfo {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.reg {
-            Some(phy_reg) => write!(f, "%R{}", phy_reg),
-            None => write!(f, "%vreg{}", self.vreg),
+            Some(phy_reg) => phy_reg.fmt(f),
+            None => self.vreg.fmt(f),
         }
     }
 }

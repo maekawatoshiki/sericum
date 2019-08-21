@@ -1,4 +1,5 @@
 use super::super::frame_object::*;
+use super::super::register::*;
 use super::{builder::*, function::*, instr::*, liveness::*, module::*};
 use crate::ir::types::*;
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -19,34 +20,39 @@ impl RegisterAllocator {
     pub fn run_on_function(&mut self, cur_func: &mut MachineFunction) {
         let mut matrix = LivenessAnalysis::new().analyze_function(cur_func);
 
-        let vregs = matrix.map.iter().map(|(vreg, _)| *vreg).collect::<Vec<_>>();
-        for vreg in vregs {
+        for vreg in matrix.collect_vregs() {
+            // TODO: 0..10 ???
             for reg in 0..10 {
-                // TODO: ???
-                if !matrix.interferes(vreg, reg) {
-                    matrix.map.get_mut(&vreg).unwrap().reg = Some(reg);
-                    let mut range = matrix.map.get(&vreg).unwrap().range.segments.clone();
-                    matrix
-                        .reg_range
-                        .entry(reg)
-                        .or_insert(LiveRange::new_empty())
-                        .segments
-                        .append(&mut range);
-                    break;
+                let reg = PhysReg(reg);
+
+                if matrix.interferes(vreg, reg) {
+                    continue;
                 }
+
+                matrix.assign_reg(vreg, reg);
+
+                let range = matrix.get_vreg_interval(vreg).unwrap().range.clone();
+                matrix.get_or_create_reg_live_range(reg).unite_range(range);
+                break;
             }
         }
 
-        when_debug!(for (_, x) in &matrix.map {
+        when_debug!(for (_, x) in &matrix.vreg_interval {
             println!("{:?}", x)
         });
 
+        // rewite vregs
         for bb_id in &cur_func.basic_blocks {
             let bb = &cur_func.basic_block_arena[*bb_id];
             for instr_id in &*bb.iseq_ref() {
                 let instr = &cur_func.instr_arena[*instr_id];
                 for def in &instr.def {
-                    let reg = matrix.map.get(&def.get_vreg()).unwrap().reg.unwrap();
+                    let reg = matrix
+                        .get_vreg_interval(def.get_vreg())
+                        .unwrap()
+                        .reg
+                        .unwrap();
+                    // if phys reg is not assigned
                     if def.get_reg().is_none() {
                         def.set_phy_reg(reg, false);
                     }
@@ -99,7 +105,7 @@ impl PhysicalRegisterAllocator {
             slot
         }
 
-        let call_instr_vreg = cur_func.instr_arena[call_instr_id].get_vreg();
+        let call_instr_vreg = cur_func.instr_arena[call_instr_id].get_vreg().get();
         let mut regs_to_save = vec![];
 
         // TODO
@@ -107,11 +113,12 @@ impl PhysicalRegisterAllocator {
             if i.def[0].info_ref().reg.is_none() {
                 continue;
             }
-            let bgn = i.get_vreg();
+            let bgn = i.get_vreg().get();
             let end = match i.get_last_use() {
                 Some(last_use) => cur_func.instr_arena[last_use].get_vreg(),
                 None => continue,
-            };
+            }
+            .get();
             if bgn < call_instr_vreg && call_instr_vreg < end {
                 regs_to_save.push(i.def[0].clone());
             }
@@ -206,13 +213,13 @@ impl PhysicalRegisterAllocator {
                 let target_last_use_id = cur_func.instr_arena[*used.get(&i).unwrap()]
                     .get_last_use()
                     .unwrap();
-                let target_last_use = cur_func.instr_arena[target_last_use_id].get_vreg();
-                if instr.get_vreg() < target_last_use {
+                let target_last_use = cur_func.instr_arena[target_last_use_id].get_vreg().get();
+                if instr.get_vreg().get() < target_last_use {
                     continue;
                 }
             }
 
-            instr.set_phy_reg(i, false);
+            instr.set_phy_reg(PhysReg(i), false);
             used.insert(i, instr_id);
             found = true;
             break;
@@ -237,8 +244,8 @@ impl PhysicalRegisterAllocator {
             }
         }
 
-        instr.set_phy_reg(k, false);
-        cur_func.instr_arena[*used.get(&k).unwrap()].set_phy_reg(num_reg - 1, true);
+        instr.set_phy_reg(PhysReg(k), false);
+        cur_func.instr_arena[*used.get(&k).unwrap()].set_phy_reg(PhysReg(num_reg - 1), true);
 
         *used.get_mut(&k).unwrap() = instr_id;
     }

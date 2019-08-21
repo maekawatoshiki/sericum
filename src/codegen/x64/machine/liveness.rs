@@ -1,16 +1,17 @@
+use super::super::register::*;
 use super::{basic_block::*, function::*, instr::*, module::*};
 use rustc_hash::FxHashMap;
 
 #[derive(Debug, Clone)]
 pub struct LiveRegMatrix {
-    pub map: FxHashMap<usize, LiveInterval>,
-    pub reg_range: FxHashMap<usize, LiveRange>,
+    pub vreg_interval: FxHashMap<VirtReg, LiveInterval>,
+    pub reg_range: FxHashMap<PhysReg, LiveRange>,
 }
 
 #[derive(Debug, Clone)]
 pub struct LiveInterval {
-    pub vreg: usize,
-    pub reg: Option<usize>,
+    pub vreg: VirtReg,
+    pub reg: Option<PhysReg>,
     pub range: LiveRange,
 }
 
@@ -27,27 +28,51 @@ pub struct LiveSegment {
 
 impl LiveRegMatrix {
     pub fn new(
-        map: FxHashMap<usize, LiveInterval>,
-        reg_range: FxHashMap<usize, LiveRange>,
+        vreg_interval: FxHashMap<VirtReg, LiveInterval>,
+        reg_range: FxHashMap<PhysReg, LiveRange>,
     ) -> Self {
-        Self { map, reg_range }
+        Self {
+            vreg_interval,
+            reg_range,
+        }
     }
 
-    /// Return true if cannot allocate reg for vreg
-    pub fn interferes(&mut self, vreg: usize, reg: usize) -> bool {
+    /// Return false if it's legal to allocate reg for vreg
+    pub fn interferes(&mut self, vreg: VirtReg, reg: PhysReg) -> bool {
         if !self.reg_range.contains_key(&reg) {
             return false;
         }
 
         let r1 = self.reg_range.get(&reg).unwrap();
-        println!("{}-> {:?}", reg, r1);
-        let r2 = &self.map.get(&vreg).unwrap().range;
+        let r2 = &self.vreg_interval.get(&vreg).unwrap().range;
+
         r1.interferes(r2)
+    }
+
+    pub fn assign_reg(&mut self, vreg: VirtReg, reg: PhysReg) {
+        if let Some(interval) = self.vreg_interval.get_mut(&vreg) {
+            interval.reg = Some(reg)
+        }
+    }
+
+    pub fn collect_vregs(&self) -> Vec<VirtReg> {
+        self.vreg_interval
+            .iter()
+            .map(|(vreg, _)| *vreg)
+            .collect::<Vec<_>>()
+    }
+
+    pub fn get_vreg_interval(&self, vreg: VirtReg) -> Option<&LiveInterval> {
+        self.vreg_interval.get(&vreg)
+    }
+
+    pub fn get_or_create_reg_live_range(&mut self, reg: PhysReg) -> &mut LiveRange {
+        self.reg_range.entry(reg).or_insert(LiveRange::new_empty())
     }
 }
 
 impl LiveInterval {
-    pub fn new(vreg: usize, range: LiveRange) -> Self {
+    pub fn new(vreg: VirtReg, range: LiveRange) -> Self {
         Self {
             vreg,
             range,
@@ -71,6 +96,10 @@ impl LiveRange {
 
     pub fn add_segment(&mut self, seg: LiveSegment) {
         self.segments.push(seg)
+    }
+
+    pub fn unite_range(&mut self, mut range: LiveRange) {
+        self.segments.append(&mut range.segments)
     }
 
     pub fn interferes(&self, other: &LiveRange) -> bool {
@@ -210,8 +239,8 @@ impl LivenessAnalysis {
     }
 
     pub fn construct_live_reg_matrix(&self, cur_func: &MachineFunction) -> LiveRegMatrix {
-        let mut vreg2range: FxHashMap<usize, LiveRange> = FxHashMap::default();
-        let mut reg2range: FxHashMap<usize, LiveRange> = FxHashMap::default();
+        let mut vreg2range: FxHashMap<VirtReg, LiveRange> = FxHashMap::default();
+        let mut reg2range: FxHashMap<PhysReg, LiveRange> = FxHashMap::default();
 
         let mut index = 0;
 
@@ -284,7 +313,6 @@ impl LivenessAnalysis {
                     .last_mut()
                     .unwrap()
                     .end = index;
-                // vreg2seg.get_mut(&liveout.get_vreg()).unwrap().end = index;
             }
 
             // for (vreg, seg) in vreg2seg {
@@ -296,7 +324,7 @@ impl LivenessAnalysis {
         }
 
         when_debug!(for (vreg, range) in &vreg2range {
-            println!("vreg{}: {:?}", vreg, range)
+            println!("{:?}: {:?}", vreg, range)
         });
 
         LiveRegMatrix::new(

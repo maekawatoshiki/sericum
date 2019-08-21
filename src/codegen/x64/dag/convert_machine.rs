@@ -1,6 +1,7 @@
 // TODO: dirty code
 
 use super::super::machine::{basic_block::*, frame_object::*, function::*, instr::*, module::*};
+use super::super::register::*;
 use super::{basic_block::*, function::*, module::*, node::*};
 use crate::ir::types::*;
 use id_arena::*;
@@ -246,8 +247,10 @@ impl ConvertToMachine {
                 )))
             }
             DAGNodeKind::Rem => {
-                let eax = RegisterInfo::new_phy_reg(Type::Int32, 0).into_machine_register();
-                let edx = RegisterInfo::new_phy_reg(Type::Int32, 2).into_machine_register();
+                let eax =
+                    RegisterInfo::new_phy_reg(Type::Int32, PhysReg(0)).into_machine_register();
+                let edx =
+                    RegisterInfo::new_phy_reg(Type::Int32, PhysReg(2)).into_machine_register();
 
                 let op1 = usual_oprand!(node.operand[0]);
                 let op2 = usual_oprand!(node.operand[1]);

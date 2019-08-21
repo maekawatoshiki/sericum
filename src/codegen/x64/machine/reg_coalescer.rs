@@ -1,5 +1,5 @@
-use super::{builder::*, function::*, instr::*, liveness::*, module::*};
-use crate::ir::types::*;
+use super::{function::*, liveness::*, module::*};
+// use crate::ir::types::*;
 
 pub struct RegisterCoalescer {}
 
