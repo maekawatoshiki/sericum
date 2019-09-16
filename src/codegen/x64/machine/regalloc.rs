@@ -21,9 +21,9 @@ impl RegisterAllocator {
         let mut matrix = LivenessAnalysis::new().analyze_function(cur_func);
 
         for vreg in matrix.collect_vregs() {
-            // TODO: 0..10 ???
-            for reg in 0..10 {
-                let reg = PhysReg(reg);
+            // TODO: 0..8 ???
+            for reg in 0..8 {
+                let reg = get_ordered_general_reg(reg).unwrap();
 
                 if matrix.interferes(vreg, reg) {
                     continue;

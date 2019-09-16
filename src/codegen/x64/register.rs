@@ -34,6 +34,21 @@ impl VirtRegGen {
     }
 }
 
+pub fn get_ordered_general_reg(n: usize) -> Option<PhysReg> {
+    match n {
+        0 => Some(PhysReg(0)),
+        1 => Some(PhysReg(1)),
+        2 => Some(PhysReg(2)),
+        3 => Some(PhysReg(4)),
+        4 => Some(PhysReg(5)),
+        5 => Some(PhysReg(8)),
+        6 => Some(PhysReg(9)),
+        7 => Some(PhysReg(10)),
+        8 => Some(PhysReg(11)),
+        _ => None,
+    }
+}
+
 impl PhysReg {
     pub fn get(&self) -> usize {
         self.0
@@ -48,7 +63,12 @@ impl VirtReg {
 
 impl fmt::Debug for PhysReg {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "%R{}", self.0)
+        let reg_names = [
+            "EAX", "ECX", "EDX", "EBX", "ESI", "EDI", "ESP", "EBP", "R8D", "R9D", "R10D", "R11D",
+            "R12D", "R13D", "R14D", "R15D",
+        ];
+        write!(f, "%{}", reg_names[self.0])
+        // write!(f, "%R{}", self.0)
     }
 }
 
