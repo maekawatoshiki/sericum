@@ -225,6 +225,16 @@ impl MachineInstr {
         }
     }
 
+    pub fn add_def(&self, id: MachineInstrId) {
+        for reg in &self.def {
+            reg.info_ref_mut().use_list.insert(id);
+        }
+
+        for reg in &self.imp_def {
+            reg.info_ref_mut().use_list.insert(id);
+        }
+    }
+
     pub fn set_tie(mut self, def: MachineRegister, use_: MachineRegister) -> Self {
         self.tie.insert(def, use_);
         self

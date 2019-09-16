@@ -97,6 +97,7 @@ impl ConvertToMachine {
             iseq.push(instr_id);
 
             machine_instr_arena[instr_id].add_use(instr_id);
+            machine_instr_arena[instr_id].add_def(instr_id);
 
             instr_id
         };

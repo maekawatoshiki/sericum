@@ -38,7 +38,7 @@ impl LiveRegMatrix {
     }
 
     /// Return false if it's legal to allocate reg for vreg
-    pub fn interferes(&mut self, vreg: VirtReg, reg: PhysReg) -> bool {
+    pub fn interferes(&self, vreg: VirtReg, reg: PhysReg) -> bool {
         if !self.reg_range.contains_key(&reg) {
             return false;
         }
@@ -47,6 +47,11 @@ impl LiveRegMatrix {
         let r2 = &self.vreg_interval.get(&vreg).unwrap().range;
 
         r1.interferes(r2)
+    }
+
+    pub fn interferes_with_range(&self, vreg: VirtReg, range: LiveRange) -> bool {
+        let r2 = &self.vreg_interval.get(&vreg).unwrap().range;
+        range.interferes(r2)
     }
 
     pub fn assign_reg(&mut self, vreg: VirtReg, reg: PhysReg) {
