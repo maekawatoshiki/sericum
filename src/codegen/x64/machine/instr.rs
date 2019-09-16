@@ -1,8 +1,9 @@
 use super::super::register::*;
 use super::{basic_block::*, frame_object::*};
 use crate::ir::types::*;
+use bimap::BiMap;
 use id_arena::*;
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 use std::{
     cell::{Ref, RefCell, RefMut},
     fmt,
@@ -12,12 +13,17 @@ use std::{
 pub type RegisterInfoRef = Rc<RefCell<RegisterInfo>>;
 pub type MachineInstrId = Id<MachineInstr>;
 
+/// Bidirectional map for interconversion between MachineInstrId and an index for
+/// ``MachineBasicBlock.iseq``
+pub struct MachineInstrIdAndIndexBiMap {
+    map: BiMap<MachineInstrId, usize>,
+}
+
 #[derive(Clone)]
 pub struct MachineInstr {
     pub opcode: MachineOpcode,
     pub operand: Vec<MachineOperand>,
     pub ty: Type, // TODO: will be removed
-    // pub reg: RegisterInfoRef, // TODO: will be removed
     pub def: Vec<MachineRegister>,
     pub tie: FxHashMap<MachineRegister, MachineRegister>, // def -> use
     pub imp_use: Vec<MachineRegister>,
@@ -31,6 +37,8 @@ pub struct RegisterInfo {
     pub ty: Type,
     pub spill: bool,
     pub last_use: Option<MachineInstrId>,
+    pub use_list: FxHashSet<MachineInstrId>,
+    pub def_list: FxHashSet<MachineInstrId>,
 }
 
 #[derive(Debug, Clone, PartialEq, Copy)]
@@ -117,6 +125,24 @@ impl ::std::hash::Hash for MachineRegister {
     }
 }
 
+impl MachineInstrIdAndIndexBiMap {
+    pub fn new() -> Self {
+        Self { map: BiMap::new() }
+    }
+
+    pub fn insert(&mut self, id: MachineInstrId, idx: usize) {
+        self.map.insert(id, idx);
+    }
+
+    pub fn get_index_by_instr_id(&self, id: MachineInstrId) -> Option<usize> {
+        self.map.get_by_left(&id).map(|x| *x)
+    }
+
+    pub fn get_instr_id_by_index(&self, idx: usize) -> Option<MachineInstrId> {
+        self.map.get_by_right(&idx).map(|x| *x)
+    }
+}
+
 impl MachineInstr {
     pub fn new(
         vreg_gen: &VirtRegGen,
@@ -182,6 +208,20 @@ impl MachineInstr {
             tie: FxHashMap::default(),
             imp_def,
             imp_use,
+        }
+    }
+
+    pub fn add_use(&self, id: MachineInstrId) {
+        for operand in &self.operand {
+            let reg = match operand {
+                MachineOperand::Register(reg) => reg,
+                _ => continue,
+            };
+            reg.info_ref_mut().use_list.insert(id);
+        }
+
+        for reg in &self.imp_use {
+            reg.info_ref_mut().use_list.insert(id);
         }
     }
 
@@ -289,6 +329,8 @@ impl RegisterInfo {
             reg: None,
             spill: false,
             last_use: None,
+            use_list: FxHashSet::default(),
+            def_list: FxHashSet::default(),
         }
     }
 
@@ -299,6 +341,8 @@ impl RegisterInfo {
             reg: Some(reg),
             spill: false,
             last_use: None,
+            use_list: FxHashSet::default(),
+            def_list: FxHashSet::default(),
         }
     }
 
@@ -309,6 +353,8 @@ impl RegisterInfo {
             reg: None,
             spill: false,
             last_use: None,
+            use_list: FxHashSet::default(),
+            def_list: FxHashSet::default(),
         }))
     }
 

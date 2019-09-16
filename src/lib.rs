@@ -15,5 +15,6 @@ extern crate dynasm;
 extern crate dynasmrt;
 extern crate id_arena;
 extern crate rustc_hash;
+extern crate bimap;
 
 pub use rustc_hash::{FxHashMap, FxHashSet};

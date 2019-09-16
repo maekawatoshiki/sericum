@@ -34,7 +34,7 @@ impl VirtRegGen {
     }
 }
 
-pub fn get_ordered_general_reg(n: usize) -> Option<PhysReg> {
+pub fn get_general_reg(n: usize) -> Option<PhysReg> {
     match n {
         0 => Some(PhysReg(0)),
         1 => Some(PhysReg(1)),

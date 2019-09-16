@@ -95,6 +95,9 @@ impl ConvertToMachine {
         ) -> MachineInstrId {
             let instr_id = machine_instr_arena.alloc(instr);
             iseq.push(instr_id);
+
+            machine_instr_arena[instr_id].add_use(instr_id);
+
             instr_id
         };
 

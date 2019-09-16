@@ -23,7 +23,7 @@ impl RegisterAllocator {
         for vreg in matrix.collect_vregs() {
             // TODO: 0..8 ???
             for reg in 0..8 {
-                let reg = get_ordered_general_reg(reg).unwrap();
+                let reg = get_general_reg(reg).unwrap();
 
                 if matrix.interferes(vreg, reg) {
                     continue;
@@ -60,6 +60,24 @@ impl RegisterAllocator {
             }
         }
     }
+    //
+    // pub fn construct_map(
+    //     &mut self,
+    //     cur_func: &mut MachineFunction,
+    // ) -> FxHashMap<MachineInstrId, usize> {
+    //     let mut map = FxHashMap::default();
+    //     let mut idx = 0;
+    //
+    //     for bb_id in &cur_func.basic_blocks {
+    //         let bb = &cur_func.basic_block_arena[*bb_id];
+    //         for instr_id in &*bb.iseq_ref() {
+    //             map.insert(instr_id, idx);
+    //             idx += 1;
+    //         }
+    //     }
+    //
+    //     map
+    // }
 }
 
 pub struct PhysicalRegisterAllocator {}
