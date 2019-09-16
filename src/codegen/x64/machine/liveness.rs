@@ -262,7 +262,7 @@ impl LivenessAnalysis {
             for instr_id in &*bb.iseq_ref() {
                 let instr = &cur_func.instr_arena[*instr_id];
 
-                i2map.insert(instr_id, index);
+                i2map.insert(*instr_id, index);
 
                 for operand in &instr.operand {
                     if let MachineOperand::Register(reg) = operand {
