@@ -241,7 +241,6 @@ impl LivenessAnalysis {
     pub fn construct_live_reg_matrix(&self, cur_func: &MachineFunction) -> LiveRegMatrix {
         let mut vreg2range: FxHashMap<VirtReg, LiveRange> = FxHashMap::default();
         let mut reg2range: FxHashMap<PhysReg, LiveRange> = FxHashMap::default();
-        let mut i2map = MachineInstrIdAndIndexBiMap::new();
 
         let mut index = 0;
 
@@ -261,8 +260,6 @@ impl LivenessAnalysis {
 
             for instr_id in &*bb.iseq_ref() {
                 let instr = &cur_func.instr_arena[*instr_id];
-
-                i2map.insert(*instr_id, index);
 
                 for operand in &instr.operand {
                     if let MachineOperand::Register(reg) = operand {
