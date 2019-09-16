@@ -34,19 +34,26 @@ impl VirtRegGen {
     }
 }
 
+// register nubmering: https://corsix.github.io/dynasm-doc/instructions.html#registers
+
 pub fn get_general_reg(n: usize) -> Option<PhysReg> {
     match n {
         0 => Some(PhysReg(0)),
         1 => Some(PhysReg(1)),
         2 => Some(PhysReg(2)),
-        3 => Some(PhysReg(4)),
-        4 => Some(PhysReg(5)),
+        3 => Some(PhysReg(6)),
+        4 => Some(PhysReg(7)),
         5 => Some(PhysReg(8)),
         6 => Some(PhysReg(9)),
         7 => Some(PhysReg(10)),
         8 => Some(PhysReg(11)),
         _ => None,
     }
+}
+
+pub fn get_arg_reg(n: usize) -> Option<PhysReg> {
+    let regs = [7, 6, 2, 1, 8, 9]; // rdi, rsi, rdx, rcx, r8, r9
+    regs.get(n).map(|x| PhysReg(*x))
 }
 
 impl PhysReg {
@@ -64,8 +71,8 @@ impl VirtReg {
 impl fmt::Debug for PhysReg {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let reg_names = [
-            "EAX", "ECX", "EDX", "EBX", "ESI", "EDI", "ESP", "EBP", "R8D", "R9D", "R10D", "R11D",
-            "R12D", "R13D", "R14D", "R15D",
+            "RAX", "RCX", "RDX", "RBX", "RSP", "RBP", "RSI", "RDI", "R8", "R9", "R10", "R11",
+            "R12", "R13", "R14", "R15",
         ];
         write!(f, "%{}", reg_names[self.0])
         // write!(f, "%R{}", self.0)

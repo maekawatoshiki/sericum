@@ -265,15 +265,41 @@ impl ConvertToMachine {
                 ))
             }
             DAGNodeKind::Call => {
-                let operands = node.operand.iter().map(|a| usual_oprand!(*a)).collect();
+                // let operands = node.operand.iter().map(|a| usual_oprand!(*a)).collect();
+                for (i, operand) in node.operand[1..].iter().enumerate() {
+                    let arg = usual_oprand!(*operand);
+                    // TODO: Push remaining arguments on stack
+                    let r = RegisterInfo::new_phy_reg(Type::Int32, get_arg_reg(i).unwrap())
+                        .into_machine_register();
+                    iseq_push(
+                        machine_instr_arena,
+                        iseq,
+                        MachineInstr::new_with_def_reg(
+                            MachineOpcode::MOV32rX,
+                            vec![arg],
+                            Type::Int32,
+                            vec![r],
+                        ),
+                    );
+                }
+
+                let callee = usual_oprand!(node.operand[0]);
+
                 Some(iseq_push(
                     machine_instr_arena,
                     iseq,
-                    MachineInstr::new(
-                        &cur_func.vreg_gen,
+                    MachineInstr::new_with_imp_def_use(
                         MachineOpcode::Call,
-                        operands,
+                        vec![callee],
                         node.ty.clone(),
+                        if node.ty == Type::Void {
+                            vec![]
+                        } else {
+                            // eax
+                            vec![RegisterInfo::new_phy_reg(Type::Int32, PhysReg(0))
+                                .into_machine_register()]
+                        },
+                        vec![], // TODO: imp-use
                     ),
                 ))
             }
