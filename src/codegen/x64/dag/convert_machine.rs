@@ -56,16 +56,19 @@ impl ConvertToMachine {
 
         for dag_bb_id in &dag_func.dag_basic_blocks {
             let node = &dag_func.dag_basic_block_arena[*dag_bb_id];
+            let bb_id = self.get_machine_bb(*dag_bb_id);
             let mut iseq = vec![];
+
             self.convert_dag(
                 &dag_func,
                 &mut machine_instr_arena,
                 &mut FxHashMap::default(),
+                bb_id,
                 &mut iseq,
                 node.entry.unwrap(),
             );
 
-            machine_bb_arena[self.get_machine_bb(*dag_bb_id)].iseq = Rc::new(RefCell::new(iseq));
+            machine_bb_arena[bb_id].iseq = Rc::new(RefCell::new(iseq));
         }
 
         MachineFunction::new(
@@ -81,6 +84,7 @@ impl ConvertToMachine {
         cur_func: &DAGFunction,
         machine_instr_arena: &mut Arena<MachineInstr>,
         dag_to_machine_reg: &mut FxHashMap<DAGNodeId, Option<MachineRegister>>,
+        cur_bb: MachineBasicBlockId,
         iseq: &mut Vec<MachineInstrId>,
         node_id: DAGNodeId,
     ) -> Option<MachineRegister> {
@@ -104,7 +108,7 @@ impl ConvertToMachine {
 
         #[rustfmt::skip]
         macro_rules! usual_oprand {($e:expr) => {
-            self.usual_oprand(cur_func, machine_instr_arena, dag_to_machine_reg, iseq, $e)
+            self.usual_oprand(cur_func, machine_instr_arena, dag_to_machine_reg, cur_bb, iseq, $e)
         };}
         #[rustfmt::skip]
         macro_rules! bb {($id:expr)=>{cur_func.dag_arena[$id].as_basic_block()};}
@@ -131,6 +135,7 @@ impl ConvertToMachine {
                         vec![val],
                         dst_ty,
                         vec![dst],
+                        cur_bb,
                     ),
                 ))
             }
@@ -144,6 +149,7 @@ impl ConvertToMachine {
                         MachineOpcode::Copy,
                         vec![reg],
                         node.ty.clone(),
+                        cur_bb,
                     ),
                 ))
             }
@@ -159,6 +165,7 @@ impl ConvertToMachine {
                         MachineOpcode::LoadRegOff,
                         vec![fi, off, align],
                         node.ty.clone(),
+                        cur_bb,
                     ),
                 ))
             }
@@ -174,6 +181,7 @@ impl ConvertToMachine {
                         MachineOpcode::LoadFiOff,
                         vec![fi, off, align],
                         node.ty.clone(),
+                        cur_bb,
                     ),
                 ))
             }
@@ -188,6 +196,7 @@ impl ConvertToMachine {
                         MachineOpcode::LoadFiConstOff,
                         vec![fi, off],
                         node.ty.clone(),
+                        cur_bb,
                     ),
                 ))
             }
@@ -204,6 +213,7 @@ impl ConvertToMachine {
                         MachineOpcode::StoreRegOff,
                         vec![fi, off, align, new_src],
                         Type::Void,
+                        cur_bb,
                     ),
                 ))
             }
@@ -220,6 +230,7 @@ impl ConvertToMachine {
                         MachineOpcode::StoreFiOff,
                         vec![fi, off, align, new_src],
                         Type::Void,
+                        cur_bb,
                     ),
                 ))
             }
@@ -235,6 +246,7 @@ impl ConvertToMachine {
                         MachineOpcode::StoreFiConstOff,
                         vec![fi, off, new_src],
                         Type::Void,
+                        cur_bb,
                     ),
                 ))
             }
@@ -248,6 +260,7 @@ impl ConvertToMachine {
                         MachineOpcode::Load,
                         vec![new_op1],
                         node.ty.clone(),
+                        cur_bb,
                     ),
                 ))
             }
@@ -262,16 +275,19 @@ impl ConvertToMachine {
                         MachineOpcode::Store,
                         vec![new_dst, new_src],
                         Type::Void,
+                        cur_bb,
                     ),
                 ))
             }
             DAGNodeKind::Call => {
-                // let operands = node.operand.iter().map(|a| usual_oprand!(*a)).collect();
+                let mut arg_regs = vec![];
                 for (i, operand) in node.operand[1..].iter().enumerate() {
                     let arg = usual_oprand!(*operand);
                     // TODO: Push remaining arguments on stack
                     let r = RegisterInfo::new_phy_reg(Type::Int32, get_arg_reg(i).unwrap())
+                        .with_vreg(cur_func.vreg_gen.next_vreg())
                         .into_machine_register();
+                    arg_regs.push(r.clone());
                     iseq_push(
                         machine_instr_arena,
                         iseq,
@@ -280,6 +296,7 @@ impl ConvertToMachine {
                             vec![arg],
                             Type::Int32,
                             vec![r],
+                            cur_bb,
                         ),
                     );
                 }
@@ -298,10 +315,13 @@ impl ConvertToMachine {
                         } else {
                             // eax
                             vec![RegisterInfo::new_phy_reg(Type::Int32, PhysReg(0))
+                                .with_vreg(cur_func.vreg_gen.next_vreg())
                                 .into_machine_register()]
                         },
                         vec![], // TODO: imp-use
-                    ),
+                        cur_bb,
+                    )
+                    .with_imp_uses(arg_regs),
                 ))
             }
             DAGNodeKind::Phi => {
@@ -322,14 +342,17 @@ impl ConvertToMachine {
                         MachineOpcode::Phi,
                         operands,
                         node.ty.clone(),
+                        cur_bb,
                     ),
                 ))
             }
             DAGNodeKind::Rem => {
-                let eax =
-                    RegisterInfo::new_phy_reg(Type::Int32, PhysReg(0)).into_machine_register();
-                let edx =
-                    RegisterInfo::new_phy_reg(Type::Int32, PhysReg(2)).into_machine_register();
+                let eax = RegisterInfo::new_phy_reg(Type::Int32, PhysReg(0))
+                    .with_vreg(cur_func.vreg_gen.next_vreg())
+                    .into_machine_register();
+                let edx = RegisterInfo::new_phy_reg(Type::Int32, PhysReg(2))
+                    .with_vreg(cur_func.vreg_gen.next_vreg())
+                    .into_machine_register();
 
                 let op1 = usual_oprand!(node.operand[0]);
                 let op2 = usual_oprand!(node.operand[1]);
@@ -342,6 +365,7 @@ impl ConvertToMachine {
                         vec![op1],
                         Type::Int32, // TODO: support other types
                         vec![eax.clone()],
+                        cur_bb,
                     ),
                 );
 
@@ -354,6 +378,7 @@ impl ConvertToMachine {
                         Type::Void,
                         vec![edx.clone()], //def
                         vec![eax.clone()], //use
+                        cur_bb,
                     ),
                 );
 
@@ -363,6 +388,7 @@ impl ConvertToMachine {
                     MachineOpcode::Copy,
                     vec![op2],
                     Type::Int32, // TODO: support other types
+                    cur_bb,
                 );
                 let op2 = MachineOperand::Register(instr1.def[0].clone());
                 iseq_push(machine_instr_arena, iseq, instr1);
@@ -376,6 +402,7 @@ impl ConvertToMachine {
                         Type::Void,
                         vec![eax.clone(), edx.clone()],
                         vec![eax, edx.clone()],
+                        cur_bb,
                     ),
                 );
 
@@ -387,6 +414,7 @@ impl ConvertToMachine {
                         MachineOpcode::Copy,
                         vec![MachineOperand::Register(edx)],
                         Type::Int32, // TODO
+                        cur_bb,
                     ),
                 ))
             }
@@ -405,6 +433,7 @@ impl ConvertToMachine {
                     },
                     vec![op1, op2],
                     node.ty.clone(),
+                    cur_bb,
                 );
                 let instr_tied = match node.kind {
                     DAGNodeKind::Add | DAGNodeKind::Sub => instr.set_tie_with_def(op1_reg),
@@ -427,6 +456,7 @@ impl ConvertToMachine {
                         },
                         vec![new_op1, new_op2],
                         node.ty.clone(),
+                        cur_bb,
                     ),
                 ))
             }
@@ -440,6 +470,7 @@ impl ConvertToMachine {
                         self.get_machine_bb(bb!(node.operand[0])),
                     )],
                     Type::Void,
+                    cur_bb,
                 ),
             )),
             DAGNodeKind::BrCond => {
@@ -455,6 +486,7 @@ impl ConvertToMachine {
                             MachineOperand::Branch(self.get_machine_bb(bb!(node.operand[1]))),
                         ],
                         Type::Void,
+                        cur_bb,
                     ),
                 ))
             }
@@ -477,6 +509,7 @@ impl ConvertToMachine {
                             MachineOperand::Branch(self.get_machine_bb(bb!(node.operand[3]))),
                         ],
                         Type::Void,
+                        cur_bb,
                     ),
                 ))
             }
@@ -490,6 +523,7 @@ impl ConvertToMachine {
                         MachineOpcode::Ret,
                         vec![new_op1],
                         Type::Void,
+                        cur_bb,
                     ),
                 ))
             }
@@ -513,6 +547,7 @@ impl ConvertToMachine {
                 cur_func,
                 machine_instr_arena,
                 dag_to_machine_reg,
+                cur_bb,
                 iseq,
                 next,
             );
@@ -526,6 +561,7 @@ impl ConvertToMachine {
         cur_func: &DAGFunction,
         machine_instr_arena: &mut Arena<MachineInstr>,
         dag_to_machine_reg: &mut FxHashMap<DAGNodeId, Option<MachineRegister>>,
+        cur_bb: MachineBasicBlockId,
         iseq: &mut Vec<MachineInstrId>,
         id: DAGNodeId,
     ) -> MachineOperand {
@@ -548,8 +584,15 @@ impl ConvertToMachine {
                 MachineOperand::Register(MachineRegister::new(r.clone()))
             }
             _ => MachineOperand::Register(
-                self.convert_dag(cur_func, machine_instr_arena, dag_to_machine_reg, iseq, id)
-                    .unwrap(),
+                self.convert_dag(
+                    cur_func,
+                    machine_instr_arena,
+                    dag_to_machine_reg,
+                    cur_bb,
+                    iseq,
+                    id,
+                )
+                .unwrap(),
             ),
         }
     }

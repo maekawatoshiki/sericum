@@ -32,6 +32,10 @@ impl VirtRegGen {
         *id += 1;
         *id
     }
+
+    pub fn next_vreg(&self) -> VirtReg {
+        VirtReg(self.next_id())
+    }
 }
 
 // register nubmering: https://corsix.github.io/dynasm-doc/instructions.html#registers

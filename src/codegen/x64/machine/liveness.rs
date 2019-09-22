@@ -50,8 +50,10 @@ impl LiveRegMatrix {
     }
 
     pub fn interferes_with_range(&self, vreg: VirtReg, range: LiveRange) -> bool {
-        let r2 = &self.vreg_interval.get(&vreg).unwrap().range;
-        range.interferes(r2)
+        match self.vreg_interval.get(&vreg) {
+            Some(interval) => range.interferes(&interval.range),
+            None => false,
+        }
     }
 
     pub fn assign_reg(&mut self, vreg: VirtReg, reg: PhysReg) {

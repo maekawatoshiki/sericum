@@ -147,7 +147,13 @@ fn dag1() {
             a = add (%arg.0), (i32 2);
             i = rem (%arg.0), (i32 3);
             a = add (%a), (%i);
-            ret (%a);
+            __ = call (->cilk_println_i32) [(%a)];
+            b = add (%a), (i32 1);
+            br label1;
+        label1:
+            c = add (%a), (%b);
+            d = add (%a), (%c);
+            ret (%d);
 
         // entry:
         //     i = alloca i32;

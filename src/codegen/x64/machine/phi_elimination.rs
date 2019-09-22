@@ -43,6 +43,7 @@ impl PhiElimination {
                             MachineOpcode::Copy,
                             vec![val.clone()],
                             phi.ty.clone(),
+                            bb,
                         );
                         copy.def = phi.def.clone();
                         let id = f.instr_arena.alloc(copy);

@@ -28,6 +28,7 @@ pub struct MachineInstr {
     pub tie: FxHashMap<MachineRegister, MachineRegister>, // def -> use
     pub imp_use: Vec<MachineRegister>,
     pub imp_def: Vec<MachineRegister>,
+    pub parent: MachineBasicBlockId,
 }
 
 #[derive(Clone, PartialEq)]
@@ -111,8 +112,6 @@ pub enum GlobalValueInfo {
 #[derive(Clone, PartialEq)]
 pub struct MachineRegister {
     pub info: RegisterInfoRef,
-    // pub vreg: usize,
-    // pub phy_reg: usize
 }
 
 impl ::std::cmp::Eq for MachineRegister {}
@@ -149,6 +148,7 @@ impl MachineInstr {
         opcode: MachineOpcode,
         operand: Vec<MachineOperand>,
         ty: Type,
+        parent: MachineBasicBlockId,
     ) -> Self {
         Self {
             opcode,
@@ -161,10 +161,15 @@ impl MachineInstr {
             tie: FxHashMap::default(),
             imp_def: vec![],
             imp_use: vec![],
+            parent,
         }
     }
 
-    pub fn new_simple(opcode: MachineOpcode, operand: Vec<MachineOperand>) -> Self {
+    pub fn new_simple(
+        opcode: MachineOpcode,
+        operand: Vec<MachineOperand>,
+        parent: MachineBasicBlockId,
+    ) -> Self {
         Self {
             opcode,
             operand,
@@ -173,6 +178,7 @@ impl MachineInstr {
             tie: FxHashMap::default(),
             imp_def: vec![],
             imp_use: vec![],
+            parent,
         }
     }
 
@@ -181,6 +187,7 @@ impl MachineInstr {
         operand: Vec<MachineOperand>,
         ty: Type,
         def: Vec<MachineRegister>,
+        parent: MachineBasicBlockId,
     ) -> Self {
         Self {
             opcode,
@@ -190,6 +197,7 @@ impl MachineInstr {
             tie: FxHashMap::default(),
             imp_def: vec![],
             imp_use: vec![],
+            parent,
         }
     }
 
@@ -199,6 +207,7 @@ impl MachineInstr {
         ty: Type,
         imp_def: Vec<MachineRegister>,
         imp_use: Vec<MachineRegister>,
+        parent: MachineBasicBlockId,
     ) -> Self {
         Self {
             opcode,
@@ -208,7 +217,18 @@ impl MachineInstr {
             tie: FxHashMap::default(),
             imp_def,
             imp_use,
+            parent,
         }
+    }
+
+    pub fn with_imp_use(mut self, r: MachineRegister) -> Self {
+        self.imp_use.push(r);
+        self
+    }
+
+    pub fn with_imp_uses(mut self, mut rs: Vec<MachineRegister>) -> Self {
+        self.imp_use.append(&mut rs);
+        self
     }
 
     pub fn add_use(&self, id: MachineInstrId) {
@@ -232,6 +252,17 @@ impl MachineInstr {
 
         for reg in &self.imp_def {
             reg.info_ref_mut().use_list.insert(id);
+        }
+    }
+
+    pub fn replace_operand_reg(&mut self, from: MachineRegister, to: MachineRegister) {
+        for operand in self.operand.iter_mut() {
+            match operand {
+                MachineOperand::Register(ref mut r) if r.get_vreg() == from.get_vreg() => {
+                    *r = to.clone();
+                }
+                _ => {}
+            }
         }
     }
 
@@ -292,6 +323,11 @@ impl MachineRegister {
         Self { info }
     }
 
+    pub fn copy_with_new_vreg(&self, vreg_gen: &VirtRegGen) -> Self {
+        let r: RegisterInfo = self.info_ref().clone();
+        r.copy_with_new_vreg(vreg_gen).into_machine_register()
+    }
+
     pub fn set_vreg(&self, vreg: VirtReg) {
         self.info.borrow_mut().set_vreg(vreg);
     }
@@ -347,7 +383,7 @@ impl RegisterInfo {
     pub fn new_phy_reg(ty: Type, reg: PhysReg) -> Self {
         Self {
             ty,
-            vreg: VirtReg(0xffff),
+            vreg: VirtReg(0),
             reg: Some(reg),
             spill: false,
             last_use: None,
@@ -368,6 +404,12 @@ impl RegisterInfo {
         }))
     }
 
+    pub fn copy_with_new_vreg(&self, vreg_gen: &VirtRegGen) -> Self {
+        let mut new = self.clone();
+        new.vreg = vreg_gen.next_vreg();
+        new
+    }
+
     pub fn into_ref(self) -> RegisterInfoRef {
         Rc::new(RefCell::new(self))
     }
@@ -378,6 +420,11 @@ impl RegisterInfo {
 
     pub fn set_vreg(&mut self, vreg: VirtReg) {
         self.vreg = vreg;
+    }
+
+    pub fn with_vreg(mut self, vreg: VirtReg) -> Self {
+        self.vreg = vreg;
+        self
     }
 
     pub fn is_vreg(&self) -> bool {

@@ -35,23 +35,32 @@ impl TwoAddressConverter {
         }
 
         for (instr_id, def, use_) in info {
-            let instr = &mut f.instr_arena[instr_id];
-            *instr
-                .operand
-                .iter_mut()
-                .find(|op| op.as_register() == &use_)
-                .unwrap() = MachineOperand::Register(def.clone());
+            let cur_bb = {
+                let instr = &mut f.instr_arena[instr_id];
+                *instr
+                    .operand
+                    .iter_mut()
+                    .find(|op| op.as_register() == &use_)
+                    .unwrap() = MachineOperand::Register(def.clone());
+                instr.parent
+            };
 
-            let instr_copy = f.instr_arena.alloc(MachineInstr::new_with_def_reg(
-                MachineOpcode::Copy,
-                vec![MachineOperand::Register(use_)],
-                Type::Void, // TODO
-                vec![def],
-            ));
+            let old_instr = ::std::mem::replace(
+                &mut f.instr_arena[instr_id],
+                MachineInstr::new_with_def_reg(
+                    MachineOpcode::Copy,
+                    vec![MachineOperand::Register(use_)],
+                    Type::Void, // TODO
+                    vec![def],
+                    cur_bb,
+                ),
+            );
+
+            let instr = f.instr_arena.alloc(old_instr);
 
             let mut builder = Builder::new(f);
-            builder.set_insert_point_before_instr(instr_id).unwrap();
-            builder.insert_instr_id(instr_copy);
+            builder.set_insert_point_after_instr(instr_id).unwrap();
+            builder.insert_instr_id(instr);
         }
     }
 }

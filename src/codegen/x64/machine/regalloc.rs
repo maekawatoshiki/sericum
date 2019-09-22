@@ -3,6 +3,7 @@ use super::super::register::*;
 use super::{builder::*, function::*, instr::*, liveness::*, module::*};
 use crate::ir::types::*;
 use rustc_hash::{FxHashMap, FxHashSet};
+use std::collections::BTreeMap;
 
 pub struct RegisterAllocator {}
 
@@ -18,7 +19,7 @@ impl RegisterAllocator {
     }
 
     pub fn run_on_function(&mut self, cur_func: &mut MachineFunction) {
-        self.collect_call_instr_id(cur_func);
+        self.insert_spill_and_reload_for_uses_across_func_call(cur_func);
 
         let mut matrix = LivenessAnalysis::new().analyze_function(cur_func);
 
@@ -49,6 +50,10 @@ impl RegisterAllocator {
             for instr_id in &*bb.iseq_ref() {
                 let instr = &cur_func.instr_arena[*instr_id];
                 for def in &instr.def {
+                    if def.get_reg().is_some() {
+                        continue;
+                    }
+
                     let reg = matrix
                         .get_vreg_interval(def.get_vreg())
                         .unwrap()
@@ -117,6 +122,18 @@ impl RegisterAllocator {
 
         println!("NEW SLOT: {:?}", slots_to_save_regs);
 
+        let mut reg2ordered = FxHashMap::default();
+        for reg in &regs_to_save {
+            let mut ordered_use_list = BTreeMap::new();
+            for use_id in &reg.info_ref().use_list {
+                let idx = i2map.get_index_by_instr_id(*use_id).unwrap();
+                ordered_use_list.insert(idx, *use_id);
+            }
+            reg2ordered.insert(reg.clone(), ordered_use_list);
+        }
+
+        let bb_of_call_instr = cur_func.instr_arena[call_instr_id].parent;
+
         for (frinfo, reg) in slots_to_save_regs.into_iter().zip(regs_to_save.iter()) {
             let store_instr_id = cur_func.instr_arena.alloc(MachineInstr::new(
                 &cur_func.vreg_gen,
@@ -126,13 +143,7 @@ impl RegisterAllocator {
                     MachineOperand::Register(reg.clone()),
                 ],
                 Type::Void,
-            ));
-
-            let load_instr_id = cur_func.instr_arena.alloc(MachineInstr::new_with_def_reg(
-                MachineOpcode::Load,
-                vec![MachineOperand::FrameIndex(frinfo)],
-                reg.info_ref().ty.clone(),
-                vec![reg.clone()],
+                bb_of_call_instr,
             ));
 
             let mut builder = Builder::new(cur_func);
@@ -140,12 +151,48 @@ impl RegisterAllocator {
             builder.set_insert_point_before_instr(call_instr_id);
             builder.insert_instr_id(store_instr_id);
 
-            builder.set_insert_point_after_instr(call_instr_id);
-            builder.insert_instr_id(load_instr_id);
+            let mut cur_bb = bb_of_call_instr;
+            let mut load_instr_id = None;
+
+            for (idx, use_id) in reg2ordered.get(&reg).unwrap() {
+                if *idx <= call_instr_idx {
+                    continue;
+                }
+
+                let bb_of_instr_using_reg = builder.function.instr_arena[*use_id].parent;
+                let bb_changed = bb_of_instr_using_reg != cur_bb;
+
+                if load_instr_id.is_none() || bb_changed {
+                    if bb_changed {
+                        cur_bb = bb_of_instr_using_reg;
+                    }
+
+                    let new_reg = reg.copy_with_new_vreg(&builder.function.vreg_gen);
+                    load_instr_id = Some(builder.function.instr_arena.alloc(
+                        MachineInstr::new_with_def_reg(
+                            MachineOpcode::Load,
+                            vec![MachineOperand::FrameIndex(frinfo.clone())],
+                            new_reg.info_ref().ty.clone(),
+                            vec![new_reg.clone()],
+                            cur_bb,
+                        ),
+                    ));
+                    builder.set_insert_point_before_instr(*use_id);
+                    builder.insert_instr_id(load_instr_id.unwrap());
+                }
+
+                when_debug!(println!("USE: {:?}", builder.function.instr_arena[*use_id]));
+
+                let new_reg = builder.function.instr_arena[load_instr_id.unwrap()].def[0].clone();
+                builder.function.instr_arena[*use_id].replace_operand_reg(reg.clone(), new_reg);
+            }
         }
     }
 
-    fn collect_call_instr_id(&mut self, cur_func: &mut MachineFunction) -> Vec<MachineInstrId> {
+    fn insert_spill_and_reload_for_uses_across_func_call(
+        &mut self,
+        cur_func: &mut MachineFunction,
+    ) -> Vec<MachineInstrId> {
         let mut call_instr_id = vec![];
 
         for bb_id in &cur_func.basic_blocks {
@@ -263,31 +310,31 @@ impl PhysicalRegisterAllocator {
 
         println!("NEW SLOT: {:?}", slots_to_save_regs);
 
-        for (frinfo, reg) in slots_to_save_regs.into_iter().zip(regs_to_save) {
-            let store_instr_id = cur_func.instr_arena.alloc(MachineInstr::new(
-                &cur_func.vreg_gen,
-                MachineOpcode::Store,
-                vec![
-                    MachineOperand::FrameIndex(frinfo.clone()),
-                    MachineOperand::Register(reg.clone()),
-                ],
-                Type::Void,
-            ));
-
-            let load_instr_id = cur_func.instr_arena.alloc(MachineInstr::new_with_def_reg(
-                MachineOpcode::Load,
-                vec![MachineOperand::FrameIndex(frinfo)],
-                reg.info_ref().ty.clone(),
-                vec![reg.clone()],
-            ));
-
-            let mut builder = Builder::new(cur_func);
-
-            builder.set_insert_point_before_instr(call_instr_id);
-            builder.insert_instr_id(store_instr_id);
-
-            builder.set_insert_point_after_instr(call_instr_id);
-            builder.insert_instr_id(load_instr_id);
+        for (_frinfo, _reg) in slots_to_save_regs.into_iter().zip(regs_to_save) {
+            // let store_instr_id = cur_func.instr_arena.alloc(MachineInstr::new(
+            //     &cur_func.vreg_gen,
+            //     MachineOpcode::Store,
+            //     vec![
+            //         MachineOperand::FrameIndex(frinfo.clone()),
+            //         MachineOperand::Register(reg.clone()),
+            //     ],
+            //     Type::Void,
+            // ));
+            //
+            // let load_instr_id = cur_func.instr_arena.alloc(MachineInstr::new_with_def_reg(
+            //     MachineOpcode::Load,
+            //     vec![MachineOperand::FrameIndex(frinfo)],
+            //     reg.info_ref().ty.clone(),
+            //     vec![reg.clone()],
+            // ));
+            //
+            // let mut builder = Builder::new(cur_func);
+            //
+            // builder.set_insert_point_before_instr(call_instr_id);
+            // builder.insert_instr_id(store_instr_id);
+            //
+            // builder.set_insert_point_after_instr(call_instr_id);
+            // builder.insert_instr_id(load_instr_id);
         }
     }
 
