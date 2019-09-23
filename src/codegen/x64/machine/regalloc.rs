@@ -44,7 +44,10 @@ impl RegisterAllocator {
             println!("{:?}", x)
         });
 
-        // rewite vregs
+        self.rewrite_vregs(cur_func, &matrix);
+    }
+
+    fn rewrite_vregs(&mut self, cur_func: &mut MachineFunction, matrix: &LiveRegMatrix) {
         for bb_id in &cur_func.basic_blocks {
             let bb = &cur_func.basic_block_arena[*bb_id];
             for instr_id in &*bb.iseq_ref() {

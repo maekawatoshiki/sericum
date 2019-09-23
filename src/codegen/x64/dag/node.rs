@@ -47,6 +47,7 @@ pub enum DAGNodeKind {
     GlobalAddress(GlobalValueKind),
     BasicBlock(DAGBasicBlockId),
     Register(RegisterInfoRef),
+    CopyToLiveOut,
 
     None,
 }

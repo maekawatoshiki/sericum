@@ -143,6 +143,12 @@ fn dag1() {
         // l3:
         //     ret (i32 0);
 
+        // entry:
+        //     a = add (%arg.0), (i32 123);
+        //     br l;
+        // l:
+        //     ret (%a);
+
         entry:
             a = add (%arg.0), (i32 2);
             i = rem (%arg.0), (i32 3);
