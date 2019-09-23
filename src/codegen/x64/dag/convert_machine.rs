@@ -354,25 +354,42 @@ impl ConvertToMachine {
 
                 let callee = usual_operand!(node.operand[0]);
 
-                Some(iseq_push(
+                let ret_reg = RegisterInfo::new_phy_reg(Type::Int32, PhysReg(0))
+                    .with_vreg(cur_func.vreg_gen.next_vreg())
+                    .into_machine_register(); // i.g. EAX
+                                              // TODO: support types other than int.
+                                              //       what about struct or union? they won't be assigned to reg
+
+                iseq_push(
                     machine_instr_arena,
                     iseq,
                     MachineInstr::new_with_imp_def_use(
                         MachineOpcode::Call,
                         vec![callee],
-                        node.ty.clone(),
+                        Type::Void,
                         if node.ty == Type::Void {
                             vec![]
                         } else {
-                            // eax
-                            vec![RegisterInfo::new_phy_reg(Type::Int32, PhysReg(0))
-                                .with_vreg(cur_func.vreg_gen.next_vreg())
-                                .into_machine_register()]
+                            vec![ret_reg.clone()]
                         },
                         vec![], // TODO: imp-use
                         cur_bb,
                     )
                     .with_imp_uses(arg_regs),
+                );
+
+                let ret_reg_ty = ret_reg.info_ref().ty.clone();
+
+                Some(iseq_push(
+                    machine_instr_arena,
+                    iseq,
+                    MachineInstr::new(
+                        &cur_func.vreg_gen,
+                        MachineOpcode::Copy,
+                        vec![MachineOperand::Register(ret_reg.clone())],
+                        ret_reg_ty,
+                        cur_bb,
+                    ),
                 ))
             }
             DAGNodeKind::Phi => {

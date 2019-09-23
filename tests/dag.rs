@@ -149,17 +149,17 @@ fn dag1() {
         // l:
         //     ret (%a);
 
-        entry:
-            a = add (%arg.0), (i32 2);
-            i = rem (%arg.0), (i32 3);
-            a = add (%a), (%i);
-            __ = call (->cilk_println_i32) [(%a)];
-            b = add (%a), (i32 1);
-            br label1;
-        label1:
-            c = add (%a), (%b);
-            d = add (%a), (%c);
-            ret (%d);
+        // entry:
+        //     a = add (%arg.0), (i32 2);
+        //     i = rem (%arg.0), (i32 3);
+        //     a = add (%a), (%i);
+        //     __ = call (->cilk_println_i32) [(%a)];
+        //     b = add (%a), (i32 1);
+        //     br label1;
+        // label1:
+        //     c = add (%a), (%b);
+        //     d = add (%a), (%c);
+        //     ret (%d);
 
         // entry:
         //     i = alloca i32;
@@ -178,18 +178,19 @@ fn dag1() {
         //     __ = call (->cilk_println_i32) [(%p)];
         //     ret (i32 0);
 
-        // entry:
-        //     cond = icmp le (%arg.0), (i32 2);
-        //     br (%cond) l1, l2;
-        // l1:
-        //     ret (i32 1);
-        // l2:
-        //     a1 = sub (%arg.0), (i32 1);
-        //     r1 = call func [(%a1)];
-        //     a2 = sub (%arg.0), (i32 2);
-        //     r2 = call func [(%a2)];
-        //     r3 = add (%r1), (%r2);
-        //     ret (%r3);
+        entry:
+            cond = icmp le (%arg.0), (i32 2);
+            br (%cond) l1, l2;
+        l1:
+            ret (i32 1);
+        l2:
+            a1 = sub (%arg.0), (i32 1);
+            r1 = call func [(%a1)];
+            a2 = sub (%arg.0), (i32 2);
+            r2 = call func [(%a2)];
+            r3 = add (%r1), (%r2);
+            ret (%r3);
+            // ret (%r1);
     });
 
     // let func = cilk_ir!(m; define [i32] func () {
