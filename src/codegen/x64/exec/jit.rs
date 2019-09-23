@@ -144,6 +144,8 @@ impl<'a> JITCompiler<'a> {
                     MachineOpcode::Sub => self.compile_sub(&frame_objects, instr),
                     MachineOpcode::Mul => self.compile_mul(&frame_objects, instr),
                     MachineOpcode::Rem => self.compile_rem(&frame_objects, instr),
+                    MachineOpcode::IDIV => self.compile_idiv(&frame_objects, instr),
+                    MachineOpcode::CDQ => self.compile_cdq(&frame_objects, instr),
                     MachineOpcode::Load => self.compile_load(&frame_objects, instr),
                     MachineOpcode::LoadFiConstOff => {
                         self.compile_load_fi_const_off(&frame_objects, instr)
@@ -388,7 +390,7 @@ impl<'a> JITCompiler<'a> {
             })
             .unwrap();
         let callee_entity = self.module.function_ref(callee_id);
-        let ret_ty = &callee_entity.ty.get_function_ty().unwrap().ret_ty;
+        // let ret_ty = &callee_entity.ty.get_function_ty().unwrap().ret_ty;
         let rsp_offset = 0;
 
         // TODO
@@ -551,6 +553,21 @@ impl<'a> JITCompiler<'a> {
                     _ => unimplemented!(),
                 };
             }
+            _ => unimplemented!(),
+        }
+    }
+
+    fn compile_cdq(&mut self, _fo: &FrameObjectsInfo, instr: &MachineInstr) {
+        dynasm!(self.asm; cdq)
+    }
+
+    fn compile_idiv(&mut self, _fo: &FrameObjectsInfo, instr: &MachineInstr) {
+        let (r, r_ty) = {
+            let reg = instr.operand[0].as_register();
+            (reg.info_ref().reg.unwrap().get() as u8, &reg.info_ref().ty)
+        };
+        match r_ty {
+            Type::Int32 => dynasm!(self.asm; idiv Rd(r)),
             _ => unimplemented!(),
         }
     }
