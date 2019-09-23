@@ -17,10 +17,18 @@ impl TypeSize for Type {
             Type::Void => 0,
         }
     }
+
+    fn size_in_bits(&self) -> usize {
+        self.size_in_byte() * 8
+    }
 }
 
 impl TypeSize for ArrayType {
     fn size_in_byte(&self) -> usize {
         self.elem_ty.size_in_byte() * self.len
+    }
+
+    fn size_in_bits(&self) -> usize {
+        self.size_in_byte() * 8
     }
 }

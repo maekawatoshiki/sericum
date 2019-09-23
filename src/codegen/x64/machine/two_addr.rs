@@ -1,5 +1,4 @@
 use super::{builder::*, function::*, instr::*, module::*};
-use crate::ir::types::*;
 use std::mem;
 
 pub struct TwoAddressConverter {}

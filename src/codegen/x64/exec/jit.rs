@@ -9,10 +9,10 @@ use rustc_hash::FxHashMap;
 macro_rules! register {
     ($f:expr; $instr_id:expr) => {{
         ($f.instr_arena[$instr_id].get_reg().unwrap()
-         + REGISTER_OFFSET) as u8
+         ) as u8
     }};
     ($reg:expr) => {{
-        ($reg.get_reg().unwrap().get() + REGISTER_OFFSET) as u8
+        ($reg.get_reg().unwrap().get()) as u8
     }};
 }
 
@@ -25,8 +25,6 @@ macro_rules! typ {
         &$reg.info_ref().ty
     }};
 }
-
-const REGISTER_OFFSET: usize = 10; // Instruction.reg.reg=0 means r10
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum GenericValue {
@@ -140,6 +138,8 @@ impl<'a> JITCompiler<'a> {
             for instr in &*bb.iseq_ref() {
                 let instr = &f.instr_arena[*instr];
                 match instr.opcode {
+                    MachineOpcode::MOV32ri => self.compile_mov32ri(instr),
+                    MachineOpcode::MOV32rr => self.compile_mov32rr(instr),
                     MachineOpcode::Add => self.compile_add(&frame_objects, instr),
                     MachineOpcode::Sub => self.compile_sub(&frame_objects, instr),
                     MachineOpcode::Mul => self.compile_mul(&frame_objects, instr),
@@ -163,10 +163,30 @@ impl<'a> JITCompiler<'a> {
                     }
                     MachineOpcode::Br => self.compile_br(instr),
                     MachineOpcode::Ret => self.compile_return(&frame_objects, instr),
-                    _ => unimplemented!(),
+                    op => unimplemented!("{:?}", op),
                 }
             }
         }
+    }
+
+    fn compile_mov32ri(&mut self, instr: &MachineInstr) {
+        assert!(matches!(instr.operand[0], MachineOperand::Constant(_)));
+        assert!(matches!(
+            instr.operand[0].as_constant(),
+            MachineConstant::Int32(_)
+        ));
+
+        let r = instr.def[0].get_reg().unwrap().get() as u8;
+        let i = instr.operand[0].as_constant().as_i32();
+        dynasm!(self.asm; mov Rd(r), i);
+    }
+
+    fn compile_mov32rr(&mut self, instr: &MachineInstr) {
+        assert!(matches!(instr.operand[0], MachineOperand::Register(_)));
+
+        let r0 = instr.def[0].get_reg().unwrap().get() as u8;
+        let r1 = instr.operand[0].as_register().get_reg().unwrap().get() as u8;
+        self.reg_copy(&Type::Int32, r0, r1);
     }
 
     fn compile_copy(&mut self, instr: &MachineInstr) {
@@ -412,11 +432,11 @@ impl<'a> JITCompiler<'a> {
             dynasm!(self.asm; call => f_entry);
         }
 
-        match ret_ty {
-            Type::Int32 => self.reg_copy(ret_ty, register!(instr), 0),
-            Type::Void => {}
-            _ => unimplemented!(),
-        }
+        // match ret_ty {
+        //     Type::Int32 => self.reg_copy(ret_ty, register!(instr), 0),
+        //     Type::Void => {}
+        //     _ => unimplemented!(),
+        // }
 
         // for save_reg in save_regs.iter().rev() {
         //     dynasm!(self.asm; pop Ra(*save_reg));

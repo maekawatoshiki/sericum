@@ -650,6 +650,10 @@ impl TypeSize for GenericValue {
             GenericValue::None => 0,
         }
     }
+
+    fn size_in_bits(&self) -> usize {
+        self.size_in_byte() * 8
+    }
 }
 
 fn roundup(n: i32, align: i32) -> i32 {

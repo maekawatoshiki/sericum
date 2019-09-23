@@ -178,6 +178,13 @@ fn dag1() {
         //     __ = call (->cilk_println_i32) [(%p)];
         //     ret (i32 0);
 
+        // entry:
+        //     i = alloca i32;
+        //     store (i32 12), (%i);
+        //     li = load (%i);
+        //     a = add (%arg.0), (%li);
+        //     ret (%a);
+
         entry:
             cond = icmp le (%arg.0), (i32 2);
             br (%cond) l1, l2;
@@ -190,7 +197,6 @@ fn dag1() {
             r2 = call func [(%a2)];
             r3 = add (%r1), (%r2);
             ret (%r3);
-            // ret (%r1);
     });
 
     // let func = cilk_ir!(m; define [i32] func () {
@@ -241,13 +247,13 @@ fn dag1() {
         }
     }
 
-    //
-    //
-    // let mut jit = exec::jit::JITCompiler::new(&machine_module);
-    // jit.compile_module();
-    // let func = machine_module.find_function_by_name("func").unwrap();
-    // println!(
-    //     "ret: {:?}",
-    //     jit.run(func, vec![exec::jit::GenericValue::Int32(40)])
-    // );
+    let mut jit = exec::jit::JITCompiler::new(&machine_module);
+    jit.compile_module();
+    let func = machine_module.find_function_by_name("func").unwrap();
+    let now = ::std::time::Instant::now();
+    println!(
+        "ret: {:?}",
+        jit.run(func, vec![exec::jit::GenericValue::Int32(40)])
+    );
+    println!("{:?}", ::std::time::Instant::now().duration_since(now))
 }

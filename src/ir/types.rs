@@ -12,6 +12,7 @@ pub enum Type {
 
 pub trait TypeSize {
     fn size_in_byte(&self) -> usize;
+    fn size_in_bits(&self) -> usize;
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

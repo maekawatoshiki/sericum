@@ -46,7 +46,8 @@ pub struct RegisterInfo {
 pub enum MachineOpcode {
     // x86_64
     CDQ,
-    MOV32rX,
+    MOV32rr,
+    MOV32ri,
     IDIV,
 
     // Memory
@@ -476,6 +477,14 @@ impl MachineOperand {
             MachineOperand::GlobalAddress(_) => None, // TODO
             MachineOperand::None => None,
             MachineOperand::Register(r) => Some(r.info_ref().ty.clone()),
+        }
+    }
+}
+
+impl MachineConstant {
+    pub fn as_i32(&self) -> i32 {
+        match self {
+            MachineConstant::Int32(i) => *i,
         }
     }
 }

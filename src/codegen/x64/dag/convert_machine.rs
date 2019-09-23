@@ -343,7 +343,7 @@ impl ConvertToMachine {
                         machine_instr_arena,
                         iseq,
                         MachineInstr::new_with_def_reg(
-                            MachineOpcode::MOV32rX,
+                            mov_n_rx(32, &arg).unwrap(),
                             vec![arg],
                             Type::Int32,
                             vec![r],
@@ -358,7 +358,7 @@ impl ConvertToMachine {
                     .with_vreg(cur_func.vreg_gen.next_vreg())
                     .into_machine_register(); // i.g. EAX
                                               // TODO: support types other than int.
-                                              //       what about struct or union? they won't be assigned to reg
+                                              //       what about struct or union? they won't be assigned to register.
 
                 iseq_push(
                     machine_instr_arena,
@@ -429,7 +429,7 @@ impl ConvertToMachine {
                     machine_instr_arena,
                     iseq,
                     MachineInstr::new_with_def_reg(
-                        MachineOpcode::MOV32rX,
+                        mov_n_rx(32, &op1).unwrap(),
                         vec![op1],
                         Type::Int32, // TODO: support other types
                         vec![eax.clone()],
@@ -453,7 +453,7 @@ impl ConvertToMachine {
                 assert_eq!(op2.get_type(), Some(Type::Int32));
                 let instr1 = MachineInstr::new(
                     &cur_func.vreg_gen,
-                    MachineOpcode::Copy,
+                    mov_n_rx(32, &op2).unwrap(),
                     vec![op2],
                     Type::Int32, // TODO: support other types
                     cur_bb,
@@ -657,5 +657,21 @@ impl ConvertToMachine {
 
     fn get_machine_bb(&self, dag_bb_id: DAGBasicBlockId) -> MachineBasicBlockId {
         *self.dag_bb_to_machine_bb.get(&dag_bb_id).unwrap()
+    }
+}
+
+fn mov_n_rx(bit: usize, x: &MachineOperand) -> Option<MachineOpcode> {
+    // TODO: refine code
+    assert!(bit > 0 && ((bit & (bit - 1)) == 0));
+
+    let mov32rx = [MachineOpcode::MOV32rr, MachineOpcode::MOV32ri];
+    let xidx = match x {
+        MachineOperand::Register(_) => 0,
+        MachineOperand::Constant(_) => 1,
+        _ => return None, // TODO: Support GlobalAddress?
+    };
+    match bit {
+        32 => Some(mov32rx[xidx]),
+        _ => None,
     }
 }
