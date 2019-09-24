@@ -1,9 +1,32 @@
+### this branch is "new-regalloc" to think&create better register allocation system
+
 # Cilk
 
 [![CircleCI](https://circleci.com/gh/maekawatoshiki/cilk.svg?style=shield)](https://circleci.com/gh/maekawatoshiki/cilk)
 [![](http://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 
-(Toy) Compiler Infrastructure influenced by LLVM written in Rust.
+Toy Compiler Infrastructure influenced by LLVM written in Rust.
+
+Do not expect too much stuff!
+
+# Note
+
+- **ONLY CODE IN ``./tests/dag.rs`` IS THE LATEST. OTHER TEST CODES IN ``./tests/`` WORK (BECAUSE OLD SOURCE CODE REMAINS) BUT ARE NO LONGER MEANINGFUL.**
+
+# To Do
+
+- Optimization
+    - Easy ones
+        1. Spill registers not to the stack but to callee saved registers such as ebp. (llc does so)
+        2. Take into consideration the physical registers' allocation order.
+    - Hard ones
+        1. ....
+
+- Refine code. (never ending task though)
+
+- Write unsafe code (carefully) for better DAG Node handling.
+
+- Write documents in detail.
 
 # Example
 
@@ -11,7 +34,8 @@
 
 ```rust
 use cilk::{
-    exec::{interpreter::interp, jit::x64::compiler, jit::x64::liveness, jit::x64::regalloc},
+    codegen::x64::{dag, exec, machine},
+    exec::interpreter::interp,
     ir::{builder::Builder, module::Module, value::{Value, ImmediateValue}, types::Type},
 };
 
@@ -72,18 +96,29 @@ println!("Function dump:\n{}", m.function_ref(fibo).to_string(&m));
 //                     
 // }                               
 
+// In this branch, this may not work correctly.
 let mut interp = interp::Interpreter::new(&m);
 let ret = interp.run_function(fibo, vec![interp::ConcreteValue::Int32(10)]);
-
 println!("fibo(10) = {:?}", ret); // fibo(10) = Int32(55)
 
-// JIT SUPPORTS ONLY x86_64
+// JIT suppports for only x86_64
 
-let mut jit = compiler::JITCompiler::new(&m);
-jit.compile_module(); // compile the whole module
+let mut dag_module = dag::convert::ConvertToDAG::new(&m).convert_module();
+dag::combine::Combine::new().combine_module(&mut dag_module);
 
-let ret = jit.run(sum, vec![compiler::GenericValue::Int32(10)]);
-println!("jit: fibo(10) = {:?}", ret); // jit: fibo(10) = Int32(55)
+let mut machine_module = dag::convert_machine::ConvertToMachine::new().convert_module(dag_module);
+machine::phi_elimination::PhiElimination::new().run_on_module(&mut machine_module);
+machine::two_addr::TwoAddressConverter::new().run_on_module(&mut machine_module);
+machine::regalloc::RegisterAllocator::new().run_on_module(&mut machine_module);
+
+// The code above (creating dag module .... register allocation) will be integrated into JITCompiler.
+
+let mut jit = exec::jit::JITCompiler::new(&machine_module);
+jit.compile_module();
+
+let func = machine_module.find_function_by_name("func").unwrap();
+println!( "fibo(10) = {:?}",
+          jit.run(func, vec![exec::jit::GenericValue::Int32(10)])); // fibo(10) = 55
 ```
 
 - Useful macro to describe IR is available
