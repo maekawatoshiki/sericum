@@ -270,6 +270,12 @@ impl LivenessAnalysis {
 
                 for operand in &instr.operand {
                     if let MachineOperand::Register(reg) = operand {
+                        if let Some(phy_reg) = reg.get_reg() {
+                            if let Some(range) = reg2range.get_mut(&phy_reg) {
+                                range.segments.last_mut().unwrap().end = index;
+                            }
+                        }
+
                         if reg.get_reg().is_none() {
                             vreg2range
                                 .get_mut(&reg.get_vreg())

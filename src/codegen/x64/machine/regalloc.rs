@@ -19,7 +19,7 @@ impl RegisterAllocator {
     }
 
     pub fn run_on_function(&mut self, cur_func: &mut MachineFunction) {
-        self.insert_spill_and_reload_for_uses_across_func_call(cur_func);
+        self.preserve_vreg_uses_across_call(cur_func);
 
         let mut matrix = LivenessAnalysis::new().analyze_function(cur_func);
 
@@ -77,9 +77,7 @@ impl RegisterAllocator {
         occupied: &mut FxHashSet<i32>,
         call_instr_id: MachineInstrId,
     ) {
-        let i2map = self.construct_i2map(cur_func);
-        let matrix = LivenessAnalysis::new().analyze_function(cur_func);
-
+        // TODO: Refine code. It's hard to understand.
         fn find_unused_slot(
             cur_func: &mut MachineFunction,
             occupied: &mut FxHashSet</*idx=*/ i32>,
@@ -99,11 +97,31 @@ impl RegisterAllocator {
             slot
         }
 
+        fn replace_reg_uses<F>(
+            func: &mut MachineFunction,
+            from: &MachineRegister,
+            to: &MachineRegister,
+            cond: F,
+        ) where
+            F: Fn(MachineInstrId) -> bool,
+        {
+            for id in &from.info_ref().use_list {
+                if !cond(*id) {
+                    continue;
+                }
+                // Rereplace ``from`` uses with new one (``to``)
+                func.instr_arena[*id].replace_operand_reg(&from, &to);
+            }
+        }
+
+        let i2map = self.construct_i2map(cur_func);
+        let matrix = LivenessAnalysis::new().analyze_function(cur_func);
+
         let call_instr_idx = i2map.get_index_by_instr_id(call_instr_id).unwrap();
         let mut regs_to_save = FxHashSet::default();
 
-        // TODO
-        for (_instr_id, instr) in &cur_func.instr_arena {
+        // TODO: It's expensive to check all the elements in ``instr_arena``
+        for (_, instr) in &cur_func.instr_arena {
             if instr.def.len() == 0 {
                 continue;
             }
@@ -116,24 +134,14 @@ impl RegisterAllocator {
             }
         }
 
-        when_debug!(println!("SAVED REG: {:?}", regs_to_save));
+        when_debug!(println!("REG TO SAVE: {:?}", regs_to_save));
 
         let mut slots_to_save_regs = vec![];
         for r in &regs_to_save {
             slots_to_save_regs.push(find_unused_slot(cur_func, occupied, r));
         }
 
-        println!("NEW SLOT: {:?}", slots_to_save_regs);
-
-        let mut reg2ordered = FxHashMap::default();
-        for reg in &regs_to_save {
-            let mut ordered_use_list = BTreeMap::new();
-            for use_id in &reg.info_ref().use_list {
-                let idx = i2map.get_index_by_instr_id(*use_id).unwrap();
-                ordered_use_list.insert(idx, *use_id);
-            }
-            reg2ordered.insert(reg.clone(), ordered_use_list);
-        }
+        println!("NEW SLOTS: {:?}", slots_to_save_regs);
 
         let bb_of_call_instr = cur_func.instr_arena[call_instr_id].parent;
 
@@ -149,50 +157,35 @@ impl RegisterAllocator {
                 bb_of_call_instr,
             ));
 
+            // Define new (virtual) register for load from ``frinfo``, because
+            // virtual register must be defined only once.
+            let new_reg = reg.copy_with_new_vreg(&cur_func.vreg_gen);
+
+            replace_reg_uses(cur_func, &reg, &new_reg, |id: MachineInstrId| -> bool {
+                let idx = i2map.get_index_by_instr_id(id).unwrap();
+                // Uses after func calling will be replaced
+                call_instr_idx < idx
+            });
+
+            let load_instr_id = cur_func.instr_arena.alloc(MachineInstr::new_with_def_reg(
+                MachineOpcode::Load,
+                vec![MachineOperand::FrameIndex(frinfo)],
+                new_reg.info_ref().ty.clone(),
+                vec![new_reg.clone()],
+                bb_of_call_instr,
+            ));
+
             let mut builder = Builder::new(cur_func);
 
             builder.set_insert_point_before_instr(call_instr_id);
             builder.insert_instr_id(store_instr_id);
 
-            let mut cur_bb = bb_of_call_instr;
-            let mut load_instr_id = None;
-
-            for (idx, use_id) in reg2ordered.get(&reg).unwrap() {
-                if *idx <= call_instr_idx {
-                    continue;
-                }
-
-                let bb_of_instr_using_reg = builder.function.instr_arena[*use_id].parent;
-                let bb_changed = bb_of_instr_using_reg != cur_bb;
-
-                if load_instr_id.is_none() || bb_changed {
-                    if bb_changed {
-                        cur_bb = bb_of_instr_using_reg;
-                    }
-
-                    let new_reg = reg.copy_with_new_vreg(&builder.function.vreg_gen);
-                    load_instr_id = Some(builder.function.instr_arena.alloc(
-                        MachineInstr::new_with_def_reg(
-                            MachineOpcode::Load,
-                            vec![MachineOperand::FrameIndex(frinfo.clone())],
-                            new_reg.info_ref().ty.clone(),
-                            vec![new_reg.clone()],
-                            cur_bb,
-                        ),
-                    ));
-                    builder.set_insert_point_before_instr(*use_id);
-                    builder.insert_instr_id(load_instr_id.unwrap());
-                }
-
-                when_debug!(println!("USE: {:?}", builder.function.instr_arena[*use_id]));
-
-                let new_reg = builder.function.instr_arena[load_instr_id.unwrap()].def[0].clone();
-                builder.function.instr_arena[*use_id].replace_operand_reg(reg.clone(), new_reg);
-            }
+            builder.set_insert_point_after_instr(call_instr_id);
+            builder.insert_instr_id(load_instr_id);
         }
     }
 
-    fn insert_spill_and_reload_for_uses_across_func_call(
+    fn preserve_vreg_uses_across_call(
         &mut self,
         cur_func: &mut MachineFunction,
     ) -> Vec<MachineInstrId> {

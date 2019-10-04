@@ -557,7 +557,7 @@ impl<'a> JITCompiler<'a> {
         }
     }
 
-    fn compile_cdq(&mut self, _fo: &FrameObjectsInfo, instr: &MachineInstr) {
+    fn compile_cdq(&mut self, _fo: &FrameObjectsInfo, _instr: &MachineInstr) {
         dynasm!(self.asm; cdq)
     }
 

@@ -256,7 +256,7 @@ impl MachineInstr {
         }
     }
 
-    pub fn replace_operand_reg(&mut self, from: MachineRegister, to: MachineRegister) {
+    pub fn replace_operand_reg(&mut self, from: &MachineRegister, to: &MachineRegister) {
         for operand in self.operand.iter_mut() {
             match operand {
                 MachineOperand::Register(ref mut r) if r.get_vreg() == from.get_vreg() => {
