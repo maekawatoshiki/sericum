@@ -177,14 +177,12 @@ impl ConvertToMachine {
                     _ => unreachable!(),
                 };
 
-                let dst_ty = dst.info_ref().ty.clone();
                 Some(iseq_push(
                     machine_instr_arena,
                     iseq,
                     MachineInstr::new_with_def_reg(
                         MachineOpcode::Copy,
                         vec![val],
-                        dst_ty,
                         vec![dst],
                         cur_bb,
                     ),
@@ -199,7 +197,7 @@ impl ConvertToMachine {
                         &cur_func.vreg_gen,
                         MachineOpcode::Copy,
                         vec![reg],
-                        node.ty.clone(),
+                        &node.ty,
                         cur_bb,
                     ),
                 ))
@@ -215,7 +213,7 @@ impl ConvertToMachine {
                         &cur_func.vreg_gen,
                         MachineOpcode::LoadRegOff,
                         vec![fi, off, align],
-                        node.ty.clone(),
+                        &node.ty,
                         cur_bb,
                     ),
                 ))
@@ -231,7 +229,7 @@ impl ConvertToMachine {
                         &cur_func.vreg_gen,
                         MachineOpcode::LoadFiOff,
                         vec![fi, off, align],
-                        node.ty.clone(),
+                        &node.ty,
                         cur_bb,
                     ),
                 ))
@@ -246,7 +244,7 @@ impl ConvertToMachine {
                         &cur_func.vreg_gen,
                         MachineOpcode::LoadFiConstOff,
                         vec![fi, off],
-                        node.ty.clone(),
+                        &node.ty,
                         cur_bb,
                     ),
                 ))
@@ -263,7 +261,7 @@ impl ConvertToMachine {
                         &cur_func.vreg_gen,
                         MachineOpcode::StoreRegOff,
                         vec![fi, off, align, new_src],
-                        Type::Void,
+                        &Type::Void,
                         cur_bb,
                     ),
                 ))
@@ -280,7 +278,7 @@ impl ConvertToMachine {
                         &cur_func.vreg_gen,
                         MachineOpcode::StoreFiOff,
                         vec![fi, off, align, new_src],
-                        Type::Void,
+                        &Type::Void,
                         cur_bb,
                     ),
                 ))
@@ -296,7 +294,7 @@ impl ConvertToMachine {
                         &cur_func.vreg_gen,
                         MachineOpcode::StoreFiConstOff,
                         vec![fi, off, new_src],
-                        Type::Void,
+                        &Type::Void,
                         cur_bb,
                     ),
                 ))
@@ -310,7 +308,7 @@ impl ConvertToMachine {
                         &cur_func.vreg_gen,
                         MachineOpcode::Load,
                         vec![new_op1],
-                        node.ty.clone(),
+                        &node.ty,
                         cur_bb,
                     ),
                 ))
@@ -325,7 +323,7 @@ impl ConvertToMachine {
                         &cur_func.vreg_gen,
                         MachineOpcode::Store,
                         vec![new_dst, new_src],
-                        Type::Void,
+                        &Type::Void,
                         cur_bb,
                     ),
                 ))
@@ -345,7 +343,6 @@ impl ConvertToMachine {
                         MachineInstr::new_with_def_reg(
                             mov_n_rx(32, &arg).unwrap(),
                             vec![arg],
-                            Type::Int32,
                             vec![r],
                             cur_bb,
                         ),
@@ -366,7 +363,6 @@ impl ConvertToMachine {
                     MachineInstr::new_with_imp_def_use(
                         MachineOpcode::Call,
                         vec![callee],
-                        Type::Void,
                         if node.ty == Type::Void {
                             vec![]
                         } else {
@@ -387,7 +383,7 @@ impl ConvertToMachine {
                         &cur_func.vreg_gen,
                         MachineOpcode::Copy,
                         vec![MachineOperand::Register(ret_reg.clone())],
-                        ret_reg_ty,
+                        &ret_reg_ty,
                         cur_bb,
                     ),
                 ))
@@ -409,7 +405,7 @@ impl ConvertToMachine {
                         &cur_func.vreg_gen,
                         MachineOpcode::Phi,
                         operands,
-                        node.ty.clone(),
+                        &node.ty,
                         cur_bb,
                     ),
                 ))
@@ -431,7 +427,6 @@ impl ConvertToMachine {
                     MachineInstr::new_with_def_reg(
                         mov_n_rx(32, &op1).unwrap(),
                         vec![op1],
-                        Type::Int32, // TODO: support other types
                         vec![eax.clone()],
                         cur_bb,
                     ),
@@ -443,7 +438,6 @@ impl ConvertToMachine {
                     MachineInstr::new_with_imp_def_use(
                         MachineOpcode::CDQ,
                         vec![],
-                        Type::Void,
                         vec![edx.clone()], //def
                         vec![eax.clone()], //use
                         cur_bb,
@@ -455,7 +449,7 @@ impl ConvertToMachine {
                     &cur_func.vreg_gen,
                     mov_n_rx(32, &op2).unwrap(),
                     vec![op2],
-                    Type::Int32, // TODO: support other types
+                    &Type::Int32, // TODO: support other types
                     cur_bb,
                 );
                 let op2 = MachineOperand::Register(instr1.def[0].clone());
@@ -467,7 +461,6 @@ impl ConvertToMachine {
                     MachineInstr::new_with_imp_def_use(
                         MachineOpcode::IDIV,
                         vec![op2],
-                        Type::Void,
                         vec![eax.clone(), edx.clone()],
                         vec![eax, edx.clone()],
                         cur_bb,
@@ -481,7 +474,7 @@ impl ConvertToMachine {
                         &cur_func.vreg_gen,
                         MachineOpcode::Copy,
                         vec![MachineOperand::Register(edx)],
-                        Type::Int32, // TODO
+                        &Type::Int32, // TODO
                         cur_bb,
                     ),
                 ))
@@ -500,7 +493,7 @@ impl ConvertToMachine {
                         _ => unreachable!(),
                     },
                     vec![op1, op2],
-                    node.ty.clone(),
+                    &node.ty,
                     cur_bb,
                 );
                 let instr_tied = match node.kind {
@@ -523,7 +516,7 @@ impl ConvertToMachine {
                             CondKind::Lt => MachineOpcode::Setlt,
                         },
                         vec![new_op1, new_op2],
-                        node.ty.clone(),
+                        &node.ty,
                         cur_bb,
                     ),
                 ))
@@ -537,7 +530,7 @@ impl ConvertToMachine {
                     vec![MachineOperand::Branch(
                         self.get_machine_bb(bb!(node.operand[0])),
                     )],
-                    Type::Void,
+                    &Type::Void,
                     cur_bb,
                 ),
             )),
@@ -553,7 +546,7 @@ impl ConvertToMachine {
                             new_cond,
                             MachineOperand::Branch(self.get_machine_bb(bb!(node.operand[1]))),
                         ],
-                        Type::Void,
+                        &Type::Void,
                         cur_bb,
                     ),
                 ))
@@ -576,7 +569,7 @@ impl ConvertToMachine {
                             new_op1,
                             MachineOperand::Branch(self.get_machine_bb(bb!(node.operand[3]))),
                         ],
-                        Type::Void,
+                        &Type::Void,
                         cur_bb,
                     ),
                 ))
@@ -590,7 +583,7 @@ impl ConvertToMachine {
                         &cur_func.vreg_gen,
                         MachineOpcode::Ret,
                         vec![new_op1],
-                        Type::Void,
+                        &Type::Void,
                         cur_bb,
                     ),
                 ))
@@ -660,7 +653,7 @@ impl ConvertToMachine {
     }
 }
 
-fn mov_n_rx(bit: usize, x: &MachineOperand) -> Option<MachineOpcode> {
+pub fn mov_n_rx(bit: usize, x: &MachineOperand) -> Option<MachineOpcode> {
     // TODO: refine code
     assert!(bit > 0 && ((bit & (bit - 1)) == 0));
 
@@ -668,6 +661,19 @@ fn mov_n_rx(bit: usize, x: &MachineOperand) -> Option<MachineOpcode> {
     let xidx = match x {
         MachineOperand::Register(_) => 0,
         MachineOperand::Constant(_) => 1,
+        _ => return None, // TODO: Support GlobalAddress?
+    };
+    match bit {
+        32 => Some(mov32rx[xidx]),
+        _ => None,
+    }
+}
+
+pub fn mov_rx(x: &MachineOperand) -> Option<MachineOpcode> {
+    let mov32rx = [MachineOpcode::MOV32rr, MachineOpcode::MOV32ri];
+    let (bit, xidx) = match x {
+        MachineOperand::Register(r) => (r.info_ref().ty.size_in_bits(), 0),
+        MachineOperand::Constant(c) => (c.size_in_bits(), 1),
         _ => return None, // TODO: Support GlobalAddress?
     };
     match bit {

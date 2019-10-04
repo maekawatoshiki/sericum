@@ -23,7 +23,7 @@ pub struct MachineInstrIdAndIndexBiMap {
 pub struct MachineInstr {
     pub opcode: MachineOpcode,
     pub operand: Vec<MachineOperand>,
-    pub ty: Type, // TODO: will be removed
+    // pub ty: Type, // TODO: will be removed
     pub def: Vec<MachineRegister>,
     pub tie: FxHashMap<MachineRegister, MachineRegister>, // def -> use
     pub imp_use: Vec<MachineRegister>,
@@ -148,17 +148,16 @@ impl MachineInstr {
         vreg_gen: &VirtRegGen,
         opcode: MachineOpcode,
         operand: Vec<MachineOperand>,
-        ty: Type,
+        ty: &Type,
         parent: MachineBasicBlockId,
     ) -> Self {
         Self {
             opcode,
             operand,
-            def: match ty.clone() {
+            def: match ty {
                 Type::Void => vec![],
-                ty => vec![vreg_gen.gen_vreg(ty).into_machine_register()],
+                ty => vec![vreg_gen.gen_vreg(ty.clone()).into_machine_register()],
             },
-            ty,
             tie: FxHashMap::default(),
             imp_def: vec![],
             imp_use: vec![],
@@ -175,7 +174,6 @@ impl MachineInstr {
             opcode,
             operand,
             def: vec![],
-            ty: Type::Void,
             tie: FxHashMap::default(),
             imp_def: vec![],
             imp_use: vec![],
@@ -186,7 +184,6 @@ impl MachineInstr {
     pub fn new_with_def_reg(
         opcode: MachineOpcode,
         operand: Vec<MachineOperand>,
-        ty: Type,
         def: Vec<MachineRegister>,
         parent: MachineBasicBlockId,
     ) -> Self {
@@ -194,7 +191,6 @@ impl MachineInstr {
             opcode,
             operand,
             def,
-            ty,
             tie: FxHashMap::default(),
             imp_def: vec![],
             imp_use: vec![],
@@ -205,7 +201,6 @@ impl MachineInstr {
     pub fn new_with_imp_def_use(
         opcode: MachineOpcode,
         operand: Vec<MachineOperand>,
-        ty: Type,
         imp_def: Vec<MachineRegister>,
         imp_use: Vec<MachineRegister>,
         parent: MachineBasicBlockId,
@@ -214,7 +209,6 @@ impl MachineInstr {
             opcode,
             operand,
             def: vec![],
-            ty,
             tie: FxHashMap::default(),
             imp_def,
             imp_use,
@@ -224,11 +218,6 @@ impl MachineInstr {
 
     pub fn with_def(mut self, def: Vec<MachineRegister>) -> Self {
         self.def = def;
-        self
-    }
-
-    pub fn with_type(mut self, ty: Type) -> Self {
-        self.ty = ty;
         self
     }
 
@@ -496,6 +485,18 @@ impl MachineConstant {
         match self {
             MachineConstant::Int32(i) => *i,
         }
+    }
+}
+
+impl TypeSize for MachineConstant {
+    fn size_in_byte(&self) -> usize {
+        match self {
+            MachineConstant::Int32(_) => 4,
+        }
+    }
+
+    fn size_in_bits(&self) -> usize {
+        self.size_in_byte() * 8
     }
 }
 

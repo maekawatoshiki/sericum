@@ -249,12 +249,14 @@ impl<'a> JITCompiler<'a> {
         let fi = instr.operand[0].as_frame_index();
         let off = &instr.operand[1];
         match off {
-            MachineOperand::Constant(MachineConstant::Int32(i)) => match &instr.ty {
-                Type::Int32 => {
-                    dynasm!(self.asm; mov Rd(rn), [rbp - fo.offset(fi.idx).unwrap() + i])
+            MachineOperand::Constant(MachineConstant::Int32(i)) => {
+                match &instr.def[0].info_ref().ty {
+                    Type::Int32 => {
+                        dynasm!(self.asm; mov Rd(rn), [rbp - fo.offset(fi.idx).unwrap() + i])
+                    }
+                    _ => unimplemented!(),
                 }
-                _ => unimplemented!(),
-            },
+            }
             _ => unimplemented!(),
         }
     }
@@ -265,7 +267,7 @@ impl<'a> JITCompiler<'a> {
         let off = register!(instr.operand[1].as_register());
         let align = instr.operand[2].as_constant();
 
-        match &instr.ty {
+        match &instr.def[0].info_ref().ty {
             Type::Int32 => match align {
                 MachineConstant::Int32(4) => {
                     dynasm!(self.asm;
@@ -284,7 +286,7 @@ impl<'a> JITCompiler<'a> {
         let off = register!(instr.operand[1].as_register());
         let align = instr.operand[2].as_constant();
 
-        match &instr.ty {
+        match &instr.def[0].info_ref().ty {
             Type::Int32 => match align {
                 MachineConstant::Int32(4) => {
                     dynasm!(self.asm; mov Rd(rn), DWORD [Ra(base) + 4*Ra(off)]);

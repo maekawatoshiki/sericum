@@ -62,7 +62,6 @@ impl TwoAddressConverter {
                     MachineInstr::new_with_def_reg(
                         MachineOpcode::Copy,
                         vec![MachineOperand::Register(use_)],
-                        def_ty,
                         vec![def],
                         instr_bb,
                     ),

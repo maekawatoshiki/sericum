@@ -152,7 +152,7 @@ impl RegisterAllocator {
                     MachineOperand::FrameIndex(frinfo.clone()),
                     MachineOperand::Register(reg.clone()),
                 ],
-                Type::Void,
+                &Type::Void,
                 bb_of_call_instr,
             ));
 
@@ -172,7 +172,6 @@ impl RegisterAllocator {
                     vec![MachineOperand::FrameIndex(frinfo)],
                     bb_of_call_instr,
                 )
-                .with_type(new_reg.info_ref().ty.clone())
                 .with_def(vec![new_reg.clone()]),
             );
 

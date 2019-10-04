@@ -1,4 +1,5 @@
-use super::{basic_block::*, function::*, instr::*, module::*};
+use super::super::dag::convert_machine::mov_rx;
+use super::{basic_block::*, builder::*, function::*, instr::*, module::*};
 use rustc_hash::FxHashMap;
 
 pub struct PhiElimination {}
@@ -32,26 +33,24 @@ impl PhiElimination {
                     _ => unreachable!(),
                 };
 
+                when_debug!(println!("PHI {:?}", val));
+
                 let mut iseq = f.basic_block_arena[bb].iseq_ref_mut();
-                for k in 0..iseq.len() {
-                    if !f.instr_arena[iseq[iseq.len() - 1 - k]]
-                        .opcode
-                        .is_terminator()
-                    {
-                        let mut copy = MachineInstr::new(
-                            &f.vreg_gen,
-                            MachineOpcode::Copy,
-                            vec![val.clone()],
-                            phi.ty.clone(),
-                            bb,
-                        );
-                        copy.def = phi.def.clone();
-                        let id = f.instr_arena.alloc(copy);
-                        let pt = iseq.len() - k;
-                        iseq.insert(pt, id);
-                        break;
-                    }
-                }
+                assert!(
+                    iseq.len() > 0 && f.instr_arena[*iseq.last().unwrap()].opcode.is_terminator()
+                );
+
+                let mut copy = MachineInstr::new(
+                    &f.vreg_gen,
+                    mov_rx(&val).unwrap(),
+                    vec![val.clone()],
+                    &phi.def[0].info_ref().ty,
+                    bb,
+                );
+                copy.def = phi.def.clone();
+                let id = f.instr_arena.alloc(copy);
+                let pt = if iseq.len() >= 2 { iseq.len() - 1 } else { 0 };
+                iseq.insert(pt, id);
 
                 i += 2;
             }

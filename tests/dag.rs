@@ -190,14 +190,19 @@ fn dag1() {
             cond = icmp le (%arg.0), (i32 2);
             br (%cond) l1, l2;
         l1:
-            ret (i32 1);
+            br merge;
+            // ret (i32 1);
         l2:
             a1 = sub (%arg.0), (i32 1);
             r1 = call func [(%a1)];
             a2 = sub (%arg.0), (i32 2);
             r2 = call func [(%a2)];
             r3 = add (%r1), (%r2);
-            ret (%r3);
+            br merge;
+        merge:
+            p = phi [ [(i32 1), l1], [(%r3), l2] ];
+            ret (%p);
+            // ret (%r3);
     });
 
     // let func = cilk_ir!(m; define [i32] func () {
