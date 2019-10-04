@@ -3,7 +3,6 @@ use super::super::register::*;
 use super::{builder::*, function::*, instr::*, liveness::*, module::*};
 use crate::ir::types::*;
 use rustc_hash::{FxHashMap, FxHashSet};
-use std::collections::BTreeMap;
 
 pub struct RegisterAllocator {}
 
@@ -167,13 +166,15 @@ impl RegisterAllocator {
                 call_instr_idx < idx
             });
 
-            let load_instr_id = cur_func.instr_arena.alloc(MachineInstr::new_with_def_reg(
-                MachineOpcode::Load,
-                vec![MachineOperand::FrameIndex(frinfo)],
-                new_reg.info_ref().ty.clone(),
-                vec![new_reg.clone()],
-                bb_of_call_instr,
-            ));
+            let load_instr_id = cur_func.instr_arena.alloc(
+                MachineInstr::new_simple(
+                    MachineOpcode::Load,
+                    vec![MachineOperand::FrameIndex(frinfo)],
+                    bb_of_call_instr,
+                )
+                .with_type(new_reg.info_ref().ty.clone())
+                .with_def(vec![new_reg.clone()]),
+            );
 
             let mut builder = Builder::new(cur_func);
 

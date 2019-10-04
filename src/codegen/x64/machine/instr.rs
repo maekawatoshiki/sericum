@@ -222,6 +222,16 @@ impl MachineInstr {
         }
     }
 
+    pub fn with_def(mut self, def: Vec<MachineRegister>) -> Self {
+        self.def = def;
+        self
+    }
+
+    pub fn with_type(mut self, ty: Type) -> Self {
+        self.ty = ty;
+        self
+    }
+
     pub fn with_imp_use(mut self, r: MachineRegister) -> Self {
         self.imp_use.push(r);
         self

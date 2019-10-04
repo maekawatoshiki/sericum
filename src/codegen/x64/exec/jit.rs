@@ -18,9 +18,6 @@ macro_rules! register {
 
 #[rustfmt::skip]
 macro_rules! typ {
-    ($f:expr; $instr_id:expr) => {{
-        $f.instr_arena[$instr_id].ty.as_ref().unwrap()
-    }};
     ($reg:expr) => {{
         &$reg.info_ref().ty
     }};
