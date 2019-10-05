@@ -55,18 +55,15 @@ impl TwoAddressConverter {
             // after:  v1 = copy v2
             //         v1 = add v1, 1
 
-            let old_instr = {
-                let def_ty = def.info_ref().ty.clone();
-                mem::replace(
-                    &mut f.instr_arena[instr_id],
-                    MachineInstr::new_with_def_reg(
-                        MachineOpcode::Copy,
-                        vec![MachineOperand::Register(use_)],
-                        vec![def],
-                        instr_bb,
-                    ),
-                )
-            };
+            let old_instr = mem::replace(
+                &mut f.instr_arena[instr_id],
+                MachineInstr::new_with_def_reg(
+                    MachineOpcode::Copy,
+                    vec![MachineOperand::Register(use_)],
+                    vec![def],
+                    instr_bb,
+                ),
+            );
 
             let instr = f.instr_arena.alloc(old_instr);
 

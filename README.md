@@ -34,7 +34,7 @@ Do not expect too much stuff!
 
 ```rust
 use cilk::{
-    codegen::x64::{dag, exec, machine},
+    codegen::x64::{exec},
     exec::interpreter::interp,
     ir::{builder::Builder, module::Module, value::{Value, ImmediateValue}, types::Type},
 };
@@ -103,20 +103,8 @@ println!("fibo(10) = {:?}", ret); // fibo(10) = Int32(55)
 
 // JIT suppports for only x86_64
 
-let mut dag_module = dag::convert::ConvertToDAG::new(&m).convert_module();
-dag::combine::Combine::new().combine_module(&mut dag_module);
-
-let mut machine_module = dag::convert_machine::ConvertToMachine::new().convert_module(dag_module);
-machine::phi_elimination::PhiElimination::new().run_on_module(&mut machine_module);
-machine::two_addr::TwoAddressConverter::new().run_on_module(&mut machine_module);
-machine::regalloc::RegisterAllocator::new().run_on_module(&mut machine_module);
-
-// The code above (creating dag module .... register allocation) will be integrated into JITCompiler.
-
-let mut jit = exec::jit::JITCompiler::new(&machine_module);
-jit.compile_module();
-
-let func = machine_module.find_function_by_name("func").unwrap();
+let mut jit = exec::jit::JITExecutor::new(&machine_module);
+let func = jit.find_function_by_name("func").unwrap();
 println!( "fibo(10) = {:?}",
           jit.run(func, vec![exec::jit::GenericValue::Int32(10)])); // fibo(10) = 55
 ```

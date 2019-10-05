@@ -1,5 +1,5 @@
 use cilk::{
-    codegen::x64::{dag, exec, machine},
+    codegen::x64::exec,
     // exec::{interpreter::interp, jit::x64::compiler},
     ir::{builder, function, module, types, value},
     *,
@@ -186,79 +186,68 @@ fn dag1() {
         //     a = add (%arg.0), (%li);
         //     ret (%a);
 
+         // entry:
+         //     // a = alloca_ ([8; i32]);
+         //     a = alloca_ ([2; [2; i32]]);
+         //     i = alloca i32;
+         //     store (i32 1), (%i);
+         //     li = load (%i);
+         //
+         //     idx = gep (%a), [(i32 0), (%li), (i32 1)];
+         //     store (i32 123), (%idx);
+         //
+         //     idx = gep (%a), [(i32 0), (i32 1), (i32 1)];
+         //     l = load (%idx);
+         //     ret (%l);
+
+
         entry:
             cond = icmp le (%arg.0), (i32 2);
             br (%cond) l1, l2;
         l1:
-            br merge;
-            // ret (i32 1);
+            // br merge;
+            ret (i32 1);
         l2:
             a1 = sub (%arg.0), (i32 1);
             r1 = call func [(%a1)];
             a2 = sub (%arg.0), (i32 2);
             r2 = call func [(%a2)];
             r3 = add (%r1), (%r2);
-            br merge;
-        merge:
-            p = phi [ [(i32 1), l1], [(%r3), l2] ];
-            ret (%p);
-            // ret (%r3);
+            ret (%r3);
+            // br merge;
+        // merge:
+        //     p = phi [ [(i32 1), l1], [(%r3), l2] ];
+        //     ret (%p);
     });
 
-    // let func = cilk_ir!(m; define [i32] func () {
-    //     entry:
-    //         a = alloca_ ([8; i32]);
-    //
-    //         idx = gep (%a), [(i32 0), (i32 3)];
-    //         store (i32 123), (%idx);
-    //
-    //         // idx = gep (%a), [(i32 0), (i32 3)];
-    //         // l = load (%idx);
-    //         ret (i32 0);
-    // });
+    let main = cilk_ir!(m; define [void] main (i32) {
+        entry:
+            i = alloca i32;
+            store (i32 1), (%i);
+            br cond;
+        cond:
+            li = load (%i);
+            c = icmp le (%li), (%arg.0);
+            br (%c) loop_, end;
+        loop_:
+            x = call (->func) [(%li)];
+            __ = call (->cilk_println_i32) [(%x)];
+            inc = add (%li), (i32 1);
+            store (%inc), (%i);
+            br cond;
+        end:
+            ret (void);
+    });
 
     println!("{}", m.function_ref(func).to_string(&m));
+    println!("{}", m.function_ref(main).to_string(&m));
 
-    let mut dag_module = dag::convert::ConvertToDAG::new(&m).convert_module();
-    dag::combine::Combine::new().combine_module(&mut dag_module);
-    println!("DAG:");
-    for (_, dag_func) in &dag_module.functions {
-        for id in &dag_func.dag_basic_blocks {
-            let bb = &dag_func.dag_basic_block_arena[*id];
-            println!("{}: {:?}", id.index(), bb);
-        }
-        for (id, dag) in &dag_func.dag_arena {
-            println!("{}: {:?}", id.index(), dag);
-        }
-    }
-
-    let mut machine_module =
-        dag::convert_machine::ConvertToMachine::new().convert_module(dag_module);
-    machine::phi_elimination::PhiElimination::new().run_on_module(&mut machine_module);
-    machine::two_addr::TwoAddressConverter::new().run_on_module(&mut machine_module);
-    // machine::regalloc::PhysicalRegisterAllocator::new().run_on_module(&mut machine_module);
-    machine::regalloc::RegisterAllocator::new().run_on_module(&mut machine_module);
-
-    let mut idx = 0;
-    for (_, machine_func) in &machine_module.functions {
-        for bb_id in &machine_func.basic_blocks {
-            let bb = &machine_func.basic_block_arena[*bb_id];
-            println!("Machine basic block: {:?}", bb);
-            for instr in &*bb.iseq_ref() {
-                println!("{}: {:?}", idx, machine_func.instr_arena[*instr]);
-                idx += 1;
-            }
-            println!()
-        }
-    }
-
-    let mut jit = exec::jit::JITCompiler::new(&machine_module);
-    jit.compile_module();
-    let func = machine_module.find_function_by_name("func").unwrap();
+    let mut jit = exec::jit::JITExecutor::new(&m);
+    let main = jit.find_function_by_name("main").unwrap();
     let now = ::std::time::Instant::now();
     println!(
-        "ret: {:?}",
-        jit.run(func, vec![exec::jit::GenericValue::Int32(40)])
+        "main: return: {:?}",
+        jit.run(main, vec![exec::jit::GenericValue::Int32(40)])
     );
     println!(
         "duration: {:?}",

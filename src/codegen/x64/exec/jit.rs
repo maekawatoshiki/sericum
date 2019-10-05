@@ -1,6 +1,7 @@
 use crate::codegen::x64::machine::{
     basic_block::*, frame_object::*, function::*, instr::*, module::*,
 };
+use crate::ir;
 use crate::ir::types::*;
 use dynasmrt::*;
 use rustc_hash::FxHashMap;
@@ -29,8 +30,13 @@ pub enum GenericValue {
     None,
 }
 
-pub struct JITCompiler<'a> {
-    module: &'a MachineModule,
+pub struct JITExecutor {
+    jit: JITCompiler,
+    machine_module: MachineModule,
+    // pub
+}
+
+pub struct JITCompiler {
     asm: x64::Assembler,
     function_map: FxHashMap<MachineFunctionId, DynamicLabel>,
     bb_to_label: FxHashMap<MachineBasicBlockId, DynamicLabel>,
@@ -43,10 +49,70 @@ pub struct FrameObjectsInfo {
     total_size: usize,
 }
 
-impl<'a> JITCompiler<'a> {
-    pub fn new(module: &'a MachineModule) -> Self {
+impl JITExecutor {
+    pub fn new(module: &ir::module::Module) -> Self {
+        use super::super::{dag, machine};
+
+        let mut dag_module = dag::convert::ConvertToDAG::new(module).convert_module();
+
+        dag::combine::Combine::new().combine_module(&mut dag_module);
+
+        when_debug!(
+            println!("DAG:");
+            for (_, dag_func) in &dag_module.functions {
+                for id in &dag_func.dag_basic_blocks {
+                    let bb = &dag_func.dag_basic_block_arena[*id];
+                    println!("{}: {:?}", id.index(), bb);
+                }
+                for (id, dag) in &dag_func.dag_arena {
+                    println!("{}: {:?}", id.index(), dag);
+                }
+            }
+        );
+
+        let mut machine_module =
+            dag::convert_machine::ConvertToMachine::new().convert_module(dag_module);
+
+        machine::phi_elimination::PhiElimination::new().run_on_module(&mut machine_module);
+        machine::two_addr::TwoAddressConverter::new().run_on_module(&mut machine_module);
+        machine::regalloc::RegisterAllocator::new().run_on_module(&mut machine_module);
+
+        when_debug!(
+            let mut idx = 0;
+            for (_, machine_func) in &machine_module.functions {
+                for bb_id in &machine_func.basic_blocks {
+                    let bb = &machine_func.basic_block_arena[*bb_id];
+                    println!("Machine basic block: {:?}", bb);
+                    for instr in &*bb.iseq_ref() {
+                        println!("{}: {:?}", idx, machine_func.instr_arena[*instr]);
+                        idx += 1;
+                    }
+                    println!()
+                }
+            }
+        );
+
+        let mut jit = JITCompiler::new();
+        jit.compile_module(&machine_module);
+
         Self {
-            module,
+            machine_module,
+            jit,
+        }
+    }
+
+    pub fn find_function_by_name(&self, name: &str) -> Option<MachineFunctionId> {
+        self.machine_module.find_function_by_name(name)
+    }
+
+    pub fn run(&mut self, id: MachineFunctionId, args: Vec<GenericValue>) -> GenericValue {
+        self.jit.run(&self.machine_module, id, args)
+    }
+}
+
+impl JITCompiler {
+    pub fn new() -> Self {
+        Self {
             asm: x64::Assembler::new().unwrap(),
             function_map: FxHashMap::default(),
             bb_to_label: FxHashMap::default(),
@@ -56,7 +122,12 @@ impl<'a> JITCompiler<'a> {
         }
     }
 
-    pub fn run(&mut self, id: MachineFunctionId, args: Vec<GenericValue>) -> GenericValue {
+    pub fn run(
+        &mut self,
+        module: &MachineModule,
+        id: MachineFunctionId,
+        args: Vec<GenericValue>,
+    ) -> GenericValue {
         let f_entry = self.get_function_entry_label(id);
         let entry = self.asm.offset();
 
@@ -76,14 +147,7 @@ impl<'a> JITCompiler<'a> {
         let buf = executor.lock();
         let f: extern "C" fn() -> u64 = unsafe { ::std::mem::transmute(buf.ptr(entry)) };
 
-        match &self
-            .module
-            .function_ref(id)
-            .ty
-            .get_function_ty()
-            .unwrap()
-            .ret_ty
-        {
+        match &module.function_ref(id).ty.get_function_ty().unwrap().ret_ty {
             Type::Int32 => GenericValue::Int32(f() as i32),
             Type::Void => {
                 f();
@@ -93,16 +157,16 @@ impl<'a> JITCompiler<'a> {
         }
     }
 
-    pub fn compile_module(&mut self) {
-        for (f_id, _) in &self.module.functions {
-            self.compile_function(f_id);
+    pub fn compile_module(&mut self, module: &MachineModule) {
+        for (f_id, _) in &module.functions {
+            self.compile_function(module, f_id);
         }
     }
 
-    fn compile_function(&mut self, id: MachineFunctionId) {
+    fn compile_function(&mut self, module: &MachineModule, id: MachineFunctionId) {
         self.bb_to_label.clear();
 
-        let f = self.module.function_ref(id);
+        let f = module.function_ref(id);
         let f_entry = self.get_function_entry_label(id);
 
         let frame_objects = FrameObjectsInfo::new(f);
@@ -155,7 +219,7 @@ impl<'a> JITCompiler<'a> {
                     }
                     MachineOpcode::StoreFiOff => self.compile_store_fi_off(&frame_objects, instr),
                     MachineOpcode::StoreRegOff => self.compile_store_reg_off(&frame_objects, instr),
-                    MachineOpcode::Call => self.compile_call(&frame_objects, instr),
+                    MachineOpcode::Call => self.compile_call(module, &frame_objects, instr),
                     MachineOpcode::Copy => self.compile_copy(instr),
                     MachineOpcode::BrccEq | MachineOpcode::BrccLe | MachineOpcode::BrccLt => {
                         self.compile_brcc(instr)
@@ -380,15 +444,19 @@ impl<'a> JITCompiler<'a> {
         }
     }
 
-    fn compile_call(&mut self, _fo: &FrameObjectsInfo, instr: &MachineInstr) {
-        let callee_id = self
-            .module
+    fn compile_call(
+        &mut self,
+        module: &MachineModule,
+        _fo: &FrameObjectsInfo,
+        instr: &MachineInstr,
+    ) {
+        let callee_id = module
             .find_function_by_name(match &instr.operand[0] {
                 MachineOperand::GlobalAddress(GlobalValueInfo::FunctionName(n)) => n.as_str(),
                 _ => unimplemented!(),
             })
             .unwrap();
-        let callee_entity = self.module.function_ref(callee_id);
+        let callee_entity = module.function_ref(callee_id);
         // let ret_ty = &callee_entity.ty.get_function_ty().unwrap().ret_ty;
         let rsp_offset = 0;
 
