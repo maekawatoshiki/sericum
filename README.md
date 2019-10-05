@@ -103,7 +103,7 @@ println!("fibo(10) = {:?}", ret); // fibo(10) = Int32(55)
 
 // JIT suppports for only x86_64
 
-let mut jit = exec::jit::JITExecutor::new(&machine_module);
+let mut jit = exec::jit::JITExecutor::new(&m);
 let func = jit.find_function_by_name("func").unwrap();
 println!( "fibo(10) = {:?}",
           jit.run(func, vec![exec::jit::GenericValue::Int32(10)])); // fibo(10) = 55
