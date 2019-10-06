@@ -1,6 +1,8 @@
 use super::super::register::*;
 use super::{basic_block::*, frame_object::*, function::*, module::*, node::*};
-use crate::ir::{basic_block::*, function::*, module::*, opcode::*, types::*, value::*};
+use crate::ir::{
+    basic_block::*, function::*, liveness::*, module::*, opcode::*, types::*, value::*,
+};
 use id_arena::*;
 use rustc_hash::FxHashMap;
 
@@ -21,6 +23,8 @@ pub struct ConversionInfo {
 
 impl<'a> ConvertToDAG<'a> {
     pub fn new(module: &'a Module) -> Self {
+        IRLivenessAnalyzer::new(&module).analyze();
+
         Self {
             module,
             instr_id_node_id: FxHashMap::default(),
@@ -42,6 +46,13 @@ impl<'a> ConvertToDAG<'a> {
         self.instr_id_node_id.clear();
 
         let func = self.module.function_ref(func_id);
+
+        when_debug!(println!(
+            "{}: dump function: \n{}",
+            file!(),
+            func.to_string(&self.module)
+        ));
+
         let mut dag_bb_arena: Arena<DAGBasicBlock> = Arena::new();
         let mut dag_bb_list: Vec<DAGBasicBlockId> = vec![];
 
@@ -346,24 +357,6 @@ impl<'a> ConvertToDAG<'a> {
             }
 
             let copy_to_live_out = *self.instr_id_to_copy_node.get(instr_liveout).unwrap();
-            // let (reg, ty) = {
-            //     let copy2reg = &self.cur_conv_info_ref().dag_arena[copy2reg_id];
-            //     (copy2reg.operand[0], copy2reg.ty.clone())
-            // };
-            // let reg = match self.cur_conv_info_ref().dag_arena[reg].kind {
-            //     DAGNodeKind::Register(ref r) => r.clone(),
-            //     _ => panic!(),
-            // };
-            // let copy_from_reg = self.cur_conv_info_mut().dag_arena.alloc(DAGNode::new(
-            //     DAGNodeKind::Register(reg),
-            //     vec![],
-            //     ty,
-            // ));
-            // let copy_from_reg = self.cur_conv_info_mut().dag_arena.alloc(DAGNode::new(
-            //     DAGNodeKind::CopyFromReg,
-            //     vec![reg],
-            //     ty,
-            // ));
             self.instr_id_node_id
                 .insert(*instr_liveout, copy_to_live_out);
         }
@@ -464,20 +457,6 @@ impl<'a> ConvertToDAG<'a> {
             vec![node_id],
             Type::Void,
         ));
-        // let ty = self.cur_conv_info_ref().dag_arena[node_id].ty.clone();
-        // let vreg = Rc::new(RefCell::new(
-        //     self.cur_conv_info_mut().vreg_gen.gen_vreg(ty.clone()),
-        // ));
-        // let vreg_node = self.cur_conv_info_mut().dag_arena.alloc(DAGNode::new(
-        //     DAGNodeKind::Register(vreg.clone()),
-        //     vec![],
-        //     ty.clone(),
-        // ));
-        // let copy2reg = self.cur_conv_info_mut().dag_arena.alloc(DAGNode::new(
-        //     DAGNodeKind::CopyToReg,
-        //     vec![vreg_node, node_id],
-        //     ty,
-        // ));
 
         self.make_chain(copy_to_live_out);
 

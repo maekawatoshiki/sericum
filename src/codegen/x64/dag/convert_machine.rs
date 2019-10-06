@@ -357,7 +357,7 @@ impl ConvertToMachine {
                                               // TODO: support types other than int.
                                               //       what about struct or union? they won't be assigned to register.
 
-                iseq_push(
+                let call_instr = iseq_push(
                     machine_instr_arena,
                     iseq,
                     MachineInstr::new_with_imp_def_use(
@@ -374,19 +374,23 @@ impl ConvertToMachine {
                     .with_imp_uses(arg_regs),
                 );
 
-                let ret_reg_ty = ret_reg.info_ref().ty.clone();
+                if node.ty == Type::Void {
+                    Some(call_instr)
+                } else {
+                    let ret_reg_ty = ret_reg.info_ref().ty.clone();
 
-                Some(iseq_push(
-                    machine_instr_arena,
-                    iseq,
-                    MachineInstr::new(
-                        &cur_func.vreg_gen,
-                        MachineOpcode::Copy,
-                        vec![MachineOperand::Register(ret_reg.clone())],
-                        &ret_reg_ty,
-                        cur_bb,
-                    ),
-                ))
+                    Some(iseq_push(
+                        machine_instr_arena,
+                        iseq,
+                        MachineInstr::new(
+                            &cur_func.vreg_gen,
+                            MachineOpcode::Copy,
+                            vec![MachineOperand::Register(ret_reg.clone())],
+                            &ret_reg_ty,
+                            cur_bb,
+                        ),
+                    ))
+                }
             }
             DAGNodeKind::Phi => {
                 let mut operands = vec![];

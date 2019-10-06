@@ -1,5 +1,5 @@
 use super::super::dag::convert_machine::mov_rx;
-use super::{basic_block::*, builder::*, function::*, instr::*, module::*};
+use super::{basic_block::*, function::*, instr::*, module::*};
 use rustc_hash::FxHashMap;
 
 pub struct PhiElimination {}

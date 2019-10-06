@@ -25,6 +25,7 @@ macro_rules! when_debug {
 
 macro_rules! matches {
     ($e:expr, $p:pat) => {
+        #[allow(unreachable_patterns)]
         match $e {
             $p => true,
             _ => false,

@@ -24,6 +24,7 @@ impl RegisterAllocator {
 
         for vreg in matrix.collect_vregs() {
             // TODO: 0..8 ???
+            let mut allocated = false;
             for reg in 0..8 {
                 let reg = get_general_reg(reg).unwrap();
 
@@ -35,8 +36,12 @@ impl RegisterAllocator {
 
                 let range = matrix.get_vreg_interval(vreg).unwrap().range.clone();
                 matrix.get_or_create_reg_live_range(reg).unite_range(range);
+
+                allocated = true;
                 break;
             }
+
+            assert!(allocated);
         }
 
         when_debug!(for (_, x) in &matrix.vreg_interval {
@@ -96,23 +101,6 @@ impl RegisterAllocator {
             slot
         }
 
-        fn replace_reg_uses<F>(
-            func: &mut MachineFunction,
-            from: &MachineRegister,
-            to: &MachineRegister,
-            cond: F,
-        ) where
-            F: Fn(MachineInstrId) -> bool,
-        {
-            for id in &from.info_ref().use_list {
-                if !cond(*id) {
-                    continue;
-                }
-                // Rereplace ``from`` uses with new one (``to``)
-                func.instr_arena[*id].replace_operand_reg(&from, &to);
-            }
-        }
-
         let i2map = self.construct_i2map(cur_func);
         let matrix = LivenessAnalysis::new().analyze_function(cur_func);
 
@@ -142,7 +130,7 @@ impl RegisterAllocator {
 
         println!("NEW SLOTS: {:?}", slots_to_save_regs);
 
-        let bb_of_call_instr = cur_func.instr_arena[call_instr_id].parent;
+        let call_instr_parent = cur_func.instr_arena[call_instr_id].parent;
 
         for (frinfo, reg) in slots_to_save_regs.into_iter().zip(regs_to_save.iter()) {
             let store_instr_id = cur_func.instr_arena.alloc(MachineInstr::new(
@@ -153,26 +141,16 @@ impl RegisterAllocator {
                     MachineOperand::Register(reg.clone()),
                 ],
                 &Type::Void,
-                bb_of_call_instr,
+                call_instr_parent,
             ));
-
-            // Define new (virtual) register for load from ``frinfo``, because
-            // virtual register must be defined only once.
-            let new_reg = reg.copy_with_new_vreg(&cur_func.vreg_gen);
-
-            replace_reg_uses(cur_func, &reg, &new_reg, |id: MachineInstrId| -> bool {
-                let idx = i2map.get_index_by_instr_id(id).unwrap();
-                // Uses after func calling will be replaced
-                call_instr_idx < idx
-            });
 
             let load_instr_id = cur_func.instr_arena.alloc(
                 MachineInstr::new_simple(
                     MachineOpcode::Load,
                     vec![MachineOperand::FrameIndex(frinfo)],
-                    bb_of_call_instr,
+                    call_instr_parent,
                 )
-                .with_def(vec![new_reg.clone()]),
+                .with_def(vec![reg.clone()]),
             );
 
             let mut builder = Builder::new(cur_func);

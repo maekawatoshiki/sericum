@@ -78,8 +78,10 @@ impl JITExecutor {
         machine::regalloc::RegisterAllocator::new().run_on_module(&mut machine_module);
 
         when_debug!(
-            let mut idx = 0;
+            println!("MachineModule dump:");
             for (_, machine_func) in &machine_module.functions {
+                let mut idx = 0;
+                println!("Machine function '{}':", machine_func.name);
                 for bb_id in &machine_func.basic_blocks {
                     let bb = &machine_func.basic_block_arena[*bb_id];
                     println!("Machine basic block: {:?}", bb);
