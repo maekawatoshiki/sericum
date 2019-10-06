@@ -143,6 +143,8 @@ impl RegisterAllocator {
                 &Type::Void,
                 call_instr_parent,
             ));
+            cur_func.instr_arena[store_instr_id].add_use(store_instr_id);
+            cur_func.instr_arena[store_instr_id].add_def(store_instr_id);
 
             let load_instr_id = cur_func.instr_arena.alloc(
                 MachineInstr::new_simple(
@@ -152,6 +154,7 @@ impl RegisterAllocator {
                 )
                 .with_def(vec![reg.clone()]),
             );
+            cur_func.instr_arena[load_instr_id].add_def(load_instr_id);
 
             let mut builder = Builder::new(cur_func);
 
@@ -163,10 +166,7 @@ impl RegisterAllocator {
         }
     }
 
-    fn preserve_vreg_uses_across_call(
-        &mut self,
-        cur_func: &mut MachineFunction,
-    ) -> Vec<MachineInstrId> {
+    fn preserve_vreg_uses_across_call(&mut self, cur_func: &mut MachineFunction) {
         let mut call_instr_id = vec![];
 
         for bb_id in &cur_func.basic_blocks {
@@ -185,11 +185,10 @@ impl RegisterAllocator {
             .iter()
             .map(|l| l.idx)
             .collect::<FxHashSet<_>>();
+
         for instr_id in call_instr_id {
             self.insert_instr_to_save_reg(cur_func, &mut occupied.clone(), instr_id);
         }
-        vec![]
-        // call_instr_id
     }
 
     // i2 means (Machine) Instr id and Index.

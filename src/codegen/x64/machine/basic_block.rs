@@ -61,6 +61,10 @@ impl MachineBasicBlock {
     pub fn liveness_ref(&self) -> Ref<LivenessInfo> {
         self.liveness.borrow()
     }
+
+    pub fn liveness_ref_mut(&self) -> RefMut<LivenessInfo> {
+        self.liveness.borrow_mut()
+    }
 }
 
 impl LivenessInfo {
@@ -70,5 +74,11 @@ impl LivenessInfo {
             live_in: FxHashSet::default(),
             live_out: FxHashSet::default(),
         }
+    }
+
+    pub fn clear(&mut self) {
+        self.def.clear();
+        self.live_in.clear();
+        self.live_out.clear();
     }
 }

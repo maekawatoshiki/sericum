@@ -36,8 +36,9 @@ pub struct RegisterInfo {
     pub vreg: VirtReg,
     pub reg: Option<PhysReg>,
     pub ty: Type,
-    pub spill: bool,
-    pub last_use: Option<MachineInstrId>,
+    pub spill: bool,                      // TODO: Will be removed
+    pub last_use: Option<MachineInstrId>, // TODO: Will be removed
+    pub tied: Option<RegisterInfoRef>,
     pub use_list: FxHashSet<MachineInstrId>,
     pub def_list: FxHashSet<MachineInstrId>,
 }
@@ -247,11 +248,11 @@ impl MachineInstr {
 
     pub fn add_def(&self, id: MachineInstrId) {
         for reg in &self.def {
-            reg.info_ref_mut().use_list.insert(id);
+            reg.info_ref_mut().def_list.insert(id);
         }
 
         for reg in &self.imp_def {
-            reg.info_ref_mut().use_list.insert(id);
+            reg.info_ref_mut().def_list.insert(id);
         }
     }
 
@@ -328,6 +329,14 @@ impl MachineRegister {
         r.copy_with_new_vreg(vreg_gen).into_machine_register()
     }
 
+    pub fn has_tied(&self) -> bool {
+        self.info_ref().tied.is_some()
+    }
+
+    pub fn tie_reg(&self, r: &MachineRegister) {
+        self.info_ref_mut().tie_reg(r.info.clone())
+    }
+
     pub fn set_vreg(&self, vreg: VirtReg) {
         self.info.borrow_mut().set_vreg(vreg);
     }
@@ -337,9 +346,13 @@ impl MachineRegister {
     }
 
     pub fn set_phy_reg(&self, reg: PhysReg, spill: bool) {
-        let mut reg_info = self.info.borrow_mut();
-        reg_info.reg = Some(reg);
-        reg_info.spill = spill;
+        let mut info = self.info_ref_mut();
+        info.reg = Some(reg);
+        info.spill = spill;
+
+        if let Some(tied) = &info.tied {
+            tied.borrow_mut().reg = Some(reg);
+        }
     }
 
     pub fn get_last_use(&self) -> Option<MachineInstrId> {
@@ -375,6 +388,7 @@ impl RegisterInfo {
             reg: None,
             spill: false,
             last_use: None,
+            tied: None,
             use_list: FxHashSet::default(),
             def_list: FxHashSet::default(),
         }
@@ -387,6 +401,7 @@ impl RegisterInfo {
             reg: Some(reg),
             spill: false,
             last_use: None,
+            tied: None,
             use_list: FxHashSet::default(),
             def_list: FxHashSet::default(),
         }
@@ -399,6 +414,7 @@ impl RegisterInfo {
             reg: None,
             spill: false,
             last_use: None,
+            tied: None,
             use_list: FxHashSet::default(),
             def_list: FxHashSet::default(),
         }))
@@ -416,6 +432,10 @@ impl RegisterInfo {
 
     pub fn into_machine_register(self) -> MachineRegister {
         MachineRegister::new(self.into_ref())
+    }
+
+    pub fn tie_reg(&mut self, tied: RegisterInfoRef) {
+        self.tied = Some(tied);
     }
 
     pub fn set_vreg(&mut self, vreg: VirtReg) {
@@ -575,7 +595,10 @@ impl fmt::Debug for MachineRegister {
 impl fmt::Debug for RegisterInfo {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.reg {
-            Some(phy_reg) => phy_reg.fmt(f),
+            Some(phy_reg) => {
+                phy_reg.fmt(f)?;
+                self.vreg.fmt(f)
+            }
             None => self.vreg.fmt(f),
         }
     }

@@ -145,9 +145,16 @@ impl LivenessAnalysis {
     }
 
     pub fn analyze_function(&mut self, cur_func: &MachineFunction) -> LiveRegMatrix {
+        self.clear_bb_liveness_info(cur_func);
         self.set_def(cur_func);
         self.visit(cur_func);
         self.construct_live_reg_matrix(cur_func)
+    }
+
+    fn clear_bb_liveness_info(&mut self, cur_func: &MachineFunction) {
+        for (_, bb) in &cur_func.basic_block_arena {
+            bb.liveness_ref_mut().clear();
+        }
     }
 
     fn set_def(&mut self, cur_func: &MachineFunction) {
@@ -255,9 +262,11 @@ impl LivenessAnalysis {
             let bb = &cur_func.basic_block_arena[*bb_id];
             let liveness = bb.liveness_ref();
 
-            // let mut vreg2seg = FxHashMap::default();
-
             for livein in &liveness.live_in {
+                if livein.get_reg().is_some() {
+                    continue;
+                }
+
                 vreg2range
                     .entry(livein.get_vreg())
                     .or_insert_with(|| LiveRange::new_empty())
@@ -319,6 +328,10 @@ impl LivenessAnalysis {
             }
 
             for liveout in &liveness.live_out {
+                if liveout.get_reg().is_some() {
+                    continue;
+                }
+
                 vreg2range
                     .get_mut(&liveout.get_vreg())
                     .unwrap()
@@ -327,13 +340,6 @@ impl LivenessAnalysis {
                     .unwrap()
                     .end = index;
             }
-
-            // for (vreg, seg) in vreg2seg {
-            //     vreg2range
-            //         .entry(vreg)
-            //         .or_insert_with(|| LiveRange::new_empty())
-            //         .add_segment(seg)
-            // }
         }
 
         when_debug!(for (vreg, range) in &vreg2range {
