@@ -3,6 +3,7 @@ use super::super::register::*;
 use super::{basic_block::*, frame_object::*, instr::*};
 use crate::ir::types::*;
 use id_arena::*;
+use std::ops::{Index, IndexMut};
 
 pub type MachineFunctionId = Id<MachineFunction>;
 
@@ -21,7 +22,7 @@ pub struct MachineFunction {
     pub basic_block_arena: Arena<MachineBasicBlock>,
 
     /// Instruction arena
-    pub instr_arena: Arena<MachineInstr>,
+    pub instr_arena: InstructionArena,
 
     /// True if internal function
     pub internal: bool,
@@ -33,12 +34,17 @@ pub struct MachineFunction {
     pub vreg_gen: VirtRegGen,
 }
 
+#[derive(Debug, Clone)]
+pub struct InstructionArena {
+    pub arena: Arena<MachineInstr>,
+}
+
 impl MachineFunction {
     pub fn new(
         f: DAGFunction,
         basic_block_arena: Arena<MachineBasicBlock>,
         basic_blocks: Vec<MachineBasicBlockId>,
-        instr_arena: Arena<MachineInstr>,
+        instr_arena: InstructionArena,
     ) -> Self {
         Self {
             name: f.name,
@@ -61,6 +67,34 @@ impl MachineFunction {
         }
         None
     }
+}
 
-    // pub fn add_
+impl InstructionArena {
+    pub fn new() -> Self {
+        Self {
+            arena: Arena::new(),
+        }
+    }
+
+    pub fn alloc(&mut self, mi: MachineInstr) -> Id<MachineInstr> {
+        let mi_id = self.arena.alloc(mi);
+        let mi = &mut self.arena[mi_id];
+        mi.add_use(mi_id);
+        mi.add_def(mi_id);
+        mi_id
+    }
+}
+
+impl Index<MachineInstrId> for InstructionArena {
+    type Output = MachineInstr;
+
+    fn index(&self, idx: MachineInstrId) -> &Self::Output {
+        &self.arena[idx]
+    }
+}
+
+impl IndexMut<MachineInstrId> for InstructionArena {
+    fn index_mut(&mut self, idx: MachineInstrId) -> &mut Self::Output {
+        &mut self.arena[idx]
+    }
 }

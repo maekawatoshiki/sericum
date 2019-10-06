@@ -54,7 +54,7 @@ impl ConvertToMachine {
                 .collect();
         }
 
-        let mut machine_instr_arena = Arena::new();
+        let mut machine_instr_arena = InstructionArena::new();
 
         for dag_bb_id in &dag_func.dag_basic_blocks {
             let node = &dag_func.dag_basic_block_arena[*dag_bb_id];
@@ -84,7 +84,7 @@ impl ConvertToMachine {
     pub fn convert_dag(
         &mut self,
         cur_func: &DAGFunction,
-        machine_instr_arena: &mut Arena<MachineInstr>,
+        machine_instr_arena: &mut InstructionArena,
         dag_to_machine_reg: &mut FxHashMap<DAGNodeId, Option<MachineRegister>>,
         cur_bb: MachineBasicBlockId,
         iseq: &mut Vec<MachineInstrId>,
@@ -133,7 +133,7 @@ impl ConvertToMachine {
     fn convert_dag_to_machine_instr(
         &mut self,
         cur_func: &DAGFunction,
-        machine_instr_arena: &mut Arena<MachineInstr>,
+        machine_instr_arena: &mut InstructionArena,
         dag_to_machine_reg: &mut FxHashMap<DAGNodeId, Option<MachineRegister>>,
         cur_bb: MachineBasicBlockId,
         iseq: &mut Vec<MachineInstrId>,
@@ -144,16 +144,12 @@ impl ConvertToMachine {
         }
 
         fn iseq_push(
-            machine_instr_arena: &mut Arena<MachineInstr>,
+            machine_instr_arena: &mut InstructionArena,
             iseq: &mut Vec<MachineInstrId>,
             instr: MachineInstr,
         ) -> MachineInstrId {
             let instr_id = machine_instr_arena.alloc(instr);
             iseq.push(instr_id);
-
-            machine_instr_arena[instr_id].add_use(instr_id);
-            machine_instr_arena[instr_id].add_def(instr_id);
-
             instr_id
         };
 
@@ -614,7 +610,7 @@ impl ConvertToMachine {
     fn usual_operand(
         &mut self,
         cur_func: &DAGFunction,
-        machine_instr_arena: &mut Arena<MachineInstr>,
+        machine_instr_arena: &mut InstructionArena,
         dag_to_machine_reg: &mut FxHashMap<DAGNodeId, Option<MachineRegister>>,
         cur_bb: MachineBasicBlockId,
         iseq: &mut Vec<MachineInstrId>,

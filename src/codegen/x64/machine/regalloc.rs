@@ -108,7 +108,7 @@ impl RegisterAllocator {
         let mut regs_to_save = FxHashSet::default();
 
         // TODO: It's expensive to check all the elements in ``instr_arena``
-        for (_, instr) in &cur_func.instr_arena {
+        for (_, instr) in &cur_func.instr_arena.arena {
             if instr.def.len() == 0 {
                 continue;
             }
@@ -259,7 +259,7 @@ impl PhysicalRegisterAllocator {
         let mut regs_to_save = vec![];
 
         // TODO
-        for (_, i) in &cur_func.instr_arena {
+        for (_, i) in &cur_func.instr_arena.arena {
             if i.def[0].info_ref().reg.is_none() {
                 continue;
             }
