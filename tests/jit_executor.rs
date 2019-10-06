@@ -6,7 +6,7 @@ use cilk::{
 };
 
 #[test]
-fn dag1() {
+fn jit_executor() {
     let mut m = module::Module::new("cilk");
 
     // Internal function must be defined when you use it

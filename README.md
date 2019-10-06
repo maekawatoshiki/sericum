@@ -11,7 +11,7 @@ Do not expect too much stuff!
 
 # Note
 
-- **ONLY CODE IN ``./tests/dag.rs`` IS THE LATEST. OTHER TEST CODES IN ``./tests/`` WORK (BECAUSE OLD SOURCE CODE REMAINS) BUT ARE NO LONGER MEANINGFUL.**
+- **ONLY CODE IN ``./tests/jit_executor.rs`` IS THE LATEST. OTHER TEST CODES IN ``./tests/`` ALSO WORK BUT ARE NO LONGER MEANINGFUL.**
 
 # To Do
 
