@@ -1,10 +1,14 @@
 use super::{basic_block::*, module::*, opcode::*, types::*, value::*};
+use crate::util::allocator::*;
 use id_arena::*;
 
 pub type FunctionId = Id<Function>;
 
 #[derive(Debug, Clone)]
 pub struct Function {
+    /// The module this function belongs to
+    pub parent: Raw<Module>,
+
     /// Function name
     pub name: String,
 
@@ -24,8 +28,9 @@ pub struct Function {
 }
 
 impl Function {
-    pub fn new(name: &str, ret_ty: Type, params_ty: Vec<Type>) -> Self {
+    pub fn new(parent: Raw<Module>, name: &str, ret_ty: Type, params_ty: Vec<Type>) -> Self {
         Self {
+            parent,
             name: name.to_string(),
             ty: Type::func_ty(ret_ty, params_ty),
             basic_block_arena: Arena::new(),
@@ -64,6 +69,7 @@ impl Function {
         Some(Value::Argument(ArgumentValue {
             func_id,
             index: idx,
+            parent: self.parent,
         }))
     }
 
@@ -92,7 +98,7 @@ impl Function {
 }
 
 impl Function {
-    pub fn to_string(&self, m: &Module) -> String {
+    pub fn to_string(&self) -> String {
         let fty = self.ty.get_function_ty().unwrap();
         format!(
             "define {} {}({}) {{\n{}}}",
@@ -105,11 +111,11 @@ impl Function {
                     s
                 })
                 .trim_matches(&[',', ' '][0..]),
-            self.basic_blocks_to_string(m)
+            self.basic_blocks_to_string()
         )
     }
 
-    fn basic_blocks_to_string(&self, m: &Module) -> String {
+    fn basic_blocks_to_string(&self) -> String {
         self.basic_block_arena
             .iter()
             .fold("".to_string(), |s, (id, b)| {
@@ -143,7 +149,7 @@ impl Function {
                         .iter()
                         .fold("".to_string(), |s, x| format!("{}{},", s, x.index()))
                         .trim_matches(','),
-                    b.to_string(m)
+                    b.to_string()
                 )
             })
     }

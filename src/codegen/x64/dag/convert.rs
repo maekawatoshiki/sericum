@@ -50,7 +50,7 @@ impl<'a> ConvertToDAG<'a> {
         when_debug!(println!(
             "{}: dump function: \n{}",
             file!(),
-            func.to_string(&self.module)
+            func.to_string()
         ));
 
         let mut dag_bb_arena: Arena<DAGBasicBlock> = Arena::new();
@@ -118,8 +118,8 @@ impl<'a> ConvertToDAG<'a> {
                     fi
                 }
             }
-            Value::Function(fid) => {
-                let f = self.module.function_ref(*fid);
+            Value::Function(FunctionValue { func_id, parent }) => {
+                let f = parent.function_ref(*func_id);
                 self.cur_conv_info_mut().dag_arena.alloc(DAGNode::new(
                     DAGNodeKind::GlobalAddress(GlobalValueKind::FunctionName(f.name.to_string())),
                     vec![],
@@ -371,7 +371,7 @@ impl<'a> ConvertToDAG<'a> {
         indices: &[Value],
     ) -> DAGNodeId {
         let mut gep = self.get_dag_id_from_value(ptr, false);
-        let mut ty = ptr.get_type(self.module);
+        let mut ty = ptr.get_type();
 
         for idx in indices {
             ty = ty.get_element_ty().unwrap();

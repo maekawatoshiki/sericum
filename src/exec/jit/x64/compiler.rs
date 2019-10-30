@@ -283,7 +283,7 @@ impl<'a> JITCompiler<'a> {
         match (op1, op2) {
             (Value::Instruction(src), Value::Instruction(dst)) => {
                 if let Some(n) = self.alloca_mgr.get_local_offset(vreg!(func; dst.id)) {
-                    match op1.get_type(self.module) {
+                    match op1.get_type() {
                         Type::Int32 => {
                             dynasm!(self.asm; mov DWORD [rbp-(n as i32)], Rd(reg!(func; src.id)))
                         }
@@ -292,7 +292,7 @@ impl<'a> JITCompiler<'a> {
                     return;
                 }
 
-                match op1.get_type(self.module) {
+                match op1.get_type() {
                     Type::Int32 => {
                         dynasm!(self.asm; mov DWORD [Ra(reg!(func; dst.id))], Rd(reg!(func; src.id)))
                     }
@@ -322,7 +322,7 @@ impl<'a> JITCompiler<'a> {
             Value::Instruction(iv) => {
                 let rn = reg!(instr);
                 if let Some(n) = self.alloca_mgr.get_local_offset(vreg!(func; iv.id)) {
-                    let mut ety = ptrval.get_type(self.module);
+                    let mut ety = ptrval.get_type();
                     dynasm!(self.asm; lea Ra(rn), [rbp - (n as i32)]);
                     for idx in indices {
                         ety = ety.get_element_ty().unwrap();
@@ -435,14 +435,11 @@ impl<'a> JITCompiler<'a> {
     }
 
     fn compile_call(&mut self, f: &Function, instr: &Instruction, callee: &Value, args: &[Value]) {
-        let returns = callee
-            .get_type(&self.module)
-            .get_function_ty()
-            .unwrap()
-            .ret_ty
-            != Type::Void;
+        let returns = callee.get_type().get_function_ty().unwrap().ret_ty != Type::Void;
         match callee {
-            Value::Function(callee_id) => {
+            Value::Function(FunctionValue {
+                func_id: callee_id, ..
+            }) => {
                 let callee_entity = self.module.function_ref(*callee_id);
                 let mut rsp_offset = 0;
 

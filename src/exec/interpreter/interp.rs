@@ -147,9 +147,9 @@ impl<'a> Interpreter<'a> {
                         mem.insert(instr_id, val);
                     }
                     Opcode::Call(f, f_args) => match f {
-                        Value::Function(id) => {
+                        Value::Function(FunctionValue { func_id, .. }) => {
                             let val = self.run_function(
-                                *id,
+                                *func_id,
                                 f_args
                                     .iter()
                                     .map(|arg| get_value(&arg, &args, &mut mem))
@@ -166,7 +166,7 @@ impl<'a> Interpreter<'a> {
                             ConcreteValue::Mem(ptr, _) => ptr,
                             _ => unreachable!(),
                         };
-                        let val = match v.get_type(&self.module).get_element_ty().unwrap() {
+                        let val = match v.get_type().get_element_ty().unwrap() {
                             Type::Int1 => {
                                 ConcreteValue::Int1(if unsafe { *(ptr as *mut u8) } == 0 {
                                     false

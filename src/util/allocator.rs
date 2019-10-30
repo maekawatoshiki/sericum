@@ -2,8 +2,10 @@ use rustc_hash::FxHashSet;
 use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct Raw<T>(*mut T);
+
+impl<T: Clone> Copy for Raw<T> {}
 
 impl<T> PartialEq for Raw<T> {
     fn eq(&self, other: &Self) -> bool {
@@ -49,6 +51,14 @@ impl<T> Drop for RawAllocator<T> {
 impl<T> Raw<T> {
     pub fn inner(&self) -> *mut T {
         self.0
+    }
+
+    pub fn inner_ref(&self) -> &T {
+        unsafe { &*self.0 }
+    }
+
+    pub fn inner_ref_mut(&self) -> &mut T {
+        unsafe { &mut *self.0 }
     }
 }
 

@@ -1,15 +1,16 @@
 use super::{basic_block::*, function::*, module::*, opcode::*, types::*, value::*};
+use crate::util::allocator::*;
 
 #[derive(Debug)]
-pub struct Builder<'a> {
-    pub module: &'a mut Module,
+pub struct Builder {
+    pub module: Raw<Module>,
     func_id: FunctionId,
     cur_bb: Option<BasicBlockId>,
     insert_point: usize,
 }
 
-impl<'a> Builder<'a> {
-    pub fn new(module: &'a mut Module, func_id: FunctionId) -> Self {
+impl Builder {
+    pub fn new(module: Raw<Module>, func_id: FunctionId) -> Self {
         Self {
             module,
             func_id,
@@ -23,7 +24,7 @@ impl<'a> Builder<'a> {
     }
 
     pub fn function_ref_mut(&mut self) -> &mut Function {
-        self.module.function_ref_mut(self.func_id)
+        self.module.inner_ref_mut().function_ref_mut(self.func_id)
     }
 
     pub fn get_param(&self, idx: usize) -> Option<Value> {
@@ -55,7 +56,7 @@ impl<'a> Builder<'a> {
 
     pub fn build_gep(&mut self, v: Value, indices: Vec<Value>) -> Value {
         let ty = v
-            .get_type(self.module)
+            .get_type()
             .get_element_ty_with_indices(&indices)
             .unwrap()
             .get_pointer_ty();
@@ -67,7 +68,7 @@ impl<'a> Builder<'a> {
     pub fn build_load(&mut self, v: Value) -> Value {
         let instr = self.create_instr_value(
             Opcode::Load(v),
-            v.get_type(self.module).get_element_ty().unwrap().clone(),
+            v.get_type().get_element_ty().unwrap().clone(),
         );
         self.append_instr_to_cur_bb(instr);
         instr
@@ -84,7 +85,7 @@ impl<'a> Builder<'a> {
             return konst;
         }
 
-        let instr = self.create_instr_value(Opcode::Add(v1, v2), v1.get_type(self.module).clone());
+        let instr = self.create_instr_value(Opcode::Add(v1, v2), v1.get_type().clone());
         self.append_instr_to_cur_bb(instr);
         instr
     }
@@ -94,7 +95,7 @@ impl<'a> Builder<'a> {
             return konst;
         }
 
-        let instr = self.create_instr_value(Opcode::Sub(v1, v2), v1.get_type(self.module).clone());
+        let instr = self.create_instr_value(Opcode::Sub(v1, v2), v1.get_type().clone());
         self.append_instr_to_cur_bb(instr);
         instr
     }
@@ -104,7 +105,7 @@ impl<'a> Builder<'a> {
             return konst;
         }
 
-        let instr = self.create_instr_value(Opcode::Mul(v1, v2), v1.get_type(self.module).clone());
+        let instr = self.create_instr_value(Opcode::Mul(v1, v2), v1.get_type().clone());
         self.append_instr_to_cur_bb(instr);
         instr
     }
@@ -114,7 +115,7 @@ impl<'a> Builder<'a> {
             return konst;
         }
 
-        let instr = self.create_instr_value(Opcode::Rem(v1, v2), v1.get_type(self.module).clone());
+        let instr = self.create_instr_value(Opcode::Rem(v1, v2), v1.get_type().clone());
         self.append_instr_to_cur_bb(instr);
         instr
     }
@@ -164,19 +165,14 @@ impl<'a> Builder<'a> {
     }
 
     pub fn build_phi(&mut self, pairs: Vec<(Value, BasicBlockId)>) -> Value {
-        let ty = pairs.get(0).unwrap().0.get_type(self.module).clone();
+        let ty = pairs.get(0).unwrap().0.get_type().clone();
         let instr = self.create_instr_value(Opcode::Phi(pairs), ty);
         self.append_instr_to_cur_bb(instr);
         instr
     }
 
     pub fn build_call(&mut self, f: Value, args: Vec<Value>) -> Value {
-        let ret_ty = f
-            .get_type(&self.module)
-            .get_function_ty()
-            .unwrap()
-            .ret_ty
-            .clone();
+        let ret_ty = f.get_type().get_function_ty().unwrap().ret_ty.clone();
         let instr = self.create_instr_value(Opcode::Call(f, args), ret_ty);
         self.append_instr_to_cur_bb(instr);
         instr
@@ -196,6 +192,7 @@ impl<'a> Builder<'a> {
         Value::Instruction(InstructionValue {
             func_id: self.func_id,
             id: instr_id,
+            parent: self.module,
         })
     }
 

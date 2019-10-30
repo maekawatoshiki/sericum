@@ -1,4 +1,5 @@
 use super::{function::*, module::*, opcode::*, types::*};
+use crate::util::allocator::*;
 
 pub type ValueId = usize;
 
@@ -19,7 +20,7 @@ pub enum Value {
     Argument(ArgumentValue),
     Immediate(ImmediateValue),
     Instruction(InstructionValue),
-    Function(FunctionId),
+    Function(FunctionValue),
     None,
 }
 
@@ -27,12 +28,20 @@ pub enum Value {
 pub struct ArgumentValue {
     pub func_id: FunctionId,
     pub index: usize,
+    pub parent: Raw<Module>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct InstructionValue {
     pub func_id: FunctionId,
     pub id: InstructionId,
+    pub parent: Raw<Module>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct FunctionValue {
+    pub func_id: FunctionId,
+    pub parent: Raw<Module>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -41,17 +50,25 @@ pub enum ImmediateValue {
 }
 
 impl Value {
-    pub fn get_type<'a>(&'a self, module: &'a Module) -> &'a Type {
+    pub fn get_type(&self) -> &Type {
         match self {
-            Value::Argument(ArgumentValue { func_id, index }) => {
-                let f = module.function_ref(*func_id);
+            Value::Argument(ArgumentValue {
+                func_id,
+                index,
+                parent,
+            }) => {
+                let f = parent.function_ref(*func_id);
                 f.get_param_type(*index).unwrap()
             }
-            Value::Instruction(InstructionValue { func_id, id }) => {
-                let f = module.function_ref(*func_id);
+            Value::Instruction(InstructionValue {
+                func_id,
+                id,
+                parent,
+            }) => {
+                let f = parent.function_ref(*func_id);
                 &f.instr_table[*id].ty
             }
-            Value::Function(id) => &module.function_ref(*id).ty,
+            Value::Function(FunctionValue { func_id, parent }) => &parent.function_ref(*func_id).ty,
             Value::Immediate(ref im) => im.get_type(),
             Value::None => &Type::Void,
         }
@@ -73,35 +90,47 @@ impl Value {
 
     // Utils
 
-    pub fn to_string(&self, module: &Module, instr: bool) -> String {
+    pub fn to_string(&self, instr: bool) -> String {
         match self {
-            Value::Argument(ArgumentValue { index, func_id }) => {
-                let f = module.function_ref(*func_id);
+            Value::Argument(ArgumentValue {
+                index,
+                func_id,
+                parent,
+            }) => {
+                let f = parent.function_ref(*func_id);
                 let ty = f.get_param_type(*index).unwrap();
                 format!("{} %arg.{}", ty.to_string(), index)
             }
             Value::Immediate(iv) => match iv {
                 ImmediateValue::Int32(i) => format!("i32 {}", i),
             },
-            Value::Instruction(InstructionValue { func_id, id }) if instr => {
-                let f = module.function_ref(*func_id);
+            Value::Instruction(InstructionValue {
+                func_id,
+                id,
+                parent,
+            }) if instr => {
+                let f = parent.function_ref(*func_id);
                 let instr = &f.instr_table[*id];
                 if instr.ty == Type::Void {
-                    format!("    {}", instr.to_string(module))
+                    format!("    {}", instr.to_string())
                 } else {
-                    format!("    %{} = {}", id.index(), instr.to_string(module))
+                    format!("    %{} = {}", id.index(), instr.to_string())
                 }
             }
-            Value::Instruction(InstructionValue { func_id, id }) => {
-                let f = module.function_ref(*func_id);
+            Value::Instruction(InstructionValue {
+                func_id,
+                id,
+                parent,
+            }) => {
+                let f = parent.function_ref(*func_id);
                 format!("{} %{}", f.instr_table[*id].ty.to_string(), id.index())
             }
-            Value::Function(id) if instr => {
-                let f = module.function_ref(*id);
-                f.to_string(module)
+            Value::Function(FunctionValue { func_id, parent }) if instr => {
+                let f = parent.function_ref(*func_id);
+                f.to_string()
             }
-            Value::Function(id) => {
-                let f = module.function_ref(*id);
+            Value::Function(FunctionValue { func_id, parent }) => {
+                let f = parent.function_ref(*func_id);
                 let fty = f.ty.get_function_ty().unwrap();
                 format!("{} {}", fty.ret_ty.to_string(), f.name)
             }
