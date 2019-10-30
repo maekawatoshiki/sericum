@@ -6,11 +6,11 @@ use cilk::{
 };
 
 #[test]
-fn jit_executor() {
+fn jit_executor1() {
     let mut ctx = context::Context::new();
     let m = ctx.create_module("cilk");
 
-    // Internal function must be defined when you use it
+    // Internal function must be defined before you use it
     let cilk_println_i32 = m.create_function(
         "cilk.println.i32",
         ir::types::Type::Void,
@@ -188,16 +188,16 @@ fn jit_executor() {
         //     ret (%a);
 
          // entry:
-         //     // a = alloca_ ([8; i32]);
-         //     a = alloca_ ([2; [2; i32]]);
+         //     a = alloca_ ([8; i32]);
+         //     // a = alloca_ ([2; [2; i32]]);
          //     i = alloca i32;
          //     store (i32 1), (%i);
          //     li = load (%i);
          //
-         //     idx = gep (%a), [(i32 0), (%li), (i32 1)];
+         //     idx = gep (%a), [(i32 0), (%li)];
          //     store (i32 123), (%idx);
          //
-         //     idx = gep (%a), [(i32 0), (i32 1), (i32 1)];
+         //     idx = gep (%a), [(i32 0), (i32 1)];
          //     l = load (%idx);
          //     ret (%l);
 
@@ -258,65 +258,66 @@ fn jit_executor() {
     )
 }
 
-// #[test]
-// fn jit_executor2() {
-//     let mut m = module::Module::new("cilk");
-//
-//     // Internal function must be defined when you use it
-//     let cilk_println_i32 = m.add_function(ir::function::Function::new(
-//         "cilk.println.i32",
-//         ir::types::Type::Void,
-//         vec![ir::types::Type::Int32],
-//     ));
-//
-//     let func = cilk_ir!(m; define [i32] func (i32) {
-//         entry:
-//             cond = icmp le (%arg.0), (i32 2);
-//             br (%cond) l1, l2;
-//         l1:
-//             // br merge;
-//             ret (i32 1);
-//         l2:
-//             a1 = sub (%arg.0), (i32 1);
-//             r1 = call func [(%a1)];
-//             a2 = sub (%arg.0), (i32 2);
-//             r2 = call func [(%a2)];
-//             r3 = add (%r1), (%r2);
-//             ret (%r3);
-//             // br merge;
-//         // merge:
-//         //     p = phi [ [(i32 1), l1], [(%r3), l2] ];
-//         //     ret (%p);
-//     });
-//
-//     let _main = cilk_ir!(m; define [void] main (i32) {
-//         entry:
-//             i = alloca i32;
-//             store (i32 1), (%i);
-//             br cond;
-//         cond:
-//             li = load (%i);
-//             c = icmp le (%li), (%arg.0);
-//             br (%c) loop_, end;
-//         loop_:
-//             x = call (->func) [(%li)];
-//             __ = call (->cilk_println_i32) [(%x)];
-//             inc = add (%li), (i32 1);
-//             store (%inc), (%i);
-//             br cond;
-//         end:
-//             ret (void);
-//     });
-//
-//     let mut jit = exec::jit::JITExecutor::new(&m);
-//     let main = jit.find_function_by_name("main").unwrap();
-//     let now = ::std::time::Instant::now();
-//     println!(
-//         "main: return: {:?}",
-//         jit.run(main, vec![exec::jit::GenericValue::Int32(35)])
-//     );
-//     println!(
-//         "duration: {:?}",
-//         ::std::time::Instant::now().duration_since(now)
-//     )
-// }
+#[test]
+fn jit_executor2() {
+    let mut ctx = context::Context::new();
+    let m = ctx.create_module("cilk");
+
+    // Internal function must be defined before you use it
+    let cilk_println_i32 = m.create_function(
+        "cilk.println.i32",
+        ir::types::Type::Void,
+        vec![ir::types::Type::Int32],
+    );
+
+    let func = cilk_ir!(m; define [i32] func (i32) {
+        entry:
+            cond = icmp le (%arg.0), (i32 2);
+            br (%cond) l1, l2;
+        l1:
+            // br merge;
+            ret (i32 1);
+        l2:
+            a1 = sub (%arg.0), (i32 1);
+            r1 = call func [(%a1)];
+            a2 = sub (%arg.0), (i32 2);
+            r2 = call func [(%a2)];
+            r3 = add (%r1), (%r2);
+            ret (%r3);
+            // br merge;
+        // merge:
+        //     p = phi [ [(i32 1), l1], [(%r3), l2] ];
+        //     ret (%p);
+    });
+
+    let _main = cilk_ir!(m; define [void] main (i32) {
+        entry:
+            i = alloca i32;
+            store (i32 1), (%i);
+            br cond;
+        cond:
+            li = load (%i);
+            c = icmp le (%li), (%arg.0);
+            br (%c) loop_, end;
+        loop_:
+            x = call (->func) [(%li)];
+            __ = call (->cilk_println_i32) [(%x)];
+            inc = add (%li), (i32 1);
+            store (%inc), (%i);
+            br cond;
+        end:
+            ret (void);
+    });
+
+    let mut jit = exec::jit::JITExecutor::new(&m);
+    let main = jit.find_function_by_name("main").unwrap();
+    let now = ::std::time::Instant::now();
+    println!(
+        "main: return: {:?}",
+        jit.run(main, vec![exec::jit::GenericValue::Int32(35)])
+    );
+    println!(
+        "duration: {:?}",
+        ::std::time::Instant::now().duration_since(now)
+    )
+}
