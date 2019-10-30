@@ -38,7 +38,7 @@ let m = ctx.create_module("cilk");
 let fibo = m.create_function(
     "fibo", Type::Int32, vec![Type::Int32]
 );
-let mut builder = Builder::new(&mut m, fibo);
+let mut builder = Builder::new(m, fibo);
 
 let entry = builder.append_basic_block();
 let br1 = builder.append_basic_block();
