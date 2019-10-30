@@ -9,10 +9,6 @@ Toy Compiler Infrastructure influenced by LLVM written in Rust.
 
 Do not expect too much stuff!
 
-# Note
-
-- **ONLY CODE IN ``./tests/jit_executor.rs`` IS THE LATEST. OTHER TEST CODES IN ``./tests/`` ALSO WORK BUT ARE NO LONGER MEANINGFUL.**
-
 # To Do
 
 - Optimization
@@ -21,12 +17,10 @@ Do not expect too much stuff!
         2. Take into consideration the physical registers' allocation order.
     - Hard ones
         1. ....
-
 - Refine code. (never ending task though)
-
 - Write unsafe code (carefully) for better DAG Node handling.
-
 - Write documents in detail.
+- Write tests. (because i removed many of them)
 
 # Example
 
@@ -36,13 +30,14 @@ Do not expect too much stuff!
 use cilk::{
     codegen::x64::{exec},
     exec::interpreter::interp,
-    ir::{builder::Builder, module::Module, value::{Value, ImmediateValue}, types::Type},
+    ir::{builder::Builder, context::Context, value::{Value, ImmediateValue}, types::Type},
 };
 
-let mut m = Module::new("cilk");
-let fibo = m.add_function(Function::new(
+let mut ctx = Context::new();
+let m = ctx.create_module("cilk");
+let fibo = m.create_function(
     "fibo", Type::Int32, vec![Type::Int32]
-));
+);
 let mut builder = Builder::new(&mut m, fibo);
 
 let entry = builder.append_basic_block();
@@ -75,7 +70,7 @@ builder.set_insert_point(br2);
     let add = builder.build_add(fibo1, fibo2);
     builder.build_ret(add);
 
-println!("Function dump:\n{}", m.function_ref(fibo).to_string(&m));
+println!("Function dump:\n{}", m.function_ref(fibo).to_string());
 
 // Function dump:
 // define i32 fibo(i32) {       
