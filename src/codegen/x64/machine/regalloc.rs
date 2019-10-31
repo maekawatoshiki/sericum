@@ -128,7 +128,7 @@ impl RegisterAllocator {
             slots_to_save_regs.push(find_unused_slot(cur_func, occupied, r));
         }
 
-        println!("NEW SLOTS: {:?}", slots_to_save_regs);
+        when_debug!(println!("NEW SLOTS: {:?}", slots_to_save_regs));
 
         let call_instr_parent = cur_func.instr_arena[call_instr_id].parent;
 

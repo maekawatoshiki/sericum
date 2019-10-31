@@ -118,9 +118,12 @@ impl JITCompiler {
             asm: x64::Assembler::new().unwrap(),
             function_map: FxHashMap::default(),
             bb_to_label: FxHashMap::default(),
-            internal_functions: vec![("cilk.println.i32".to_string(), cilk_println_i32_ as _)]
-                .into_iter()
-                .collect::<FxHashMap<_, _>>(),
+            internal_functions: vec![
+                ("cilk.println.i32".to_string(), cilk_println_i32_ as _),
+                ("cilk.printch.i32".to_string(), cilk_printch_i32_ as _),
+            ]
+            .into_iter()
+            .collect::<FxHashMap<_, _>>(),
         }
     }
 
@@ -755,4 +758,10 @@ fn roundup(n: i32, align: i32) -> i32 {
 #[no_mangle]
 pub extern "C" fn cilk_println_i32_(i: i32) {
     println!("{}", i);
+}
+
+// EXPERIMENTAL Internal function cilk.printch.i32
+#[no_mangle]
+pub extern "C" fn cilk_printch_i32_(ch: i32) {
+    print!("{}", ch as u8 as char);
 }

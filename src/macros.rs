@@ -224,4 +224,8 @@ macro_rules! cilk_ir {
         cilk_expr!(builder; bb_map; $( $exp )*);
         f
     }};
+    (($builder:expr) { $($exp:tt)* }) => {{
+        let mut bb_map: FxHashMap<&str, basic_block::BasicBlockId> = FxHashMap::default();
+        cilk_expr!($builder; bb_map; $( $exp )*);
+    }}
 }

@@ -50,6 +50,14 @@ pub enum ImmediateValue {
 }
 
 impl Value {
+    pub fn new_imm_int32(i: i32) -> Self {
+        Self::Immediate(ImmediateValue::Int32(i))
+    }
+
+    pub fn new_func(f: FunctionValue) -> Self {
+        Self::Function(f)
+    }
+
     pub fn get_type(&self) -> &Type {
         match self {
             Value::Argument(ArgumentValue {

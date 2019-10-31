@@ -38,7 +38,7 @@ impl Function {
             instr_table: Arena::new(),
             // TODO
             internal: match name {
-                "cilk.println.i32" => true,
+                "cilk.println.i32" | "cilk.printch.i32" => true, // TODO
                 _ => false,
             },
         }
