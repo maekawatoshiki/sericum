@@ -12,8 +12,8 @@ impl Context {
         }
     }
 
-    pub fn create_module(&mut self, name: &str) -> Raw<Module> {
+    pub fn create_module(&mut self, name: &str) -> ModuleRef {
         let module = Module::new(name);
-        self.module_alloc.alloc(module)
+        ModuleRef(self.module_alloc.alloc(module))
     }
 }

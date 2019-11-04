@@ -157,7 +157,7 @@ fn brainfuxk() {
     // <<<<<]]>>>]";
 
     let mut ctx = context::Context::new();
-    let m = ctx.create_module("brainfuxk");
+    let mut m = ctx.create_module("brainfuxk");
 
     // Internal function must be defined before you use it
     let cilk_printch_i32 = m.create_function(
@@ -301,7 +301,7 @@ fn brainfuxk() {
 #[test]
 fn jit_executor1() {
     let mut ctx = context::Context::new();
-    let m = ctx.create_module("cilk");
+    let mut m = ctx.create_module("cilk");
 
     // Internal function must be defined before you use it
     let cilk_println_i32 = m.create_function(
@@ -554,7 +554,7 @@ fn jit_executor1() {
 #[test]
 fn jit_executor2() {
     let mut ctx = context::Context::new();
-    let m = ctx.create_module("cilk");
+    let mut m = ctx.create_module("cilk");
 
     // Internal function must be defined before you use it
     let cilk_println_i32 = m.create_function(

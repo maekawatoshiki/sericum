@@ -7,5 +7,3 @@ pub mod types;
 pub mod value;
 pub mod liveness;
 pub mod context;
-
-pub use module::ModuleTrait;

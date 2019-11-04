@@ -1,6 +1,6 @@
 use rustc_hash::FxHashSet;
 use std::hash::{Hash, Hasher};
-use std::ops::Deref;
+use std::ops::{Deref, DerefMut};
 
 #[derive(Debug, Clone)]
 pub struct Raw<T>(*mut T);
@@ -67,5 +67,11 @@ impl<T> Deref for Raw<T> {
 
     fn deref(&self) -> &T {
         unsafe { &*self.inner() }
+    }
+}
+
+impl<T> DerefMut for Raw<T> {
+    fn deref_mut(&mut self) -> &mut T {
+        unsafe { &mut *self.inner() }
     }
 }

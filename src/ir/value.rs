@@ -1,5 +1,4 @@
 use super::{function::*, module::*, opcode::*, types::*};
-use crate::util::allocator::*;
 
 pub type ValueId = usize;
 
@@ -28,20 +27,20 @@ pub enum Value {
 pub struct ArgumentValue {
     pub func_id: FunctionId,
     pub index: usize,
-    pub parent: Raw<Module>,
+    pub parent: ModuleRef,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct InstructionValue {
     pub func_id: FunctionId,
     pub id: InstructionId,
-    pub parent: Raw<Module>,
+    pub parent: ModuleRef,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct FunctionValue {
     pub func_id: FunctionId,
-    pub parent: Raw<Module>,
+    pub parent: ModuleRef,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]

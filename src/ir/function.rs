@@ -1,5 +1,4 @@
 use super::{basic_block::*, module::*, opcode::*, types::*, value::*};
-use crate::util::allocator::*;
 use id_arena::*;
 
 pub type FunctionId = Id<Function>;
@@ -7,7 +6,7 @@ pub type FunctionId = Id<Function>;
 #[derive(Debug, Clone)]
 pub struct Function {
     /// The module this function belongs to
-    pub parent: Raw<Module>,
+    pub parent: ModuleRef,
 
     /// Function name
     pub name: String,
@@ -28,7 +27,7 @@ pub struct Function {
 }
 
 impl Function {
-    pub fn new(parent: Raw<Module>, name: &str, ret_ty: Type, params_ty: Vec<Type>) -> Self {
+    pub fn new(parent: ModuleRef, name: &str, ret_ty: Type, params_ty: Vec<Type>) -> Self {
         Self {
             parent,
             name: name.to_string(),

@@ -1,16 +1,15 @@
 use super::{basic_block::*, function::*, module::*, opcode::*, types::*, value::*};
-use crate::util::allocator::*;
 
 #[derive(Debug)]
 pub struct Builder {
-    pub module: Raw<Module>,
+    pub module: ModuleRef,
     func_id: FunctionId,
     cur_bb: Option<BasicBlockId>,
     insert_point: usize,
 }
 
 impl Builder {
-    pub fn new(module: Raw<Module>, func_id: FunctionId) -> Self {
+    pub fn new(module: ModuleRef, func_id: FunctionId) -> Self {
         Self {
             module,
             func_id,
@@ -24,7 +23,7 @@ impl Builder {
     }
 
     pub fn function_ref_mut(&mut self) -> &mut Function {
-        self.module.inner_ref_mut().function_ref_mut(self.func_id)
+        self.module.function_ref_mut(self.func_id)
     }
 
     pub fn get_param(&self, idx: usize) -> Option<Value> {
