@@ -121,6 +121,10 @@ impl JITCompiler {
             internal_functions: vec![
                 ("cilk.println.i32".to_string(), cilk_println_i32_ as _),
                 ("cilk.printch.i32".to_string(), cilk_printch_i32_ as _),
+                (
+                    "cilk.memset.p0i32.i32".to_string(),
+                    cilk_memset_p0i32_i32_ as _,
+                ),
             ]
             .into_iter()
             .collect::<FxHashMap<_, _>>(),
@@ -176,6 +180,9 @@ impl JITCompiler {
 
         let frame_objects = FrameObjectsInfo::new(f);
 
+        // prologue
+        // TODO: Create PrologueInserter for machine code
+
         dynasm!(self.asm
             ; => f_entry
             ; push rbp
@@ -189,9 +196,15 @@ impl JITCompiler {
                     let off = frame_objects.offset(-(i as i32 + 1)).unwrap();
                     dynasm!(self.asm; mov [rbp - off], Rd(reg4arg(i).unwrap()));
                 }
+                Type::Pointer(_) => {
+                    let off = frame_objects.offset(-(i as i32 + 1)).unwrap();
+                    dynasm!(self.asm; mov [rbp - off], Ra(reg4arg(i).unwrap()));
+                }
                 _ => unimplemented!(),
             }
         }
+
+        // body
 
         for bb_id in &f.basic_blocks {
             let bb = &f.basic_block_arena[*bb_id];
@@ -206,6 +219,9 @@ impl JITCompiler {
                 match instr.opcode {
                     MachineOpcode::MOV32ri => self.compile_mov32ri(instr),
                     MachineOpcode::MOV32rr => self.compile_mov32rr(instr),
+                    MachineOpcode::MOV64ri => self.compile_mov64ri(instr),
+                    MachineOpcode::MOV64rr => self.compile_mov64rr(instr),
+                    MachineOpcode::LEA64 => self.compile_lea64(&frame_objects, instr),
                     MachineOpcode::Add => self.compile_add(&frame_objects, instr),
                     MachineOpcode::Sub => self.compile_sub(&frame_objects, instr),
                     MachineOpcode::Mul => self.compile_mul(&frame_objects, instr),
@@ -257,6 +273,33 @@ impl JITCompiler {
         self.reg_copy(&Type::Int32, r0, r1);
     }
 
+    fn compile_mov64ri(&mut self, _instr: &MachineInstr) {
+        unimplemented!()
+        // assert!(matches!(instr.operand[0], MachineOperand::Constant(_)));
+        // assert!(matches!(
+        //     instr.operand[0].as_constant(),
+        //     MachineConstant::Int64(_)
+        // ));
+        //
+        // let r = instr.def[0].get_reg().unwrap().get() as u8;
+        // let i = instr.operand[0].as_constant().as_i64();
+        // dynasm!(self.asm; mov Ra(r), i);
+    }
+
+    fn compile_mov64rr(&mut self, instr: &MachineInstr) {
+        assert!(matches!(instr.operand[0], MachineOperand::Register(_)));
+
+        let r0 = instr.def[0].get_reg().unwrap().get() as u8;
+        let r1 = instr.operand[0].as_register().get_reg().unwrap().get() as u8;
+        self.reg_copy(&Type::Int64, r0, r1);
+    }
+
+    fn compile_lea64(&mut self, fo: &FrameObjectsInfo, instr: &MachineInstr) {
+        let r0 = instr.def[0].get_reg().unwrap().get() as u8;
+        let fi = instr.operand[0].as_frame_index();
+        dynasm!(self.asm; lea Ra(r0), [rbp - fo.offset(fi.idx).unwrap()]);
+    }
+
     fn compile_copy(&mut self, instr: &MachineInstr) {
         let rn = register!(instr);
         let op0 = &instr.operand[0];
@@ -274,6 +317,7 @@ impl JITCompiler {
             MachineOperand::Register(i0) => match op1 {
                 MachineOperand::Constant(c) => match c {
                     MachineConstant::Int32(x) => dynasm!(self.asm; cmp Rd(register!(i0)), *x),
+                    MachineConstant::Int64(_) => unimplemented!(),
                 },
                 MachineOperand::Register(i1) => match typ!(i0) {
                     Type::Int32 => dynasm!(self.asm; cmp Rd(register!(i0)), Rd(register!(i1))),
@@ -305,6 +349,7 @@ impl JITCompiler {
                 let off = fo.offset(fi.idx).unwrap();
                 match fi.ty {
                     Type::Int32 => dynasm!(self.asm; mov Rd(rn), [rbp - off]),
+                    Type::Pointer(_) => dynasm!(self.asm; mov Ra(rn),[rbp - off]),
                     _ => unimplemented!(),
                 }
             }
@@ -375,6 +420,7 @@ impl JITCompiler {
                 match src {
                     MachineOperand::Constant(c) => match c {
                         MachineConstant::Int32(i) => dynasm!(self.asm; mov DWORD [rbp - off], *i),
+                        _ => unimplemented!(),
                     },
                     MachineOperand::Register(i) => match fi.ty {
                         Type::Int32 => dynasm!(self.asm; mov [rbp - off], Rd(register!(i))),
@@ -528,6 +574,7 @@ impl JITCompiler {
                         dynasm!(self.asm;
                             lea Ra(rn), [rbp + i - fo.offset(fi.idx).unwrap()]);
                     }
+                    _ => unimplemented!(),
                 },
                 MachineOperand::Register(r) => {
                     dynasm!(self.asm;
@@ -541,6 +588,7 @@ impl JITCompiler {
                 match op1 {
                     MachineOperand::Constant(c) => match c {
                         MachineConstant::Int32(x) => dynasm!(self.asm; add Rd(rn), *x),
+                        _ => unimplemented!(),
                     },
                     MachineOperand::Register(i1) => match typ!(i1) {
                         Type::Int32 => dynasm!(self.asm; add Rd(rn), Rd(register!(i1))),
@@ -658,6 +706,7 @@ impl JITCompiler {
         match &instr.operand[0] {
             MachineOperand::Constant(c) => match c {
                 MachineConstant::Int32(i) => dynasm!(self.asm; mov rax, *i),
+                _ => unimplemented!(),
             },
             MachineOperand::Register(i) => dynasm!(self.asm; mov rax, Ra(register!(i))),
             MachineOperand::FrameIndex(fi) => {
@@ -690,6 +739,7 @@ impl JITCompiler {
 
         match ty {
             Type::Int32 => dynasm!(self.asm; mov Rd(r0), Rd(r1)),
+            Type::Int64 => dynasm!(self.asm; mov Ra(r0), Ra(r1)),
             _ => unimplemented!(),
         }
     }
@@ -764,4 +814,10 @@ pub extern "C" fn cilk_println_i32_(i: i32) {
 #[no_mangle]
 pub extern "C" fn cilk_printch_i32_(ch: i32) {
     print!("{}", ch as u8 as char);
+}
+
+// EXPERIMENTAL Internal function cilk.memset.p0i32.i32
+#[no_mangle]
+pub extern "C" fn cilk_memset_p0i32_i32_(p: *mut i32, x: i32, count: i32) {
+    unsafe { ::std::ptr::write_bytes(p, x as u8, count as usize) }
 }

@@ -87,6 +87,7 @@ impl<'a> Interpreter<'a> {
                                 match ty {
                                     Type::Int1 => Box::into_raw(Box::new(0u8)) as *mut u8,
                                     Type::Int32 => Box::into_raw(Box::new(0u32)) as *mut u8,
+                                    Type::Int64 => Box::into_raw(Box::new(0u64)) as *mut u8,
                                     Type::Pointer(_) => unimplemented!(),
                                     Type::Void => unreachable!(),
                                     Type::Function(_) => unimplemented!(),

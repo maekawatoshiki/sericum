@@ -49,6 +49,9 @@ pub enum MachineOpcode {
     CDQ,
     MOV32rr,
     MOV32ri,
+    MOV64rr,
+    MOV64ri,
+    LEA64,
     IDIV,
 
     // Memory
@@ -104,6 +107,7 @@ pub enum MachineOperand {
 #[derive(Clone, Copy, PartialEq)]
 pub enum MachineConstant {
     Int32(i32),
+    Int64(i64),
 }
 
 #[derive(Clone)]
@@ -492,6 +496,7 @@ impl MachineOperand {
         match self {
             MachineOperand::Branch(_) => None,
             MachineOperand::Constant(MachineConstant::Int32(_)) => Some(Type::Int32),
+            MachineOperand::Constant(MachineConstant::Int64(_)) => Some(Type::Int64),
             MachineOperand::FrameIndex(fi) => Some(fi.ty.clone()),
             MachineOperand::GlobalAddress(_) => None, // TODO
             MachineOperand::None => None,
@@ -504,6 +509,14 @@ impl MachineConstant {
     pub fn as_i32(&self) -> i32 {
         match self {
             MachineConstant::Int32(i) => *i,
+            _ => unimplemented!(),
+        }
+    }
+
+    pub fn as_i64(&self) -> i64 {
+        match self {
+            MachineConstant::Int64(i) => *i,
+            _ => unimplemented!(),
         }
     }
 }
@@ -512,6 +525,7 @@ impl TypeSize for MachineConstant {
     fn size_in_byte(&self) -> usize {
         match self {
             MachineConstant::Int32(_) => 4,
+            MachineConstant::Int64(_) => 8,
         }
     }
 
@@ -605,6 +619,7 @@ impl fmt::Debug for MachineConstant {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             MachineConstant::Int32(i) => write!(f, "i32 {}", i),
+            MachineConstant::Int64(i) => write!(f, "i64 {}", i),
         }
     }
 }

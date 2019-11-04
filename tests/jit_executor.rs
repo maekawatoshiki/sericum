@@ -166,6 +166,16 @@ fn brainfuxk() {
         vec![types::Type::Int32],
     );
 
+    let cilk_memset_i32 = m.create_function(
+        "cilk.memset.p0i32.i32",
+        types::Type::Void,
+        vec![
+            types::Type::Pointer(Box::new(types::Type::Int32)),
+            types::Type::Int32,
+            types::Type::Int32,
+        ],
+    );
+
     let f = m.create_function("compiled_brainfuxk_code", types::Type::Void, vec![]);
 
     let mut builder = builder::Builder::new(m, f);
@@ -180,22 +190,10 @@ fn brainfuxk() {
     ))));
     let idx = builder.build_alloca(types::Type::Int32);
 
-    // init (set 0 to idx and fill tape with 0. there's no func like memset yet)
+    // initialize (idx = 0, fill tape with 0)
     cilk_ir!((builder) {
         store (i32 0), (%idx);
-        br l1;
-    l1:
-        i = load (%idx);
-        cond = icmp lt (%i), (i32 tape_len as i32);
-        br (%cond) l2, l3;
-    l2:
-        x1 = gep (%tape), [(i32 0), (%i)];
-        store (i32 0), (%x1);
-        x2 = add (%i), (i32 1);
-        store (%x2), (%idx);
-        br l1;
-    l3:
-        store (i32 0), (%idx);
+        __ = call (->cilk_memset_i32) [(%tape), (i32 0), (i32 tape_len as i32)];
     });
 
     let mut br_stack = vec![]; // branches corresponding to each [ ]
@@ -299,6 +297,40 @@ fn brainfuxk() {
 }
 
 #[test]
+fn pointer() {
+    let mut ctx = context::Context::new();
+    let mut m = ctx.create_module("cilk");
+
+    let cilk_memset_i32 = m.create_function(
+        "cilk.memset.p0i32.i32",
+        types::Type::Void,
+        vec![
+            types::Type::Pointer(Box::new(types::Type::Int32)),
+            types::Type::Int32,
+            types::Type::Int32,
+        ],
+    );
+
+    let func = cilk_ir!(m; define [i32] func [] {
+    entry:
+        arr = alloca_ ([16; i32]);
+
+        __ = call (->cilk_memset_i32) [(%arr), (i32 0), (i32 16)];
+
+        p = gep (%arr), [(i32 0), (i32 15)];
+        v = load (%p);
+
+        ret (%v);
+    });
+
+    println!("{}", m.function_ref(func).to_string());
+
+    let mut jit = exec::jit::JITExecutor::new(&m);
+    let func = jit.find_function_by_name("func").unwrap();
+    assert_eq!(jit.run(func, vec![]), exec::jit::GenericValue::Int32(0));
+}
+
+#[test]
 fn jit_executor1() {
     let mut ctx = context::Context::new();
     let mut m = ctx.create_module("cilk");
@@ -310,7 +342,7 @@ fn jit_executor1() {
         vec![ir::types::Type::Int32],
     );
 
-    let func = cilk_ir!(m; define [i32] func (i32) {
+    let func = cilk_ir!(m; define [i32] func [(i32)] {
         // entry:
         //     i = alloca i32;
         //     store (i32 10), (%i);
@@ -514,7 +546,7 @@ fn jit_executor1() {
         //     ret (%p);
     });
 
-    let _main = cilk_ir!(m; define [void] main (i32) {
+    let _main = cilk_ir!(m; define [void] main [(i32)] {
         entry:
             i = alloca i32;
             store (i32 2), (%i);
@@ -563,7 +595,7 @@ fn jit_executor2() {
         vec![ir::types::Type::Int32],
     );
 
-    let func = cilk_ir!(m; define [i32] func (i32) {
+    let func = cilk_ir!(m; define [i32] func [(i32)] {
         entry:
             cond = icmp le (%arg.0), (i32 2);
             br (%cond) l1, l2;
@@ -583,7 +615,7 @@ fn jit_executor2() {
         //     ret (%p);
     });
 
-    let _main = cilk_ir!(m; define [void] main (i32) {
+    let _main = cilk_ir!(m; define [void] main [(i32)] {
         entry:
             i = alloca i32;
             store (i32 1), (%i);

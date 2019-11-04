@@ -153,6 +153,28 @@ impl ConvertToMachine {
             instr_id
         };
 
+        fn move_operand_to_reg(
+            op: MachineOperand,
+            r: MachineRegister,
+            bb: MachineBasicBlockId,
+        ) -> MachineInstr {
+            match op {
+                MachineOperand::Branch(_) => unimplemented!(),
+                MachineOperand::Constant(_) | MachineOperand::Register(_) => {
+                    MachineInstr::new_with_def_reg(mov_rx(&op).unwrap(), vec![op], vec![r], bb)
+                }
+                MachineOperand::FrameIndex(_) => {
+                    MachineInstr::new_with_def_reg(
+                        MachineOpcode::LEA64, // TODO
+                        vec![op],
+                        vec![r],
+                        bb,
+                    )
+                }
+                _ => unimplemented!(),
+            }
+        }
+
         #[rustfmt::skip]
         macro_rules! usual_operand {($e:expr) => {
             self.usual_operand(cur_func, machine_instr_arena, dag_to_machine_reg, cur_bb, iseq, $e)
@@ -326,23 +348,16 @@ impl ConvertToMachine {
             }
             DAGNodeKind::Call => {
                 let mut arg_regs = vec![];
+                // TODO: We have to push remaining arguments on stack
                 for (i, operand) in node.operand[1..].iter().enumerate() {
                     let arg = usual_operand!(*operand);
-                    // TODO: Push remaining arguments on stack
-                    let r = RegisterInfo::new_phy_reg(Type::Int32, get_arg_reg(i).unwrap())
+                    let ty = arg.get_type().unwrap();
+                    let r = RegisterInfo::new_phy_reg(ty, get_arg_reg(i).unwrap())
                         .with_vreg(cur_func.vreg_gen.next_vreg())
                         .into_machine_register();
                     arg_regs.push(r.clone());
-                    iseq_push(
-                        machine_instr_arena,
-                        iseq,
-                        MachineInstr::new_with_def_reg(
-                            mov_n_rx(32, &arg).unwrap(),
-                            vec![arg],
-                            vec![r],
-                            cur_bb,
-                        ),
-                    );
+                    let instr = move_operand_to_reg(arg, r, cur_bb);
+                    iseq_push(machine_instr_arena, iseq, instr);
                 }
 
                 let callee = usual_operand!(node.operand[0]);
@@ -671,6 +686,7 @@ pub fn mov_n_rx(bit: usize, x: &MachineOperand) -> Option<MachineOpcode> {
 
 pub fn mov_rx(x: &MachineOperand) -> Option<MachineOpcode> {
     let mov32rx = [MachineOpcode::MOV32rr, MachineOpcode::MOV32ri];
+    let mov64rx = [MachineOpcode::MOV64rr, MachineOpcode::MOV64ri];
     let (bit, xidx) = match x {
         MachineOperand::Register(r) => (r.info_ref().ty.size_in_bits(), 0),
         MachineOperand::Constant(c) => (c.size_in_bits(), 1),
@@ -678,6 +694,7 @@ pub fn mov_rx(x: &MachineOperand) -> Option<MachineOpcode> {
     };
     match bit {
         32 => Some(mov32rx[xidx]),
+        64 => Some(mov64rx[xidx]),
         _ => None,
     }
 }

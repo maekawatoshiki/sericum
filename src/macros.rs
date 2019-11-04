@@ -63,6 +63,13 @@ macro_rules! cilk_parse_ty {
     (void) => {
         types::Type::Void
     };
+    (ptr $($elem:tt)*) => {
+        types::Type::Pointer(
+            Box::new(
+                cilk_parse_ty!($($elem)*)
+            )
+        )
+    };
     ([$n:expr; $ty:ident]) => {
         types::Type::Array(
             Box::new(
@@ -73,10 +80,10 @@ macro_rules! cilk_parse_ty {
     ([$n:expr; $($elem:tt)*]) => {
         types::Type::Array(
             Box::new(
-                types::ArrayType::new(cilk_parse_ty!($($elem)*), $n)
-            )
+            types::ArrayType::new(cilk_parse_ty!($($elem)*), $n)
         )
-    };
+    )
+};
 }
 
 #[macro_export]
@@ -110,76 +117,76 @@ macro_rules! icmp_kind {
 
 #[macro_export]
 macro_rules! cilk_expr {
-    ($builder:expr; $bb_map:expr; $label:ident : $($remain:tt)*) => {
-        let bb = *$bb_map.entry(stringify!($label)).or_insert_with(|| $builder.append_basic_block());
-        $builder.set_insert_point(bb);
-        cilk_expr!($builder; $bb_map; $( $remain )*);
-    };
-    ($builder:expr; $bb_map:expr; $x:ident = alloca $ty:ident; $($remain:tt)*) => {
-        let $x = $builder.build_alloca(cilk_parse_ty!($ty));
-        cilk_expr!($builder; $bb_map; $( $remain )*);
-    };
-    ($builder:expr; $bb_map:expr; $x:ident = alloca_ ($($ty:tt)*); $($remain:tt)*) => {
-        let $x = $builder.build_alloca(cilk_parse_ty!($( $ty )*));
-        cilk_expr!($builder; $bb_map; $( $remain )*);
-    };
-    ($builder:expr; $bb_map:expr; $x:ident = load ($($val:tt)*); $($remain:tt)*) => {
-        let val= cilk_value!($builder; $( $val )*);
-        let $x = $builder.build_load(val);
-        cilk_expr!($builder; $bb_map; $( $remain )*);
-    };
-    ($builder:expr; $bb_map:expr; store ($($val1:tt)*), ($($val2:tt)*); $($remain:tt)*) => {
-        let src = cilk_value!($builder; $( $val1 )*);
-        let dst = cilk_value!($builder; $( $val2 )*);
-        $builder.build_store(src, dst);
-        cilk_expr!($builder; $bb_map; $( $remain )*);
-    };
-    ($builder:expr; $bb_map:expr; $x:ident = add ($($val1:tt)*), ($($val2:tt)*); $($remain:tt)*) => {
-        let val1 = cilk_value!($builder; $( $val1 )*);
-        let val2 = cilk_value!($builder; $( $val2 )*);
-        let $x = $builder.build_add(val1, val2);
-        cilk_expr!($builder; $bb_map; $( $remain )*);
-    };
-    ($builder:expr; $bb_map:expr; $x:ident = sub ($($val1:tt)*), ($($val2:tt)*); $($remain:tt)*) => {
-        let val1 = cilk_value!($builder; $( $val1 )*);
-        let val2 = cilk_value!($builder; $( $val2 )*);
-        let $x = $builder.build_sub(val1, val2);
-        cilk_expr!($builder; $bb_map; $( $remain )*);
-    };
-    ($builder:expr; $bb_map:expr; $x:ident = mul ($($val1:tt)*), ($($val2:tt)*); $($remain:tt)*) => {
-        let val1 = cilk_value!($builder; $( $val1 )*);
-        let val2 = cilk_value!($builder; $( $val2 )*);
-        let $x = $builder.build_mul(val1, val2);
-        cilk_expr!($builder; $bb_map; $( $remain )*);
-    };
-    ($builder:expr; $bb_map:expr; $x:ident = rem ($($val1:tt)*), ($($val2:tt)*); $($remain:tt)*) => {
-        let val1 = cilk_value!($builder; $( $val1 )*);
-        let val2 = cilk_value!($builder; $( $val2 )*);
-        let $x = $builder.build_rem(val1, val2);
-        cilk_expr!($builder; $bb_map; $( $remain )*);
-    };
-    ($builder:expr; $bb_map:expr; $x:ident = gep ($($val:tt)*), [$( ( $($idx:tt)* ) ),*] ; $($remain:tt)*) => {
-        let val = cilk_value!($builder; $( $val )*);
-        let indices = vec![$( cilk_value!($builder; $( $idx )*) ),*];
-        let $x = $builder.build_gep(val, indices);
-        cilk_expr!($builder; $bb_map; $( $remain )*);
-    };
-    ($builder:expr; $bb_map:expr; $x:ident = phi [$( [ ($($arg:tt)*), $bb:ident ] ),*] ; $($remain:tt)*) => {
-        let args = vec![$(
-                           (cilk_value!($builder; $( $arg )*),
-                            *$bb_map.entry(stringify!($bb)).or_insert_with(|| $builder.append_basic_block()))
-                       ),*];
-        let $x = $builder.build_phi(args);
-        cilk_expr!($builder; $bb_map; $( $remain )*);
-    };
-    ($builder:expr; $bb_map:expr; $x:ident = call $name:ident [$( ( $($arg:tt)* ) ),*] ; $($remain:tt)*) => {
-        let args = vec![ $( cilk_value!($builder; $( $arg )*) ),* ];
-        let $x = $builder.build_call(value::Value::Function(
-                value::FunctionValue { func_id: $builder.module.find_function_by_name(stringify!($name)).unwrap(),
-                parent: $builder.module }), args);
-        cilk_expr!($builder; $bb_map; $( $remain )*);
-    };
-    ($builder:expr; $bb_map:expr; $x:ident = call (->$id:expr) [$( ( $($arg:tt)* ) ),*] ; $($remain:tt)*) => {
+($builder:expr; $bb_map:expr; $label:ident : $($remain:tt)*) => {
+    let bb = *$bb_map.entry(stringify!($label)).or_insert_with(|| $builder.append_basic_block());
+    $builder.set_insert_point(bb);
+    cilk_expr!($builder; $bb_map; $( $remain )*);
+};
+($builder:expr; $bb_map:expr; $x:ident = alloca $ty:ident; $($remain:tt)*) => {
+    let $x = $builder.build_alloca(cilk_parse_ty!($ty));
+    cilk_expr!($builder; $bb_map; $( $remain )*);
+};
+($builder:expr; $bb_map:expr; $x:ident = alloca_ ($($ty:tt)*); $($remain:tt)*) => {
+    let $x = $builder.build_alloca(cilk_parse_ty!($( $ty )*));
+    cilk_expr!($builder; $bb_map; $( $remain )*);
+};
+($builder:expr; $bb_map:expr; $x:ident = load ($($val:tt)*); $($remain:tt)*) => {
+    let val= cilk_value!($builder; $( $val )*);
+    let $x = $builder.build_load(val);
+    cilk_expr!($builder; $bb_map; $( $remain )*);
+};
+($builder:expr; $bb_map:expr; store ($($val1:tt)*), ($($val2:tt)*); $($remain:tt)*) => {
+    let src = cilk_value!($builder; $( $val1 )*);
+    let dst = cilk_value!($builder; $( $val2 )*);
+    $builder.build_store(src, dst);
+    cilk_expr!($builder; $bb_map; $( $remain )*);
+};
+($builder:expr; $bb_map:expr; $x:ident = add ($($val1:tt)*), ($($val2:tt)*); $($remain:tt)*) => {
+    let val1 = cilk_value!($builder; $( $val1 )*);
+    let val2 = cilk_value!($builder; $( $val2 )*);
+    let $x = $builder.build_add(val1, val2);
+    cilk_expr!($builder; $bb_map; $( $remain )*);
+};
+($builder:expr; $bb_map:expr; $x:ident = sub ($($val1:tt)*), ($($val2:tt)*); $($remain:tt)*) => {
+    let val1 = cilk_value!($builder; $( $val1 )*);
+    let val2 = cilk_value!($builder; $( $val2 )*);
+    let $x = $builder.build_sub(val1, val2);
+    cilk_expr!($builder; $bb_map; $( $remain )*);
+};
+($builder:expr; $bb_map:expr; $x:ident = mul ($($val1:tt)*), ($($val2:tt)*); $($remain:tt)*) => {
+    let val1 = cilk_value!($builder; $( $val1 )*);
+    let val2 = cilk_value!($builder; $( $val2 )*);
+    let $x = $builder.build_mul(val1, val2);
+    cilk_expr!($builder; $bb_map; $( $remain )*);
+};
+($builder:expr; $bb_map:expr; $x:ident = rem ($($val1:tt)*), ($($val2:tt)*); $($remain:tt)*) => {
+    let val1 = cilk_value!($builder; $( $val1 )*);
+    let val2 = cilk_value!($builder; $( $val2 )*);
+    let $x = $builder.build_rem(val1, val2);
+    cilk_expr!($builder; $bb_map; $( $remain )*);
+};
+($builder:expr; $bb_map:expr; $x:ident = gep ($($val:tt)*), [$( ( $($idx:tt)* ) ),*] ; $($remain:tt)*) => {
+    let val = cilk_value!($builder; $( $val )*);
+    let indices = vec![$( cilk_value!($builder; $( $idx )*) ),*];
+    let $x = $builder.build_gep(val, indices);
+    cilk_expr!($builder; $bb_map; $( $remain )*);
+};
+($builder:expr; $bb_map:expr; $x:ident = phi [$( [ ($($arg:tt)*), $bb:ident ] ),*] ; $($remain:tt)*) => {
+    let args = vec![$(
+                       (cilk_value!($builder; $( $arg )*),
+                        *$bb_map.entry(stringify!($bb)).or_insert_with(|| $builder.append_basic_block()))
+                   ),*];
+    let $x = $builder.build_phi(args);
+    cilk_expr!($builder; $bb_map; $( $remain )*);
+};
+($builder:expr; $bb_map:expr; $x:ident = call $name:ident [$( ( $($arg:tt)* ) ),*] ; $($remain:tt)*) => {
+    let args = vec![ $( cilk_value!($builder; $( $arg )*) ),* ];
+    let $x = $builder.build_call(value::Value::Function(
+            value::FunctionValue { func_id: $builder.module.find_function_by_name(stringify!($name)).unwrap(),
+            parent: $builder.module }), args);
+    cilk_expr!($builder; $bb_map; $( $remain )*);
+};
+($builder:expr; $bb_map:expr; $x:ident = call (->$id:expr) [$( ( $($arg:tt)* ) ),*] ; $($remain:tt)*) => {
         let args = vec![ $( cilk_value!($builder; $( $arg )*) ),* ];
         let $x = $builder.build_call(value::Value::Function(value::FunctionValue { func_id: $id, parent: $builder.module }), args);
         cilk_expr!($builder; $bb_map; $( $remain )*);
@@ -213,11 +220,11 @@ macro_rules! cilk_expr {
 
 #[macro_export]
 macro_rules! cilk_ir {
-    ($m:expr; define [$ret_ty:ident] $name:ident ($( $arg:ident ),* ) { $($exp:tt)* }) => {{
+    ($m:expr; define [$($ret_ty:tt)*] $name:ident [$(($($arg:tt)*)),*] { $($exp:tt)* }) => {{
         let f = $m.create_function(
                 stringify!($name),
-                cilk_parse_ty!($ret_ty),
-                vec![$( cilk_parse_ty!($arg) ),*],
+                cilk_parse_ty!($($ret_ty)*),
+                vec![$( cilk_parse_ty!($($arg)*) ),*],
             );
         let mut builder = builder::Builder::new($m, f);
         let mut bb_map: FxHashMap<&str, basic_block::BasicBlockId> = FxHashMap::default();
