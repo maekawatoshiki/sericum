@@ -1,4 +1,4 @@
-use super::super::dag::convert_machine::mov_rx;
+use super::super::dag::convert_to_machine::mov_rx;
 use super::{basic_block::*, function::*, instr::*, module::*};
 use rustc_hash::FxHashMap;
 

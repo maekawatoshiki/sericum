@@ -71,7 +71,7 @@ impl JITExecutor {
         );
 
         let mut machine_module =
-            dag::convert_machine::ConvertToMachine::new().convert_module(dag_module);
+            dag::convert_to_machine::ConvertToMachine::new().convert_module(dag_module);
 
         machine::phi_elimination::PhiElimination::new().run_on_module(&mut machine_module);
         machine::two_addr::TwoAddressConverter::new().run_on_module(&mut machine_module);
