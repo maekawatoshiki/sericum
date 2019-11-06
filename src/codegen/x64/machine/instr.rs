@@ -308,6 +308,17 @@ impl MachineInstr {
     pub fn get_reg(&self) -> Option<PhysReg> {
         self.def[0].info_ref().reg
     }
+
+    pub fn has_def_reg(&self) -> bool {
+        self.def.len() > 0
+    }
+
+    pub fn get_def_reg(&self) -> Option<&MachineRegister> {
+        if !self.has_def_reg() {
+            return None;
+        }
+        Some(&self.def[0])
+    }
 }
 
 impl MachineOpcode {
