@@ -57,7 +57,7 @@ impl JITExecutor {
 
         dag::combine::Combine::new().combine_module(&mut dag_module);
 
-        when_debug!(
+        debug!(
             println!("DAG:");
             for (_, dag_func) in &dag_module.functions {
                 for id in &dag_func.dag_basic_blocks {
@@ -77,7 +77,7 @@ impl JITExecutor {
         machine::two_addr::TwoAddressConverter::new().run_on_module(&mut machine_module);
         machine::regalloc::RegisterAllocator::new().run_on_module(&mut machine_module);
 
-        when_debug!(
+        debug!(
             println!("MachineModule dump:");
             for (_, machine_func) in &machine_module.functions {
                 let mut idx = 0;
@@ -528,7 +528,7 @@ impl JITCompiler {
         //     }
         // }
 
-        // when_debug!(println!("saved register: {:?}", save_regs));
+        // debug!(println!("saved register: {:?}", save_regs));
 
         // for save_reg in &save_regs {
         //     dynasm!(self.asm; push Ra(*save_reg));

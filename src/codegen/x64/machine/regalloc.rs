@@ -44,7 +44,7 @@ impl RegisterAllocator {
             assert!(allocated);
         }
 
-        when_debug!(for (_, x) in &matrix.vreg_interval {
+        debug!(for (_, x) in &matrix.vreg_interval {
             println!("{:?}", x)
         });
 
@@ -121,14 +121,14 @@ impl RegisterAllocator {
             }
         }
 
-        when_debug!(println!("REG TO SAVE: {:?}", regs_to_save));
+        debug!(println!("REG TO SAVE: {:?}", regs_to_save));
 
         let mut slots_to_save_regs = vec![];
         for r in &regs_to_save {
             slots_to_save_regs.push(find_unused_slot(cur_func, occupied, r));
         }
 
-        when_debug!(println!("NEW SLOTS: {:?}", slots_to_save_regs));
+        debug!(println!("NEW SLOTS: {:?}", slots_to_save_regs));
 
         let call_instr_parent = cur_func.instr_arena[call_instr_id].parent;
 
@@ -274,7 +274,7 @@ impl PhysicalRegisterAllocator {
             }
         }
 
-        when_debug!(println!("SAVED REG: {:?}", regs_to_save));
+        debug!(println!("SAVED REG: {:?}", regs_to_save));
 
         let mut slots_to_save_regs = vec![];
         for r in &regs_to_save {

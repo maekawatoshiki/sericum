@@ -14,7 +14,7 @@ macro_rules! match_then {
     }};
 }
 
-macro_rules! when_debug {
+macro_rules! debug {
     ($($arg:tt)*) => {
         #[cfg(debug_assertions)]
         {
@@ -31,28 +31,6 @@ macro_rules! matches {
             _ => false,
         }
     };
-}
-
-#[rustfmt::skip]
-macro_rules! reg {
-    ($f:expr; $instr_id:expr) => {{
-        $f.instr_table[$instr_id].reg.borrow().reg.unwrap()
-            .shift(REGISTER_OFFSET).as_u8()
-    }};
-    ($instr:expr) => {{
-        $instr.reg.borrow().reg.unwrap()
-            .shift(REGISTER_OFFSET).as_u8()
-    }};
-}
-
-#[rustfmt::skip]
-macro_rules! vreg {
-    ($f:expr ; $instr_id:expr) => {{
-        $f.instr_table[$instr_id].reg.borrow().vreg
-    }};
-    ($instr:expr) => {{
-        $instr.reg.borrow().vreg
-    }};
 }
 
 #[macro_export]

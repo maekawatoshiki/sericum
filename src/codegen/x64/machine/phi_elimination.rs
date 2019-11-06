@@ -33,7 +33,7 @@ impl PhiElimination {
                     _ => unreachable!(),
                 };
 
-                when_debug!(println!("PHI {:?}", val));
+                debug!(println!("PHI {:?}", val));
 
                 let mut iseq = f.basic_block_arena[bb].iseq_ref_mut();
                 assert!(

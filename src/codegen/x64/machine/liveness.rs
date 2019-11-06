@@ -342,7 +342,7 @@ impl LivenessAnalysis {
             }
         }
 
-        when_debug!(for (vreg, range) in &vreg2range {
+        debug!(for (vreg, range) in &vreg2range {
             println!("{:?}: {:?}", vreg, range)
         });
 

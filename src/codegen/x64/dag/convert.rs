@@ -47,7 +47,7 @@ impl<'a> ConvertToDAG<'a> {
 
         let func = self.module.function_ref(func_id);
 
-        when_debug!(println!(
+        debug!(println!(
             "{}: dump function: \n{}",
             file!(),
             func.to_string()
