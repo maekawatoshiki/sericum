@@ -1,4 +1,4 @@
-### this branch is "new-regalloc" to devise better register allocation system
+### this readme doesn't contain the latest information
 
 # Cilk
 
