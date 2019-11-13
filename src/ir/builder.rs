@@ -1,43 +1,37 @@
-use super::{basic_block::*, function::*, module::*, opcode::*, types::*, value::*};
+use super::{basic_block::*, function::*, opcode::*, types::*, value::*};
 
 #[derive(Debug)]
-pub struct Builder {
-    pub module: ModuleRef,
+pub struct Builder<'a> {
+    pub function: &'a mut Function,
     func_id: FunctionId,
     cur_bb: Option<BasicBlockId>,
     insert_point: usize,
 }
 
-impl Builder {
-    pub fn new(module: ModuleRef, func_id: FunctionId) -> Self {
+impl<'a> Builder<'a> {
+    pub fn new(function: &'a mut Function) -> Self {
+        let module = function.parent;
+        let func_id = module.find_function(&*function).unwrap();
         Self {
-            module,
+            function,
             func_id,
             cur_bb: None,
             insert_point: 0,
         }
     }
 
-    pub fn function_ref(&self) -> &Function {
-        self.module.function_ref(self.func_id)
-    }
-
-    pub fn function_ref_mut(&mut self) -> &mut Function {
-        self.module.function_ref_mut(self.func_id)
-    }
-
     pub fn get_param(&self, idx: usize) -> Option<Value> {
-        self.function_ref().get_param_value(self.func_id, idx)
+        self.function.get_param_value(self.func_id, idx)
     }
 
     pub fn append_basic_block(&mut self) -> BasicBlockId {
-        self.function_ref_mut().append_basic_block()
+        self.function.append_basic_block()
     }
 
     pub fn set_insert_point(&mut self, id: BasicBlockId) {
         self.cur_bb = Some(id);
-        self.function_ref_mut().append_existing_basic_block(id);
-        let iseq_len = self.function_ref().basic_block_ref(id).iseq_ref().len();
+        self.function.append_existing_basic_block(id);
+        let iseq_len = self.function.basic_block_ref(id).iseq_ref().len();
         self.insert_point = iseq_len;
     }
 
@@ -130,11 +124,11 @@ impl Builder {
         self.append_instr_to_cur_bb(instr);
 
         let cur_bb_id = self.cur_bb.unwrap();
-        self.function_ref_mut()
+        self.function
             .basic_block_ref_mut(cur_bb_id)
             .succ
             .push(dst_id);
-        self.function_ref_mut()
+        self.function
             .basic_block_ref_mut(dst_id)
             .pred
             .push(cur_bb_id);
@@ -147,18 +141,12 @@ impl Builder {
         let instr = self.create_instr_value(Opcode::CondBr(cond, bb1, bb2), Type::Void);
         self.append_instr_to_cur_bb(instr);
 
-        let cur_bb = self.function_ref_mut().basic_block_ref_mut(cur_bb_id);
+        let cur_bb = self.function.basic_block_ref_mut(cur_bb_id);
         cur_bb.succ.push(bb1);
         cur_bb.succ.push(bb2);
 
-        self.function_ref_mut()
-            .basic_block_ref_mut(bb1)
-            .pred
-            .push(cur_bb_id);
-        self.function_ref_mut()
-            .basic_block_ref_mut(bb2)
-            .pred
-            .push(cur_bb_id);
+        self.function.basic_block_ref_mut(bb1).pred.push(cur_bb_id);
+        self.function.basic_block_ref_mut(bb2).pred.push(cur_bb_id);
 
         instr
     }
@@ -187,11 +175,11 @@ impl Builder {
 
     fn create_instr_value(&mut self, opcode: Opcode, ret_ty: Type) -> Value {
         let instr = Instruction::new(opcode, ret_ty);
-        let instr_id = self.function_ref_mut().instr_id(instr);
+        let instr_id = self.function.instr_id(instr);
         Value::Instruction(InstructionValue {
             func_id: self.func_id,
             id: instr_id,
-            parent: self.module,
+            parent: self.function.parent,
         })
     }
 
@@ -200,7 +188,7 @@ impl Builder {
         let insert_point = self.insert_point;
         self.insert_point += 1;
 
-        let bb = self.function_ref().basic_block_ref(bb_id);
+        let bb = self.function.basic_block_ref(bb_id);
         bb.iseq_ref_mut().insert(insert_point, instr);
     }
 }

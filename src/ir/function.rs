@@ -3,6 +3,20 @@ use id_arena::*;
 
 pub type FunctionId = Id<Function>;
 
+pub struct FunctionName<'a>(pub &'a str);
+
+impl<'a> From<&'a Function> for FunctionName<'a> {
+    fn from(f: &'a Function) -> Self {
+        FunctionName(&f.name)
+    }
+}
+
+impl<'a> From<&'a str> for FunctionName<'a> {
+    fn from(s: &'a str) -> Self {
+        FunctionName(s)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Function {
     /// The module this function belongs to
@@ -151,5 +165,11 @@ impl Function {
                     b.to_string()
                 )
             })
+    }
+}
+
+impl PartialEq for Function {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name
     }
 }

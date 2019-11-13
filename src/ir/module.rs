@@ -32,13 +32,14 @@ impl Module {
         &mut self.functions[id]
     }
 
-    pub fn find_function_by_name(&self, name: &str) -> Option<FunctionId> {
-        for (id, func) in &self.functions {
-            if func.name == name {
-                return Some(id);
-            }
-        }
-        None
+    pub fn find_function<'a, Name: Into<FunctionName<'a>>>(
+        &self,
+        name: Name,
+    ) -> Option<FunctionId> {
+        let name = name.into().0;
+        self.functions
+            .iter()
+            .find_map(|(id, f)| if f.name == name { Some(id) } else { None })
     }
 }
 

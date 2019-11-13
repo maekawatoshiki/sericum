@@ -1,7 +1,5 @@
 use super::{function::*, module::*, opcode::*, types::*};
 
-pub type ValueId = usize;
-
 macro_rules! const_op { ($name:ident, $op:tt) => {
     pub fn $name(&self, v: &Value) -> Option<Value> {
         use ImmediateValue::*;

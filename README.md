@@ -38,8 +38,10 @@ let m = ctx.create_module("cilk");
 let fibo = m.create_function(
     "fibo", Type::Int32, vec![Type::Int32]
 );
-let mut builder = Builder::new(m, fibo);
+let fibo_entity = m.function_ref_mut(fibo);
+let mut builder = Builder::new(fibo_entity);
 
+{
 let entry = builder.append_basic_block();
 let br1 = builder.append_basic_block();
 let br2 = builder.append_basic_block();
@@ -70,7 +72,7 @@ builder.set_insert_point(br2);
     let add = builder.build_add(fibo1, fibo2);
     builder.build_ret(add);
 
-println!("Function dump:\n{}", m.function_ref(fibo).to_string());
+println!("Function dump:\n{}", fibo_entity.to_string());
 
 // Function dump:
 // define i32 fibo(i32) {       

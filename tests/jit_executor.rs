@@ -176,9 +176,10 @@ fn brainfuxk() {
         ],
     );
 
-    let f = m.create_function("compiled_brainfuxk_code", types::Type::Void, vec![]);
+    let f_id = m.create_function("compiled_brainfuxk_code", types::Type::Void, vec![]);
+    let f = m.function_ref_mut(f_id);
 
-    let mut builder = builder::Builder::new(m, f);
+    let mut builder = builder::Builder::new(f);
     let entry = builder.append_basic_block();
     builder.set_insert_point(entry);
 
@@ -237,7 +238,7 @@ fn brainfuxk() {
                 builder.build_call(
                     value::Value::new_func(value::FunctionValue {
                         func_id: cilk_printch_i32,
-                        parent: builder.module,
+                        parent: builder.function.parent,
                     }),
                     vec![cur_val],
                 );
@@ -286,7 +287,7 @@ fn brainfuxk() {
 
     builder.build_ret(value::Value::None);
 
-    println!("IR: {}", m.function_ref(f).to_string());
+    println!("IR: {}", f.to_string());
 
     let mut jit = exec::jit::JITExecutor::new(&m);
     let func = jit
