@@ -3,12 +3,17 @@ use super::super::register::*;
 use super::{builder::*, function::*, instr::*, liveness::*, module::*};
 use crate::ir::types::*;
 use rustc_hash::{FxHashMap, FxHashSet};
+use std::collections::VecDeque;
 
-pub struct RegisterAllocator {}
+pub struct RegisterAllocator {
+    queue: VecDeque<VirtReg>,
+}
 
 impl RegisterAllocator {
     pub fn new() -> Self {
-        Self {}
+        Self {
+            queue: VecDeque::new(),
+        }
     }
 
     pub fn run_on_module(&mut self, module: &mut MachineModule) {
@@ -22,7 +27,9 @@ impl RegisterAllocator {
 
         let mut matrix = LivenessAnalysis::new().analyze_function(cur_func);
 
-        for vreg in matrix.collect_vregs() {
+        self.queue = matrix.collect_vregs().into_iter().collect();
+
+        while let Some(vreg) = self.queue.pop_front() {
             // TODO: 0..8 ???
             let mut allocated = false;
             for reg in 0..8 {
@@ -33,9 +40,6 @@ impl RegisterAllocator {
                 }
 
                 matrix.assign_reg(vreg, reg);
-
-                let range = matrix.get_vreg_interval(vreg).unwrap().range.clone();
-                matrix.get_or_create_reg_live_range(reg).unite_range(range);
 
                 allocated = true;
                 break;

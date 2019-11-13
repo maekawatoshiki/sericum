@@ -3,6 +3,8 @@ use super::{basic_block::*, function::*, instr::*, module::*};
 use rustc_hash::FxHashMap;
 use std::cmp::Ordering;
 
+const IDX_STEP: usize = 16;
+
 #[derive(Debug, Clone)]
 pub struct LiveRegMatrix {
     pub id2pp: FxHashMap<MachineInstrId, ProgramPoint>,
@@ -71,9 +73,12 @@ impl LiveRegMatrix {
     }
 
     pub fn assign_reg(&mut self, vreg: VirtReg, reg: PhysReg) {
-        if let Some(interval) = self.vreg_interval.get_mut(&vreg) {
-            interval.reg = Some(reg)
-        }
+        // assign reg to vreg
+        self.vreg_interval.get_mut(&vreg).unwrap().reg = Some(reg);
+
+        let vreg_range = self.get_vreg_interval(vreg).unwrap().range.clone();
+        self.get_or_create_reg_live_range(reg)
+            .unite_range(vreg_range);
     }
 
     pub fn collect_vregs(&self) -> Vec<VirtReg> {
@@ -376,7 +381,7 @@ impl LivenessAnalysis {
                         .add_segment(LiveSegment::new(cur_pp!(), cur_pp!()))
                 }
 
-                index += 1;
+                index += IDX_STEP;
             }
 
             for liveout in &liveness.live_out {

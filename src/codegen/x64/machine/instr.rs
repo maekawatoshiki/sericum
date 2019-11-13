@@ -16,7 +16,6 @@ pub type MachineInstrId = Id<MachineInstr>;
 pub struct MachineInstr {
     pub opcode: MachineOpcode,
     pub operand: Vec<MachineOperand>,
-    // pub ty: Type, // TODO: will be removed
     pub def: Vec<MachineRegister>,
     pub tie: FxHashMap<MachineRegister, MachineRegister>, // def -> use
     pub imp_use: Vec<MachineRegister>,
