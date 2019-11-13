@@ -101,10 +101,9 @@ impl RegisterAllocator {
             slot
         }
 
-        let i2map = self.construct_i2map(cur_func);
         let matrix = LivenessAnalysis::new().analyze_function(cur_func);
 
-        let call_instr_idx = i2map.get_index_by_instr_id(call_instr_id).unwrap();
+        let call_instr_pp = matrix.get_program_point_of_instr(call_instr_id).unwrap();
         let mut regs_to_save = FxHashSet::default();
 
         // TODO: It's expensive to check all the elements in ``instr_arena``
@@ -115,7 +114,10 @@ impl RegisterAllocator {
 
             if matrix.interferes_with_range(
                 instr.get_vreg(),
-                LiveRange::new(vec![LiveSegment::new(call_instr_idx, call_instr_idx + 1)]),
+                LiveRange::new(vec![LiveSegment::new(
+                    call_instr_pp,
+                    call_instr_pp.next_idx(),
+                )]),
             ) {
                 regs_to_save.insert(instr.def[0].clone());
             }
@@ -189,26 +191,6 @@ impl RegisterAllocator {
         for instr_id in call_instr_id {
             self.insert_instr_to_save_reg(cur_func, &mut occupied.clone(), instr_id);
         }
-    }
-
-    // i2 means (Machine) Instr id and Index.
-    // TODO: IT'S NOT CLEAR
-    pub fn construct_i2map(
-        &mut self,
-        cur_func: &mut MachineFunction,
-    ) -> MachineInstrIdAndIndexBiMap {
-        let mut i2map = MachineInstrIdAndIndexBiMap::new();
-        let mut idx = 0;
-
-        for bb_id in &cur_func.basic_blocks {
-            let bb = &cur_func.basic_block_arena[*bb_id];
-            for instr_id in &*bb.iseq_ref() {
-                i2map.insert(*instr_id, idx);
-                idx += 1;
-            }
-        }
-
-        i2map
     }
 }
 

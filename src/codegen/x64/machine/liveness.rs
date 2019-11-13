@@ -1,9 +1,11 @@
 use super::super::register::*;
 use super::{basic_block::*, function::*, instr::*, module::*};
 use rustc_hash::FxHashMap;
+use std::cmp::Ordering;
 
 #[derive(Debug, Clone)]
 pub struct LiveRegMatrix {
+    pub id2pp: FxHashMap<MachineInstrId, ProgramPoint>,
     pub vreg_interval: FxHashMap<VirtReg, LiveInterval>,
     pub reg_range: FxHashMap<PhysReg, LiveRange>,
 }
@@ -22,19 +24,31 @@ pub struct LiveRange {
 
 #[derive(Debug, Clone)]
 pub struct LiveSegment {
-    start: usize,
-    end: usize,
+    start: ProgramPoint,
+    end: ProgramPoint,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct ProgramPoint {
+    bb: usize,
+    idx: usize,
 }
 
 impl LiveRegMatrix {
     pub fn new(
+        id2pp: FxHashMap<MachineInstrId, ProgramPoint>,
         vreg_interval: FxHashMap<VirtReg, LiveInterval>,
         reg_range: FxHashMap<PhysReg, LiveRange>,
     ) -> Self {
         Self {
+            id2pp,
             vreg_interval,
             reg_range,
         }
+    }
+
+    pub fn get_program_point_of_instr(&self, id: MachineInstrId) -> Option<ProgramPoint> {
+        self.id2pp.get(&id).map(|x| *x)
     }
 
     /// Return false if it's legal to allocate reg for vreg
@@ -122,12 +136,43 @@ impl LiveRange {
 }
 
 impl LiveSegment {
-    pub fn new(start: usize, end: usize) -> Self {
+    pub fn new(start: ProgramPoint, end: ProgramPoint) -> Self {
         Self { start, end }
     }
 
     pub fn interferes(&self, seg: &LiveSegment) -> bool {
         self.start < seg.end && self.end > seg.start
+    }
+}
+
+impl ProgramPoint {
+    pub fn new(bb: usize, idx: usize) -> Self {
+        Self { bb, idx }
+    }
+
+    pub fn next_idx(mut self) -> Self {
+        self.idx += 1;
+        self
+    }
+}
+
+impl PartialOrd for ProgramPoint {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        if self.bb < other.bb {
+            return Some(Ordering::Less);
+        }
+
+        if self.bb > other.bb {
+            return Some(Ordering::Greater);
+        }
+
+        Some(self.idx.cmp(&other.idx))
+    }
+}
+
+impl PartialEq for ProgramPoint {
+    fn eq(&self, other: &Self) -> bool {
+        self.bb == other.bb && self.idx == other.idx
     }
 }
 
@@ -255,12 +300,17 @@ impl LivenessAnalysis {
     pub fn construct_live_reg_matrix(&self, cur_func: &MachineFunction) -> LiveRegMatrix {
         let mut vreg2range: FxHashMap<VirtReg, LiveRange> = FxHashMap::default();
         let mut reg2range: FxHashMap<PhysReg, LiveRange> = FxHashMap::default();
+        let mut id2pp: FxHashMap<MachineInstrId, ProgramPoint> = FxHashMap::default();
 
-        let mut index = 0;
+        let mut bb_idx = 0;
 
         for bb_id in &cur_func.basic_blocks {
+            let mut index = 0;
             let bb = &cur_func.basic_block_arena[*bb_id];
             let liveness = bb.liveness_ref();
+
+            #[rustfmt::skip]
+            macro_rules! cur_pp { () => { ProgramPoint::new(bb_idx, index) };}
 
             for livein in &liveness.live_in {
                 if livein.get_reg().is_some() {
@@ -270,18 +320,19 @@ impl LivenessAnalysis {
                 vreg2range
                     .entry(livein.get_vreg())
                     .or_insert_with(|| LiveRange::new_empty())
-                    .add_segment(LiveSegment::new(index, index))
-                // vreg2seg.insert(livein.get_vreg(), LiveSegment::new(index, index));
+                    .add_segment(LiveSegment::new(cur_pp!(), cur_pp!()))
             }
 
             for instr_id in &*bb.iseq_ref() {
                 let instr = &cur_func.instr_arena[*instr_id];
 
+                id2pp.insert(*instr_id, cur_pp!());
+
                 for operand in &instr.operand {
                     if let MachineOperand::Register(reg) = operand {
                         if let Some(phy_reg) = reg.get_reg() {
                             if let Some(range) = reg2range.get_mut(&phy_reg) {
-                                range.segments.last_mut().unwrap().end = index;
+                                range.segments.last_mut().unwrap().end = cur_pp!();
                             }
                         }
 
@@ -292,28 +343,29 @@ impl LivenessAnalysis {
                                 .segments
                                 .last_mut()
                                 .unwrap()
-                                .end = index;
+                                .end = cur_pp!();
                         }
                     }
                 }
 
+                // TODO: def.len() > 0 is no easy to understand
                 if instr.def.len() > 0 {
                     if instr.def[0].get_reg().is_some() {
                         reg2range
                             .entry(instr.def[0].get_reg().unwrap())
                             .or_insert_with(|| LiveRange::new_empty())
-                            .add_segment(LiveSegment::new(index, index));
+                            .add_segment(LiveSegment::new(cur_pp!(), cur_pp!()));
                     } else {
                         vreg2range
                             .entry(instr.def[0].get_vreg())
                             .or_insert_with(|| LiveRange::new_empty())
-                            .add_segment(LiveSegment::new(index, index));
+                            .add_segment(LiveSegment::new(cur_pp!(), cur_pp!()));
                     }
                 }
 
                 for use_ in &instr.imp_use {
                     if let Some(range) = reg2range.get_mut(&use_.get_reg().unwrap()) {
-                        range.segments.last_mut().unwrap().end = index;
+                        range.segments.last_mut().unwrap().end = cur_pp!();
                     }
                 }
 
@@ -321,7 +373,7 @@ impl LivenessAnalysis {
                     reg2range
                         .entry(def.get_reg().unwrap())
                         .or_insert_with(|| LiveRange::new_empty())
-                        .add_segment(LiveSegment::new(index, index))
+                        .add_segment(LiveSegment::new(cur_pp!(), cur_pp!()))
                 }
 
                 index += 1;
@@ -338,8 +390,10 @@ impl LivenessAnalysis {
                     .segments
                     .last_mut()
                     .unwrap()
-                    .end = index;
+                    .end = cur_pp!();
             }
+
+            bb_idx += 1;
         }
 
         debug!(for (vreg, range) in &vreg2range {
@@ -347,6 +401,7 @@ impl LivenessAnalysis {
         });
 
         LiveRegMatrix::new(
+            id2pp,
             vreg2range
                 .into_iter()
                 .map(|(vreg, range)| (vreg, LiveInterval::new(vreg, range)))

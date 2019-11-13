@@ -1,7 +1,6 @@
 use super::super::register::*;
 use super::{basic_block::*, frame_object::*};
 use crate::ir::types::*;
-use bimap::BiMap;
 use id_arena::*;
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::{
@@ -12,12 +11,6 @@ use std::{
 
 pub type RegisterInfoRef = Rc<RefCell<RegisterInfo>>;
 pub type MachineInstrId = Id<MachineInstr>;
-
-/// Bidirectional map for interconversion between MachineInstrId and an index for
-/// ``MachineBasicBlock.iseq``
-pub struct MachineInstrIdAndIndexBiMap {
-    map: BiMap<MachineInstrId, usize>,
-}
 
 #[derive(Clone)]
 pub struct MachineInstr {
@@ -127,24 +120,6 @@ impl ::std::hash::Hash for MachineRegister {
         if let Some(reg) = self.info_ref().reg {
             state.write_usize(reg.get())
         }
-    }
-}
-
-impl MachineInstrIdAndIndexBiMap {
-    pub fn new() -> Self {
-        Self { map: BiMap::new() }
-    }
-
-    pub fn insert(&mut self, id: MachineInstrId, idx: usize) {
-        self.map.insert(id, idx);
-    }
-
-    pub fn get_index_by_instr_id(&self, id: MachineInstrId) -> Option<usize> {
-        self.map.get_by_left(&id).map(|x| *x)
-    }
-
-    pub fn get_instr_id_by_index(&self, idx: usize) -> Option<MachineInstrId> {
-        self.map.get_by_right(&idx).map(|x| *x)
     }
 }
 
