@@ -595,6 +595,7 @@ impl fmt::Debug for RegisterInfo {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.reg {
             Some(phy_reg) => phy_reg.fmt(f),
+
             None => self.vreg.fmt(f),
         }
     }

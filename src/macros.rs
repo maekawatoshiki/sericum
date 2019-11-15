@@ -6,6 +6,7 @@ macro_rules! some_then {
     }};
 }
 
+#[allow(unused_macros)]
 macro_rules! match_then {
     ($x:pat, $e:expr, $t:expr) => {{
         if let $x = $e {
