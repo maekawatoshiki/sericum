@@ -35,9 +35,8 @@ pub struct Function {
 
     /// Instruction arena
     pub instr_table: Arena<Instruction>,
-
-    /// True if internal function
-    pub internal: bool,
+    // True if internal function
+    // pub internal: bool,
 }
 
 impl Function {
@@ -50,10 +49,10 @@ impl Function {
             basic_blocks: vec![],
             instr_table: Arena::new(),
             // TODO
-            internal: match name {
-                "cilk.memset.p0i32.i32" | "cilk.println.i32" | "cilk.printch.i32" => true, // TODO
-                _ => false,
-            },
+            // internal: match name {
+            //     "cilk.memset.p0i32.i32" | "cilk.println.i32" | "cilk.printch.i32" => true, // TODO
+            //     _ => false,
+            // },
         }
     }
 

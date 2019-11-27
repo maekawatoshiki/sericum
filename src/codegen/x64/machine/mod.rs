@@ -5,7 +5,7 @@ pub mod instr;
 pub mod liveness;
 pub mod module;
 pub mod phi_elimination;
+pub mod reg_coalescer;
 pub mod regalloc;
 pub mod two_addr;
-pub mod reg_coalescer;
 pub use super::frame_object;

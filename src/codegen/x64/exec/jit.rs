@@ -2,7 +2,7 @@ use crate::codegen::x64::machine::{
     basic_block::*, frame_object::*, function::*, instr::*, module::*,
 };
 use crate::ir;
-use crate::ir::types::*;
+use crate::{ir::types::*, codegen::internal_function_names};
 use dynasmrt::*;
 use rustc_hash::FxHashMap;
 
@@ -118,16 +118,24 @@ impl JITCompiler {
             asm: x64::Assembler::new().unwrap(),
             function_map: FxHashMap::default(),
             bb_to_label: FxHashMap::default(),
-            internal_functions: vec![
-                ("cilk.println.i32".to_string(), cilk_println_i32_ as _),
-                ("cilk.printch.i32".to_string(), cilk_printch_i32_ as _),
-                (
-                    "cilk.memset.p0i32.i32".to_string(),
-                    cilk_memset_p0i32_i32_ as _,
-                ),
-            ]
-            .into_iter()
-            .collect::<FxHashMap<_, _>>(),
+            internal_functions: {
+                let internal_names = internal_function_names();
+                let internals = vec![
+                    cilk_memset_p0i32_i32_ as u64,
+                    cilk_println_i32_ as _,
+                    cilk_printch_i32_ as _,
+                ];
+                assert!(
+                    internal_names.len() == internals.len(),
+                    "unimplemented internal function"
+                );
+                internal_names
+                    .iter()
+                    .map(|n| n.to_string())
+                    .zip(internals)
+                    .into_iter()
+                    .collect::<FxHashMap<_, _>>()
+            },
         }
     }
 

@@ -22,9 +22,8 @@ pub struct DAGFunction {
     /// DAG node arena
     pub dag_arena: Arena<DAGNode>,
 
-    /// True if internal function
-    pub internal: bool,
-
+    // /// True if internal function
+    // pub internal: bool,
     pub local_mgr: LocalVariableManager,
 
     /// Virtual register generator
@@ -46,7 +45,6 @@ impl DAGFunction {
             dag_basic_block_arena,
             dag_basic_blocks,
             dag_arena,
-            internal: func.internal,
             local_mgr,
             vreg_gen,
         }

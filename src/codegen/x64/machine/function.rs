@@ -1,7 +1,7 @@
 use super::super::dag::function::*;
 use super::super::register::*;
 use super::{basic_block::*, frame_object::*, instr::*};
-use crate::ir::types::*;
+use crate::{ir::types::*, codegen::is_internal_function};
 use id_arena::*;
 use std::ops::{Index, IndexMut};
 
@@ -47,12 +47,12 @@ impl MachineFunction {
         instr_arena: InstructionArena,
     ) -> Self {
         Self {
+            internal: is_internal_function(&f.name),
             name: f.name,
             ty: f.ty,
             instr_arena,
             basic_block_arena,
             basic_blocks,
-            internal: f.internal,
             local_mgr: f.local_mgr,
             vreg_gen: f.vreg_gen,
         }
