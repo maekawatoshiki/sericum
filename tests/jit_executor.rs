@@ -681,8 +681,7 @@ fn spill() {
 
     let mut jit = exec::jit::JITExecutor::new(&m);
     let func = jit.find_function_by_name("func").unwrap();
-    println!(
-        "return: {:?}",
-        jit.run(func, vec![exec::jit::GenericValue::Int32(1)])
-    );
+    let res = jit.run(func, vec![exec::jit::GenericValue::Int32(1)]);
+    println!("return: {:?}", res);
+    assert_eq!(res, exec::jit::GenericValue::Int32(35));
 }

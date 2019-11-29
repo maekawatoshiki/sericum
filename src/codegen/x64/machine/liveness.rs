@@ -7,7 +7,7 @@ const IDX_STEP: usize = 16;
 
 #[derive(Debug, Clone)]
 pub struct LiveRegMatrix {
-    pub vreg_entity: FxHashMap<VirtReg, MachineRegister>,
+    pub vreg2entity: FxHashMap<VirtReg, MachineRegister>,
     pub id2pp: FxHashMap<MachineInstrId, ProgramPoint>,
     pub vreg_interval: FxHashMap<VirtReg, LiveInterval>,
     pub reg_range: FxHashMap<PhysReg, LiveRange>,
@@ -39,32 +39,33 @@ pub struct ProgramPoint {
 
 impl LiveRegMatrix {
     pub fn new(
-        vreg_entity: FxHashMap<VirtReg, MachineRegister>,
+        vreg2entity: FxHashMap<VirtReg, MachineRegister>,
         id2pp: FxHashMap<MachineInstrId, ProgramPoint>,
         vreg_interval: FxHashMap<VirtReg, LiveInterval>,
         reg_range: FxHashMap<PhysReg, LiveRange>,
     ) -> Self {
         Self {
-            vreg_entity,
+            vreg2entity,
             id2pp,
             vreg_interval,
             reg_range,
         }
     }
 
+    pub fn contains_vreg_entity(&self, vreg: &MachineRegister) -> bool {
+        self.vreg2entity.contains_key(&vreg.get_vreg())
+    }
+
     pub fn add_vreg_entity(&mut self, vreg: MachineRegister) {
-        self.vreg_entity.insert(vreg.get_vreg(), vreg);
+        self.vreg2entity.insert(vreg.get_vreg(), vreg);
     }
 
     pub fn add_live_interval(&mut self, vreg: VirtReg, range: LiveRange) {
-        self.vreg_interval.insert(
+        self.vreg_interval.entry(vreg).or_insert(LiveInterval {
             vreg,
-            LiveInterval {
-                vreg,
-                range,
-                reg: None,
-            },
-        );
+            range,
+            reg: None,
+        });
     }
 
     pub fn get_program_point_of_instr(&self, id: MachineInstrId) -> Option<ProgramPoint> {
@@ -163,15 +164,15 @@ impl LiveRegMatrix {
         Some(reg)
     }
 
-    pub fn get_vreg_entity(&self, vreg: VirtReg) -> Option<&MachineRegister> {
-        self.vreg_entity.get(&vreg)
-    }
-
     pub fn collect_vregs(&self) -> Vec<VirtReg> {
         self.vreg_interval
             .iter()
             .map(|(vreg, _)| *vreg)
             .collect::<Vec<_>>()
+    }
+
+    pub fn get_entity_by_vreg(&self, vreg: VirtReg) -> Option<&MachineRegister> {
+        self.vreg2entity.get(&vreg)
     }
 
     pub fn get_vreg_interval(&self, vreg: VirtReg) -> Option<&LiveInterval> {
@@ -216,6 +217,14 @@ impl LiveRange {
 
     pub fn new_empty() -> Self {
         Self { segments: vec![] }
+    }
+
+    pub fn shorten(&mut self) {
+        let start = match self.segments.iter().min_by(|x, y| x.start.cmp(&y.start)) {
+            Some(seg) => seg.start,
+            None => return,
+        };
+        self.segments = vec![LiveSegment::new(start, start)];
     }
 
     pub fn add_segment(&mut self, seg: LiveSegment) {
@@ -444,7 +453,7 @@ impl LivenessAnalysis {
         let mut vreg2range: FxHashMap<VirtReg, LiveRange> = FxHashMap::default();
         let mut reg2range: FxHashMap<PhysReg, LiveRange> = FxHashMap::default();
         let mut id2pp: FxHashMap<MachineInstrId, ProgramPoint> = FxHashMap::default();
-        let mut vreg_entity: FxHashMap<VirtReg, MachineRegister> = FxHashMap::default();
+        let mut vreg2entity: FxHashMap<VirtReg, MachineRegister> = FxHashMap::default();
 
         let mut bb_idx = 0;
 
@@ -473,7 +482,7 @@ impl LivenessAnalysis {
                 id2pp.insert(*instr_id, cur_pp!());
 
                 for def_reg in instr.collect_defined_regs() {
-                    vreg_entity.insert(def_reg.get_vreg(), def_reg);
+                    vreg2entity.insert(def_reg.get_vreg(), def_reg);
                 }
 
                 for operand in &instr.operand {
@@ -549,7 +558,7 @@ impl LivenessAnalysis {
         });
 
         LiveRegMatrix::new(
-            vreg_entity,
+            vreg2entity,
             id2pp,
             vreg2range
                 .into_iter()

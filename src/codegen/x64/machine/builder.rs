@@ -68,6 +68,7 @@ impl<'a> BuilderWithLiveInfoEdit<'a> {
         self.matrix.id2pp.insert(instr_id, pp);
 
         {
+            // update registers' use&def list. TODO: refine code
             let instr = &self.function.instr_arena[instr_id];
             for def in instr.collect_defined_regs() {
                 self.matrix.add_vreg_entity(def.clone());
@@ -76,14 +77,16 @@ impl<'a> BuilderWithLiveInfoEdit<'a> {
                     LiveRange::new(vec![LiveSegment::new(pp, pp)]),
                 );
             }
-            let instr_pp = *self.matrix.id2pp.get(&instr_id).unwrap();
             for use_ in instr.collect_used_regs() {
-                *self
+                let end_point = self
                     .matrix
                     .get_vreg_interval_mut(use_.get_vreg())
                     .unwrap()
                     .end_point_mut()
-                    .unwrap() = instr_pp;
+                    .unwrap();
+                if *end_point <= pp {
+                    *end_point = pp
+                }
             }
         }
 
