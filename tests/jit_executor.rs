@@ -647,3 +647,42 @@ fn jit_executor2() {
         ::std::time::Instant::now().duration_since(now)
     )
 }
+
+#[test]
+fn spill() {
+    let mut ctx = context::Context::new();
+    let mut m = ctx.create_module("cilk");
+
+    let func = cilk_ir!(m; define [i32] func [(i32)] {
+        entry:
+            // cond = icmp le (%arg.0), (i32 2);
+            x1 = add (%arg.0), (i32 1);
+            x2 = add (%arg.0), (i32 2);
+            x3 = add (%arg.0), (i32 3);
+            x4 = add (%arg.0), (i32 4);
+            x5 = add (%arg.0), (i32 5);
+            x6 = add (%arg.0), (i32 6);
+            x7 = add (%arg.0), (i32 7);
+            // x8 = add (%arg.0), (i32 8);
+            // x9 = add (%arg.0), (i32 9);
+            // x10 = add (%arg.0), (i32 10);
+
+            y1 = add (%x1), (%x2);
+            y2 = add (%y1), (%x3);
+            y3 = add (%y2), (%x4);
+            y4 = add (%y3), (%x5);
+            y5 = add (%y4), (%x6);
+            y6 = add (%y5), (%x7);
+            // y7 = add (%y6), (%x8);
+            // y8 = add (%y7), (%x9);
+            // y9 = add (%y8), (%x10);
+            ret (%y6);
+    });
+
+    let mut jit = exec::jit::JITExecutor::new(&m);
+    let func = jit.find_function_by_name("func").unwrap();
+    println!(
+        "return: {:?}",
+        jit.run(func, vec![exec::jit::GenericValue::Int32(1)])
+    );
+}

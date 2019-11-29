@@ -7,6 +7,7 @@ const IDX_STEP: usize = 16;
 
 #[derive(Debug, Clone)]
 pub struct LiveRegMatrix {
+    pub vreg_entity: FxHashMap<VirtReg, MachineRegister>,
     pub id2pp: FxHashMap<MachineInstrId, ProgramPoint>,
     pub vreg_interval: FxHashMap<VirtReg, LiveInterval>,
     pub reg_range: FxHashMap<PhysReg, LiveRange>,
@@ -38,15 +39,32 @@ pub struct ProgramPoint {
 
 impl LiveRegMatrix {
     pub fn new(
+        vreg_entity: FxHashMap<VirtReg, MachineRegister>,
         id2pp: FxHashMap<MachineInstrId, ProgramPoint>,
         vreg_interval: FxHashMap<VirtReg, LiveInterval>,
         reg_range: FxHashMap<PhysReg, LiveRange>,
     ) -> Self {
         Self {
+            vreg_entity,
             id2pp,
             vreg_interval,
             reg_range,
         }
+    }
+
+    pub fn add_vreg_entity(&mut self, vreg: MachineRegister) {
+        self.vreg_entity.insert(vreg.get_vreg(), vreg);
+    }
+
+    pub fn add_live_interval(&mut self, vreg: VirtReg, range: LiveRange) {
+        self.vreg_interval.insert(
+            vreg,
+            LiveInterval {
+                vreg,
+                range,
+                reg: None,
+            },
+        );
     }
 
     pub fn get_program_point_of_instr(&self, id: MachineInstrId) -> Option<ProgramPoint> {
@@ -72,6 +90,52 @@ impl LiveRegMatrix {
         }
     }
 
+    pub fn collect_interfering_vregs(&self, vreg: VirtReg) -> Vec<VirtReg> {
+        let mut interferings = vec![];
+        let vreg_interval = &self.vreg_interval.get(&vreg).unwrap();
+
+        for (cur_vreg, interval) in &self.vreg_interval {
+            if vreg == *cur_vreg {
+                continue;
+            }
+
+            if interval.interferes(vreg_interval) {
+                interferings.push(*cur_vreg);
+            }
+        }
+
+        interferings
+    }
+
+    pub fn pick_assigned_and_longest_lived_vreg(&self, vregs: &[VirtReg]) -> Option<VirtReg> {
+        let mut longest: Option<(ProgramPoint, VirtReg)> = None;
+
+        for vreg in vregs {
+            match longest {
+                Some((ref mut endpp1, ref mut vreg1)) => {
+                    let interval2 = self.vreg_interval.get(vreg).unwrap();
+                    if interval2.reg.is_none() {
+                        continue;
+                    }
+                    let endpp2 = interval2.end_point().unwrap();
+                    if *endpp1 < endpp2 {
+                        *endpp1 = endpp2;
+                        *vreg1 = *vreg
+                    }
+                }
+                None => {
+                    let interval = self.vreg_interval.get(vreg).unwrap();
+                    if interval.reg.is_none() {
+                        continue;
+                    }
+                    longest = Some((interval.end_point().unwrap(), *vreg))
+                }
+            }
+        }
+
+        longest.and_then(|(_, vreg)| Some(vreg))
+    }
+
     pub fn assign_reg(&mut self, vreg: VirtReg, reg: PhysReg) {
         // assign reg to vreg
         self.vreg_interval.get_mut(&vreg).unwrap().reg = Some(reg);
@@ -79,6 +143,28 @@ impl LiveRegMatrix {
         let vreg_range = self.get_vreg_interval(vreg).unwrap().range.clone();
         self.get_or_create_reg_live_range(reg)
             .unite_range(vreg_range);
+    }
+
+    pub fn unassign_reg(&mut self, vreg: VirtReg) -> Option<PhysReg> {
+        let maybe_reg = &mut self.vreg_interval.get_mut(&vreg).unwrap().reg;
+
+        if maybe_reg.is_none() {
+            return None;
+        }
+
+        let reg = maybe_reg.unwrap();
+        // unassign physical register
+        *maybe_reg = None;
+
+        let vreg_range = self.get_vreg_interval(vreg).unwrap().range.clone();
+        self.get_or_create_reg_live_range(reg)
+            .remove_range(vreg_range);
+
+        Some(reg)
+    }
+
+    pub fn get_vreg_entity(&self, vreg: VirtReg) -> Option<&MachineRegister> {
+        self.vreg_entity.get(&vreg)
     }
 
     pub fn collect_vregs(&self) -> Vec<VirtReg> {
@@ -90,6 +176,10 @@ impl LiveRegMatrix {
 
     pub fn get_vreg_interval(&self, vreg: VirtReg) -> Option<&LiveInterval> {
         self.vreg_interval.get(&vreg)
+    }
+
+    pub fn get_vreg_interval_mut(&mut self, vreg: VirtReg) -> Option<&mut LiveInterval> {
+        self.vreg_interval.get_mut(&vreg)
     }
 
     pub fn get_or_create_reg_live_range(&mut self, reg: PhysReg) -> &mut LiveRange {
@@ -109,6 +199,14 @@ impl LiveInterval {
     pub fn interferes(&self, other: &LiveInterval) -> bool {
         self.range.interferes(&other.range)
     }
+
+    pub fn end_point(&self) -> Option<ProgramPoint> {
+        self.range.end_point()
+    }
+
+    pub fn end_point_mut(&mut self) -> Option<&mut ProgramPoint> {
+        self.range.end_point_mut()
+    }
 }
 
 impl LiveRange {
@@ -126,6 +224,30 @@ impl LiveRange {
 
     pub fn unite_range(&mut self, mut range: LiveRange) {
         self.segments.append(&mut range.segments)
+    }
+
+    pub fn remove_segment(&mut self, seg: &LiveSegment) {
+        self.segments.retain(|seg_| seg_.start != seg.start);
+    }
+
+    pub fn remove_range(&mut self, range: LiveRange) {
+        for seg in &range.segments {
+            self.remove_segment(seg)
+        }
+    }
+
+    pub fn end_point(&self) -> Option<ProgramPoint> {
+        self.segments
+            .iter()
+            .max_by(|x, y| x.end.cmp(&y.end))
+            .and_then(|seg| Some(seg.end))
+    }
+
+    pub fn end_point_mut(&mut self) -> Option<&mut ProgramPoint> {
+        self.segments
+            .iter_mut()
+            .max_by(|x, y| x.end.cmp(&y.end))
+            .and_then(|seg| Some(&mut seg.end))
     }
 
     pub fn interferes(&self, other: &LiveRange) -> bool {
@@ -159,19 +281,35 @@ impl ProgramPoint {
         self.idx += 1;
         self
     }
+
+    pub fn idx(&self) -> usize {
+        self.idx
+    }
+
+    pub fn bb(&self) -> usize {
+        self.bb
+    }
 }
 
-impl PartialOrd for ProgramPoint {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+impl Ord for ProgramPoint {
+    fn cmp(&self, other: &Self) -> Ordering {
         if self.bb < other.bb {
-            return Some(Ordering::Less);
+            return Ordering::Less;
         }
 
         if self.bb > other.bb {
-            return Some(Ordering::Greater);
+            return Ordering::Greater;
         }
 
-        Some(self.idx.cmp(&other.idx))
+        self.idx.cmp(&other.idx)
+    }
+}
+
+impl Eq for ProgramPoint {}
+
+impl PartialOrd for ProgramPoint {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
     }
 }
 
@@ -306,6 +444,7 @@ impl LivenessAnalysis {
         let mut vreg2range: FxHashMap<VirtReg, LiveRange> = FxHashMap::default();
         let mut reg2range: FxHashMap<PhysReg, LiveRange> = FxHashMap::default();
         let mut id2pp: FxHashMap<MachineInstrId, ProgramPoint> = FxHashMap::default();
+        let mut vreg_entity: FxHashMap<VirtReg, MachineRegister> = FxHashMap::default();
 
         let mut bb_idx = 0;
 
@@ -332,6 +471,10 @@ impl LivenessAnalysis {
                 let instr = &cur_func.instr_arena[*instr_id];
 
                 id2pp.insert(*instr_id, cur_pp!());
+
+                for def_reg in instr.collect_defined_regs() {
+                    vreg_entity.insert(def_reg.get_vreg(), def_reg);
+                }
 
                 for operand in &instr.operand {
                     if let MachineOperand::Register(reg) = operand {
@@ -406,6 +549,7 @@ impl LivenessAnalysis {
         });
 
         LiveRegMatrix::new(
+            vreg_entity,
             id2pp,
             vreg2range
                 .into_iter()

@@ -8,4 +8,5 @@ pub mod phi_elimination;
 pub mod reg_coalescer;
 pub mod regalloc;
 pub mod two_addr;
+pub mod spiller;
 pub use super::frame_object;

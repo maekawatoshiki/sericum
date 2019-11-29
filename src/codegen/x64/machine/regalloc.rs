@@ -1,6 +1,6 @@
 use super::super::frame_object::*;
 use super::super::register::*;
-use super::{builder::*, function::*, instr::*, liveness::*, module::*};
+use super::{builder::*, function::*, instr::*, liveness::*, module::*, spiller::Spiller};
 use crate::ir::types::*;
 use rustc_hash::FxHashSet;
 use std::collections::VecDeque;
@@ -32,7 +32,7 @@ impl RegisterAllocator {
         while let Some(vreg) = self.queue.pop_front() {
             // TODO: 0..8 ???
             let mut allocated = false;
-            for reg in 0..8 {
+            for reg in 0..6 {
                 let reg = get_general_reg(reg).unwrap();
 
                 if matrix.interferes(vreg, reg) {
@@ -45,7 +45,43 @@ impl RegisterAllocator {
                 break;
             }
 
-            assert!(allocated);
+            if allocated {
+                continue;
+            }
+
+            let interfering = matrix.collect_interfering_vregs(vreg);
+            let reg_to_spill = matrix
+                .pick_assigned_and_longest_lived_vreg(&interfering)
+                .unwrap();
+            let phy_reg = matrix.unassign_reg(reg_to_spill).unwrap();
+            matrix.assign_reg(vreg, phy_reg);
+
+            let new_regs = Spiller::new(cur_func, &mut matrix).spill(reg_to_spill);
+            self.queue.push_back(reg_to_spill);
+            for new_reg in &new_regs {
+                self.queue.push_back(new_reg.get_vreg());
+            }
+
+            debug!(
+                println!("interfering({:?}): {:?}", vreg, interfering);
+                println!(
+                    "spill target: {:?}",reg_to_spill
+            ));
+            debug!(
+                println!("MachineModule dump:");
+                let mut idx = 0;
+                for bb_id in &cur_func.basic_blocks {
+                    let bb = &cur_func.basic_block_arena[*bb_id];
+                    println!("Machine basic block: {:?}", bb);
+                    for instr in &*bb.iseq_ref() {
+                        println!("{}: {:?}", idx, cur_func.instr_arena[*instr]);
+                        idx += 1;
+                    }
+                    println!()
+                }
+            );
+
+            // unimplemented!("spilling");
         }
 
         debug!(for (_, x) in &matrix.vreg_interval {
@@ -161,7 +197,7 @@ impl RegisterAllocator {
             );
             cur_func.instr_arena[load_instr_id].add_def(load_instr_id); // TODO: is this needed?
 
-            let mut builder = Builder::new(cur_func);
+            let mut builder = BuilderWithLiveInfoEdit::new(matrix, cur_func);
 
             builder.set_insert_point_before_instr(call_instr_id);
             builder.insert_instr_id(store_instr_id);

@@ -293,6 +293,23 @@ impl MachineInstr {
         }
         Some(&self.def[0])
     }
+
+    pub fn collect_defined_regs(&self) -> Vec<MachineRegister> {
+        let mut regs = self.def.clone();
+        regs.append(&mut self.imp_def.clone());
+        regs
+    }
+
+    pub fn collect_used_regs(&self) -> Vec<MachineRegister> {
+        let mut regs = vec![];
+        for operand in &self.operand {
+            match operand {
+                MachineOperand::Register(r) => regs.push(r.clone()),
+                _ => {}
+            }
+        }
+        regs
+    }
 }
 
 impl MachineOpcode {
@@ -311,6 +328,14 @@ impl MachineOpcode {
 impl MachineRegister {
     pub fn new(info: RegisterInfoRef) -> Self {
         Self { info }
+    }
+
+    pub fn add_use(&self, use_id: MachineInstrId) {
+        self.info_ref_mut().use_list.insert(use_id);
+    }
+
+    pub fn add_def(&self, def_id: MachineInstrId) {
+        self.info_ref_mut().def_list.insert(def_id);
     }
 
     pub fn copy_with_new_vreg(&self, vreg_gen: &VirtRegGen) -> Self {
