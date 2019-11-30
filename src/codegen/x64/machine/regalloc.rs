@@ -58,8 +58,8 @@ impl RegisterAllocator {
 
             let new_regs = Spiller::new(cur_func, &mut matrix).spill(reg_to_spill);
             self.queue.push_back(reg_to_spill);
-            for new_reg in &new_regs {
-                self.queue.push_back(new_reg.get_vreg());
+            for new_reg in new_regs {
+                self.queue.push_back(new_reg);
             }
 
             debug!(
@@ -142,7 +142,7 @@ impl RegisterAllocator {
             slot
         }
 
-        let call_instr_pp = matrix.get_program_point_of_instr(call_instr_id).unwrap();
+        let call_instr_pp = matrix.get_program_point(call_instr_id).unwrap();
         let mut regs_to_save = FxHashSet::default();
 
         // TODO: It's expensive to check all the elements in ``instr_arena``

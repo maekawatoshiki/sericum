@@ -68,7 +68,7 @@ impl LiveRegMatrix {
         });
     }
 
-    pub fn get_program_point_of_instr(&self, id: MachineInstrId) -> Option<ProgramPoint> {
+    pub fn get_program_point(&self, id: MachineInstrId) -> Option<ProgramPoint> {
         self.id2pp.get(&id).map(|x| *x)
     }
 
@@ -219,7 +219,7 @@ impl LiveRange {
         Self { segments: vec![] }
     }
 
-    pub fn shorten(&mut self) {
+    pub fn adjust_end_to_start(&mut self) {
         let start = match self.segments.iter().min_by(|x, y| x.start.cmp(&y.start)) {
             Some(seg) => seg.start,
             None => return,

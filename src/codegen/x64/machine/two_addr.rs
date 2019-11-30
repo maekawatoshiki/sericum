@@ -57,12 +57,12 @@ impl TwoAddressConverter {
 
             let old_instr = mem::replace(
                 &mut f.instr_arena[instr_id],
-                MachineInstr::new_with_def_reg(
+                MachineInstr::new_simple(
                     MachineOpcode::Copy,
                     vec![MachineOperand::Register(use_)],
-                    vec![def],
                     instr_bb,
-                ),
+                )
+                .with_def(vec![def]),
             );
 
             let instr = f.instr_arena.alloc(old_instr);

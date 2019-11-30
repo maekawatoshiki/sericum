@@ -205,8 +205,18 @@ impl MachineInstr {
         self
     }
 
+    pub fn with_imp_def(mut self, r: MachineRegister) -> Self {
+        self.imp_def.push(r);
+        self
+    }
+
     pub fn with_imp_uses(mut self, mut rs: Vec<MachineRegister>) -> Self {
         self.imp_use.append(&mut rs);
+        self
+    }
+
+    pub fn with_imp_defs(mut self, mut rs: Vec<MachineRegister>) -> Self {
+        self.imp_def.append(&mut rs);
         self
     }
 

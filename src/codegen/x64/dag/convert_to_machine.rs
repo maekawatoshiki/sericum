@@ -285,20 +285,20 @@ impl ConvertToMachine {
                 let op1 = self.usual_operand(conv_info, node.operand[0]);
                 let op2 = self.usual_operand(conv_info, node.operand[1]);
 
-                conv_info.push_instr(MachineInstr::new_with_def_reg(
-                    mov_n_rx(32, &op1).unwrap(),
-                    vec![op1],
-                    vec![eax.clone()],
-                    conv_info.cur_bb,
-                ));
+                conv_info.push_instr(
+                    MachineInstr::new_simple(
+                        mov_n_rx(32, &op1).unwrap(),
+                        vec![op1],
+                        conv_info.cur_bb,
+                    )
+                    .with_def(vec![eax.clone()]),
+                );
 
-                conv_info.push_instr(MachineInstr::new_with_imp_def_use(
-                    MachineOpcode::CDQ,
-                    vec![],
-                    vec![edx.clone()], //def
-                    vec![eax.clone()], //use
-                    conv_info.cur_bb,
-                ));
+                conv_info.push_instr(
+                    MachineInstr::new_simple(MachineOpcode::CDQ, vec![], conv_info.cur_bb)
+                        .with_imp_def(edx.clone())
+                        .with_imp_use(eax.clone()),
+                );
 
                 assert_eq!(op2.get_type(), Some(Type::Int32));
                 let instr1 = MachineInstr::new(
@@ -311,13 +311,11 @@ impl ConvertToMachine {
                 let op2 = MachineOperand::Register(instr1.def[0].clone());
                 conv_info.push_instr(instr1);
 
-                conv_info.push_instr(MachineInstr::new_with_imp_def_use(
-                    MachineOpcode::IDIV,
-                    vec![op2],
-                    vec![eax.clone(), edx.clone()],
-                    vec![eax, edx.clone()],
-                    conv_info.cur_bb,
-                ));
+                conv_info.push_instr(
+                    MachineInstr::new_simple(MachineOpcode::IDIV, vec![op2], conv_info.cur_bb)
+                        .with_imp_defs(vec![eax.clone(), edx.clone()])
+                        .with_imp_uses(vec![eax, edx.clone()]),
+                );
 
                 Some(conv_info.push_instr(MachineInstr::new(
                     &conv_info.cur_func.vreg_gen,
