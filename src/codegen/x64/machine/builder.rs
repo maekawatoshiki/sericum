@@ -77,7 +77,7 @@ impl<'a> BuilderTrait for BuilderWithLiveInfoEdit<'a> {
         {
             // update registers' use&def list. TODO: refine code
             let instr = &self.function.instr_arena[instr_id];
-            for def in instr.collect_defined_regs() {
+            for def in &instr.def {
                 self.matrix.add_vreg_entity(def.clone());
                 self.matrix.add_live_interval(
                     def.get_vreg(),
