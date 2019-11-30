@@ -162,13 +162,14 @@ impl ConvertToMachine {
                 )))
             }
             DAGNodeKind::LoadRegOff => {
-                let fi = self.usual_operand(conv_info, node.operand[0]);
+                let base = self.usual_operand(conv_info, node.operand[0]);
                 let off = self.usual_operand(conv_info, node.operand[1]);
                 let align = self.usual_operand(conv_info, node.operand[2]);
+                // MachineOperand::Mem(base, off, align);
                 Some(conv_info.push_instr(MachineInstr::new(
                     &conv_info.cur_func.vreg_gen,
                     MachineOpcode::LoadRegOff,
-                    vec![fi, off, align],
+                    vec![base, off, align],
                     &node.ty,
                     conv_info.cur_bb,
                 )))
@@ -197,14 +198,14 @@ impl ConvertToMachine {
                 )))
             }
             DAGNodeKind::StoreRegOff => {
-                let fi = self.usual_operand(conv_info, node.operand[0]);
+                let base = self.usual_operand(conv_info, node.operand[0]);
                 let off = self.usual_operand(conv_info, node.operand[1]);
                 let align = self.usual_operand(conv_info, node.operand[2]);
                 let new_src = self.usual_operand(conv_info, node.operand[3]);
                 Some(conv_info.push_instr(MachineInstr::new(
                     &conv_info.cur_func.vreg_gen,
                     MachineOpcode::StoreRegOff,
-                    vec![fi, off, align, new_src],
+                    vec![base, off, align, new_src],
                     &Type::Void,
                     conv_info.cur_bb,
                 )))

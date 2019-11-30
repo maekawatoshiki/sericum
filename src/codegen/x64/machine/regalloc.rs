@@ -108,7 +108,7 @@ impl RegisterAllocator {
                         .unwrap();
                     // if phys reg is not assigned
                     if def.get_reg().is_none() {
-                        def.set_phy_reg(reg, false);
+                        def.set_phy_reg(reg);
                     }
                 }
             }

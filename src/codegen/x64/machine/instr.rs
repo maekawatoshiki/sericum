@@ -28,8 +28,6 @@ pub struct RegisterInfo {
     pub vreg: VirtReg,
     pub reg: Option<PhysReg>,
     pub ty: Type,
-    pub spill: bool,                      // TODO: Will be removed
-    pub last_use: Option<MachineInstrId>, // TODO: Will be removed
     pub tied: Option<RegisterInfoRef>,
     pub use_list: FxHashSet<MachineInstrId>,
     pub def_list: FxHashSet<MachineInstrId>,
@@ -93,7 +91,15 @@ pub enum MachineOperand {
     FrameIndex(FrameIndexInfo),
     GlobalAddress(GlobalValueInfo),
     Branch(MachineBasicBlockId),
+    // Mem(MachineMemOperand),
     None,
+}
+
+#[derive(Clone)]
+pub enum MachineMemOperand {
+    BaseOffAlign(MachineRegister, MachineRegister, MachineConstant),
+    FiOffAlign(FrameIndexInfo, MachineRegister, MachineConstant),
+    FiOff(FrameIndexInfo, MachineConstant),
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -270,19 +276,9 @@ impl MachineInstr {
         x.info_ref_mut().vreg = vreg;
     }
 
-    pub fn set_last_use(&self, last_use: Option<MachineInstrId>) {
-        let x = &self.def[0];
-        x.info_ref_mut().last_use = last_use;
-    }
-
-    pub fn set_phy_reg(&self, reg: PhysReg, spill: bool) {
+    pub fn set_phy_reg(&self, reg: PhysReg) {
         let mut reg_info = self.def[0].info_ref_mut();
         reg_info.reg = Some(reg);
-        reg_info.spill = spill;
-    }
-
-    pub fn get_last_use(&self) -> Option<MachineInstrId> {
-        self.def[0].info_ref().last_use
     }
 
     pub fn get_vreg(&self) -> VirtReg {
@@ -365,22 +361,13 @@ impl MachineRegister {
         self.info.borrow_mut().set_vreg(vreg);
     }
 
-    pub fn set_last_use(&self, last_use: Option<MachineInstrId>) {
-        self.info.borrow_mut().last_use = last_use;
-    }
-
-    pub fn set_phy_reg(&self, reg: PhysReg, spill: bool) {
+    pub fn set_phy_reg(&self, reg: PhysReg) {
         let mut info = self.info_ref_mut();
         info.reg = Some(reg);
-        info.spill = spill;
 
         if let Some(tied) = &info.tied {
             tied.borrow_mut().reg = Some(reg);
         }
-    }
-
-    pub fn get_last_use(&self) -> Option<MachineInstrId> {
-        self.info.borrow().last_use
     }
 
     pub fn get_vreg(&self) -> VirtReg {
@@ -410,8 +397,6 @@ impl RegisterInfo {
             ty,
             vreg: VirtReg(0),
             reg: None,
-            spill: false,
-            last_use: None,
             tied: None,
             use_list: FxHashSet::default(),
             def_list: FxHashSet::default(),
@@ -423,8 +408,6 @@ impl RegisterInfo {
             ty,
             vreg: VirtReg(0),
             reg: Some(reg),
-            spill: false,
-            last_use: None,
             tied: None,
             use_list: FxHashSet::default(),
             def_list: FxHashSet::default(),
@@ -436,8 +419,6 @@ impl RegisterInfo {
             ty,
             vreg: VirtReg(0),
             reg: None,
-            spill: false,
-            last_use: None,
             tied: None,
             use_list: FxHashSet::default(),
             def_list: FxHashSet::default(),
