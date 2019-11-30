@@ -22,7 +22,7 @@ pub struct MachineBasicBlock {
     pub succ: Vec<MachineBasicBlockId>,
 
     /// Instruction list
-    pub iseq: Rc<RefCell<Vec<MachineInstrId>>>,
+    pub iseq: RefCell<Vec<MachineInstrId>>,
 }
 
 #[derive(Clone, Debug)]
@@ -35,7 +35,7 @@ pub struct LivenessInfo {
 impl MachineBasicBlock {
     pub fn new() -> Self {
         Self {
-            iseq: Rc::new(RefCell::new(vec![])),
+            iseq: RefCell::new(vec![]),
             pred: vec![],
             succ: vec![],
             liveness: Rc::new(RefCell::new(LivenessInfo::new())),

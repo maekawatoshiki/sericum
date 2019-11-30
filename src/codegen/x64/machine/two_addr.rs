@@ -69,7 +69,7 @@ impl TwoAddressConverter {
 
             let mut builder = Builder::new(f);
             builder.set_insert_point_after_instr(instr_id).unwrap();
-            builder.insert_instr_id(instr);
+            builder.insert(instr);
         }
     }
 }

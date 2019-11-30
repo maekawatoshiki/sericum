@@ -1,6 +1,6 @@
 use super::super::{frame_object::FrameIndexInfo, register::VirtReg};
 use super::{
-    builder::BuilderWithLiveInfoEdit,
+    builder::{BuilderTrait, BuilderWithLiveInfoEdit},
     function::MachineFunction,
     instr::{MachineInstr, MachineOpcode, MachineOperand, MachineRegister},
     liveness::LiveRegMatrix,
@@ -45,7 +45,7 @@ impl<'a> Spiller<'a> {
 
         let mut builder = BuilderWithLiveInfoEdit::new(self.matrix, self.func);
         builder.set_insert_point_after_instr(def_id).unwrap();
-        builder.insert_instr_id(store_id);
+        builder.insert(store_id);
     }
 
     pub fn insert_reload(&mut self, r: MachineRegister, slot: &FrameIndexInfo) -> Vec<VirtReg> {
@@ -76,7 +76,7 @@ impl<'a> Spiller<'a> {
 
             let mut builder = BuilderWithLiveInfoEdit::new(self.matrix, self.func);
             builder.set_insert_point_before_instr(use_id);
-            builder.insert_instr_id(load_id);
+            builder.insert(load_id);
         }
 
         r.info_ref_mut().use_list.clear();

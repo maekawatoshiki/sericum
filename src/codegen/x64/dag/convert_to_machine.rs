@@ -6,7 +6,7 @@ use super::{basic_block::*, function::*, module::*, node::*};
 use crate::ir::types::*;
 use id_arena::*;
 use rustc_hash::FxHashMap;
-use std::{cell::RefCell, rc::Rc};
+use std::cell::RefCell;
 
 pub struct ConvertToMachine {
     pub dag_bb_to_machine_bb: FxHashMap<DAGBasicBlockId, MachineBasicBlockId>,
@@ -80,7 +80,7 @@ impl ConvertToMachine {
                 node.entry.unwrap(),
             );
 
-            machine_bb_arena[bb_id].iseq = Rc::new(RefCell::new(iseq));
+            machine_bb_arena[bb_id].iseq = RefCell::new(iseq);
         }
 
         MachineFunction::new(

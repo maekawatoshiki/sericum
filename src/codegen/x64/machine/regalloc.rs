@@ -30,7 +30,7 @@ impl RegisterAllocator {
         self.queue = matrix.collect_vregs().into_iter().collect();
 
         while let Some(vreg) = self.queue.pop_front() {
-            // TODO: 0..8 ???
+            // TODO: 0..6 ???
             let mut allocated = false;
             for reg in 0..6 {
                 let reg = get_general_reg(reg).unwrap();
@@ -200,10 +200,10 @@ impl RegisterAllocator {
             let mut builder = BuilderWithLiveInfoEdit::new(matrix, cur_func);
 
             builder.set_insert_point_before_instr(call_instr_id);
-            builder.insert_instr_id(store_instr_id);
+            builder.insert(store_instr_id);
 
             builder.set_insert_point_after_instr(call_instr_id);
-            builder.insert_instr_id(load_instr_id);
+            builder.insert(load_instr_id);
         }
     }
 
