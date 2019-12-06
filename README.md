@@ -1,5 +1,3 @@
-## I'm focusing on creating new register allocation system in new-regalloc branch
-
 # Cilk
 
 [![CircleCI](https://circleci.com/gh/maekawatoshiki/cilk.svg?style=shield)](https://circleci.com/gh/maekawatoshiki/cilk)
