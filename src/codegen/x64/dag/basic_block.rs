@@ -1,4 +1,4 @@
-use super::node::{DAGNode, DAGNodeId};
+use super::node::DAGNode;
 use crate::util::allocator::*;
 use id_arena::*;
 

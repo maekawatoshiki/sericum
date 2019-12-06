@@ -1,5 +1,3 @@
-### this readme doesn't contain the latest information
-
 # Cilk
 
 [![CircleCI](https://circleci.com/gh/maekawatoshiki/cilk.svg?style=shield)](https://circleci.com/gh/maekawatoshiki/cilk)
@@ -17,10 +15,9 @@ Do not expect too much stuff!
         2. Take into consideration the physical registers' allocation order.
     - Hard ones
         1. ....
-- Refine code. (never ending task though)
-- Write unsafe code (carefully) for better DAG Node handling.
-- Write documents in detail.
-- Write tests. (because i removed many of them)
+- Refine code (never ending though)
+- Write documents in detail
+- Write tests (because I recently removed most of them)
 
 # Example
 

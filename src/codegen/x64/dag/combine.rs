@@ -1,7 +1,6 @@
 use super::{function::*, module::*, node::*};
 use crate::ir::types::*;
 use crate::util::allocator::*;
-use id_arena::*;
 use rustc_hash::FxHashMap;
 
 pub struct Combine {}
