@@ -30,16 +30,14 @@ Do not expect too much stuff!
 use cilk::{
     codegen::x64::{exec},
     exec::interpreter::interp,
-    ir::{builder::Builder, context::Context, value::{Value, ImmediateValue}, types::Type},
+    ir::{builder::Builder, module::Module, value::{Value, ImmediateValue}, types::Type},
 };
 
-let mut ctx = Context::new();
-let m = ctx.create_module("cilk");
+let mut m = Module::new("cilk");
 let fibo = m.create_function(
     "fibo", Type::Int32, vec![Type::Int32]
 );
-let fibo_entity = m.function_ref_mut(fibo);
-let mut builder = Builder::new(fibo_entity);
+let mut builder = Builder::new(&mut m, fibo);
 
 {
 let entry = builder.append_basic_block();
@@ -72,7 +70,7 @@ builder.set_insert_point(br2);
     let add = builder.build_add(fibo1, fibo2);
     builder.build_ret(add);
 
-println!("Function dump:\n{}", fibo_entity.to_string());
+println!("Function dump:\n{}", m.dump(fibo));
 
 // Function dump:
 // define i32 fibo(i32) {       
