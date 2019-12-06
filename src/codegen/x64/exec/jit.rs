@@ -63,9 +63,9 @@ impl JITExecutor {
                     let bb = &dag_func.dag_basic_block_arena[*id];
                     println!("{}: {:?}", id.index(), bb);
                 }
-                for (id, dag) in &dag_func.dag_arena {
-                    println!("{}: {:?}", id.index(), dag);
-                }
+                // for (id, dag) in &dag_func.dag_heap {
+                //     println!("{}: {:?}", id.index(), dag);
+                // }
             }
         );
 

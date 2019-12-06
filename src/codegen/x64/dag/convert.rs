@@ -3,21 +3,23 @@ use super::{basic_block::*, frame_object::*, function::*, module::*, node::*};
 use crate::ir::{
     basic_block::*, function::*, liveness::*, module::*, opcode::*, types::*, value::*,
 };
+use crate::util::allocator::{Raw, RawAllocator};
 use id_arena::*;
 use rustc_hash::FxHashMap;
 
 pub struct ConvertToDAG<'a> {
     pub module: &'a Module,
-    pub instr_id_node_id: FxHashMap<InstructionId, DAGNodeId>,
-    pub instr_id_to_copy_node: FxHashMap<InstructionId, DAGNodeId>,
+    pub instr_id_node_id: FxHashMap<InstructionId, Raw<DAGNode>>,
+    pub instr_id_to_copy_node: FxHashMap<InstructionId, Raw<DAGNode>>,
     pub cur_conversion_info: Option<ConversionInfo>,
 }
 
 pub struct ConversionInfo {
-    pub dag_arena: Arena<DAGNode>,
+    pub dag_heap: RawAllocator<DAGNode>,
+    // pub dag_arena: Arena<DAGNode>,
     pub local_mgr: LocalVariableManager,
     pub bb_to_dag_bb: FxHashMap<BasicBlockId, DAGBasicBlockId>,
-    pub last_chain_node: Option<DAGNodeId>,
+    pub last_chain_node: Option<Raw<DAGNode>>,
     pub vreg_gen: VirtRegGen,
 }
 
@@ -77,7 +79,7 @@ impl<'a> ConvertToDAG<'a> {
         let conv_info = ::std::mem::replace(&mut self.cur_conversion_info, None).unwrap();
         DAGFunction::new(
             func,
-            conv_info.dag_arena,
+            conv_info.dag_heap,
             dag_bb_arena,
             dag_bb_list,
             conv_info.local_mgr,
@@ -85,11 +87,11 @@ impl<'a> ConvertToDAG<'a> {
         )
     }
 
-    pub fn get_dag_id_from_value(&mut self, v: &Value, arg_load: bool) -> DAGNodeId {
+    pub fn get_dag_id_from_value(&mut self, v: &Value, arg_load: bool) -> Raw<DAGNode> {
         match v {
             Value::Instruction(iv) => self.instr_id_node_id[&iv.id],
             Value::Immediate(ImmediateValue::Int32(i)) => {
-                self.cur_conv_info_mut().dag_arena.alloc(DAGNode::new(
+                self.cur_conv_info_mut().dag_heap.alloc(DAGNode::new(
                     DAGNodeKind::Constant(ConstantKind::Int32(*i)),
                     vec![],
                     Type::Int32,
@@ -101,13 +103,13 @@ impl<'a> ConvertToDAG<'a> {
                     .function_ref(av.func_id)
                     .get_param_type(av.index)
                     .unwrap();
-                let fi = self.cur_conv_info_mut().dag_arena.alloc(DAGNode::new(
+                let fi = self.cur_conv_info_mut().dag_heap.alloc(DAGNode::new(
                     DAGNodeKind::FrameIndex(-(av.index as i32 + 1), ty.clone()),
                     vec![],
                     ty.clone(),
                 ));
                 if arg_load {
-                    let load_id = self.cur_conv_info_mut().dag_arena.alloc(DAGNode::new(
+                    let load_id = self.cur_conv_info_mut().dag_heap.alloc(DAGNode::new(
                         DAGNodeKind::Load,
                         vec![fi],
                         ty.clone(),
@@ -120,13 +122,13 @@ impl<'a> ConvertToDAG<'a> {
             }
             Value::Function(FunctionValue { func_id }) => {
                 let f = self.module.function_ref(*func_id);
-                self.cur_conv_info_mut().dag_arena.alloc(DAGNode::new(
+                self.cur_conv_info_mut().dag_heap.alloc(DAGNode::new(
                     DAGNodeKind::GlobalAddress(GlobalValueKind::FunctionName(f.name.to_string())),
                     vec![],
                     Type::Void, // TODO
                 ))
             }
-            Value::None => self.cur_conv_info_mut().dag_arena.alloc(DAGNode::new(
+            Value::None => self.cur_conv_info_mut().dag_heap.alloc(DAGNode::new(
                 DAGNodeKind::None,
                 vec![],
                 Type::Void,
@@ -138,8 +140,8 @@ impl<'a> ConvertToDAG<'a> {
         &mut self,
         func: &Function,
         bb: &BasicBlock,
-    ) -> DAGNodeId {
-        let entry_node = self.cur_conv_info_mut().dag_arena.alloc(DAGNode::new(
+    ) -> Raw<DAGNode> {
+        let entry_node = self.cur_conv_info_mut().dag_heap.alloc(DAGNode::new(
             DAGNodeKind::Entry,
             vec![],
             Type::Void,
@@ -148,11 +150,11 @@ impl<'a> ConvertToDAG<'a> {
 
         macro_rules! make_chain {
             ($dag_id:expr) => {{
-                let dag_id = $dag_id;
+                let dag = $dag_id;
                 let conv_info = self.cur_conv_info_mut();
-                if let Some(last_node_id) = &mut conv_info.last_chain_node {
-                    conv_info.dag_arena[*last_node_id].next = Some(dag_id);
-                    *last_node_id = dag_id;
+                if let Some(last_node) = &mut conv_info.last_chain_node {
+                    last_node.next = Some(dag);
+                    *last_node = dag;
                 }
             }};
         }
@@ -165,7 +167,7 @@ impl<'a> ConvertToDAG<'a> {
                 Opcode::Alloca(ref ty) => {
                     let fi = self.cur_conv_info_mut_with(|c| {
                         let frinfo = c.local_mgr.alloc(ty);
-                        c.dag_arena.alloc(DAGNode::new(
+                        c.dag_heap.alloc(DAGNode::new(
                             DAGNodeKind::FrameIndex(frinfo.idx, frinfo.ty), // TODO
                             vec![],
                             ty.clone(),
@@ -175,7 +177,7 @@ impl<'a> ConvertToDAG<'a> {
                 }
                 Opcode::Load(ref v) => {
                     let v = self.get_dag_id_from_value(v, true);
-                    let load_id = self.cur_conv_info_mut().dag_arena.alloc(DAGNode::new(
+                    let load_id = self.cur_conv_info_mut().dag_heap.alloc(DAGNode::new(
                         DAGNodeKind::Load,
                         vec![v],
                         instr.ty.clone(),
@@ -193,7 +195,7 @@ impl<'a> ConvertToDAG<'a> {
                 Opcode::Store(ref src, ref dst) => {
                     let dst = self.get_dag_id_from_value(dst, true);
                     let src = self.get_dag_id_from_value(src, true);
-                    let id = self.cur_conv_info_mut().dag_arena.alloc(DAGNode::new(
+                    let id = self.cur_conv_info_mut().dag_heap.alloc(DAGNode::new(
                         DAGNodeKind::Store,
                         vec![dst, src],
                         Type::Void,
@@ -208,12 +210,12 @@ impl<'a> ConvertToDAG<'a> {
                     self.instr_id_node_id.insert(instr_id, gep);
                 }
                 Opcode::Call(ref f, ref args) => {
-                    let mut operands: Vec<DAGNodeId> = args
+                    let mut operands: Vec<Raw<DAGNode>> = args
                         .iter()
                         .map(|a| self.get_dag_id_from_value(a, true))
                         .collect();
                     operands.insert(0, self.get_dag_id_from_value(f, true));
-                    let id = self.cur_conv_info_mut().dag_arena.alloc(DAGNode::new(
+                    let id = self.cur_conv_info_mut().dag_heap.alloc(DAGNode::new(
                         DAGNodeKind::Call,
                         operands,
                         instr.ty.clone(),
@@ -233,7 +235,7 @@ impl<'a> ConvertToDAG<'a> {
                 | Opcode::Rem(ref v1, ref v2) => {
                     let v1 = self.get_dag_id_from_value(v1, true);
                     let v2 = self.get_dag_id_from_value(v2, true);
-                    let bin_id = self.cur_conv_info_mut().dag_arena.alloc(DAGNode::new(
+                    let bin_id = self.cur_conv_info_mut().dag_heap.alloc(DAGNode::new(
                         match instr.opcode {
                             Opcode::Add(_, _) => DAGNodeKind::Add,
                             Opcode::Sub(_, _) => DAGNodeKind::Sub,
@@ -254,48 +256,45 @@ impl<'a> ConvertToDAG<'a> {
                     }
                 }
                 Opcode::Br(bb) => make_chain!(self.cur_conv_info_mut_with(|c| {
-                    let bb = c.dag_arena.alloc(DAGNode::new(
+                    let bb = c.dag_heap.alloc(DAGNode::new(
                         DAGNodeKind::BasicBlock(c.get_dag_bb(bb)),
                         vec![],
                         Type::Void,
                     ));
-                    c.dag_arena
+                    c.dag_heap
                         .alloc(DAGNode::new(DAGNodeKind::Br, vec![bb], Type::Void))
                 })),
                 Opcode::CondBr(ref v, then_, else_) => {
                     let v = self.get_dag_id_from_value(v, true);
                     make_chain!({
                         let c = self.cur_conv_info_mut();
-                        let bb = c.dag_arena.alloc(DAGNode::new(
+                        let bb = c.dag_heap.alloc(DAGNode::new(
                             DAGNodeKind::BasicBlock(c.get_dag_bb(then_)),
                             vec![],
                             Type::Void,
                         ));
-                        c.dag_arena.alloc(DAGNode::new(
-                            DAGNodeKind::BrCond,
-                            vec![v, bb],
-                            Type::Void,
-                        ))
+                        c.dag_heap
+                            .alloc(DAGNode::new(DAGNodeKind::BrCond, vec![v, bb], Type::Void))
                     });
                     make_chain!(self.cur_conv_info_mut_with(|c| {
-                        let bb = c.dag_arena.alloc(DAGNode::new(
+                        let bb = c.dag_heap.alloc(DAGNode::new(
                             DAGNodeKind::BasicBlock(c.get_dag_bb(else_)),
                             vec![],
                             Type::Void,
                         ));
-                        c.dag_arena
+                        c.dag_heap
                             .alloc(DAGNode::new(DAGNodeKind::Br, vec![bb], Type::Void))
                     }));
                 }
                 Opcode::ICmp(ref c, ref v1, ref v2) => {
                     let v1 = self.get_dag_id_from_value(v1, true);
                     let v2 = self.get_dag_id_from_value(v2, true);
-                    let cond = self.cur_conv_info_mut().dag_arena.alloc(DAGNode::new(
+                    let cond = self.cur_conv_info_mut().dag_heap.alloc(DAGNode::new(
                         DAGNodeKind::CondKind((*c).into()),
                         vec![],
                         Type::Void,
                     ));
-                    let id = self.cur_conv_info_mut().dag_arena.alloc(DAGNode::new(
+                    let id = self.cur_conv_info_mut().dag_heap.alloc(DAGNode::new(
                         DAGNodeKind::Setcc,
                         vec![cond, v1, v2],
                         instr.ty.clone(),
@@ -312,22 +311,21 @@ impl<'a> ConvertToDAG<'a> {
                     let mut operands = vec![];
                     for (val, bb) in pairs {
                         // Remove CopyFromReg if necessary
-                        let val_id = self.get_dag_id_from_value(val, true);
-                        let val = &self.cur_conv_info_ref().dag_arena[val_id];
+                        let val = self.get_dag_id_from_value(val, true);
                         operands.push(match val.kind {
                             DAGNodeKind::CopyFromReg => val.operand[0],
-                            _ => val_id,
+                            _ => val,
                         });
 
                         operands.push(self.cur_conv_info_mut_with(|c| {
-                            c.dag_arena.alloc(DAGNode::new(
+                            c.dag_heap.alloc(DAGNode::new(
                                 DAGNodeKind::BasicBlock(c.get_dag_bb(*bb)),
                                 vec![],
                                 Type::Void,
                             ))
                         }))
                     }
-                    let id = self.cur_conv_info_mut().dag_arena.alloc(DAGNode::new(
+                    let id = self.cur_conv_info_mut().dag_heap.alloc(DAGNode::new(
                         DAGNodeKind::Phi,
                         operands,
                         instr.ty.clone(),
@@ -342,7 +340,7 @@ impl<'a> ConvertToDAG<'a> {
                 }
                 Opcode::Ret(ref v) => {
                     let v = self.get_dag_id_from_value(v, true);
-                    make_chain!(self.cur_conv_info_mut().dag_arena.alloc(DAGNode::new(
+                    make_chain!(self.cur_conv_info_mut().dag_heap.alloc(DAGNode::new(
                         DAGNodeKind::Ret,
                         vec![v],
                         Type::Void
@@ -369,7 +367,7 @@ impl<'a> ConvertToDAG<'a> {
         _instr: &Instruction,
         ptr: &Value,
         indices: &[Value],
-    ) -> DAGNodeId {
+    ) -> Raw<DAGNode> {
         let mut gep = self.get_dag_id_from_value(ptr, false);
         let mut ty = ptr.get_type(self.module);
 
@@ -377,9 +375,9 @@ impl<'a> ConvertToDAG<'a> {
             ty = ty.get_element_ty().unwrap();
 
             let idx = self.get_dag_id_from_value(idx, true);
-            let arena = &mut self.cur_conv_info_mut().dag_arena;
-            let idx = match arena[idx].kind {
-                DAGNodeKind::Constant(ConstantKind::Int32(i)) => arena.alloc(DAGNode::new(
+            let heap = &mut self.cur_conv_info_mut().dag_heap;
+            let idx = match idx.kind {
+                DAGNodeKind::Constant(ConstantKind::Int32(i)) => heap.alloc(DAGNode::new(
                     DAGNodeKind::Constant(ConstantKind::Int32(i * ty.size_in_byte() as i32)),
                     vec![],
                     Type::Int32,
@@ -389,16 +387,16 @@ impl<'a> ConvertToDAG<'a> {
                 | DAGNodeKind::GlobalAddress(_)
                 | DAGNodeKind::BasicBlock(_) => idx,
                 _ => {
-                    let tysz = arena.alloc(DAGNode::new(
+                    let tysz = heap.alloc(DAGNode::new(
                         DAGNodeKind::Constant(ConstantKind::Int32(ty.size_in_byte() as i32)),
                         vec![],
                         Type::Int32,
                     ));
-                    arena.alloc(DAGNode::new(DAGNodeKind::Mul, vec![idx, tysz], ty.clone()))
+                    heap.alloc(DAGNode::new(DAGNodeKind::Mul, vec![idx, tysz], ty.clone()))
                 }
             };
 
-            gep = self.cur_conv_info_mut().dag_arena.alloc(DAGNode::new(
+            gep = self.cur_conv_info_mut().dag_heap.alloc(DAGNode::new(
                 DAGNodeKind::Add,
                 vec![gep, idx],
                 ty.clone(), // TODO
@@ -443,16 +441,16 @@ impl<'a> ConvertToDAG<'a> {
         }
     }
 
-    fn make_chain(&mut self, dag_id: DAGNodeId) {
+    fn make_chain(&mut self, node: Raw<DAGNode>) {
         let conv_info = self.cur_conv_info_mut();
-        if let Some(last_node_id) = &mut conv_info.last_chain_node {
-            conv_info.dag_arena[*last_node_id].next = Some(dag_id);
-            *last_node_id = dag_id;
+        if let Some(last_node) = &mut conv_info.last_chain_node {
+            last_node.next = Some(node);
+            *last_node = node;
         }
     }
 
-    fn make_chain_with_copying(&mut self, node_id: DAGNodeId) -> DAGNodeId {
-        let copy_to_live_out = self.cur_conv_info_mut().dag_arena.alloc(DAGNode::new(
+    fn make_chain_with_copying(&mut self, node_id: Raw<DAGNode>) -> Raw<DAGNode> {
+        let copy_to_live_out = self.cur_conv_info_mut().dag_heap.alloc(DAGNode::new(
             DAGNodeKind::CopyToLiveOut,
             vec![node_id],
             Type::Void,
@@ -467,7 +465,8 @@ impl<'a> ConvertToDAG<'a> {
 impl ConversionInfo {
     pub fn new() -> Self {
         ConversionInfo {
-            dag_arena: Arena::new(),
+            dag_heap: RawAllocator::new(),
+            // dag_heap: Arena::new(),
             local_mgr: LocalVariableManager::new(),
             bb_to_dag_bb: FxHashMap::default(),
             last_chain_node: None,

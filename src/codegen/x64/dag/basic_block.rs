@@ -1,4 +1,5 @@
-use super::node::DAGNodeId;
+use super::node::{DAGNode, DAGNodeId};
+use crate::util::allocator::*;
 use id_arena::*;
 
 pub type DAGBasicBlockId = Id<DAGBasicBlock>;
@@ -12,7 +13,7 @@ pub struct DAGBasicBlock {
     pub succ: Vec<DAGBasicBlockId>,
 
     /// Entry node
-    pub entry: Option<DAGNodeId>,
+    pub entry: Option<Raw<DAGNode>>,
 }
 
 impl DAGBasicBlock {
@@ -24,7 +25,7 @@ impl DAGBasicBlock {
         }
     }
 
-    pub fn set_entry(&mut self, entry: DAGNodeId) {
+    pub fn set_entry(&mut self, entry: Raw<DAGNode>) {
         self.entry = Some(entry);
     }
 }

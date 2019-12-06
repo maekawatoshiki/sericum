@@ -4,19 +4,20 @@ use super::super::machine::{basic_block::*, frame_object::*, function::*, instr:
 use super::super::register::*;
 use super::{basic_block::*, function::*, module::*, node::*};
 use crate::ir::types::*;
+use crate::util::allocator::*;
 use id_arena::*;
 use rustc_hash::FxHashMap;
 use std::cell::RefCell;
 
 pub struct ConvertToMachine {
     pub dag_bb_to_machine_bb: FxHashMap<DAGBasicBlockId, MachineBasicBlockId>,
-    pub node_id_to_machine_instr_id: FxHashMap<DAGNodeId, MachineInstrId>,
+    pub node_id_to_machine_instr_id: FxHashMap<Raw<DAGNode>, MachineInstrId>,
 }
 
 pub struct ConversionInfo<'a> {
     cur_func: &'a DAGFunction,
     machine_instr_arena: &'a mut InstructionArena,
-    dag_to_reg: FxHashMap<DAGNodeId, Option<MachineRegister>>,
+    dag_to_reg: FxHashMap<Raw<DAGNode>, Option<MachineRegister>>,
     cur_bb: MachineBasicBlockId,
     iseq: &'a mut Vec<MachineInstrId>,
 }
@@ -94,24 +95,21 @@ impl ConvertToMachine {
     pub fn convert_dag(
         &mut self,
         conv_info: &mut ConversionInfo,
-        node_id: DAGNodeId,
+        node: Raw<DAGNode>,
     ) -> Option<MachineRegister> {
-        if let Some(machine_register) = conv_info.dag_to_reg.get(&node_id) {
+        if let Some(machine_register) = conv_info.dag_to_reg.get(&node) {
             return machine_register.clone();
         }
 
-        let machine_register = match self.convert_dag_to_machine_instr(conv_info, node_id) {
+        let machine_register = match self.convert_dag_to_machine_instr(conv_info, node) {
             Some(id) => {
                 let instr = &conv_info.machine_instr_arena[id];
                 instr.get_def_reg().map(|r| r.clone())
             }
             None => None,
         };
-        conv_info
-            .dag_to_reg
-            .insert(node_id, machine_register.clone());
+        conv_info.dag_to_reg.insert(node, machine_register.clone());
 
-        let node = &conv_info.cur_func.dag_arena[node_id];
         some_then!(next, node.next, {
             self.convert_dag(conv_info, next);
         });
@@ -122,24 +120,22 @@ impl ConvertToMachine {
     fn convert_dag_to_machine_instr(
         &mut self,
         conv_info: &mut ConversionInfo,
-        node_id: DAGNodeId,
+        node: Raw<DAGNode>,
     ) -> Option<MachineInstrId> {
-        if let Some(machine_instr_id) = self.node_id_to_machine_instr_id.get(&node_id) {
+        if let Some(machine_instr_id) = self.node_id_to_machine_instr_id.get(&node) {
             return Some(*machine_instr_id);
         }
 
         #[rustfmt::skip]
-        macro_rules! bb {($id:expr)=>{conv_info.cur_func.dag_arena[$id].as_basic_block()};}
+        macro_rules! bb {($id:expr)=>{ $id.as_basic_block() };}
         #[rustfmt::skip]
-        macro_rules! cond_kind {($id:expr)=>{conv_info.cur_func.dag_arena[$id].as_cond_kind()};}
-
-        let node = &conv_info.cur_func.dag_arena[node_id];
+        macro_rules! cond_kind {($id:expr)=>{ $id.as_cond_kind() };}
 
         let machine_instr_id = match node.kind {
             DAGNodeKind::Entry => None,
             DAGNodeKind::CopyToReg => {
                 let val = self.usual_operand(conv_info, node.operand[1]);
-                let dst = match &conv_info.cur_func.dag_arena[node.operand[0]].kind {
+                let dst = match &node.operand[0].kind {
                     DAGNodeKind::Register(r) => MachineRegister::new(r.clone()),
                     _ => unreachable!(),
                 };
@@ -256,7 +252,7 @@ impl ConvertToMachine {
                     conv_info.cur_bb,
                 )))
             }
-            DAGNodeKind::Call => Some(self.convert_call_dag(conv_info, node)),
+            DAGNodeKind::Call => Some(self.convert_call_dag(conv_info, &*node)),
             DAGNodeKind::Phi => {
                 let mut operands = vec![];
                 let mut i = 0;
@@ -423,7 +419,7 @@ impl ConvertToMachine {
 
         if machine_instr_id.is_some() {
             self.node_id_to_machine_instr_id
-                .insert(node_id, machine_instr_id.unwrap());
+                .insert(node, machine_instr_id.unwrap());
         }
 
         machine_instr_id
@@ -507,8 +503,11 @@ impl ConvertToMachine {
         }
     }
 
-    fn usual_operand(&mut self, conv_info: &mut ConversionInfo, id: DAGNodeId) -> MachineOperand {
-        let node = &conv_info.cur_func.dag_arena[id];
+    fn usual_operand(
+        &mut self,
+        conv_info: &mut ConversionInfo,
+        node: Raw<DAGNode>,
+    ) -> MachineOperand {
         match node.kind {
             DAGNodeKind::Constant(c) => match c {
                 ConstantKind::Int32(i) => MachineOperand::Constant(MachineConstant::Int32(i)),
@@ -526,7 +525,7 @@ impl ConvertToMachine {
             DAGNodeKind::Register(ref r) => {
                 MachineOperand::Register(MachineRegister::new(r.clone()))
             }
-            _ => MachineOperand::Register(self.convert_dag(conv_info, id).unwrap()),
+            _ => MachineOperand::Register(self.convert_dag(conv_info, node).unwrap()),
         }
     }
 

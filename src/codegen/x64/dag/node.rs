@@ -1,6 +1,7 @@
 use super::super::machine::instr::*;
 use super::basic_block::*;
 use crate::ir::{opcode::*, types::*};
+use crate::util::allocator::*;
 use id_arena::*;
 
 pub type DAGNodeId = Id<DAGNode>;
@@ -8,9 +9,9 @@ pub type DAGNodeId = Id<DAGNode>;
 #[derive(Debug, Clone)]
 pub struct DAGNode {
     pub kind: DAGNodeKind,
-    pub operand: Vec<DAGNodeId>,
+    pub operand: Vec<Raw<DAGNode>>,
     pub ty: Type,
-    pub next: Option<DAGNodeId>,
+    pub next: Option<Raw<DAGNode>>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -101,7 +102,7 @@ impl ConstantKind {
 }
 
 impl DAGNode {
-    pub fn new(kind: DAGNodeKind, operand: Vec<DAGNodeId>, ty: Type) -> Self {
+    pub fn new(kind: DAGNodeKind, operand: Vec<Raw<DAGNode>>, ty: Type) -> Self {
         Self {
             kind,
             ty,
@@ -110,7 +111,7 @@ impl DAGNode {
         }
     }
 
-    pub fn set_next(mut self, next: DAGNodeId) -> Self {
+    pub fn set_next(mut self, next: Raw<DAGNode>) -> Self {
         self.next = Some(next);
         self
     }

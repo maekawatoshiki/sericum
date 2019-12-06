@@ -1,7 +1,6 @@
 use super::function::*;
 use id_arena::*;
 
-#[derive(Clone, Debug)]
 pub struct DAGModule {
     pub name: String,
     pub functions: Arena<DAGFunction>,
