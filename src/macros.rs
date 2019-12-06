@@ -161,13 +161,14 @@ macro_rules! cilk_expr {
 ($builder:expr; $bb_map:expr; $x:ident = call $name:ident [$( ( $($arg:tt)* ) ),*] ; $($remain:tt)*) => {
     let args = vec![ $( cilk_value!($builder; $( $arg )*) ),* ];
     let $x = $builder.build_call(value::Value::Function(
-            value::FunctionValue { func_id: $builder.function.parent.find_function(stringify!($name)).unwrap(),
-            parent: $builder.function.parent }), args);
+            value::FunctionValue {
+                func_id: $builder.module.find_function(stringify!($name)).unwrap(),
+            }), args);
     cilk_expr!($builder; $bb_map; $( $remain )*);
 };
 ($builder:expr; $bb_map:expr; $x:ident = call (->$id:expr) [$( ( $($arg:tt)* ) ),*] ; $($remain:tt)*) => {
         let args = vec![ $( cilk_value!($builder; $( $arg )*) ),* ];
-        let $x = $builder.build_call(value::Value::Function(value::FunctionValue { func_id: $id, parent: $builder.function.parent }), args);
+        let $x = $builder.build_call(value::Value::Function(value::FunctionValue { func_id: $id }), args);
         cilk_expr!($builder; $bb_map; $( $remain )*);
     };
     ($builder:expr; $bb_map:expr; $x:ident = icmp $kind:ident ($($val1:tt)*), ($($val2:tt)*); $($remain:tt)*) => {
@@ -205,8 +206,7 @@ macro_rules! cilk_ir {
                 cilk_parse_ty!($($ret_ty)*),
                 vec![$( cilk_parse_ty!($($arg)*) ),*],
             );
-        let f = $m.function_ref_mut(f_id);
-        let mut builder = builder::Builder::new(f);
+        let mut builder = builder::Builder::new(&mut $m, f_id);
         let mut bb_map: FxHashMap<&str, basic_block::BasicBlockId> = FxHashMap::default();
         cilk_expr!(builder; bb_map; $( $exp )*);
         f_id

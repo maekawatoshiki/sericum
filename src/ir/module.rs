@@ -1,10 +1,5 @@
 use super::{function::*, types::*};
-use crate::util::allocator::*;
 use id_arena::*;
-use std::ops::{Deref, DerefMut};
-
-#[derive(Clone, Debug, Copy, PartialEq, Eq, Hash)]
-pub struct ModuleRef(pub Raw<Module>);
 
 #[derive(Clone, Debug)]
 pub struct Module {
@@ -20,8 +15,19 @@ impl Module {
         }
     }
 
+    pub fn create_function(
+        &mut self,
+        name: &str,
+        ret_ty: Type,
+        params_ty: Vec<Type>,
+    ) -> FunctionId {
+        Function::new(self, name, ret_ty, params_ty)
+    }
+
     pub fn add_function(&mut self, f: Function) -> FunctionId {
-        self.functions.alloc(f)
+        let id = self.functions.alloc(f);
+        self.function_ref_mut(id).id = Some(id);
+        id
     }
 
     pub fn function_ref(&self, id: FunctionId) -> &Function {
@@ -40,31 +46,5 @@ impl Module {
         self.functions
             .iter()
             .find_map(|(id, f)| if f.name == name { Some(id) } else { None })
-    }
-}
-
-impl ModuleRef {
-    pub fn create_function(
-        &mut self,
-        name: &str,
-        ret_ty: Type,
-        params_ty: Vec<Type>,
-    ) -> FunctionId {
-        let func = Function::new(*self, name, ret_ty, params_ty);
-        self.add_function(func)
-    }
-}
-
-impl Deref for ModuleRef {
-    type Target = Module;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl DerefMut for ModuleRef {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
     }
 }

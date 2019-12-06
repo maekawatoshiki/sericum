@@ -1,19 +1,17 @@
-use super::{basic_block::*, function::*, opcode::*, types::*, value::*};
+use super::{basic_block::*, function::*, module::Module, opcode::*, types::*, value::*};
 
 #[derive(Debug)]
 pub struct Builder<'a> {
-    pub function: &'a mut Function,
+    pub module: &'a mut Module,
     func_id: FunctionId,
     cur_bb: Option<BasicBlockId>,
     insert_point: usize,
 }
 
 impl<'a> Builder<'a> {
-    pub fn new(function: &'a mut Function) -> Self {
-        let module = function.parent;
-        let func_id = module.find_function(&*function).unwrap();
+    pub fn new(module: &'a mut Module, func_id: FunctionId) -> Self {
         Self {
-            function,
+            module,
             func_id,
             cur_bb: None,
             insert_point: 0,
@@ -21,17 +19,22 @@ impl<'a> Builder<'a> {
     }
 
     pub fn get_param(&self, idx: usize) -> Option<Value> {
-        self.function.get_param_value(self.func_id, idx)
+        self.module
+            .function_ref(self.func_id)
+            .get_param_value(self.func_id, idx)
     }
 
     pub fn append_basic_block(&mut self) -> BasicBlockId {
-        self.function.append_basic_block()
+        self.module
+            .function_ref_mut(self.func_id)
+            .append_basic_block()
     }
 
     pub fn set_insert_point(&mut self, id: BasicBlockId) {
         self.cur_bb = Some(id);
-        self.function.append_existing_basic_block(id);
-        let iseq_len = self.function.basic_block_ref(id).iseq_ref().len();
+        let function = self.module.function_ref_mut(self.func_id);
+        function.append_existing_basic_block(id);
+        let iseq_len = function.basic_block_ref(id).iseq_ref().len();
         self.insert_point = iseq_len;
     }
 
@@ -49,7 +52,7 @@ impl<'a> Builder<'a> {
 
     pub fn build_gep(&mut self, v: Value, indices: Vec<Value>) -> Value {
         let ty = v
-            .get_type()
+            .get_type(self.module)
             .get_element_ty_with_indices(&indices)
             .unwrap()
             .get_pointer_ty();
@@ -61,7 +64,7 @@ impl<'a> Builder<'a> {
     pub fn build_load(&mut self, v: Value) -> Value {
         let instr = self.create_instr_value(
             Opcode::Load(v),
-            v.get_type().get_element_ty().unwrap().clone(),
+            v.get_type(self.module).get_element_ty().unwrap().clone(),
         );
         self.append_instr_to_cur_bb(instr);
         instr
@@ -78,7 +81,7 @@ impl<'a> Builder<'a> {
             return konst;
         }
 
-        let instr = self.create_instr_value(Opcode::Add(v1, v2), v1.get_type().clone());
+        let instr = self.create_instr_value(Opcode::Add(v1, v2), v1.get_type(self.module).clone());
         self.append_instr_to_cur_bb(instr);
         instr
     }
@@ -88,7 +91,7 @@ impl<'a> Builder<'a> {
             return konst;
         }
 
-        let instr = self.create_instr_value(Opcode::Sub(v1, v2), v1.get_type().clone());
+        let instr = self.create_instr_value(Opcode::Sub(v1, v2), v1.get_type(self.module).clone());
         self.append_instr_to_cur_bb(instr);
         instr
     }
@@ -98,7 +101,7 @@ impl<'a> Builder<'a> {
             return konst;
         }
 
-        let instr = self.create_instr_value(Opcode::Mul(v1, v2), v1.get_type().clone());
+        let instr = self.create_instr_value(Opcode::Mul(v1, v2), v1.get_type(self.module).clone());
         self.append_instr_to_cur_bb(instr);
         instr
     }
@@ -108,7 +111,7 @@ impl<'a> Builder<'a> {
             return konst;
         }
 
-        let instr = self.create_instr_value(Opcode::Rem(v1, v2), v1.get_type().clone());
+        let instr = self.create_instr_value(Opcode::Rem(v1, v2), v1.get_type(self.module).clone());
         self.append_instr_to_cur_bb(instr);
         instr
     }
@@ -124,14 +127,10 @@ impl<'a> Builder<'a> {
         self.append_instr_to_cur_bb(instr);
 
         let cur_bb_id = self.cur_bb.unwrap();
-        self.function
-            .basic_block_ref_mut(cur_bb_id)
-            .succ
-            .push(dst_id);
-        self.function
-            .basic_block_ref_mut(dst_id)
-            .pred
-            .push(cur_bb_id);
+        self.with_function(|f| {
+            f.basic_block_ref_mut(cur_bb_id).succ.push(dst_id);
+            f.basic_block_ref_mut(dst_id).pred.push(cur_bb_id);
+        });
 
         instr
     }
@@ -141,25 +140,32 @@ impl<'a> Builder<'a> {
         let instr = self.create_instr_value(Opcode::CondBr(cond, bb1, bb2), Type::Void);
         self.append_instr_to_cur_bb(instr);
 
-        let cur_bb = self.function.basic_block_ref_mut(cur_bb_id);
-        cur_bb.succ.push(bb1);
-        cur_bb.succ.push(bb2);
+        self.with_function(|f| {
+            let cur_bb = f.basic_block_ref_mut(cur_bb_id);
+            cur_bb.succ.push(bb1);
+            cur_bb.succ.push(bb2);
 
-        self.function.basic_block_ref_mut(bb1).pred.push(cur_bb_id);
-        self.function.basic_block_ref_mut(bb2).pred.push(cur_bb_id);
+            f.basic_block_ref_mut(bb1).pred.push(cur_bb_id);
+            f.basic_block_ref_mut(bb2).pred.push(cur_bb_id);
+        });
 
         instr
     }
 
     pub fn build_phi(&mut self, pairs: Vec<(Value, BasicBlockId)>) -> Value {
-        let ty = pairs.get(0).unwrap().0.get_type().clone();
+        let ty = pairs.get(0).unwrap().0.get_type(self.module).clone();
         let instr = self.create_instr_value(Opcode::Phi(pairs), ty);
         self.append_instr_to_cur_bb(instr);
         instr
     }
 
     pub fn build_call(&mut self, f: Value, args: Vec<Value>) -> Value {
-        let ret_ty = f.get_type().get_function_ty().unwrap().ret_ty.clone();
+        let ret_ty = f
+            .get_type(self.module)
+            .get_function_ty()
+            .unwrap()
+            .ret_ty
+            .clone();
         let instr = self.create_instr_value(Opcode::Call(f, args), ret_ty);
         self.append_instr_to_cur_bb(instr);
         instr
@@ -175,11 +181,10 @@ impl<'a> Builder<'a> {
 
     fn create_instr_value(&mut self, opcode: Opcode, ret_ty: Type) -> Value {
         let instr = Instruction::new(opcode, ret_ty);
-        let instr_id = self.function.instr_id(instr);
+        let instr_id = self.function_ref_mut().instr_id(instr);
         Value::Instruction(InstructionValue {
             func_id: self.func_id,
             id: instr_id,
-            parent: self.function.parent,
         })
     }
 
@@ -188,7 +193,23 @@ impl<'a> Builder<'a> {
         let insert_point = self.insert_point;
         self.insert_point += 1;
 
-        let bb = self.function.basic_block_ref(bb_id);
+        let bb = self.function_ref().basic_block_ref(bb_id);
         bb.iseq_ref_mut().insert(insert_point, instr);
+    }
+
+    fn function_ref(&self) -> &Function {
+        self.module.function_ref(self.func_id)
+    }
+
+    fn function_ref_mut(&mut self) -> &mut Function {
+        self.module.function_ref_mut(self.func_id)
+    }
+
+    fn with_function<F, T>(&mut self, mut f: F) -> T
+    where
+        F: FnMut(&mut Function) -> T,
+    {
+        let function = self.module.function_ref_mut(self.func_id);
+        f(function)
     }
 }

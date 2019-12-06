@@ -167,7 +167,7 @@ impl<'a> Interpreter<'a> {
                             ConcreteValue::Mem(ptr, _) => ptr,
                             _ => unreachable!(),
                         };
-                        let val = match v.get_type().get_element_ty().unwrap() {
+                        let val = match v.get_type(self.module).get_element_ty().unwrap() {
                             Type::Int1 => {
                                 ConcreteValue::Int1(if unsafe { *(ptr as *mut u8) } == 0 {
                                     false

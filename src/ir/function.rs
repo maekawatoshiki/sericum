@@ -1,4 +1,4 @@
-use super::{basic_block::*, module::*, opcode::*, types::*, value::*};
+use super::{basic_block::*, module::Module, opcode::*, types::*, value::*};
 use id_arena::*;
 
 pub type FunctionId = Id<Function>;
@@ -19,9 +19,8 @@ impl<'a> From<&'a str> for FunctionName<'a> {
 
 #[derive(Debug, Clone)]
 pub struct Function {
-    /// The module this function belongs to
-    pub parent: ModuleRef,
-
+    // /// The module this function belongs to
+    // pub parent: ModuleRef,
     /// Function name
     pub name: String,
 
@@ -35,25 +34,25 @@ pub struct Function {
 
     /// Instruction arena
     pub instr_table: Arena<Instruction>,
-    // True if internal function
-    // pub internal: bool,
+
+    pub id: Option<FunctionId>,
 }
 
 impl Function {
-    pub fn new(parent: ModuleRef, name: &str, ret_ty: Type, params_ty: Vec<Type>) -> Self {
-        Self {
-            parent,
+    pub fn new(module: &mut Module, name: &str, ret_ty: Type, params_ty: Vec<Type>) -> FunctionId {
+        module.add_function(Self {
             name: name.to_string(),
             ty: Type::func_ty(ret_ty, params_ty),
             basic_block_arena: Arena::new(),
             basic_blocks: vec![],
             instr_table: Arena::new(),
+            id: None,
             // TODO
             // internal: match name {
             //     "cilk.memset.p0i32.i32" | "cilk.println.i32" | "cilk.printch.i32" => true, // TODO
             //     _ => false,
             // },
-        }
+        })
     }
 
     pub fn append_basic_block(&mut self) -> BasicBlockId {
@@ -81,7 +80,7 @@ impl Function {
         Some(Value::Argument(ArgumentValue {
             func_id,
             index: idx,
-            parent: self.parent,
+            // parent: self.parent,
         }))
     }
 
@@ -110,7 +109,7 @@ impl Function {
 }
 
 impl Function {
-    pub fn to_string(&self) -> String {
+    pub fn to_string(&self, parent: &Module) -> String {
         let fty = self.ty.get_function_ty().unwrap();
         format!(
             "define {} {}({}) {{\n{}}}",
@@ -123,11 +122,11 @@ impl Function {
                     s
                 })
                 .trim_matches(&[',', ' '][0..]),
-            self.basic_blocks_to_string()
+            self.basic_blocks_to_string(parent)
         )
     }
 
-    fn basic_blocks_to_string(&self) -> String {
+    fn basic_blocks_to_string(&self, parent: &Module) -> String {
         self.basic_block_arena
             .iter()
             .fold("".to_string(), |s, (id, b)| {
@@ -161,7 +160,7 @@ impl Function {
                         .iter()
                         .fold("".to_string(), |s, x| format!("{}{},", s, x.index()))
                         .trim_matches(','),
-                    b.to_string()
+                    b.to_string(parent)
                 )
             })
     }

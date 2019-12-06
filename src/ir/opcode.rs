@@ -1,4 +1,4 @@
-use super::{basic_block::*, types::*, value::*};
+use super::{basic_block::*, module::Module, types::*, value::*};
 use id_arena::*;
 use std::{cell::RefCell, rc::Rc};
 // use rustc_hash::FxHashMap;
@@ -60,8 +60,8 @@ impl Instruction {
         }
     }
 
-    pub fn to_string(&self) -> String {
-        self.opcode.to_string()
+    pub fn to_string(&self, parent: &Module) -> String {
+        self.opcode.to_string(parent)
     }
 
     pub fn set_last_use(&self, last_use: Option<InstructionId>) {
@@ -107,52 +107,75 @@ impl Opcode {
         }
     }
 
-    pub fn to_string(&self) -> String {
+    pub fn to_string(&self, parent: &Module) -> String {
         match self {
             Opcode::Alloca(ty) => format!("alloca {}", ty.to_string()),
-            Opcode::Load(v) => format!("load {}", v.to_string(false)),
-            Opcode::Store(src, dst) => {
-                format!("store {}, {}", src.to_string(false), dst.to_string(false))
-            }
+            Opcode::Load(v) => format!("load {}", v.to_string(parent, false)),
+            Opcode::Store(src, dst) => format!(
+                "store {}, {}",
+                src.to_string(parent, false),
+                dst.to_string(parent, false)
+            ),
             Opcode::GetElementPtr(ptrval, indices) => format!(
                 "getelementptr {}{}",
-                ptrval.to_string(false),
+                ptrval.to_string(parent, false),
                 indices.iter().fold("".to_string(), |mut s, idx| {
                     s += ", ";
-                    s += idx.to_string(false).as_str();
+                    s += idx.to_string(parent, false).as_str();
                     s
                 })
             ),
-            Opcode::Add(v1, v2) => format!("add {}, {}", v1.to_string(false), v2.to_string(false)),
-            Opcode::Sub(v1, v2) => format!("sub {}, {}", v1.to_string(false), v2.to_string(false)),
-            Opcode::Mul(v1, v2) => format!("mul {}, {}", v1.to_string(false), v2.to_string(false)),
-            Opcode::Rem(v1, v2) => format!("rem {}, {}", v1.to_string(false), v2.to_string(false)),
+            Opcode::Add(v1, v2) => format!(
+                "add {}, {}",
+                v1.to_string(parent, false),
+                v2.to_string(parent, false)
+            ),
+            Opcode::Sub(v1, v2) => format!(
+                "sub {}, {}",
+                v1.to_string(parent, false),
+                v2.to_string(parent, false)
+            ),
+            Opcode::Mul(v1, v2) => format!(
+                "mul {}, {}",
+                v1.to_string(parent, false),
+                v2.to_string(parent, false)
+            ),
+            Opcode::Rem(v1, v2) => format!(
+                "rem {}, {}",
+                v1.to_string(parent, false),
+                v2.to_string(parent, false)
+            ),
             Opcode::ICmp(kind, v1, v2) => format!(
                 "icmp {} {}, {}",
                 kind.as_str(),
-                v1.to_string(false),
-                v2.to_string(false)
+                v1.to_string(parent, false),
+                v2.to_string(parent, false)
             ),
             Opcode::Br(id) => format!("br %label.{}", id.index()),
             Opcode::CondBr(v, id1, id2) => format!(
                 "br {} %label.{}, %label.{}",
-                v.to_string(false),
+                v.to_string(parent, false),
                 id1.index(),
                 id2.index()
             ),
             Opcode::Phi(pairs) => pairs.iter().fold("phi".to_string(), |s, (val, bb)| {
-                format!("{} [{}, %label.{}]", s, val.to_string(false), bb.index())
+                format!(
+                    "{} [{}, %label.{}]",
+                    s,
+                    val.to_string(parent, false),
+                    bb.index()
+                )
             }),
             Opcode::Call(v, args) => format!(
                 "call {}({})",
-                v.to_string(false),
+                v.to_string(parent, false),
                 args.iter().fold("".to_string(), |s, val| format!(
                     "{}{}, ",
                     s,
-                    val.to_string(false)
+                    val.to_string(parent, false)
                 ))
             ),
-            Opcode::Ret(v) => format!("ret {}", v.to_string(false)),
+            Opcode::Ret(v) => format!("ret {}", v.to_string(parent, false)),
         }
     }
 }
