@@ -21,10 +21,6 @@ impl LocalVariableManager {
         self.locals.push(info.clone());
         info
     }
-
-    // pub fn add_frame_index_info(&mut self, info:FrameIndexInfo) {
-    //     self.locals
-    // }
 }
 
 #[derive(Clone)]

@@ -1,4 +1,4 @@
-use super::{module::Module, opcode::*, value::*};
+use super::{module::Module, opcode::*, value::*, DumpToString};
 use id_arena::*;
 use rustc_hash::FxHashSet;
 use std::{
@@ -48,8 +48,10 @@ impl BasicBlock {
     pub fn iseq_ref_mut(&self) -> RefMut<Vec<Value>> {
         self.iseq.borrow_mut()
     }
+}
 
-    pub fn to_string(&self, module: &Module) -> String {
+impl DumpToString for BasicBlock {
+    fn dump(&self, module: &Module) -> String {
         self.iseq_ref().iter().fold("".to_string(), |s, instr| {
             format!("{}{}\n", s, instr.to_string(module, true))
         })

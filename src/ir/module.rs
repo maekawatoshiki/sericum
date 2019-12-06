@@ -1,4 +1,4 @@
-use super::{function::*, types::*};
+use super::{function::*, types::*, DumpToString};
 use id_arena::*;
 
 #[derive(Clone, Debug)]
@@ -46,5 +46,9 @@ impl Module {
         self.functions
             .iter()
             .find_map(|(id, f)| if f.name == name { Some(id) } else { None })
+    }
+
+    pub fn dump<T: DumpToString>(&self, obj: T) -> String {
+        obj.dump(self)
     }
 }

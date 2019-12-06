@@ -1,4 +1,4 @@
-use super::{function::*, module::*, opcode::*, types::*};
+use super::{function::*, module::*, opcode::*, types::*, DumpToString};
 
 macro_rules! const_op { ($name:ident, $op:tt) => {
     pub fn $name(&self, v: &Value) -> Option<Value> {
@@ -128,7 +128,7 @@ impl Value {
             }
             Value::Function(FunctionValue { func_id }) if instr => {
                 let f = parent.function_ref(*func_id);
-                f.to_string(parent)
+                f.dump(parent)
             }
             Value::Function(FunctionValue { func_id }) => {
                 let f = parent.function_ref(*func_id);

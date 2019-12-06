@@ -2,7 +2,7 @@ use crate::codegen::x64::machine::{
     basic_block::*, frame_object::*, function::*, instr::*, module::*,
 };
 use crate::ir;
-use crate::{ir::types::*, codegen::internal_function_names};
+use crate::{codegen::internal_function_names, ir::types::*};
 use dynasmrt::*;
 use rustc_hash::FxHashMap;
 
@@ -33,7 +33,6 @@ pub enum GenericValue {
 pub struct JITExecutor {
     jit: JITCompiler,
     machine_module: MachineModule,
-    // pub
 }
 
 pub struct JITCompiler {

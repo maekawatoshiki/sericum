@@ -284,8 +284,7 @@ fn brainfuxk() {
 
     builder.build_ret(value::Value::None);
 
-    let f = m.function_ref(f_id);
-    println!("IR: {}", f.to_string(&m));
+    println!("IR: {}", m.dump(f_id));
 
     let mut jit = exec::jit::JITExecutor::new(&m);
     let func = jit
@@ -294,40 +293,39 @@ fn brainfuxk() {
     jit.run(func, vec![]);
     println!();
 }
-//
-// #[test]
-// fn pointer() {
-//     let mut ctx = context::Context::new();
-//     let mut m = ctx.create_module("cilk");
-//
-//     let cilk_memset_i32 = m.create_function(
-//         "cilk.memset.p0i32.i32",
-//         types::Type::Void,
-//         vec![
-//             types::Type::Pointer(Box::new(types::Type::Int32)),
-//             types::Type::Int32,
-//             types::Type::Int32,
-//         ],
-//     );
-//
-//     let func = cilk_ir!(m; define [i32] func [] {
-//     entry:
-//         arr = alloca_ ([16; i32]);
-//
-//         __ = call (->cilk_memset_i32) [(%arr), (i32 0), (i32 16)];
-//
-//         p = gep (%arr), [(i32 0), (i32 15)];
-//         v = load (%p);
-//
-//         ret (%v);
-//     });
-//
-//     println!("{}", m.function_ref(func).to_string());
-//
-//     let mut jit = exec::jit::JITExecutor::new(&m);
-//     let func = jit.find_function_by_name("func").unwrap();
-//     assert_eq!(jit.run(func, vec![]), exec::jit::GenericValue::Int32(0));
-// }
+
+#[test]
+fn pointer() {
+    let mut m = module::Module::new("cilk");
+
+    let cilk_memset_i32 = m.create_function(
+        "cilk.memset.p0i32.i32",
+        types::Type::Void,
+        vec![
+            types::Type::Pointer(Box::new(types::Type::Int32)),
+            types::Type::Int32,
+            types::Type::Int32,
+        ],
+    );
+
+    let func = cilk_ir!(m; define [i32] func [] {
+    entry:
+        arr = alloca_ ([16; i32]);
+
+        __ = call (->cilk_memset_i32) [(%arr), (i32 0), (i32 16)];
+
+        p = gep (%arr), [(i32 0), (i32 15)];
+        v = load (%p);
+
+        ret (%v);
+    });
+
+    println!("{}", m.dump(func));
+
+    let mut jit = exec::jit::JITExecutor::new(&m);
+    let func = jit.find_function_by_name("func").unwrap();
+    assert_eq!(jit.run(func, vec![]), exec::jit::GenericValue::Int32(0));
+}
 
 #[test]
 fn jit_executor1() {

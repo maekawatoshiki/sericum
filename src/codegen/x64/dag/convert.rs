@@ -50,7 +50,7 @@ impl<'a> ConvertToDAG<'a> {
         debug!(println!(
             "{}: dump function: \n{}",
             file!(),
-            func.to_string(self.module)
+            self.module.dump(func),
         ));
 
         let mut dag_bb_arena: Arena<DAGBasicBlock> = Arena::new();

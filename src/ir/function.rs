@@ -1,4 +1,4 @@
-use super::{basic_block::*, module::Module, opcode::*, types::*, value::*};
+use super::{basic_block::*, module::Module, opcode::*, types::*, value::*, DumpToString};
 use id_arena::*;
 
 pub type FunctionId = Id<Function>;
@@ -19,8 +19,6 @@ impl<'a> From<&'a str> for FunctionName<'a> {
 
 #[derive(Debug, Clone)]
 pub struct Function {
-    // /// The module this function belongs to
-    // pub parent: ModuleRef,
     /// Function name
     pub name: String,
 
@@ -80,7 +78,6 @@ impl Function {
         Some(Value::Argument(ArgumentValue {
             func_id,
             index: idx,
-            // parent: self.parent,
         }))
     }
 
@@ -95,74 +92,69 @@ impl Function {
     pub fn instr_id(&mut self, instr: Instruction) -> InstructionId {
         self.instr_table.alloc(instr)
     }
-
-    pub fn renumber_vreg(&self) {
-        let mut n = 1;
-        for (_, bb) in &self.basic_block_arena {
-            for instr_val in &mut *bb.iseq_ref_mut() {
-                let id = instr_val.get_instr_id().unwrap();
-                self.instr_table[id].set_vreg(n);
-                n += 1
-            }
-        }
-    }
 }
 
-impl Function {
-    pub fn to_string(&self, parent: &Module) -> String {
-        let fty = self.ty.get_function_ty().unwrap();
+impl DumpToString for &Function {
+    fn dump(&self, module: &Module) -> String {
+        let ty = self.ty.get_function_ty().unwrap();
         format!(
             "define {} {}({}) {{\n{}}}",
-            fty.ret_ty.to_string(),
+            ty.ret_ty.to_string(),
             self.name,
-            fty.params_ty
+            ty.params_ty
                 .iter()
                 .fold("".to_string(), |mut s, p| {
                     s += &(p.to_string() + ", ");
                     s
                 })
                 .trim_matches(&[',', ' '][0..]),
-            self.basic_blocks_to_string(parent)
+            self.basic_block_arena.dump(module)
         )
     }
+}
 
-    fn basic_blocks_to_string(&self, parent: &Module) -> String {
-        self.basic_block_arena
-            .iter()
-            .fold("".to_string(), |s, (id, b)| {
-                format!(
-                    "{}label.{}:\t// pred({}), succ({}), def({}), in({}), out({})\n{}\n",
-                    s,
-                    id.index(),
-                    &b.pred
-                        .iter()
-                        .fold("".to_string(), |s, x| format!("{}{},", s, x.index()))
-                        .trim_matches(','),
-                    &b.succ
-                        .iter()
-                        .fold("".to_string(), |s, x| format!("{}{},", s, x.index()))
-                        .trim_matches(','),
-                    &b.liveness
-                        .borrow()
-                        .def
-                        .iter()
-                        .fold("".to_string(), |s, x| format!("{}{},", s, x.index()))
-                        .trim_matches(','),
-                    &b.liveness
-                        .borrow()
-                        .live_in
-                        .iter()
-                        .fold("".to_string(), |s, x| format!("{}{},", s, x.index()))
-                        .trim_matches(','),
-                    &b.liveness
-                        .borrow()
-                        .live_out
-                        .iter()
-                        .fold("".to_string(), |s, x| format!("{}{},", s, x.index()))
-                        .trim_matches(','),
-                    b.to_string(parent)
-                )
-            })
+impl DumpToString for FunctionId {
+    fn dump(&self, module: &Module) -> String {
+        module.function_ref(*self).dump(module)
+    }
+}
+
+impl DumpToString for Arena<BasicBlock> {
+    fn dump(&self, module: &Module) -> String {
+        self.iter().fold("".to_string(), |s, (id, b)| {
+            format!(
+                "{}label.{}:\t// pred({}), succ({}), def({}), in({}), out({})\n{}\n",
+                s,
+                id.index(),
+                &b.pred
+                    .iter()
+                    .fold("".to_string(), |s, x| format!("{}{},", s, x.index()))
+                    .trim_matches(','),
+                &b.succ
+                    .iter()
+                    .fold("".to_string(), |s, x| format!("{}{},", s, x.index()))
+                    .trim_matches(','),
+                &b.liveness
+                    .borrow()
+                    .def
+                    .iter()
+                    .fold("".to_string(), |s, x| format!("{}{},", s, x.index()))
+                    .trim_matches(','),
+                &b.liveness
+                    .borrow()
+                    .live_in
+                    .iter()
+                    .fold("".to_string(), |s, x| format!("{}{},", s, x.index()))
+                    .trim_matches(','),
+                &b.liveness
+                    .borrow()
+                    .live_out
+                    .iter()
+                    .fold("".to_string(), |s, x| format!("{}{},", s, x.index()))
+                    .trim_matches(','),
+                b.dump(module)
+            )
+        })
     }
 }
 
