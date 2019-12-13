@@ -1,7 +1,7 @@
 use super::super::dag::function::*;
 use super::super::register::*;
 use super::{basic_block::*, frame_object::*, instr::*};
-use crate::{ir::types::*, codegen::is_internal_function};
+use crate::{codegen::is_internal_function, ir::types::*};
 use id_arena::*;
 use std::ops::{Index, IndexMut};
 
@@ -66,6 +66,10 @@ impl MachineFunction {
             }
         }
         None
+    }
+
+    pub fn get_entry_bb(&self) -> Option<&MachineBasicBlockId> {
+        self.basic_blocks.get(0)
     }
 }
 

@@ -43,6 +43,9 @@ pub enum MachineOpcode {
     MOV64ri,
     LEA64,
     IDIV,
+    PUSH64,
+    POP64,
+    RET,
 
     // Memory
     Load,
@@ -91,15 +94,7 @@ pub enum MachineOperand {
     FrameIndex(FrameIndexInfo),
     GlobalAddress(GlobalValueInfo),
     Branch(MachineBasicBlockId),
-    // Mem(MachineMemOperand),
     None,
-}
-
-#[derive(Clone)]
-pub enum MachineMemOperand {
-    BaseOffAlign(MachineRegister, MachineRegister, MachineConstant),
-    FiOffAlign(FrameIndexInfo, MachineRegister, MachineConstant),
-    FiOff(FrameIndexInfo, MachineConstant),
 }
 
 #[derive(Clone, Copy, PartialEq)]

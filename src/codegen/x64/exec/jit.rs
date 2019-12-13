@@ -1,3 +1,5 @@
+use super::super::register::get_arg_reg;
+use super::roundup;
 use crate::codegen::x64::machine::{
     basic_block::*, frame_object::*, function::*, instr::*, module::*,
 };
@@ -42,12 +44,6 @@ pub struct JITCompiler {
     internal_functions: FxHashMap<String, u64>, // name -> fn address
 }
 
-#[derive(Debug)]
-pub struct FrameObjectsInfo {
-    offset_map: FxHashMap<i32, usize>, // frame index -> offset
-    total_size: usize,
-}
-
 impl JITExecutor {
     pub fn new(module: &ir::module::Module) -> Self {
         use super::super::{dag, machine};
@@ -75,6 +71,8 @@ impl JITExecutor {
         machine::phi_elimination::PhiElimination::new().run_on_module(&mut machine_module);
         machine::two_addr::TwoAddressConverter::new().run_on_module(&mut machine_module);
         machine::regalloc::RegisterAllocator::new().run_on_module(&mut machine_module);
+        machine::pro_epi_inserter::PrologueEpilogueInserter::new()
+            .run_on_module(&mut machine_module);
 
         debug!(
             println!("MachineModule dump:");
@@ -149,7 +147,9 @@ impl JITCompiler {
 
         for (idx, arg) in args.iter().enumerate() {
             match arg {
-                GenericValue::Int32(i) => dynasm!(self.asm; mov Ra(reg4arg(idx).unwrap()), *i),
+                GenericValue::Int32(i) => {
+                    dynasm!(self.asm; mov Ra(get_arg_reg(idx).unwrap().get() as u8), *i)
+                }
                 GenericValue::None => unreachable!(),
             }
         }
@@ -183,6 +183,11 @@ impl JITCompiler {
         self.bb_to_label.clear();
 
         let f = module.function_ref(id);
+
+        if f.internal {
+            return;
+        }
+
         let f_entry = self.get_function_entry_label(id);
 
         let frame_objects = FrameObjectsInfo::new(f);
@@ -192,25 +197,24 @@ impl JITCompiler {
 
         dynasm!(self.asm
             ; => f_entry
-            ; push rbp
-            ; mov rbp, rsp
-            ; sub rsp, roundup(frame_objects.total_size() + /*push rbp=*/8, 16) - 8
+            // ; push rbp
+            // ; mov rbp, rsp
+            // ; sub rsp, roundup(frame_objects.total_size() + /*push rbp=*/8, 16) - 8
         );
 
-        for (i, ty) in f.ty.get_function_ty().unwrap().params_ty.iter().enumerate() {
-            match ty {
-                Type::Int32 => {
-                    let off = frame_objects.offset(-(i as i32 + 1)).unwrap();
-                    dynasm!(self.asm; mov [rbp - off], Rd(reg4arg(i).unwrap()));
-                }
-                Type::Pointer(_) => {
-                    let off = frame_objects.offset(-(i as i32 + 1)).unwrap();
-                    dynasm!(self.asm; mov [rbp - off], Ra(reg4arg(i).unwrap()));
-                }
-                _ => unimplemented!(),
-            }
-        }
-
+        // for (i, ty) in f.ty.get_function_ty().unwrap().params_ty.iter().enumerate() {
+        //     match ty {
+        //         Type::Int32 => {
+        //             let off = frame_objects.offset(-(i as i32 + 1)).unwrap();
+        //             dynasm!(self.asm; mov [rbp - off], Rd(get_arg_reg(i).unwrap()));
+        //         }
+        //         Type::Pointer(_) => {
+        //             let off = frame_objects.offset(-(i as i32 + 1)).unwrap();
+        //             dynasm!(self.asm; mov [rbp - off], Ra(get_arg_reg(i).unwrap()));
+        //         }
+        //         _ => unimplemented!(),
+        //     }
+        // }
         // body
 
         for bb_id in &f.basic_blocks {
@@ -229,6 +233,9 @@ impl JITCompiler {
                     MachineOpcode::MOV64ri => self.compile_mov64ri(instr),
                     MachineOpcode::MOV64rr => self.compile_mov64rr(instr),
                     MachineOpcode::LEA64 => self.compile_lea64(&frame_objects, instr),
+                    MachineOpcode::RET => self.compile_ret(),
+                    MachineOpcode::PUSH64 => self.compile_push64(instr),
+                    MachineOpcode::POP64 => self.compile_pop64(instr),
                     MachineOpcode::Add => self.compile_add(&frame_objects, instr),
                     MachineOpcode::Sub => self.compile_sub(&frame_objects, instr),
                     MachineOpcode::Mul => self.compile_mul(&frame_objects, instr),
@@ -305,6 +312,22 @@ impl JITCompiler {
         let r0 = instr.def[0].get_reg().unwrap().get() as u8;
         let fi = instr.operand[0].as_frame_index();
         dynasm!(self.asm; lea Ra(r0), [rbp - fo.offset(fi.idx).unwrap()]);
+    }
+
+    fn compile_push64(&mut self, instr: &MachineInstr) {
+        let op0 = &instr.operand[0];
+        match op0 {
+            MachineOperand::Register(reg) => dynasm!(self.asm; push Rq(register!(reg))),
+            _ => unimplemented!(),
+        }
+    }
+
+    fn compile_pop64(&mut self, instr: &MachineInstr) {
+        let op0 = &instr.operand[0];
+        match op0 {
+            MachineOperand::Register(reg) => dynasm!(self.asm; pop Rq(register!(reg))),
+            _ => unimplemented!(),
+        }
     }
 
     fn compile_copy(&mut self, instr: &MachineInstr) {
@@ -593,9 +616,12 @@ impl JITCompiler {
             MachineOperand::Register(i0) => {
                 self.reg_copy(typ!(i0), rn, register!(i0));
                 match op1 {
-                    MachineOperand::Constant(MachineConstant::Int32(x)) => {
-                        dynasm!(self.asm; sub Rd(rn), *x)
-                    }
+                    // TODO: SUB32ri, SUB64ri32
+                    MachineOperand::Constant(MachineConstant::Int32(x)) => match typ!(i0) {
+                        Type::Int32 => dynasm!(self.asm; sub Ra(rn), *x),
+                        Type::Int64 => dynasm!(self.asm; sub Rq(rn), *x),
+                        _ => unimplemented!(),
+                    },
                     MachineOperand::Register(i1) => match typ!(i1) {
                         Type::Int32 => dynasm!(self.asm; sub Rd(rn), Rd(register!(i1))),
                         _ => unimplemented!(),
@@ -685,6 +711,10 @@ impl JITCompiler {
         }
     }
 
+    fn compile_ret(&mut self) {
+        dynasm!(self.asm; ret);
+    }
+
     fn compile_return(&mut self, fo: &FrameObjectsInfo, instr: &MachineInstr) {
         match &instr.operand[0] {
             MachineOperand::Constant(c) => match c {
@@ -705,11 +735,13 @@ impl JITCompiler {
         for (idx, arg) in args.iter().enumerate() {
             match arg {
                 MachineOperand::Constant(MachineConstant::Int32(i)) => {
-                    dynasm!(self.asm; mov Rd(reg4arg(idx).unwrap()), *i)
+                    dynasm!(self.asm; mov Rd(get_arg_reg(idx).unwrap().get() as u8), *i)
                 }
-                MachineOperand::Register(id) => {
-                    self.reg_copy(typ!(id), reg4arg(idx).unwrap(), register!(id))
-                }
+                MachineOperand::Register(id) => self.reg_copy(
+                    typ!(id),
+                    get_arg_reg(idx).unwrap().get() as u8,
+                    register!(id),
+                ),
                 _ => unimplemented!(),
             }
         }
@@ -722,7 +754,7 @@ impl JITCompiler {
 
         match ty {
             Type::Int32 => dynasm!(self.asm; mov Rd(r0), Rd(r1)),
-            Type::Int64 => dynasm!(self.asm; mov Ra(r0), Ra(r1)),
+            Type::Int64 => dynasm!(self.asm; mov Rq(r0), Rq(r1)),
             _ => unimplemented!(),
         }
     }
@@ -746,45 +778,6 @@ impl JITCompiler {
         self.function_map.insert(f_id, f_entry);
         f_entry
     }
-}
-
-impl FrameObjectsInfo {
-    pub fn new(f: &MachineFunction) -> Self {
-        let mut offset_map = FxHashMap::default();
-        let mut offset = 0;
-
-        for (i, param_ty) in f.ty.get_function_ty().unwrap().params_ty.iter().enumerate() {
-            offset += param_ty.size_in_byte();
-            offset_map.insert(-(i as i32 + 1), offset);
-        }
-
-        for FrameIndexInfo { idx, ty } in &f.local_mgr.locals {
-            offset += ty.size_in_byte();
-            offset_map.insert(*idx, offset);
-        }
-
-        Self {
-            offset_map,
-            total_size: offset,
-        }
-    }
-
-    pub fn offset(&self, frame_index: i32) -> Option<i32> {
-        self.offset_map.get(&frame_index).map(|x| *x as i32)
-    }
-
-    pub fn total_size(&self) -> i32 {
-        self.total_size as i32
-    }
-}
-
-fn reg4arg(idx: usize) -> Option<u8> {
-    let regs = [7, 6, 2, 1, 8, 9]; // rdi, rsi, rdx, rcx, r8, r9
-    regs.get(idx).map(|x| *x as u8)
-}
-
-fn roundup(n: i32, align: i32) -> i32 {
-    (n + align - 1) & !(align - 1)
 }
 
 // Internal function cilk.println.i32

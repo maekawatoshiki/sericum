@@ -19,7 +19,9 @@ pub struct Builder<'a> {
 }
 
 pub trait BuilderTrait {
+    fn set_insert_point_at_entry_bb(&mut self);
     fn set_insert_point_at(&mut self, pt: usize, bb_id: MachineBasicBlockId);
+    fn set_insert_point_at_end(&mut self, bb_id: MachineBasicBlockId);
     fn set_insert_point_before_instr(&mut self, instr_id: MachineInstrId) -> Option<()>;
     fn set_insert_point_after_instr(&mut self, instr_id: MachineInstrId) -> Option<()>;
     fn insert(&mut self, instr_id: MachineInstrId);
@@ -37,9 +39,19 @@ impl<'a> BuilderWithLiveInfoEdit<'a> {
 }
 
 impl<'a> BuilderTrait for BuilderWithLiveInfoEdit<'a> {
+    fn set_insert_point_at_entry_bb(&mut self) {
+        let entry = *self.function.get_entry_bb().unwrap();
+        self.set_insert_point_at(0, entry);
+    }
+
     fn set_insert_point_at(&mut self, pt: usize, bb_id: MachineBasicBlockId) {
         self.cur_bb_id = Some(bb_id);
         self.insert_point = pt;
+    }
+
+    fn set_insert_point_at_end(&mut self, bb_id: MachineBasicBlockId) {
+        self.cur_bb_id = Some(bb_id);
+        self.insert_point = self.function.basic_block_arena[bb_id].iseq_ref().len();
     }
 
     fn set_insert_point_before_instr(&mut self, instr_id: MachineInstrId) -> Option<()> {
@@ -111,12 +123,26 @@ impl<'a> Builder<'a> {
             insert_point: 0,
         }
     }
+
+    pub fn get_cur_bb(&self) -> Option<MachineBasicBlockId> {
+        self.cur_bb_id
+    }
 }
 
 impl<'a> BuilderTrait for Builder<'a> {
+    fn set_insert_point_at_entry_bb(&mut self) {
+        let entry = *self.function.get_entry_bb().unwrap();
+        self.set_insert_point_at(0, entry);
+    }
+
     fn set_insert_point_at(&mut self, pt: usize, bb_id: MachineBasicBlockId) {
         self.cur_bb_id = Some(bb_id);
         self.insert_point = pt;
+    }
+
+    fn set_insert_point_at_end(&mut self, bb_id: MachineBasicBlockId) {
+        self.cur_bb_id = Some(bb_id);
+        self.insert_point = self.function.basic_block_arena[bb_id].iseq_ref().len();
     }
 
     fn set_insert_point_before_instr(&mut self, instr_id: MachineInstrId) -> Option<()> {
