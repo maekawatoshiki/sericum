@@ -78,6 +78,10 @@ impl PrologueEpilogueInserter {
         let mov_rsp_i = builder.function.instr_arena.alloc(mov_rsp_i);
         builder.insert(mov_rsp_i);
 
+        self.insert_arg_copy(&mut builder)
+    }
+
+    fn insert_arg_copy<'a>(&mut self, builder: &mut Builder<'a>) {
         for (i, ty) in builder
             .function
             .ty
@@ -85,7 +89,7 @@ impl PrologueEpilogueInserter {
             .unwrap()
             .params_ty
             .clone()
-            .iter()
+            .into_iter()
             .enumerate()
         {
             match ty {
@@ -95,8 +99,8 @@ impl PrologueEpilogueInserter {
                         MachineOpcode::Store,
                         vec![
                             MachineOperand::FrameIndex(FrameIndexInfo::new(
-                                ty.clone(),
-                                -(i as i32 + 1),
+                                ty,
+                                FrameIndexKind::Arg(i),
                             )),
                             MachineOperand::Register(
                                 RegisterInfo::new_phy_reg(
@@ -108,8 +112,7 @@ impl PrologueEpilogueInserter {
                         ],
                         builder.get_cur_bb().unwrap(),
                     );
-                    let inst = builder.function.instr_arena.alloc(inst);
-                    builder.insert(inst);
+                    builder.insert(inst)
                 }
                 Type::Pointer(_) => {
                     unimplemented!()

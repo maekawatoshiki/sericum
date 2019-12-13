@@ -1,5 +1,5 @@
-use super::super::register::*;
-use super::{basic_block::*, frame_object::*, function::*, module::*, node::*};
+use super::super::{frame_object::*, register::*};
+use super::{basic_block::*, function::*, module::*, node::*};
 use crate::ir::{
     basic_block::*, function::*, liveness::*, module::*, opcode::*, types::*, value::*,
 };
@@ -104,7 +104,10 @@ impl<'a> ConvertToDAG<'a> {
                     .get_param_type(av.index)
                     .unwrap();
                 let fi = self.cur_conv_info_mut().dag_heap.alloc(DAGNode::new(
-                    DAGNodeKind::FrameIndex(-(av.index as i32 + 1), ty.clone()),
+                    DAGNodeKind::FrameIndex(FrameIndexInfo::new(
+                        ty.clone(),
+                        FrameIndexKind::Arg(av.index),
+                    )),
                     vec![],
                     ty.clone(),
                 ));
@@ -168,7 +171,7 @@ impl<'a> ConvertToDAG<'a> {
                     let fi = self.cur_conv_info_mut_with(|c| {
                         let frinfo = c.local_mgr.alloc(ty);
                         c.dag_heap.alloc(DAGNode::new(
-                            DAGNodeKind::FrameIndex(frinfo.idx, frinfo.ty), // TODO
+                            DAGNodeKind::FrameIndex(frinfo.clone()), // TODO
                             vec![],
                             ty.clone(),
                         ))
@@ -383,7 +386,7 @@ impl<'a> ConvertToDAG<'a> {
                     Type::Int32,
                 )),
                 DAGNodeKind::CondKind(_)
-                | DAGNodeKind::FrameIndex(_, _)
+                | DAGNodeKind::FrameIndex(_)
                 | DAGNodeKind::GlobalAddress(_)
                 | DAGNodeKind::BasicBlock(_) => idx,
                 _ => {

@@ -1,6 +1,6 @@
 // TODO: dirty code
 
-use super::super::machine::{basic_block::*, frame_object::*, function::*, instr::*, module::*};
+use super::super::machine::{basic_block::*, function::*, instr::*, module::*};
 use super::super::register::*;
 use super::{basic_block::*, function::*, module::*, node::*};
 use crate::ir::types::*;
@@ -512,9 +512,7 @@ impl ConvertToMachine {
             DAGNodeKind::Constant(c) => match c {
                 ConstantKind::Int32(i) => MachineOperand::Constant(MachineConstant::Int32(i)),
             },
-            DAGNodeKind::FrameIndex(idx, ref ty) => {
-                MachineOperand::FrameIndex({ FrameIndexInfo::new(ty.clone(), idx.clone()) })
-            }
+            DAGNodeKind::FrameIndex(ref kind) => MachineOperand::FrameIndex(kind.clone()),
             DAGNodeKind::GlobalAddress(ref g) => match g {
                 GlobalValueKind::FunctionName(n) => {
                     MachineOperand::GlobalAddress(GlobalValueInfo::FunctionName(n.clone()))

@@ -119,13 +119,13 @@ impl RegisterAllocator {
         &mut self,
         cur_func: &mut MachineFunction,
         matrix: &mut LiveRegMatrix,
-        occupied: &mut FxHashSet<i32>,
+        occupied: &mut FxHashSet<FrameIndexKind>,
         call_instr_id: MachineInstrId,
     ) {
         // TODO: Refine code. It's hard to understand.
         fn find_unused_slot(
             cur_func: &mut MachineFunction,
-            occupied: &mut FxHashSet</*idx=*/ i32>,
+            occupied: &mut FxHashSet<FrameIndexKind>,
             r: &MachineRegister,
         ) -> FrameIndexInfo {
             for slot in &*cur_func.local_mgr.locals {

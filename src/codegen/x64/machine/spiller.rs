@@ -41,11 +41,10 @@ impl<'a> Spiller<'a> {
             ],
             def_instr.parent,
         );
-        let store_id = self.func.instr_arena.alloc(store);
 
         let mut builder = BuilderWithLiveInfoEdit::new(self.matrix, self.func);
         builder.set_insert_point_after_instr(def_id).unwrap();
-        builder.insert(store_id);
+        builder.insert(store);
     }
 
     pub fn insert_reload(&mut self, r: MachineRegister, slot: &FrameIndexInfo) -> Vec<VirtReg> {
@@ -72,11 +71,10 @@ impl<'a> Spiller<'a> {
                 use_instr.parent,
             )
             .with_def(vec![new_r.clone()]);
-            let load_id = self.func.instr_arena.alloc(load);
 
             let mut builder = BuilderWithLiveInfoEdit::new(self.matrix, self.func);
             builder.set_insert_point_before_instr(use_id);
-            builder.insert(load_id);
+            builder.insert(load);
         }
 
         r.info_ref_mut().use_list.clear();

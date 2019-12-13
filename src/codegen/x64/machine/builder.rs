@@ -18,13 +18,29 @@ pub struct Builder<'a> {
     insert_point: usize,
 }
 
+pub trait MachineInstTrait {
+    fn into_id(self, f: &mut MachineFunction) -> MachineInstrId;
+}
+
 pub trait BuilderTrait {
     fn set_insert_point_at_entry_bb(&mut self);
     fn set_insert_point_at(&mut self, pt: usize, bb_id: MachineBasicBlockId);
     fn set_insert_point_at_end(&mut self, bb_id: MachineBasicBlockId);
     fn set_insert_point_before_instr(&mut self, instr_id: MachineInstrId) -> Option<()>;
     fn set_insert_point_after_instr(&mut self, instr_id: MachineInstrId) -> Option<()>;
-    fn insert(&mut self, instr_id: MachineInstrId);
+    fn insert<T: MachineInstTrait>(&mut self, inst: T);
+}
+
+impl MachineInstTrait for MachineInstrId {
+    fn into_id(self, _: &mut MachineFunction) -> MachineInstrId {
+        self
+    }
+}
+
+impl MachineInstTrait for MachineInstr {
+    fn into_id(self, f: &mut MachineFunction) -> MachineInstrId {
+        f.instr_arena.alloc(self)
+    }
 }
 
 impl<'a> BuilderWithLiveInfoEdit<'a> {
@@ -66,7 +82,7 @@ impl<'a> BuilderTrait for BuilderWithLiveInfoEdit<'a> {
         Some(())
     }
 
-    fn insert(&mut self, instr_id: MachineInstrId) {
+    fn insert<T: MachineInstTrait>(&mut self, inst: T) {
         let insert_pt = self.insert_point;
         self.insert_point += 1;
 
@@ -84,6 +100,7 @@ impl<'a> BuilderTrait for BuilderWithLiveInfoEdit<'a> {
             ProgramPoint::new(start.bb(), (end.idx() + start.idx()) / 2)
         };
 
+        let instr_id = inst.into_id(&mut self.function);
         self.matrix.id2pp.insert(instr_id, pp);
 
         {
@@ -157,8 +174,9 @@ impl<'a> BuilderTrait for Builder<'a> {
         Some(())
     }
 
-    fn insert(&mut self, instr_id: MachineInstrId) {
+    fn insert<T: MachineInstTrait>(&mut self, inst: T) {
         let insert_pt = self.insert_point;
+        let instr_id = inst.into_id(&mut self.function);
         self.insert_point += 1;
         self.function.basic_block_arena[self.cur_bb_id.unwrap()]
             .iseq_ref_mut()

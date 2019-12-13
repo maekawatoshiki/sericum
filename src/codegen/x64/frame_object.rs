@@ -11,7 +11,7 @@ pub struct LocalVariableManager {
 
 #[derive(Debug)]
 pub struct FrameObjectsInfo {
-    offset_map: FxHashMap<i32, usize>, // frame index -> offset
+    offset_map: FxHashMap<FrameIndexKind, usize>, // frame index -> offset
     total_size: usize,
 }
 
@@ -19,12 +19,12 @@ impl LocalVariableManager {
     pub fn new() -> Self {
         Self {
             locals: vec![],
-            cur_idx: 1,
+            cur_idx: 0,
         }
     }
 
     pub fn alloc(&mut self, ty: &Type) -> FrameIndexInfo {
-        let info = FrameIndexInfo::new(ty.clone(), self.cur_idx as i32);
+        let info = FrameIndexInfo::new(ty.clone(), FrameIndexKind::Local(self.cur_idx));
         self.cur_idx += 1;
         self.locals.push(info.clone());
         info
@@ -38,7 +38,7 @@ impl FrameObjectsInfo {
 
         for (i, param_ty) in f.ty.get_function_ty().unwrap().params_ty.iter().enumerate() {
             offset += param_ty.size_in_byte();
-            offset_map.insert(-(i as i32 + 1), offset);
+            offset_map.insert(FrameIndexKind::Arg(i), offset);
         }
 
         for FrameIndexInfo { idx, ty } in &f.local_mgr.locals {
@@ -52,8 +52,8 @@ impl FrameObjectsInfo {
         }
     }
 
-    pub fn offset(&self, frame_index: i32) -> Option<i32> {
-        self.offset_map.get(&frame_index).map(|x| *x as i32)
+    pub fn offset(&self, kind: FrameIndexKind) -> Option<i32> {
+        self.offset_map.get(&kind).map(|x| *x as i32)
     }
 
     pub fn total_size(&self) -> i32 {
@@ -61,20 +61,36 @@ impl FrameObjectsInfo {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub struct FrameIndexInfo {
     pub ty: Type,
-    pub idx: i32,
+    pub idx: FrameIndexKind,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Copy)]
+pub enum FrameIndexKind {
+    Arg(usize),
+    Local(usize),
+}
+
+impl FrameIndexKind {
+    pub fn new_arg(idx: usize) -> Self {
+        FrameIndexKind::Arg(idx)
+    }
+
+    pub fn new_local(idx: usize) -> Self {
+        FrameIndexKind::Local(idx)
+    }
 }
 
 impl FrameIndexInfo {
-    pub fn new(ty: Type, idx: i32) -> Self {
+    pub fn new(ty: Type, idx: FrameIndexKind) -> Self {
         Self { ty, idx }
     }
 }
 
 impl fmt::Debug for FrameIndexInfo {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "fi<{:?}, {}>", self.ty, self.idx)
+        write!(f, "FI<{:?}, {:?}>", self.ty, self.idx)
     }
 }

@@ -1,5 +1,4 @@
-use super::super::machine::instr::*;
-use super::basic_block::*;
+use super::{super::frame_object::FrameIndexInfo, super::machine::instr::*, basic_block::*};
 use crate::ir::{opcode::*, types::*};
 use crate::util::allocator::*;
 use id_arena::*;
@@ -43,7 +42,7 @@ pub enum DAGNodeKind {
     StoreRegOff,
 
     CondKind(CondKind),
-    FrameIndex(i32, Type), // TODO
+    FrameIndex(FrameIndexInfo), // TODO
     Constant(ConstantKind),
     GlobalAddress(GlobalValueKind),
     BasicBlock(DAGBasicBlockId),
@@ -142,13 +141,13 @@ impl DAGNode {
     }
 
     pub fn is_frame_index(&self) -> bool {
-        matches!(self.kind, DAGNodeKind::FrameIndex(_, _))
+        matches!(self.kind, DAGNodeKind::FrameIndex(_))
     }
 
     pub fn is_operation(&self) -> bool {
         match self.kind {
             DAGNodeKind::CondKind(_)
-            | DAGNodeKind::FrameIndex(_, _)
+            | DAGNodeKind::FrameIndex(_)
             | DAGNodeKind::Constant(_)
             | DAGNodeKind::GlobalAddress(_)
             | DAGNodeKind::BasicBlock(_)
