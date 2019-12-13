@@ -11,7 +11,7 @@ Do not expect too much stuff!
 
 - Optimization
     - Easy ones
-        1. Spill registers not to the stack but to callee saved registers such as ebp. (llc does so)
+        1. Spill registers not to the stack but to callee saved registers such as ebx. (llc does so)
         2. Take into consideration the physical registers' allocation order.
     - Hard ones
         1. ....
