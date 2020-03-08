@@ -9,6 +9,10 @@ pub struct RegisterAllocator {
     queue: VecDeque<VirtReg>,
 }
 
+pub struct AllocationOrder<'a> {
+    matrix: &'a LiveRegMatrix,
+}
+
 impl RegisterAllocator {
     pub fn new() -> Self {
         Self {
@@ -234,5 +238,21 @@ impl RegisterAllocator {
         for instr_id in call_instr_id {
             self.insert_instr_to_save_reg(cur_func, matrix, &mut occupied.clone(), instr_id);
         }
+    }
+}
+
+// TODO: Take into consideration the use list of register
+impl<'a> AllocationOrder<'a> {
+    pub fn new(matrix: &'a LiveRegMatrix) -> Self {
+        Self { matrix }
+    }
+
+    pub fn get_order_iter(&self, vreg: VirtReg) -> Option<RegisterOrder> {
+        Some(
+            self.matrix
+                .get_entity_by_vreg(vreg)?
+                .get_reg_class()
+                .get_reg_order(),
+        )
     }
 }

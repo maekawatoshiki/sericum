@@ -374,6 +374,10 @@ impl MachineRegister {
         self.info.borrow().reg
     }
 
+    pub fn get_reg_class(&self) -> RegisterClassKind {
+        self.info.borrow().reg_class
+    }
+
     pub fn info_ref(&self) -> Ref<RegisterInfo> {
         self.info.borrow()
     }
