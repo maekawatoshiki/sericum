@@ -1,4 +1,4 @@
-use super::super::register::*;
+use super::super::register::{PhysReg, RegisterClassKind, VirtReg, VirtRegGen};
 use super::{basic_block::*, frame_object::*};
 use crate::ir::types::*;
 use id_arena::*;
@@ -28,6 +28,7 @@ pub struct RegisterInfo {
     pub vreg: VirtReg,
     pub reg: Option<PhysReg>,
     pub ty: Type,
+    pub reg_class: RegisterClassKind,
     pub tied: Option<RegisterInfoRef>,
     pub use_list: FxHashSet<MachineInstrId>,
     pub def_list: FxHashSet<MachineInstrId>,
@@ -386,9 +387,19 @@ impl MachineRegister {
     }
 }
 
+// TODO: TEMPORARY FUNCTION. WILL BE REMOVED.
+fn ty2rc(ty: &Type) -> RegisterClassKind {
+    match ty {
+        Type::Int32 => RegisterClassKind::GR32,
+        Type::Int64 => RegisterClassKind::GR64,
+        _ => RegisterClassKind::GR32,
+    }
+}
+
 impl RegisterInfo {
     pub fn new(ty: Type) -> Self {
         Self {
+            reg_class: ty2rc(&ty),
             ty,
             vreg: VirtReg(0),
             reg: None,
@@ -400,6 +411,7 @@ impl RegisterInfo {
 
     pub fn new_phy_reg(ty: Type, reg: PhysReg) -> Self {
         Self {
+            reg_class: ty2rc(&ty),
             ty,
             vreg: VirtReg(0),
             reg: Some(reg),
@@ -411,8 +423,9 @@ impl RegisterInfo {
 
     pub fn new_ref(ty: Type) -> RegisterInfoRef {
         Rc::new(RefCell::new(Self {
-            ty,
+            reg_class: ty2rc(&ty),
             vreg: VirtReg(0),
+            ty,
             reg: None,
             tied: None,
             use_list: FxHashSet::default(),
