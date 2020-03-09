@@ -7,6 +7,8 @@ Toy Compiler Infrastructure influenced by LLVM written in Rust.
 
 Do not expect too much stuff!
 
+*Requirement: Rust nightly*
+
 # To Do
 
 - Optimization
