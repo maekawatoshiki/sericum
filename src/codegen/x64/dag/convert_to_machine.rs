@@ -457,9 +457,14 @@ impl ConvertToMachine {
         for (i, operand) in node.operand[1..].iter().enumerate() {
             let arg = self.usual_operand(conv_info, *operand);
             let ty = arg.get_type().unwrap();
-            let r = RegisterInfo::new_phy_reg(ty, get_arg_reg(i).unwrap())
-                .with_vreg(conv_info.cur_func.vreg_gen.next_vreg())
-                .into_machine_register();
+
+            // TODO: not simple
+            let r = RegisterInfo::new(ty).with_vreg(conv_info.cur_func.vreg_gen.next_vreg());
+            let r = {
+                let a = r.reg_class.get_nth_arg_reg(i).unwrap();
+                r.with_reg(a).into_machine_register()
+            };
+
             arg_regs.push(r.clone());
             let instr = move_operand_to_reg(arg, r, conv_info.cur_bb);
             conv_info.push_instr(instr);

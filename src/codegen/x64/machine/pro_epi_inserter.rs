@@ -105,7 +105,12 @@ impl PrologueEpilogueInserter {
                             MachineOperand::Register(
                                 RegisterInfo::new_phy_reg(
                                     Type::Int32,
-                                    PhysReg(get_arg_reg(i).unwrap().get()),
+                                    PhysReg(
+                                        RegisterClassKind::GR32
+                                            .get_nth_arg_reg(i)
+                                            .unwrap()
+                                            .retrieve(),
+                                    ),
                                 )
                                 .into_machine_register(),
                             ),

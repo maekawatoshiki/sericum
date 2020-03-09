@@ -34,11 +34,9 @@ impl RegisterAllocator {
         self.queue = matrix.collect_vregs().into_iter().collect();
 
         while let Some(vreg) = self.queue.pop_front() {
-            // TODO: 0..6 ???
             let mut allocated = false;
-            for reg in 0..6 {
-                let reg = get_general_reg(reg).unwrap();
-
+            let order = AllocationOrder::new(&matrix).get_order(vreg).unwrap();
+            for reg in order {
                 if matrix.interferes(vreg, reg) {
                     continue;
                 }
@@ -247,7 +245,7 @@ impl<'a> AllocationOrder<'a> {
         Self { matrix }
     }
 
-    pub fn get_order_iter(&self, vreg: VirtReg) -> Option<RegisterOrder> {
+    pub fn get_order(&self, vreg: VirtReg) -> Option<RegisterOrder> {
         Some(
             self.matrix
                 .get_entity_by_vreg(vreg)?

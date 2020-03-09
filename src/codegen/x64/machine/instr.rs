@@ -117,9 +117,9 @@ pub struct MachineRegister {
 impl ::std::cmp::Eq for MachineRegister {}
 impl ::std::hash::Hash for MachineRegister {
     fn hash<H: ::std::hash::Hasher>(&self, state: &mut H) {
-        state.write_usize(self.info.borrow().vreg.get());
+        state.write_usize(self.info.borrow().vreg.retrieve());
         if let Some(reg) = self.info_ref().reg {
-            state.write_usize(reg.get())
+            state.write_usize(reg.retrieve())
         }
     }
 }
@@ -461,6 +461,11 @@ impl RegisterInfo {
 
     pub fn with_vreg(mut self, vreg: VirtReg) -> Self {
         self.vreg = vreg;
+        self
+    }
+
+    pub fn with_reg(mut self, reg: PhysReg) -> Self {
+        self.reg = Some(reg);
         self
     }
 
