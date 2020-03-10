@@ -16,8 +16,7 @@ macro_rules! register {
 }
 
 fn phys_reg_to_dynasm_reg(r: PhysReg) -> u8 {
-    // TODO: OFFSET
-    r.retrieve() as u8
+    (r.retrieve() - r.reg_class() as usize) as u8
 }
 
 #[rustfmt::skip]
@@ -797,4 +796,13 @@ pub extern "C" fn cilk_printch_i32_(ch: i32) {
 #[no_mangle]
 pub extern "C" fn cilk_memset_p0i32_i32_(p: *mut i32, x: i32, count: i32) {
     unsafe { ::std::ptr::write_bytes(p, x as u8, count as usize) }
+}
+
+#[test]
+fn test_phys_reg_to_dynasm_reg() {
+    use super::super::register::*;
+    assert_eq!(phys_reg_to_dynasm_reg(GR32::EAX.as_phys_reg()), 0);
+    assert_eq!(phys_reg_to_dynasm_reg(GR64::RAX.as_phys_reg()), 0);
+    assert_eq!(phys_reg_to_dynasm_reg(GR32::R15D.as_phys_reg()), 15);
+    assert_eq!(phys_reg_to_dynasm_reg(GR64::R15.as_phys_reg()), 15);
 }
