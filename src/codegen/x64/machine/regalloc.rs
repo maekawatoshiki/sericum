@@ -145,12 +145,12 @@ impl RegisterAllocator {
                 if occupied.contains(&slot.idx) {
                     continue;
                 }
-                if r.info_ref().ty == slot.ty {
+                if Some(r.info_ref().reg_class) == ty2rc(&slot.ty) {
                     occupied.insert(slot.idx);
                     return slot.clone();
                 }
             }
-            let slot = cur_func.local_mgr.alloc(&r.info_ref().ty);
+            let slot = cur_func.local_mgr.alloc(&rc2ty(r.info_ref().reg_class));
             occupied.insert(slot.idx);
             slot
         }
@@ -194,7 +194,7 @@ impl RegisterAllocator {
                     MachineOperand::FrameIndex(frinfo.clone()),
                     MachineOperand::Register(reg.clone()),
                 ],
-                &Type::Void,
+                None,
                 call_instr_parent,
             ));
             cur_func.instr_arena[store_instr_id].add_use(store_instr_id);

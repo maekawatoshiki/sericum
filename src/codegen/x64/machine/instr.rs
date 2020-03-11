@@ -1,4 +1,6 @@
-use super::super::register::{PhysReg, RegisterClassKind, VirtReg, VirtRegGen};
+use super::super::register::{
+    rc2ty, PhysReg, RegisterClassKind, VirtReg, VirtRegGen, X64RegisterTrait,
+};
 use super::{basic_block::*, frame_object::*};
 use crate::ir::types::*;
 use id_arena::*;
@@ -27,7 +29,6 @@ pub struct MachineInstr {
 pub struct RegisterInfo {
     pub vreg: VirtReg,
     pub reg: Option<PhysReg>,
-    pub ty: Type,
     pub reg_class: RegisterClassKind,
     pub tied: Option<RegisterInfoRef>,
     pub use_list: FxHashSet<MachineInstrId>,
@@ -129,15 +130,16 @@ impl MachineInstr {
         vreg_gen: &VirtRegGen,
         opcode: MachineOpcode,
         operand: Vec<MachineOperand>,
-        ty: &Type,
+        rc: Option<RegisterClassKind>,
+        // ty: &Type,
         parent: MachineBasicBlockId,
     ) -> Self {
         Self {
             opcode,
             operand,
-            def: match ty {
-                Type::Void => vec![],
-                ty => vec![vreg_gen.gen_vreg(ty.clone()).into_machine_register()],
+            def: match rc {
+                None => vec![],
+                Some(rc) => vec![vreg_gen.gen_vreg(rc).into_machine_register()],
             },
             tie: FxHashMap::default(),
             imp_def: vec![],
@@ -391,20 +393,10 @@ impl MachineRegister {
     }
 }
 
-// TODO: TEMPORARY FUNCTION. WILL BE REMOVED.
-fn ty2rc(ty: &Type) -> RegisterClassKind {
-    match ty {
-        Type::Int32 => RegisterClassKind::GR32,
-        Type::Int64 => RegisterClassKind::GR64,
-        _ => RegisterClassKind::GR32,
-    }
-}
-
 impl RegisterInfo {
-    pub fn new(ty: Type) -> Self {
+    pub fn new(reg_class: RegisterClassKind) -> Self {
         Self {
-            reg_class: ty2rc(&ty),
-            ty,
+            reg_class,
             vreg: VirtReg(0),
             reg: None,
             tied: None,
@@ -413,23 +405,21 @@ impl RegisterInfo {
         }
     }
 
-    pub fn new_phy_reg(ty: Type, reg: PhysReg) -> Self {
+    pub fn new_phy_reg<T: X64RegisterTrait>(reg: T) -> Self {
         Self {
-            reg_class: ty2rc(&ty),
-            ty,
+            reg_class: reg.as_phys_reg().reg_class(),
             vreg: VirtReg(0),
-            reg: Some(reg),
+            reg: Some(reg.as_phys_reg()),
             tied: None,
             use_list: FxHashSet::default(),
             def_list: FxHashSet::default(),
         }
     }
 
-    pub fn new_ref(ty: Type) -> RegisterInfoRef {
+    pub fn new_ref(reg_class: RegisterClassKind) -> RegisterInfoRef {
         Rc::new(RefCell::new(Self {
-            reg_class: ty2rc(&ty),
+            reg_class,
             vreg: VirtReg(0),
-            ty,
             reg: None,
             tied: None,
             use_list: FxHashSet::default(),
@@ -518,7 +508,8 @@ impl MachineOperand {
             MachineOperand::FrameIndex(fi) => Some(fi.ty.clone()),
             MachineOperand::GlobalAddress(_) => None, // TODO
             MachineOperand::None => None,
-            MachineOperand::Register(r) => Some(r.info_ref().ty.clone()),
+            // TODO
+            MachineOperand::Register(r) => Some(rc2ty(r.info_ref().reg_class)),
         }
     }
 }

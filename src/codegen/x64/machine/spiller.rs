@@ -1,4 +1,7 @@
-use super::super::{frame_object::FrameIndexInfo, register::VirtReg};
+use super::super::{
+    frame_object::FrameIndexInfo,
+    register::{rc2ty, VirtReg},
+};
 use super::{
     builder::{BuilderTrait, BuilderWithLiveInfoEdit},
     function::MachineFunction,
@@ -49,15 +52,11 @@ impl<'a> Spiller<'a> {
 
     pub fn insert_reload(&mut self, r: MachineRegister, slot: &FrameIndexInfo) -> Vec<VirtReg> {
         let mut new_regs = vec![];
-        let r_ty = r.info_ref().ty.clone();
+        let rc = r.info_ref().reg_class;
 
         for use_id in &r.info_ref().use_list {
             let use_id = *use_id;
-            let new_r = self
-                .func
-                .vreg_gen
-                .gen_vreg(r_ty.clone())
-                .into_machine_register();
+            let new_r = self.func.vreg_gen.gen_vreg(rc).into_machine_register();
             new_regs.push(new_r.get_vreg());
             self.matrix.add_vreg_entity(new_r.clone());
 
@@ -84,7 +83,7 @@ impl<'a> Spiller<'a> {
 
     pub fn spill(&mut self, vreg: VirtReg) -> Vec<VirtReg> {
         let r = self.matrix.get_entity_by_vreg(vreg).unwrap().clone();
-        let slot = self.func.local_mgr.alloc(&r.info_ref().ty); // TODO
+        let slot = self.func.local_mgr.alloc(&rc2ty(r.info_ref().reg_class)); // TODO
 
         self.matrix
             .get_vreg_interval_mut(vreg)

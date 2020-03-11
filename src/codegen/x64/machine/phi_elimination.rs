@@ -44,7 +44,7 @@ impl PhiElimination {
                     &f.vreg_gen,
                     mov_rx(&val).unwrap(),
                     vec![val.clone()],
-                    &phi.def[0].info_ref().ty,
+                    Some(phi.def[0].info_ref().reg_class),
                     bb,
                 );
                 copy.def = phi.def.clone();

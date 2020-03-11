@@ -28,6 +28,24 @@ pub enum RegisterClassKind {
     // NEXT = GR64_NUM, TODO
 }
 
+// TODO: TEMPORARY FUNCTIONS. WILL BE REMOVED.
+pub fn ty2rc(ty: &Type) -> Option<RegisterClassKind> {
+    match ty {
+        Type::Void => None,
+        Type::Int32 => Some(RegisterClassKind::GR32),
+        Type::Int64 => Some(RegisterClassKind::GR64),
+        Type::Pointer(_) => Some(RegisterClassKind::GR64),
+        Type::Array(_) => Some(RegisterClassKind::GR64),
+        e => unimplemented!("{:?}", e),
+    }
+}
+pub fn rc2ty(rc: RegisterClassKind) -> Type {
+    match rc {
+        RegisterClassKind::GR32 => Type::Int32,
+        RegisterClassKind::GR64 => Type::Int64,
+    }
+}
+
 impl PhysReg {
     pub fn reg_class(&self) -> RegisterClassKind {
         // TODO: FOLLOWING CODE IS SLOW
@@ -65,6 +83,17 @@ impl RegisterClassKind {
 
     pub fn get_nth_arg_reg(&self, nth: usize) -> Option<PhysReg> {
         self.get_arg_reg_order_vec().get(nth).map(|r| *r)
+    }
+
+    pub fn size_in_bits(&self) -> usize {
+        match self {
+            Self::GR32 => 32,
+            Self::GR64 => 64,
+        }
+    }
+
+    pub fn size_in_byte(&self) -> usize {
+        self.size_in_bits() / 8
     }
 
     // TODO: proper name?
@@ -182,6 +211,12 @@ pub trait X64RegisterTrait {
     fn as_phys_reg(&self) -> PhysReg;
 }
 
+impl X64RegisterTrait for PhysReg {
+    fn as_phys_reg(&self) -> PhysReg {
+        *self
+    }
+}
+
 // register nubmering: https://corsix.github.io/dynasm-doc/instructions.html#registers
 
 impl X64RegisterTrait for GR32 {
@@ -275,8 +310,8 @@ impl VirtRegGen {
         }
     }
 
-    pub fn gen_vreg(&self, ty: Type) -> RegisterInfo {
-        let mut reg = RegisterInfo::new(ty);
+    pub fn gen_vreg(&self, rc: RegisterClassKind) -> RegisterInfo {
+        let mut reg = RegisterInfo::new(rc);
         reg.set_vreg(VirtReg(self.next_id()));
         reg
     }
