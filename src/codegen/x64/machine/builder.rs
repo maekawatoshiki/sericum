@@ -96,6 +96,7 @@ impl<'a> BuilderTrait for BuilderWithLiveInfoEdit<'a> {
             } else {
                 *self.matrix.id2pp.get(&iseq[insert_pt - 1]).unwrap()
             };
+            debug!(println!("start:{:?}, end:{:?}", end, start));
             assert!(end.idx() - start.idx() >= 2); // TODO
             ProgramPoint::new(start.bb(), (end.idx() + start.idx()) / 2)
         };

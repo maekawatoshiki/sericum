@@ -31,7 +31,19 @@ impl RegisterAllocator {
 
         self.preserve_vreg_uses_across_call(cur_func, &mut matrix);
 
-        self.queue = matrix.collect_vregs().into_iter().collect();
+        fn sort_queue(mut queue: Vec<VirtReg>, matrix: &LiveRegMatrix) -> Vec<VirtReg> {
+            queue.sort_by(|x, y| {
+                let x = matrix.get_vreg_interval(*x).unwrap().start_point().unwrap();
+                let y = matrix.get_vreg_interval(*y).unwrap().start_point().unwrap();
+                x.cmp(&y)
+            });
+            queue
+        }
+
+        // TODO: Is this correct?
+        self.queue = sort_queue(matrix.collect_vregs(), &matrix)
+            .into_iter()
+            .collect();
 
         while let Some(vreg) = self.queue.pop_front() {
             let mut allocated = false;
@@ -53,6 +65,7 @@ impl RegisterAllocator {
 
             let interfering = matrix.collect_interfering_vregs(vreg);
             let reg_to_spill = matrix
+                // TODO: spill weight is coming soon
                 .pick_assigned_and_longest_lived_vreg(&interfering)
                 .unwrap();
             let phy_reg = matrix.unassign_reg(reg_to_spill).unwrap();
@@ -82,8 +95,6 @@ impl RegisterAllocator {
                     println!()
                 }
             );
-
-            // unimplemented!("spilling");
         }
 
         debug!(for (_, x) in &matrix.vreg_interval {

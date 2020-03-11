@@ -22,6 +22,7 @@ pub struct LiveInterval {
 
 #[derive(Debug, Clone)]
 pub struct LiveRange {
+    // TODO: segments should be sorted by LiveSegment.start
     pub segments: Vec<LiveSegment>,
 }
 
@@ -201,6 +202,10 @@ impl LiveInterval {
         self.range.interferes(&other.range)
     }
 
+    pub fn start_point(&self) -> Option<ProgramPoint> {
+        self.range.start_point()
+    }
+
     pub fn end_point(&self) -> Option<ProgramPoint> {
         self.range.end_point()
     }
@@ -243,6 +248,13 @@ impl LiveRange {
         for seg in &range.segments {
             self.remove_segment(seg)
         }
+    }
+
+    pub fn start_point(&self) -> Option<ProgramPoint> {
+        self.segments
+            .iter()
+            .min_by(|x, y| x.start.cmp(&y.start))
+            .and_then(|seg| Some(seg.start))
     }
 
     pub fn end_point(&self) -> Option<ProgramPoint> {
