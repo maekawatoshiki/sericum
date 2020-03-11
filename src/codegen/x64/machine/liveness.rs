@@ -79,6 +79,14 @@ impl LiveRegMatrix {
             return false;
         }
 
+        // TODO: cost so much
+        if !reg
+            .reg_class()
+            .shares_same_register_file(self.get_entity_by_vreg(vreg).unwrap().get_reg_class())
+        {
+            return false;
+        }
+
         let r1 = self.reg_range.get(&reg).unwrap();
         let r2 = &self.vreg_interval.get(&vreg).unwrap().range;
 

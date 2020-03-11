@@ -30,14 +30,21 @@ pub enum RegisterClassKind {
 
 impl PhysReg {
     pub fn reg_class(&self) -> RegisterClassKind {
-        const RC: [RegisterClassKind; 2] = [RegisterClassKind::GR32, RegisterClassKind::GR64];
-        let p = self.retrieve();
-        for i in 0..RC.len() - 1 {
-            if RC[i] as usize <= p && p < RC[i + 1] as usize {
-                return RC[i];
-            }
+        // TODO: FOLLOWING CODE IS SLOW
+        // const RC: [RegisterClassKind; 2] = [RegisterClassKind::GR32, RegisterClassKind::GR64];
+        // let p = self.retrieve();
+        // for i in 0..RC.len() - 1 {
+        //     if RC[i] as usize <= p && p < RC[i + 1] as usize {
+        //         return RC[i];
+        //     }
+        // }
+        // *RC.last().unwrap()
+
+        let n = self.retrieve();
+        if RegisterClassKind::GR32 as usize <= n && n < RegisterClassKind::GR64 as usize {
+            return RegisterClassKind::GR32;
         }
-        *RC.last().unwrap()
+        RegisterClassKind::GR64
     }
 }
 
@@ -58,6 +65,14 @@ impl RegisterClassKind {
 
     pub fn get_nth_arg_reg(&self, nth: usize) -> Option<PhysReg> {
         self.get_arg_reg_order_vec().get(nth).map(|r| *r)
+    }
+
+    // TODO: proper name?
+    pub fn shares_same_register_file(&self, rc: RegisterClassKind) -> bool {
+        match self {
+            Self::GR32 => matches!(rc, Self::GR32 | Self::GR64),
+            Self::GR64 => matches!(rc, Self::GR32 | Self::GR64),
+        }
     }
 
     // Returns normal order of registers used to pass arguments
