@@ -52,6 +52,14 @@ impl<'a> BuilderWithLiveInfoEdit<'a> {
             insert_point: 0,
         }
     }
+
+    fn calc_program_point(&mut self, insert_pt: usize) -> ProgramPoint {
+        // calculate program point for given insert point
+        let bb = &self.function.basic_block_arena[self.cur_bb_id.unwrap()];
+        let iseq = bb.iseq_ref();
+        let pp = self.matrix.get_program_point(iseq[insert_pt]).unwrap();
+        self.matrix.program_points.prev_of(pp)
+    }
 }
 
 impl<'a> BuilderTrait for BuilderWithLiveInfoEdit<'a> {
@@ -86,19 +94,7 @@ impl<'a> BuilderTrait for BuilderWithLiveInfoEdit<'a> {
         let insert_pt = self.insert_point;
         self.insert_point += 1;
 
-        let pp = {
-            // calculate program point for given instr (=instr_id)
-            let bb = &self.function.basic_block_arena[self.cur_bb_id.unwrap()];
-            let iseq = bb.iseq_ref();
-            let end = *self.matrix.id2pp.get(&iseq[insert_pt]).unwrap();
-            let start = if insert_pt == 0 {
-                end // TODO
-            } else {
-                *self.matrix.id2pp.get(&iseq[insert_pt - 1]).unwrap()
-            };
-            assert!(end.idx() - start.idx() >= 2); // TODO
-            ProgramPoint::new(start.bb(), (end.idx() + start.idx()) / 2)
-        };
+        let pp = self.calc_program_point(insert_pt);
 
         let instr_id = inst.into_id(&mut self.function);
         self.matrix.id2pp.insert(instr_id, pp);

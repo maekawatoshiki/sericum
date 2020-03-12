@@ -1,4 +1,6 @@
-use super::super::register::get_arg_reg;
+// TODO: much legacy code remains.
+
+use super::super::register::{PhysReg, RegisterClassKind};
 use super::roundup;
 use crate::codegen::x64::machine::{
     basic_block::*, frame_object::*, function::*, instr::*, module::*,
@@ -10,20 +12,13 @@ use rustc_hash::FxHashMap;
 
 #[rustfmt::skip]
 macro_rules! register {
-    ($f:expr; $instr_id:expr) => {{
-        ($f.instr_arena[$instr_id].get_reg().unwrap()
-         ) as u8
-    }};
     ($reg:expr) => {{
-        ($reg.get_reg().unwrap().get()) as u8
+        phys_reg_to_dynasm_reg($reg.get_reg().unwrap())
     }};
 }
 
-#[rustfmt::skip]
-macro_rules! typ {
-    ($reg:expr) => {{
-        &$reg.info_ref().ty
-    }};
+fn phys_reg_to_dynasm_reg(r: PhysReg) -> u8 {
+    (r.retrieve() - r.reg_class() as usize) as u8
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -59,9 +54,6 @@ impl JITExecutor {
                     let bb = &dag_func.dag_basic_block_arena[*id];
                     println!("{}: {:?}", id.index(), bb);
                 }
-                // for (id, dag) in &dag_func.dag_heap {
-                //     println!("{}: {:?}", id.index(), dag);
-                // }
             }
         );
 
@@ -147,9 +139,8 @@ impl JITCompiler {
 
         for (idx, arg) in args.iter().enumerate() {
             match arg {
-                GenericValue::Int32(i) => {
-                    dynasm!(self.asm; mov Ra(get_arg_reg(idx).unwrap().get() as u8), *i)
-                }
+                GenericValue::Int32(i) => dynasm!(self.asm; mov Ra(phys_reg_to_dynasm_reg(
+                    RegisterClassKind::GR32.get_nth_arg_reg(idx).unwrap())), *i),
                 GenericValue::None => unreachable!(),
             }
         }
@@ -274,7 +265,7 @@ impl JITCompiler {
             MachineConstant::Int32(_)
         ));
 
-        let r = instr.def[0].get_reg().unwrap().get() as u8;
+        let r = phys_reg_to_dynasm_reg(instr.def[0].get_reg().unwrap());
         let i = instr.operand[0].as_constant().as_i32();
         dynasm!(self.asm; mov Rd(r), i);
     }
@@ -282,9 +273,9 @@ impl JITCompiler {
     fn compile_mov32rr(&mut self, instr: &MachineInstr) {
         assert!(matches!(instr.operand[0], MachineOperand::Register(_)));
 
-        let r0 = instr.def[0].get_reg().unwrap().get() as u8;
-        let r1 = instr.operand[0].as_register().get_reg().unwrap().get() as u8;
-        self.reg_copy(&Type::Int32, r0, r1);
+        let r0 = phys_reg_to_dynasm_reg(instr.def[0].get_reg().unwrap());
+        let r1 = phys_reg_to_dynasm_reg(instr.operand[0].as_register().get_reg().unwrap());
+        self.reg_copy(RegisterClassKind::GR32, r0, r1);
     }
 
     fn compile_mov64ri(&mut self, _instr: &MachineInstr) {
@@ -303,13 +294,13 @@ impl JITCompiler {
     fn compile_mov64rr(&mut self, instr: &MachineInstr) {
         assert!(matches!(instr.operand[0], MachineOperand::Register(_)));
 
-        let r0 = instr.def[0].get_reg().unwrap().get() as u8;
-        let r1 = instr.operand[0].as_register().get_reg().unwrap().get() as u8;
-        self.reg_copy(&Type::Int64, r0, r1);
+        let r0 = phys_reg_to_dynasm_reg(instr.def[0].get_reg().unwrap());
+        let r1 = phys_reg_to_dynasm_reg(instr.operand[0].as_register().get_reg().unwrap());
+        self.reg_copy(RegisterClassKind::GR64, r0, r1);
     }
 
     fn compile_lea64(&mut self, fo: &FrameObjectsInfo, instr: &MachineInstr) {
-        let r0 = instr.def[0].get_reg().unwrap().get() as u8;
+        let r0 = phys_reg_to_dynasm_reg(instr.def[0].get_reg().unwrap());
         let fi = instr.operand[0].as_frame_index();
         dynasm!(self.asm; lea Ra(r0), [rbp - fo.offset(fi.idx).unwrap()]);
     }
@@ -334,7 +325,7 @@ impl JITCompiler {
         let rn = register!(instr);
         let op0 = &instr.operand[0];
         match op0 {
-            MachineOperand::Register(reg) => self.reg_copy(typ!(reg), rn, register!(reg)),
+            MachineOperand::Register(reg) => self.reg_copy(reg.get_reg_class(), rn, register!(reg)),
             _ => unimplemented!(),
         }
     }
@@ -349,8 +340,10 @@ impl JITCompiler {
                     MachineConstant::Int32(x) => dynasm!(self.asm; cmp Rd(register!(i0)), *x),
                     MachineConstant::Int64(_) => unimplemented!(),
                 },
-                MachineOperand::Register(i1) => match typ!(i0) {
-                    Type::Int32 => dynasm!(self.asm; cmp Rd(register!(i0)), Rd(register!(i1))),
+                MachineOperand::Register(i1) => match i0.get_reg_class() {
+                    RegisterClassKind::GR32 => {
+                        dynasm!(self.asm; cmp Rd(register!(i0)), Rd(register!(i1)))
+                    }
                     _ => unimplemented!(),
                 },
                 _ => unimplemented!(),
@@ -394,8 +387,8 @@ impl JITCompiler {
         let off = &instr.operand[1];
         match off {
             MachineOperand::Constant(MachineConstant::Int32(i)) => {
-                match &instr.def[0].info_ref().ty {
-                    Type::Int32 => {
+                match &instr.def[0].info_ref().reg_class {
+                    RegisterClassKind::GR32 => {
                         dynasm!(self.asm; mov Rd(rn), [rbp - fo.offset(fi.idx).unwrap() + i])
                     }
                     _ => unimplemented!(),
@@ -411,8 +404,8 @@ impl JITCompiler {
         let off = register!(instr.operand[1].as_register());
         let align = instr.operand[2].as_constant();
 
-        match &instr.def[0].info_ref().ty {
-            Type::Int32 => match align {
+        match &instr.def[0].info_ref().reg_class {
+            RegisterClassKind::GR32 => match align {
                 MachineConstant::Int32(4) => {
                     dynasm!(self.asm;
                     mov Rd(rn), DWORD [rbp + 4*Ra(off) - fo.offset(fi.idx).unwrap()]
@@ -430,8 +423,8 @@ impl JITCompiler {
         let off = register!(instr.operand[1].as_register());
         let align = instr.operand[2].as_constant();
 
-        match &instr.def[0].info_ref().ty {
-            Type::Int32 => match align {
+        match &instr.def[0].info_ref().reg_class {
+            RegisterClassKind::GR32 => match align {
                 MachineConstant::Int32(4) => {
                     dynasm!(self.asm; mov Rd(rn), DWORD [Ra(base) + 4*Ra(off)]);
                 }
@@ -475,10 +468,14 @@ impl JITCompiler {
                 _ => unimplemented!(),
             },
             MachineOperand::Register(r) => match off {
-                MachineOperand::Constant(MachineConstant::Int32(off)) => match r.info_ref().ty {
-                    Type::Int32 => dynasm!(self.asm; mov [rbp - fi + off], Rd(register!(r))),
-                    _ => unimplemented!(),
-                },
+                MachineOperand::Constant(MachineConstant::Int32(off)) => {
+                    match r.info_ref().reg_class {
+                        RegisterClassKind::GR32 => {
+                            dynasm!(self.asm; mov [rbp - fi + off], Rd(register!(r)))
+                        }
+                        _ => unimplemented!(),
+                    }
+                }
                 _ => unimplemented!(),
             },
             _ => unimplemented!(),
@@ -590,14 +587,14 @@ impl JITCompiler {
             },
             // unimplemented!(), // TODO: Address
             MachineOperand::Register(i0) => {
-                self.reg_copy(typ!(i0), rn, register!(i0));
+                self.reg_copy(i0.get_reg_class(), rn, register!(i0));
                 match op1 {
                     MachineOperand::Constant(c) => match c {
                         MachineConstant::Int32(x) => dynasm!(self.asm; add Rd(rn), *x),
                         _ => unimplemented!(),
                     },
-                    MachineOperand::Register(i1) => match typ!(i1) {
-                        Type::Int32 => dynasm!(self.asm; add Rd(rn), Rd(register!(i1))),
+                    MachineOperand::Register(i1) => match i1.get_reg_class() {
+                        RegisterClassKind::GR32 => dynasm!(self.asm; add Rd(rn), Rd(register!(i1))),
                         _ => unimplemented!(),
                     },
                     _ => unimplemented!(),
@@ -614,16 +611,16 @@ impl JITCompiler {
         match op0 {
             MachineOperand::FrameIndex(_) => unimplemented!(), // TODO: Address
             MachineOperand::Register(i0) => {
-                self.reg_copy(typ!(i0), rn, register!(i0));
+                self.reg_copy(i0.get_reg_class(), rn, register!(i0));
                 match op1 {
                     // TODO: SUB32ri, SUB64ri32
-                    MachineOperand::Constant(MachineConstant::Int32(x)) => match typ!(i0) {
-                        Type::Int32 => dynasm!(self.asm; sub Ra(rn), *x),
-                        Type::Int64 => dynasm!(self.asm; sub Rq(rn), *x),
-                        _ => unimplemented!(),
+                    MachineOperand::Constant(MachineConstant::Int32(x)) => match i0.get_reg_class()
+                    {
+                        RegisterClassKind::GR32 => dynasm!(self.asm; sub Ra(rn), *x),
+                        RegisterClassKind::GR64 => dynasm!(self.asm; sub Rq(rn), *x),
                     },
-                    MachineOperand::Register(i1) => match typ!(i1) {
-                        Type::Int32 => dynasm!(self.asm; sub Rd(rn), Rd(register!(i1))),
+                    MachineOperand::Register(i1) => match i1.get_reg_class() {
+                        RegisterClassKind::GR32 => dynasm!(self.asm; sub Rd(rn), Rd(register!(i1))),
                         _ => unimplemented!(),
                     },
                     _ => unimplemented!(),
@@ -643,9 +640,9 @@ impl JITCompiler {
                     MachineOperand::Constant(MachineConstant::Int32(x)) => {
                         dynasm!(self.asm; imul Rd(rn),Rd(register!(i0)), *x)
                     }
-                    MachineOperand::Register(i1) => match typ!(i1) {
-                        Type::Int32 => {
-                            self.reg_copy(typ!(i0), rn, register!(i0));
+                    MachineOperand::Register(i1) => match i1.get_reg_class() {
+                        RegisterClassKind::GR32 => {
+                            self.reg_copy(i0.get_reg_class(), rn, register!(i0));
                             dynasm!(self.asm; imul Rd(rn), Rd(register!(i1)))
                         }
                         _ => unimplemented!(),
@@ -663,7 +660,7 @@ impl JITCompiler {
         let op1 = &instr.operand[1];
         match op0 {
             MachineOperand::Register(i0) => {
-                self.reg_copy(typ!(i0), 0, register!(i0));
+                self.reg_copy(i0.get_reg_class(), 0, register!(i0));
                 match op1 {
                     MachineOperand::Constant(MachineConstant::Int32(x)) => dynasm!(self.asm
                         ; mov Rd(rn), *x
@@ -671,8 +668,8 @@ impl JITCompiler {
                         ; div Rd(rn)
                         ; mov Rd(rn), edx
                     ),
-                    MachineOperand::Register(i1) => match typ!(i1) {
-                        Type::Int32 => dynasm!(self.asm
+                    MachineOperand::Register(i1) => match i1.get_reg_class() {
+                        RegisterClassKind::GR32 => dynasm!(self.asm
                             ; mov edx, 0
                             ; div Rd(register!(i1))
                             ; mov Rd(rn), edx
@@ -693,10 +690,13 @@ impl JITCompiler {
     fn compile_idiv(&mut self, _fo: &FrameObjectsInfo, instr: &MachineInstr) {
         let (r, r_ty) = {
             let reg = instr.operand[0].as_register();
-            (reg.info_ref().reg.unwrap().get() as u8, &reg.info_ref().ty)
+            (
+                phys_reg_to_dynasm_reg(reg.info_ref().reg.unwrap()),
+                &reg.info_ref().reg_class,
+            )
         };
         match r_ty {
-            Type::Int32 => dynasm!(self.asm; idiv Rd(r)),
+            RegisterClassKind::GR32 => dynasm!(self.asm; idiv Rd(r)),
             _ => unimplemented!(),
         }
     }
@@ -735,11 +735,12 @@ impl JITCompiler {
         for (idx, arg) in args.iter().enumerate() {
             match arg {
                 MachineOperand::Constant(MachineConstant::Int32(i)) => {
-                    dynasm!(self.asm; mov Rd(get_arg_reg(idx).unwrap().get() as u8), *i)
+                    dynasm!(self.asm; mov Rd(phys_reg_to_dynasm_reg(
+                                RegisterClassKind::GR32.get_nth_arg_reg(idx).unwrap())), *i)
                 }
                 MachineOperand::Register(id) => self.reg_copy(
-                    typ!(id),
-                    get_arg_reg(idx).unwrap().get() as u8,
+                    id.get_reg_class(),
+                    phys_reg_to_dynasm_reg(id.get_reg_class().get_nth_arg_reg(idx).unwrap()),
                     register!(id),
                 ),
                 _ => unimplemented!(),
@@ -747,15 +748,15 @@ impl JITCompiler {
         }
     }
 
-    fn reg_copy(&mut self, ty: &Type, r0: u8, r1: u8) {
+    // TODO: r0 and r1 should be PhysReg not u8
+    fn reg_copy(&mut self, rc: RegisterClassKind, r0: u8, r1: u8) {
         if r0 == r1 {
             return;
         }
 
-        match ty {
-            Type::Int32 => dynasm!(self.asm; mov Rd(r0), Rd(r1)),
-            Type::Int64 => dynasm!(self.asm; mov Rq(r0), Rq(r1)),
-            _ => unimplemented!(),
+        match rc {
+            RegisterClassKind::GR32 => dynasm!(self.asm; mov Rd(r0), Rd(r1)),
+            RegisterClassKind::GR64 => dynasm!(self.asm; mov Rq(r0), Rq(r1)),
         }
     }
 
@@ -796,4 +797,13 @@ pub extern "C" fn cilk_printch_i32_(ch: i32) {
 #[no_mangle]
 pub extern "C" fn cilk_memset_p0i32_i32_(p: *mut i32, x: i32, count: i32) {
     unsafe { ::std::ptr::write_bytes(p, x as u8, count as usize) }
+}
+
+#[test]
+fn test_phys_reg_to_dynasm_reg() {
+    use super::super::register::*;
+    assert_eq!(phys_reg_to_dynasm_reg(GR32::EAX.as_phys_reg()), 0);
+    assert_eq!(phys_reg_to_dynasm_reg(GR64::RAX.as_phys_reg()), 0);
+    assert_eq!(phys_reg_to_dynasm_reg(GR32::R15D.as_phys_reg()), 15);
+    assert_eq!(phys_reg_to_dynasm_reg(GR64::R15.as_phys_reg()), 15);
 }

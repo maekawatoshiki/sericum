@@ -1,12 +1,15 @@
 use super::super::frame_object::*;
 use super::super::register::*;
 use super::{builder::*, function::*, instr::*, liveness::*, module::*, spiller::Spiller};
-use crate::ir::types::*;
 use rustc_hash::FxHashSet;
 use std::collections::VecDeque;
 
 pub struct RegisterAllocator {
     queue: VecDeque<VirtReg>,
+}
+
+pub struct AllocationOrder<'a> {
+    matrix: &'a LiveRegMatrix,
 }
 
 impl RegisterAllocator {
@@ -27,14 +30,24 @@ impl RegisterAllocator {
 
         self.preserve_vreg_uses_across_call(cur_func, &mut matrix);
 
-        self.queue = matrix.collect_vregs().into_iter().collect();
+        fn sort_queue(mut queue: Vec<VirtReg>, matrix: &LiveRegMatrix) -> Vec<VirtReg> {
+            queue.sort_by(|x, y| {
+                let x = matrix.get_vreg_interval(*x).unwrap().start_point().unwrap();
+                let y = matrix.get_vreg_interval(*y).unwrap().start_point().unwrap();
+                x.cmp(&y)
+            });
+            queue
+        }
+
+        // TODO: Is this correct?
+        self.queue = sort_queue(matrix.collect_vregs(), &matrix)
+            .into_iter()
+            .collect();
 
         while let Some(vreg) = self.queue.pop_front() {
-            // TODO: 0..6 ???
             let mut allocated = false;
-            for reg in 0..6 {
-                let reg = get_general_reg(reg).unwrap();
-
+            let order = AllocationOrder::new(&matrix).get_order(vreg).unwrap();
+            for reg in order {
                 if matrix.interferes(vreg, reg) {
                     continue;
                 }
@@ -51,6 +64,7 @@ impl RegisterAllocator {
 
             let interfering = matrix.collect_interfering_vregs(vreg);
             let reg_to_spill = matrix
+                // TODO: spill weight is coming soon
                 .pick_assigned_and_longest_lived_vreg(&interfering)
                 .unwrap();
             let phy_reg = matrix.unassign_reg(reg_to_spill).unwrap();
@@ -80,8 +94,6 @@ impl RegisterAllocator {
                     println!()
                 }
             );
-
-            // unimplemented!("spilling");
         }
 
         debug!(for (_, x) in &matrix.vreg_interval {
@@ -132,12 +144,12 @@ impl RegisterAllocator {
                 if occupied.contains(&slot.idx) {
                     continue;
                 }
-                if r.info_ref().ty == slot.ty {
+                if Some(r.info_ref().reg_class) == ty2rc(&slot.ty) {
                     occupied.insert(slot.idx);
                     return slot.clone();
                 }
             }
-            let slot = cur_func.local_mgr.alloc(&r.info_ref().ty);
+            let slot = cur_func.local_mgr.alloc(&rc2ty(r.info_ref().reg_class));
             occupied.insert(slot.idx);
             slot
         }
@@ -153,10 +165,7 @@ impl RegisterAllocator {
 
             if matrix.interferes_with_range(
                 instr.get_vreg(),
-                LiveRange::new(vec![LiveSegment::new(
-                    call_instr_pp,
-                    call_instr_pp.next_idx(),
-                )]),
+                LiveRange::new(vec![LiveSegment::new(call_instr_pp, call_instr_pp)]),
             ) {
                 regs_to_save.insert(instr.def[0].clone());
             }
@@ -181,7 +190,7 @@ impl RegisterAllocator {
                     MachineOperand::FrameIndex(frinfo.clone()),
                     MachineOperand::Register(reg.clone()),
                 ],
-                &Type::Void,
+                None,
                 call_instr_parent,
             ));
             cur_func.instr_arena[store_instr_id].add_use(store_instr_id);
@@ -234,5 +243,21 @@ impl RegisterAllocator {
         for instr_id in call_instr_id {
             self.insert_instr_to_save_reg(cur_func, matrix, &mut occupied.clone(), instr_id);
         }
+    }
+}
+
+// TODO: Take into consideration the use list of register
+impl<'a> AllocationOrder<'a> {
+    pub fn new(matrix: &'a LiveRegMatrix) -> Self {
+        Self { matrix }
+    }
+
+    pub fn get_order(&self, vreg: VirtReg) -> Option<RegisterOrder> {
+        Some(
+            self.matrix
+                .get_entity_by_vreg(vreg)?
+                .get_reg_class()
+                .get_reg_order(),
+        )
     }
 }
