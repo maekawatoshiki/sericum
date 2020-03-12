@@ -1,3 +1,6 @@
 /target
 **/*.rs.bk
 Cargo.lock
+defs/target
+defs/**/*.rs.bk
+defs/Cargo.lock

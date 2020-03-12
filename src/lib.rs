@@ -13,6 +13,7 @@ pub use ir::*;
 
 #[macro_use]
 extern crate dynasm;
+extern crate defs;
 extern crate dynasmrt;
 extern crate id_arena;
 extern crate rustc_hash;
