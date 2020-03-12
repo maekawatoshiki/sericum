@@ -1,3 +1,5 @@
+// TODO: much legacy code remains.
+
 use super::super::register::{PhysReg, RegisterClassKind};
 use super::roundup;
 use crate::codegen::x64::machine::{
@@ -616,7 +618,6 @@ impl JITCompiler {
                     {
                         RegisterClassKind::GR32 => dynasm!(self.asm; sub Ra(rn), *x),
                         RegisterClassKind::GR64 => dynasm!(self.asm; sub Rq(rn), *x),
-                        _ => unimplemented!(),
                     },
                     MachineOperand::Register(i1) => match i1.get_reg_class() {
                         RegisterClassKind::GR32 => dynasm!(self.asm; sub Rd(rn), Rd(register!(i1))),

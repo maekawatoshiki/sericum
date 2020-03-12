@@ -1,7 +1,6 @@
 use super::super::frame_object::*;
 use super::super::register::*;
 use super::{builder::*, function::*, instr::*, liveness::*, module::*, spiller::Spiller};
-use crate::ir::types::*;
 use rustc_hash::FxHashSet;
 use std::collections::VecDeque;
 

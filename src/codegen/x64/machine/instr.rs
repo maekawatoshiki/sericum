@@ -1,5 +1,5 @@
 use super::super::register::{
-    rc2ty, PhysReg, RegisterClassKind, VirtReg, VirtRegGen, X64RegisterTrait,
+    rc2ty, PhysReg, RegisterClassKind, TargetRegisterTrait, VirtReg, VirtRegGen,
 };
 use super::{basic_block::*, frame_object::*};
 use crate::ir::types::*;
@@ -405,7 +405,7 @@ impl RegisterInfo {
         }
     }
 
-    pub fn new_phy_reg<T: X64RegisterTrait>(reg: T) -> Self {
+    pub fn new_phy_reg<T: TargetRegisterTrait>(reg: T) -> Self {
         Self {
             reg_class: reg.as_phys_reg().reg_class(),
             vreg: VirtReg(0),

@@ -207,11 +207,11 @@ pub enum GR64 {
     R15,
 }
 
-pub trait X64RegisterTrait {
+pub trait TargetRegisterTrait {
     fn as_phys_reg(&self) -> PhysReg;
 }
 
-impl X64RegisterTrait for PhysReg {
+impl TargetRegisterTrait for PhysReg {
     fn as_phys_reg(&self) -> PhysReg {
         *self
     }
@@ -219,7 +219,7 @@ impl X64RegisterTrait for PhysReg {
 
 // register nubmering: https://corsix.github.io/dynasm-doc/instructions.html#registers
 
-impl X64RegisterTrait for GR32 {
+impl TargetRegisterTrait for GR32 {
     fn as_phys_reg(&self) -> PhysReg {
         let n = match self {
             GR32::EAX => 0,
@@ -243,7 +243,7 @@ impl X64RegisterTrait for GR32 {
     }
 }
 
-impl X64RegisterTrait for GR64 {
+impl TargetRegisterTrait for GR64 {
     fn as_phys_reg(&self) -> PhysReg {
         let n = match self {
             GR64::RAX => 0,
