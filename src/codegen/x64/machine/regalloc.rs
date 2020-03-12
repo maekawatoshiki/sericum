@@ -165,10 +165,7 @@ impl RegisterAllocator {
 
             if matrix.interferes_with_range(
                 instr.get_vreg(),
-                LiveRange::new(vec![LiveSegment::new(
-                    call_instr_pp,
-                    call_instr_pp.next_idx(),
-                )]),
+                LiveRange::new(vec![LiveSegment::new(call_instr_pp, call_instr_pp)]),
             ) {
                 regs_to_save.insert(instr.def[0].clone());
             }

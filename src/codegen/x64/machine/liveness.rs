@@ -1,16 +1,17 @@
 use super::super::register::*;
 use super::{basic_block::*, function::*, instr::*, module::*};
+use crate::util::allocator::{Raw, RawAllocator};
 use rustc_hash::FxHashMap;
 use std::cmp::Ordering;
 
 const IDX_STEP: usize = 16;
 
-#[derive(Debug, Clone)]
 pub struct LiveRegMatrix {
     pub vreg2entity: FxHashMap<VirtReg, MachineRegister>,
     pub id2pp: FxHashMap<MachineInstrId, ProgramPoint>,
     pub vreg_interval: FxHashMap<VirtReg, LiveInterval>,
     pub reg_range: FxHashMap<PhysReg, LiveRange>,
+    pub program_points: ProgramPoints,
 }
 
 #[derive(Debug, Clone)]
@@ -34,8 +35,19 @@ pub struct LiveSegment {
 
 #[derive(Debug, Clone, Copy)]
 pub struct ProgramPoint {
+    base: Raw<ProgramPointBase>,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct ProgramPointBase {
+    prev: Option<Raw<ProgramPointBase>>,
+    next: Option<Raw<ProgramPointBase>>,
     bb: usize,
     idx: usize,
+}
+
+pub struct ProgramPoints {
+    allocator: RawAllocator<ProgramPointBase>,
 }
 
 impl LiveRegMatrix {
@@ -44,12 +56,14 @@ impl LiveRegMatrix {
         id2pp: FxHashMap<MachineInstrId, ProgramPoint>,
         vreg_interval: FxHashMap<VirtReg, LiveInterval>,
         reg_range: FxHashMap<PhysReg, LiveRange>,
+        program_points: ProgramPoints,
     ) -> Self {
         Self {
             vreg2entity,
             id2pp,
             vreg_interval,
             reg_range,
+            program_points,
         }
     }
 
@@ -301,14 +315,81 @@ impl LiveSegment {
     }
 }
 
-impl ProgramPoint {
-    pub fn new(bb: usize, idx: usize) -> Self {
-        Self { bb, idx }
+impl ProgramPoints {
+    pub fn new() -> Self {
+        Self {
+            allocator: RawAllocator::new(),
+        }
     }
 
-    pub fn next_idx(mut self) -> Self {
-        self.idx += 1;
+    pub fn new_program_point(&mut self, ppb: ProgramPointBase) -> ProgramPoint {
+        ProgramPoint::new(self.allocator.alloc(ppb))
+    }
+
+    pub fn prev_of(&mut self, pp: ProgramPoint) -> ProgramPoint {
+        let mut end: Raw<_> = pp.base;
+        let start = end.prev;
+
+        if start.is_none() {
+            unimplemented!()
+        }
+
+        let mut start: Raw<_> = start.unwrap();
+
+        // need to renumber program points belonging to the same block as pp
+        if end.idx() - start.idx() < 2 {
+            start.renumber_in_bb();
+            return self.prev_of(pp);
+        }
+
+        let new_pp = self.new_program_point(ProgramPointBase::new(
+            Some(start),
+            Some(end),
+            start.bb(),
+            (end.idx() + start.idx()) / 2,
+        ));
+        start.next = Some(new_pp.base);
+        end.prev = Some(new_pp.base);
+
+        new_pp
+    }
+}
+
+impl ProgramPoint {
+    pub fn new(base: Raw<ProgramPointBase>) -> Self {
+        Self { base }
+    }
+
+    pub fn set_prev(mut self, pp: Option<ProgramPoint>) -> Self {
+        some_then!(mut pp, pp, {
+            pp.base.next = Some(self.base);
+            self.base.prev = Some(pp.base)
+        });
         self
+    }
+
+    pub fn idx(&self) -> usize {
+        self.base.idx()
+    }
+
+    pub fn bb(&self) -> usize {
+        self.base.bb()
+    }
+}
+
+impl ProgramPointBase {
+    pub fn new(
+        prev: Option<Raw<ProgramPointBase>>,
+        next: Option<Raw<ProgramPointBase>>,
+        bb: usize,
+        idx: usize,
+    ) -> Self {
+        Self {
+            prev,
+            next,
+            bb,
+            idx,
+        }
     }
 
     pub fn idx(&self) -> usize {
@@ -318,19 +399,41 @@ impl ProgramPoint {
     pub fn bb(&self) -> usize {
         self.bb
     }
+
+    // pub fn find_bb_start(&self) -> ProgramPointBase {
+    //     let mut cur = *self;
+    //     while let Some(prev) = cur.prev {
+    //         if cur.bb() != prev.bb() {
+    //             return cur;
+    //         }
+    //         cur = *prev;
+    //     }
+    //     cur
+    // }
+
+    pub fn renumber_in_bb(&self) {
+        let mut cur = *self;
+        while let Some(mut next) = cur.next {
+            if cur.bb != next.bb {
+                break;
+            }
+            (*next).idx += IDX_STEP;
+            cur = *next;
+        }
+    }
 }
 
 impl Ord for ProgramPoint {
     fn cmp(&self, other: &Self) -> Ordering {
-        if self.bb < other.bb {
+        if self.bb() < other.bb() {
             return Ordering::Less;
         }
 
-        if self.bb > other.bb {
+        if self.bb() > other.bb() {
             return Ordering::Greater;
         }
 
-        self.idx.cmp(&other.idx)
+        self.idx().cmp(&other.idx())
     }
 }
 
@@ -344,7 +447,7 @@ impl PartialOrd for ProgramPoint {
 
 impl PartialEq for ProgramPoint {
     fn eq(&self, other: &Self) -> bool {
-        self.bb == other.bb && self.idx == other.idx
+        self.bb() == other.bb() && self.idx() == other.idx()
     }
 }
 
@@ -474,7 +577,9 @@ impl LivenessAnalysis {
         let mut reg2range: FxHashMap<PhysReg, LiveRange> = FxHashMap::default();
         let mut id2pp: FxHashMap<MachineInstrId, ProgramPoint> = FxHashMap::default();
         let mut vreg2entity: FxHashMap<VirtReg, MachineRegister> = FxHashMap::default();
+        let mut program_points = ProgramPoints::new();
 
+        let mut last_pp: Option<ProgramPoint> = None;
         let mut bb_idx = 0;
 
         for bb_id in &cur_func.basic_blocks {
@@ -483,7 +588,12 @@ impl LivenessAnalysis {
             let liveness = bb.liveness_ref();
 
             #[rustfmt::skip]
-            macro_rules! cur_pp { () => { ProgramPoint::new(bb_idx, index) };}
+            macro_rules! cur_pp { () => {{
+                last_pp = Some(program_points.new_program_point(
+                        ProgramPointBase::new(None, None, bb_idx, index))
+                        .set_prev(last_pp));
+                last_pp.unwrap()
+            }};}
 
             for livein in &liveness.live_in {
                 if livein.get_reg().is_some() {
@@ -585,6 +695,7 @@ impl LivenessAnalysis {
                 .map(|(vreg, range)| (vreg, LiveInterval::new(vreg, range)))
                 .collect(),
             reg2range,
+            program_points,
         )
     }
 }
