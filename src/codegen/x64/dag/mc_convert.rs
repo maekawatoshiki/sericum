@@ -9,7 +9,7 @@ use id_arena::*;
 use rustc_hash::FxHashMap;
 use std::cell::RefCell;
 
-pub struct MachineCodeSelector {
+pub struct MIConverter {
     pub dag_bb_to_machine_bb: FxHashMap<DAGBasicBlockId, MachineBasicBlockId>,
     pub node_id_to_machine_instr_id: FxHashMap<Raw<DAGNode>, MachineInstrId>,
 }
@@ -22,7 +22,7 @@ pub struct ConversionInfo<'a> {
     iseq: &'a mut Vec<MachineInstrId>,
 }
 
-impl MachineCodeSelector {
+impl MIConverter {
     pub fn new() -> Self {
         Self {
             dag_bb_to_machine_bb: FxHashMap::default(),
@@ -131,6 +131,7 @@ impl MachineCodeSelector {
         #[rustfmt::skip]
         macro_rules! cond_kind {($id:expr)=>{ $id.as_cond_kind() };}
 
+        // there should be no NodeKind::IRs here
         let machine_instr_id = match &node.kind {
             NodeKind::IR(IRNodeKind::Entry) => None,
             NodeKind::IR(IRNodeKind::CopyToReg) => {

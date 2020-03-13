@@ -19,9 +19,11 @@ impl Combine {
     fn combine_function(&mut self, func: &mut DAGFunction) {
         for bb_id in &func.dag_basic_blocks {
             let bb = &func.dag_basic_block_arena[*bb_id];
-            some_then!(entry, bb.entry, {
-                self.combine_node(&mut FxHashMap::default(), &mut func.dag_heap, entry);
-            })
+            self.combine_node(
+                &mut FxHashMap::default(),
+                &mut func.dag_heap,
+                bb.entry.unwrap(),
+            );
         }
     }
 
