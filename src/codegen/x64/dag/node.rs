@@ -19,12 +19,28 @@ pub enum NodeKind {
     IR(IRNodeKind),
     // machine instruction
     MI(MINodeKind),
+    // operand
+    Operand(OperandNodeKind),
     None,
 }
 
 // x64 dependent
 #[derive(Debug, Clone, PartialEq)]
-pub enum MINodeKind {}
+pub enum MINodeKind {
+    MOVrmi32,  // out = mov [rbp - fi.off + const_off]
+    MOVrmri32, // out = mov [rbp - fi.off + off * align]
+    MOVrrri32, // out = mov [base + off * align]
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum OperandNodeKind {
+    CondKind(CondKind),
+    FrameIndex(FrameIndexInfo), // TODO
+    Constant(ConstantKind),
+    GlobalAddress(GlobalValueKind),
+    BasicBlock(DAGBasicBlockId),
+    Register(RegisterInfoRef),
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum IRNodeKind {
@@ -46,21 +62,10 @@ pub enum IRNodeKind {
 
     CopyToReg,
     CopyFromReg,
-
-    LoadFiConstOff,
-    LoadFiOff,
-    LoadRegOff,
     StoreFiConstOff,
     StoreFiOff,
     StoreRegOff,
 
-    // TODO: NodeKind::Operand
-    CondKind(CondKind),
-    FrameIndex(FrameIndexInfo), // TODO
-    Constant(ConstantKind),
-    GlobalAddress(GlobalValueKind),
-    BasicBlock(DAGBasicBlockId),
-    Register(RegisterInfoRef),
     CopyToLiveOut,
 }
 
@@ -129,40 +134,40 @@ impl DAGNode {
 
     pub fn as_basic_block(&self) -> DAGBasicBlockId {
         match self.kind {
-            NodeKind::IR(IRNodeKind::BasicBlock(bb)) => bb,
+            NodeKind::Operand(OperandNodeKind::BasicBlock(bb)) => bb,
             _ => panic!(),
         }
     }
 
     pub fn as_cond_kind(&self) -> CondKind {
         match self.kind {
-            NodeKind::IR(IRNodeKind::CondKind(ck)) => ck,
+            NodeKind::Operand(OperandNodeKind::CondKind(ck)) => ck,
             _ => panic!(),
         }
     }
 
     pub fn as_constant(&self) -> ConstantKind {
         match self.kind {
-            NodeKind::IR(IRNodeKind::Constant(c)) => c,
+            NodeKind::Operand(OperandNodeKind::Constant(c)) => c,
             _ => panic!(),
         }
     }
 
     pub fn is_constant(&self) -> bool {
-        matches!(self.kind, NodeKind::IR(IRNodeKind::Constant(_)))
+        matches!(self.kind, NodeKind::Operand(OperandNodeKind::Constant(_)))
     }
 
     pub fn is_frame_index(&self) -> bool {
-        matches!(self.kind, NodeKind::IR(IRNodeKind::FrameIndex(_)))
+        matches!(self.kind, NodeKind::Operand(OperandNodeKind::FrameIndex(_)))
     }
 
     pub fn is_operation(&self) -> bool {
         match self.kind {
-            NodeKind::IR(IRNodeKind::CondKind(_))
-            | NodeKind::IR(IRNodeKind::FrameIndex(_))
-            | NodeKind::IR(IRNodeKind::Constant(_))
-            | NodeKind::IR(IRNodeKind::GlobalAddress(_))
-            | NodeKind::IR(IRNodeKind::BasicBlock(_))
+            NodeKind::Operand(OperandNodeKind::CondKind(_))
+            | NodeKind::Operand(OperandNodeKind::FrameIndex(_))
+            | NodeKind::Operand(OperandNodeKind::Constant(_))
+            | NodeKind::Operand(OperandNodeKind::GlobalAddress(_))
+            | NodeKind::Operand(OperandNodeKind::BasicBlock(_))
             | NodeKind::None => false,
             _ => true,
         }

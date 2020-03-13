@@ -9,7 +9,7 @@ use id_arena::*;
 use rustc_hash::FxHashMap;
 use std::cell::RefCell;
 
-pub struct ConvertToMachine {
+pub struct MachineCodeSelector {
     pub dag_bb_to_machine_bb: FxHashMap<DAGBasicBlockId, MachineBasicBlockId>,
     pub node_id_to_machine_instr_id: FxHashMap<Raw<DAGNode>, MachineInstrId>,
 }
@@ -22,7 +22,7 @@ pub struct ConversionInfo<'a> {
     iseq: &'a mut Vec<MachineInstrId>,
 }
 
-impl ConvertToMachine {
+impl MachineCodeSelector {
     pub fn new() -> Self {
         Self {
             dag_bb_to_machine_bb: FxHashMap::default(),
@@ -136,7 +136,9 @@ impl ConvertToMachine {
             NodeKind::IR(IRNodeKind::CopyToReg) => {
                 let val = self.usual_operand(conv_info, node.operand[1]);
                 let dst = match &node.operand[0].kind {
-                    NodeKind::IR(IRNodeKind::Register(r)) => MachineRegister::new(r.clone()),
+                    NodeKind::Operand(OperandNodeKind::Register(r)) => {
+                        MachineRegister::new(r.clone())
+                    }
                     _ => unreachable!(),
                 };
 
@@ -157,7 +159,7 @@ impl ConvertToMachine {
                     conv_info.cur_bb,
                 )))
             }
-            NodeKind::IR(IRNodeKind::LoadRegOff) => {
+            NodeKind::MI(MINodeKind::MOVrrri32) => {
                 let base = self.usual_operand(conv_info, node.operand[0]);
                 let off = self.usual_operand(conv_info, node.operand[1]);
                 let align = self.usual_operand(conv_info, node.operand[2]);
@@ -170,7 +172,7 @@ impl ConvertToMachine {
                     conv_info.cur_bb,
                 )))
             }
-            NodeKind::IR(IRNodeKind::LoadFiOff) => {
+            NodeKind::MI(MINodeKind::MOVrmri32) => {
                 let fi = self.usual_operand(conv_info, node.operand[0]);
                 let off = self.usual_operand(conv_info, node.operand[1]);
                 let align = self.usual_operand(conv_info, node.operand[2]);
@@ -182,7 +184,7 @@ impl ConvertToMachine {
                     conv_info.cur_bb,
                 )))
             }
-            NodeKind::IR(IRNodeKind::LoadFiConstOff) => {
+            NodeKind::MI(MINodeKind::MOVrmi32) => {
                 let fi = self.usual_operand(conv_info, node.operand[0]);
                 let off = self.usual_operand(conv_info, node.operand[1]);
                 Some(conv_info.push_instr(MachineInstr::new(
@@ -518,19 +520,19 @@ impl ConvertToMachine {
         node: Raw<DAGNode>,
     ) -> MachineOperand {
         match node.kind {
-            NodeKind::IR(IRNodeKind::Constant(c)) => match c {
+            NodeKind::Operand(OperandNodeKind::Constant(c)) => match c {
                 ConstantKind::Int32(i) => MachineOperand::Constant(MachineConstant::Int32(i)),
             },
-            NodeKind::IR(IRNodeKind::FrameIndex(ref kind)) => {
+            NodeKind::Operand(OperandNodeKind::FrameIndex(ref kind)) => {
                 MachineOperand::FrameIndex(kind.clone())
             }
-            NodeKind::IR(IRNodeKind::GlobalAddress(ref g)) => match g {
+            NodeKind::Operand(OperandNodeKind::GlobalAddress(ref g)) => match g {
                 GlobalValueKind::FunctionName(n) => {
                     MachineOperand::GlobalAddress(GlobalValueInfo::FunctionName(n.clone()))
                 }
             },
-            NodeKind::IR(IRNodeKind::BasicBlock(_)) => unimplemented!(),
-            NodeKind::IR(IRNodeKind::Register(ref r)) => {
+            NodeKind::Operand(OperandNodeKind::BasicBlock(_)) => unimplemented!(),
+            NodeKind::Operand(OperandNodeKind::Register(ref r)) => {
                 MachineOperand::Register(MachineRegister::new(r.clone()))
             }
             NodeKind::None => MachineOperand::None,

@@ -93,7 +93,7 @@ impl Combine {
                 .as_constant()
                 .add(node.operand[1].as_constant());
             let c = heap.alloc(DAGNode::new(
-                NodeKind::IR(IRNodeKind::Constant(const_folded)),
+                NodeKind::Operand(OperandNodeKind::Constant(const_folded)),
                 vec![],
                 const_folded.get_type(),
             ));
@@ -119,7 +119,7 @@ impl Combine {
 
             if op0.is_frame_index() && op1.is_constant() {
                 return heap.alloc(DAGNode::new(
-                    NodeKind::IR(IRNodeKind::LoadFiConstOff),
+                    NodeKind::MI(MINodeKind::MOVrmi32),
                     vec![op0, op1],
                     node.ty.clone(),
                 ));
@@ -130,7 +130,7 @@ impl Combine {
                 && op1.operand[1].is_constant()
             {
                 return heap.alloc(DAGNode::new(
-                    NodeKind::IR(IRNodeKind::LoadFiOff),
+                    NodeKind::MI(MINodeKind::MOVrmri32),
                     vec![op0, op1.operand[0], op1.operand[1]],
                     node.ty.clone(),
                 ));
@@ -141,7 +141,7 @@ impl Combine {
                 && op1.operand[1].is_constant()
             {
                 return heap.alloc(DAGNode::new(
-                    NodeKind::IR(IRNodeKind::LoadRegOff),
+                    NodeKind::MI(MINodeKind::MOVrrri32),
                     vec![op0, op1.operand[0], op1.operand[1]],
                     node.ty.clone(),
                 ));

@@ -94,7 +94,7 @@ impl<'a> ConvertToDAG<'a> {
             Value::Instruction(iv) => self.instr_id_node_id[&iv.id],
             Value::Immediate(ImmediateValue::Int32(i)) => {
                 self.cur_conv_info_mut().dag_heap.alloc(DAGNode::new(
-                    NodeKind::IR(IRNodeKind::Constant(ConstantKind::Int32(*i))),
+                    NodeKind::Operand(OperandNodeKind::Constant(ConstantKind::Int32(*i))),
                     vec![],
                     Type::Int32,
                 ))
@@ -106,7 +106,7 @@ impl<'a> ConvertToDAG<'a> {
                     .get_param_type(av.index)
                     .unwrap();
                 let fi = self.cur_conv_info_mut().dag_heap.alloc(DAGNode::new(
-                    NodeKind::IR(IRNodeKind::FrameIndex(FrameIndexInfo::new(
+                    NodeKind::Operand(OperandNodeKind::FrameIndex(FrameIndexInfo::new(
                         ty.clone(),
                         FrameIndexKind::Arg(av.index),
                     ))),
@@ -128,9 +128,9 @@ impl<'a> ConvertToDAG<'a> {
             Value::Function(FunctionValue { func_id }) => {
                 let f = self.module.function_ref(*func_id);
                 self.cur_conv_info_mut().dag_heap.alloc(DAGNode::new(
-                    NodeKind::IR(IRNodeKind::GlobalAddress(GlobalValueKind::FunctionName(
-                        f.name.to_string(),
-                    ))),
+                    NodeKind::Operand(OperandNodeKind::GlobalAddress(
+                        GlobalValueKind::FunctionName(f.name.to_string()),
+                    )),
                     vec![],
                     Type::Void, // TODO
                 ))
@@ -175,7 +175,7 @@ impl<'a> ConvertToDAG<'a> {
                     let fi = self.cur_conv_info_mut_with(|c| {
                         let frinfo = c.local_mgr.alloc(ty);
                         c.dag_heap.alloc(DAGNode::new(
-                            NodeKind::IR(IRNodeKind::FrameIndex(frinfo.clone())), // TODO
+                            NodeKind::Operand(OperandNodeKind::FrameIndex(frinfo.clone())), // TODO
                             vec![],
                             ty.clone(),
                         ))
@@ -264,7 +264,7 @@ impl<'a> ConvertToDAG<'a> {
                 }
                 Opcode::Br(bb) => make_chain!(self.cur_conv_info_mut_with(|c| {
                     let bb = c.dag_heap.alloc(DAGNode::new(
-                        NodeKind::IR(IRNodeKind::BasicBlock(c.get_dag_bb(bb))),
+                        NodeKind::Operand(OperandNodeKind::BasicBlock(c.get_dag_bb(bb))),
                         vec![],
                         Type::Void,
                     ));
@@ -279,7 +279,7 @@ impl<'a> ConvertToDAG<'a> {
                     make_chain!({
                         let c = self.cur_conv_info_mut();
                         let bb = c.dag_heap.alloc(DAGNode::new(
-                            NodeKind::IR(IRNodeKind::BasicBlock(c.get_dag_bb(then_))),
+                            NodeKind::Operand(OperandNodeKind::BasicBlock(c.get_dag_bb(then_))),
                             vec![],
                             Type::Void,
                         ));
@@ -291,7 +291,7 @@ impl<'a> ConvertToDAG<'a> {
                     });
                     make_chain!(self.cur_conv_info_mut_with(|c| {
                         let bb = c.dag_heap.alloc(DAGNode::new(
-                            NodeKind::IR(IRNodeKind::BasicBlock(c.get_dag_bb(else_))),
+                            NodeKind::Operand(OperandNodeKind::BasicBlock(c.get_dag_bb(else_))),
                             vec![],
                             Type::Void,
                         ));
@@ -306,7 +306,7 @@ impl<'a> ConvertToDAG<'a> {
                     let v1 = self.get_dag_id_from_value(v1, true);
                     let v2 = self.get_dag_id_from_value(v2, true);
                     let cond = self.cur_conv_info_mut().dag_heap.alloc(DAGNode::new(
-                        NodeKind::IR(IRNodeKind::CondKind((*c).into())),
+                        NodeKind::Operand(OperandNodeKind::CondKind((*c).into())),
                         vec![],
                         Type::Void,
                     ));
@@ -335,7 +335,7 @@ impl<'a> ConvertToDAG<'a> {
 
                         operands.push(self.cur_conv_info_mut_with(|c| {
                             c.dag_heap.alloc(DAGNode::new(
-                                NodeKind::IR(IRNodeKind::BasicBlock(c.get_dag_bb(*bb))),
+                                NodeKind::Operand(OperandNodeKind::BasicBlock(c.get_dag_bb(*bb))),
                                 vec![],
                                 Type::Void,
                             ))
@@ -393,23 +393,23 @@ impl<'a> ConvertToDAG<'a> {
             let idx = self.get_dag_id_from_value(idx, true);
             let heap = &mut self.cur_conv_info_mut().dag_heap;
             let idx = match idx.kind {
-                NodeKind::IR(IRNodeKind::Constant(ConstantKind::Int32(i))) => {
+                NodeKind::Operand(OperandNodeKind::Constant(ConstantKind::Int32(i))) => {
                     heap.alloc(DAGNode::new(
-                        NodeKind::IR(IRNodeKind::Constant(ConstantKind::Int32(
+                        NodeKind::Operand(OperandNodeKind::Constant(ConstantKind::Int32(
                             i * ty.size_in_byte() as i32,
                         ))),
                         vec![],
                         Type::Int32,
                     ))
                 }
-                NodeKind::IR(IRNodeKind::CondKind(_))
-                | NodeKind::IR(IRNodeKind::FrameIndex(_))
-                | NodeKind::IR(IRNodeKind::GlobalAddress(_))
-                | NodeKind::IR(IRNodeKind::BasicBlock(_)) => idx,
+                NodeKind::Operand(OperandNodeKind::CondKind(_))
+                | NodeKind::Operand(OperandNodeKind::FrameIndex(_))
+                | NodeKind::Operand(OperandNodeKind::GlobalAddress(_))
+                | NodeKind::Operand(OperandNodeKind::BasicBlock(_)) => idx,
                 _ => {
                     let tysz = heap.alloc(DAGNode::new(
-                        NodeKind::IR(IRNodeKind::Constant(ConstantKind::Int32(
-                            ty.size_in_byte() as i32
+                        NodeKind::Operand(OperandNodeKind::Constant(ConstantKind::Int32(
+                            ty.size_in_byte() as i32,
                         ))),
                         vec![],
                         Type::Int32,
