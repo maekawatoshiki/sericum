@@ -131,12 +131,12 @@ impl ConvertToMachine {
         #[rustfmt::skip]
         macro_rules! cond_kind {($id:expr)=>{ $id.as_cond_kind() };}
 
-        let machine_instr_id = match node.kind {
-            DAGNodeKind::Entry => None,
-            DAGNodeKind::CopyToReg => {
+        let machine_instr_id = match &node.kind {
+            NodeKind::IR(IRNodeKind::Entry) => None,
+            NodeKind::IR(IRNodeKind::CopyToReg) => {
                 let val = self.usual_operand(conv_info, node.operand[1]);
                 let dst = match &node.operand[0].kind {
-                    DAGNodeKind::Register(r) => MachineRegister::new(r.clone()),
+                    NodeKind::IR(IRNodeKind::Register(r)) => MachineRegister::new(r.clone()),
                     _ => unreachable!(),
                 };
 
@@ -147,7 +147,7 @@ impl ConvertToMachine {
                     conv_info.cur_bb,
                 )))
             }
-            DAGNodeKind::CopyFromReg => {
+            NodeKind::IR(IRNodeKind::CopyFromReg) => {
                 let reg = self.usual_operand(conv_info, node.operand[0]);
                 Some(conv_info.push_instr(MachineInstr::new(
                     &conv_info.cur_func.vreg_gen,
@@ -157,7 +157,7 @@ impl ConvertToMachine {
                     conv_info.cur_bb,
                 )))
             }
-            DAGNodeKind::LoadRegOff => {
+            NodeKind::IR(IRNodeKind::LoadRegOff) => {
                 let base = self.usual_operand(conv_info, node.operand[0]);
                 let off = self.usual_operand(conv_info, node.operand[1]);
                 let align = self.usual_operand(conv_info, node.operand[2]);
@@ -170,7 +170,7 @@ impl ConvertToMachine {
                     conv_info.cur_bb,
                 )))
             }
-            DAGNodeKind::LoadFiOff => {
+            NodeKind::IR(IRNodeKind::LoadFiOff) => {
                 let fi = self.usual_operand(conv_info, node.operand[0]);
                 let off = self.usual_operand(conv_info, node.operand[1]);
                 let align = self.usual_operand(conv_info, node.operand[2]);
@@ -182,7 +182,7 @@ impl ConvertToMachine {
                     conv_info.cur_bb,
                 )))
             }
-            DAGNodeKind::LoadFiConstOff => {
+            NodeKind::IR(IRNodeKind::LoadFiConstOff) => {
                 let fi = self.usual_operand(conv_info, node.operand[0]);
                 let off = self.usual_operand(conv_info, node.operand[1]);
                 Some(conv_info.push_instr(MachineInstr::new(
@@ -193,7 +193,7 @@ impl ConvertToMachine {
                     conv_info.cur_bb,
                 )))
             }
-            DAGNodeKind::StoreRegOff => {
+            NodeKind::IR(IRNodeKind::StoreRegOff) => {
                 let base = self.usual_operand(conv_info, node.operand[0]);
                 let off = self.usual_operand(conv_info, node.operand[1]);
                 let align = self.usual_operand(conv_info, node.operand[2]);
@@ -206,7 +206,7 @@ impl ConvertToMachine {
                     conv_info.cur_bb,
                 )))
             }
-            DAGNodeKind::StoreFiOff => {
+            NodeKind::IR(IRNodeKind::StoreFiOff) => {
                 let fi = self.usual_operand(conv_info, node.operand[0]);
                 let off = self.usual_operand(conv_info, node.operand[1]);
                 let align = self.usual_operand(conv_info, node.operand[2]);
@@ -219,7 +219,7 @@ impl ConvertToMachine {
                     conv_info.cur_bb,
                 )))
             }
-            DAGNodeKind::StoreFiConstOff => {
+            NodeKind::IR(IRNodeKind::StoreFiConstOff) => {
                 let fi = self.usual_operand(conv_info, node.operand[0]);
                 let off = self.usual_operand(conv_info, node.operand[1]);
                 let new_src = self.usual_operand(conv_info, node.operand[2]);
@@ -231,7 +231,7 @@ impl ConvertToMachine {
                     conv_info.cur_bb,
                 )))
             }
-            DAGNodeKind::Load => {
+            NodeKind::IR(IRNodeKind::Load) => {
                 let new_op1 = self.usual_operand(conv_info, node.operand[0]);
                 Some(conv_info.push_instr(MachineInstr::new(
                     &conv_info.cur_func.vreg_gen,
@@ -241,7 +241,7 @@ impl ConvertToMachine {
                     conv_info.cur_bb,
                 )))
             }
-            DAGNodeKind::Store => {
+            NodeKind::IR(IRNodeKind::Store) => {
                 let new_dst = self.usual_operand(conv_info, node.operand[0]);
                 let new_src = self.usual_operand(conv_info, node.operand[1]);
                 Some(conv_info.push_instr(MachineInstr::new(
@@ -252,8 +252,8 @@ impl ConvertToMachine {
                     conv_info.cur_bb,
                 )))
             }
-            DAGNodeKind::Call => Some(self.convert_call_dag(conv_info, &*node)),
-            DAGNodeKind::Phi => {
+            NodeKind::IR(IRNodeKind::Call) => Some(self.convert_call_dag(conv_info, &*node)),
+            NodeKind::IR(IRNodeKind::Phi) => {
                 let mut operands = vec![];
                 let mut i = 0;
                 while i < node.operand.len() {
@@ -271,7 +271,7 @@ impl ConvertToMachine {
                     conv_info.cur_bb,
                 )))
             }
-            DAGNodeKind::Rem => {
+            NodeKind::IR(IRNodeKind::Rem) => {
                 let eax = RegisterInfo::new_phy_reg(GR32::EAX)
                     .with_vreg(conv_info.cur_func.vreg_gen.next_vreg())
                     .into_machine_register();
@@ -322,17 +322,19 @@ impl ConvertToMachine {
                     conv_info.cur_bb,
                 )))
             }
-            DAGNodeKind::Add | DAGNodeKind::Sub | DAGNodeKind::Mul => {
+            NodeKind::IR(IRNodeKind::Add)
+            | NodeKind::IR(IRNodeKind::Sub)
+            | NodeKind::IR(IRNodeKind::Mul) => {
                 let op1 = self.usual_operand(conv_info, node.operand[0]);
                 let op2 = self.usual_operand(conv_info, node.operand[1]);
                 let op1_reg = op1.as_register().clone();
                 let instr = MachineInstr::new(
                     &conv_info.cur_func.vreg_gen,
                     match node.kind {
-                        DAGNodeKind::Add => MachineOpcode::Add,
-                        DAGNodeKind::Sub => MachineOpcode::Sub,
-                        DAGNodeKind::Mul => MachineOpcode::Mul,
-                        DAGNodeKind::Rem => MachineOpcode::Rem,
+                        NodeKind::IR(IRNodeKind::Add) => MachineOpcode::Add,
+                        NodeKind::IR(IRNodeKind::Sub) => MachineOpcode::Sub,
+                        NodeKind::IR(IRNodeKind::Mul) => MachineOpcode::Mul,
+                        NodeKind::IR(IRNodeKind::Rem) => MachineOpcode::Rem,
                         _ => unreachable!(),
                     },
                     vec![op1, op2],
@@ -340,12 +342,14 @@ impl ConvertToMachine {
                     conv_info.cur_bb,
                 );
                 let instr_tied = match node.kind {
-                    DAGNodeKind::Add | DAGNodeKind::Sub => instr.set_tie_with_def(op1_reg),
+                    NodeKind::IR(IRNodeKind::Add) | NodeKind::IR(IRNodeKind::Sub) => {
+                        instr.set_tie_with_def(op1_reg)
+                    }
                     _ => instr,
                 };
                 Some(conv_info.push_instr(instr_tied))
             }
-            DAGNodeKind::Setcc => {
+            NodeKind::IR(IRNodeKind::Setcc) => {
                 let new_op1 = self.usual_operand(conv_info, node.operand[1]);
                 let new_op2 = self.usual_operand(conv_info, node.operand[2]);
                 Some(conv_info.push_instr(MachineInstr::new(
@@ -360,7 +364,7 @@ impl ConvertToMachine {
                     conv_info.cur_bb,
                 )))
             }
-            DAGNodeKind::Br => Some(conv_info.push_instr(MachineInstr::new(
+            NodeKind::IR(IRNodeKind::Br) => Some(conv_info.push_instr(MachineInstr::new(
                 &conv_info.cur_func.vreg_gen,
                 MachineOpcode::Br,
                 vec![MachineOperand::Branch(
@@ -369,7 +373,7 @@ impl ConvertToMachine {
                 None,
                 conv_info.cur_bb,
             ))),
-            DAGNodeKind::BrCond => {
+            NodeKind::IR(IRNodeKind::BrCond) => {
                 let new_cond = self.usual_operand(conv_info, node.operand[0]);
                 Some(conv_info.push_instr(MachineInstr::new(
                     &conv_info.cur_func.vreg_gen,
@@ -382,7 +386,7 @@ impl ConvertToMachine {
                     conv_info.cur_bb,
                 )))
             }
-            DAGNodeKind::Brcc => {
+            NodeKind::IR(IRNodeKind::Brcc) => {
                 let new_op0 = self.usual_operand(conv_info, node.operand[1]);
                 let new_op1 = self.usual_operand(conv_info, node.operand[2]);
                 Some(conv_info.push_instr(MachineInstr::new(
@@ -401,7 +405,7 @@ impl ConvertToMachine {
                     conv_info.cur_bb,
                 )))
             }
-            DAGNodeKind::Ret => {
+            NodeKind::IR(IRNodeKind::Ret) => {
                 let new_op1 = self.usual_operand(conv_info, node.operand[0]);
                 Some(conv_info.push_instr(MachineInstr::new(
                     &conv_info.cur_func.vreg_gen,
@@ -411,7 +415,7 @@ impl ConvertToMachine {
                     conv_info.cur_bb,
                 )))
             }
-            DAGNodeKind::CopyToLiveOut => {
+            NodeKind::IR(IRNodeKind::CopyToLiveOut) => {
                 self.convert_dag_to_machine_instr(conv_info, node.operand[0])
             }
             _ => None,
@@ -514,20 +518,22 @@ impl ConvertToMachine {
         node: Raw<DAGNode>,
     ) -> MachineOperand {
         match node.kind {
-            DAGNodeKind::Constant(c) => match c {
+            NodeKind::IR(IRNodeKind::Constant(c)) => match c {
                 ConstantKind::Int32(i) => MachineOperand::Constant(MachineConstant::Int32(i)),
             },
-            DAGNodeKind::FrameIndex(ref kind) => MachineOperand::FrameIndex(kind.clone()),
-            DAGNodeKind::GlobalAddress(ref g) => match g {
+            NodeKind::IR(IRNodeKind::FrameIndex(ref kind)) => {
+                MachineOperand::FrameIndex(kind.clone())
+            }
+            NodeKind::IR(IRNodeKind::GlobalAddress(ref g)) => match g {
                 GlobalValueKind::FunctionName(n) => {
                     MachineOperand::GlobalAddress(GlobalValueInfo::FunctionName(n.clone()))
                 }
             },
-            DAGNodeKind::None => MachineOperand::None,
-            DAGNodeKind::BasicBlock(_) => unimplemented!(),
-            DAGNodeKind::Register(ref r) => {
+            NodeKind::IR(IRNodeKind::BasicBlock(_)) => unimplemented!(),
+            NodeKind::IR(IRNodeKind::Register(ref r)) => {
                 MachineOperand::Register(MachineRegister::new(r.clone()))
             }
+            NodeKind::None => MachineOperand::None,
             _ => MachineOperand::Register(self.convert_dag(conv_info, node).unwrap()),
         }
     }
