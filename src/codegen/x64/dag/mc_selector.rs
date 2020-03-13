@@ -166,7 +166,7 @@ impl MachineCodeSelector {
                 // MachineOperand::Mem(base, off, align);
                 Some(conv_info.push_instr(MachineInstr::new(
                     &conv_info.cur_func.vreg_gen,
-                    MachineOpcode::LoadRegOff,
+                    MachineOpcode::MOVrrri32,
                     vec![base, off, align],
                     ty2rc(&node.ty),
                     conv_info.cur_bb,
@@ -178,7 +178,7 @@ impl MachineCodeSelector {
                 let align = self.usual_operand(conv_info, node.operand[2]);
                 Some(conv_info.push_instr(MachineInstr::new(
                     &conv_info.cur_func.vreg_gen,
-                    MachineOpcode::LoadFiOff,
+                    MachineOpcode::MOVrmri32,
                     vec![fi, off, align],
                     ty2rc(&node.ty),
                     conv_info.cur_bb,
@@ -189,7 +189,7 @@ impl MachineCodeSelector {
                 let off = self.usual_operand(conv_info, node.operand[1]);
                 Some(conv_info.push_instr(MachineInstr::new(
                     &conv_info.cur_func.vreg_gen,
-                    MachineOpcode::LoadFiConstOff,
+                    MachineOpcode::MOVrmi32,
                     vec![fi, off],
                     ty2rc(&node.ty),
                     conv_info.cur_bb,
@@ -324,16 +324,34 @@ impl MachineCodeSelector {
                     conv_info.cur_bb,
                 )))
             }
-            NodeKind::IR(IRNodeKind::Add)
-            | NodeKind::IR(IRNodeKind::Sub)
-            | NodeKind::IR(IRNodeKind::Mul) => {
+            NodeKind::IR(IRNodeKind::Add) => {
+                let op1 = self.usual_operand(conv_info, node.operand[0]);
+                let op2 = self.usual_operand(conv_info, node.operand[1]);
+                let op1_reg = op1.as_register().clone();
+                let opcode = if op1.is_register(RegisterClassKind::GR32)
+                    && op2.is_register(RegisterClassKind::GR32)
+                {
+                    MachineOpcode::ADDrr32
+                } else {
+                    MachineOpcode::Add
+                };
+                let inst = MachineInstr::new(
+                    &conv_info.cur_func.vreg_gen,
+                    opcode,
+                    vec![op1, op2],
+                    ty2rc(&node.ty),
+                    conv_info.cur_bb,
+                );
+                let inst_tied = inst.set_tie_with_def(op1_reg);
+                Some(conv_info.push_instr(inst_tied))
+            }
+            NodeKind::IR(IRNodeKind::Sub) | NodeKind::IR(IRNodeKind::Mul) => {
                 let op1 = self.usual_operand(conv_info, node.operand[0]);
                 let op2 = self.usual_operand(conv_info, node.operand[1]);
                 let op1_reg = op1.as_register().clone();
                 let instr = MachineInstr::new(
                     &conv_info.cur_func.vreg_gen,
                     match node.kind {
-                        NodeKind::IR(IRNodeKind::Add) => MachineOpcode::Add,
                         NodeKind::IR(IRNodeKind::Sub) => MachineOpcode::Sub,
                         NodeKind::IR(IRNodeKind::Mul) => MachineOpcode::Mul,
                         NodeKind::IR(IRNodeKind::Rem) => MachineOpcode::Rem,
@@ -344,9 +362,7 @@ impl MachineCodeSelector {
                     conv_info.cur_bb,
                 );
                 let instr_tied = match node.kind {
-                    NodeKind::IR(IRNodeKind::Add) | NodeKind::IR(IRNodeKind::Sub) => {
-                        instr.set_tie_with_def(op1_reg)
-                    }
+                    NodeKind::IR(IRNodeKind::Sub) => instr.set_tie_with_def(op1_reg),
                     _ => instr,
                 };
                 Some(conv_info.push_instr(instr_tied))

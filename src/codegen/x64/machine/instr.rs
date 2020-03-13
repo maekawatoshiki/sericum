@@ -37,7 +37,11 @@ pub struct RegisterInfo {
 
 #[derive(Debug, Clone, PartialEq, Copy)]
 pub enum MachineOpcode {
-    // x86_64
+    MOVrmi32,  // out = mov [rbp - fi.off + const_off]
+    MOVrmri32, // out = mov [rbp - fi.off + off * align]
+    MOVrrri32, // out = mov [base + off * align]
+
+    ADDrr32,
     CDQ,
     MOV32rr,
     MOV32ri,
@@ -49,14 +53,10 @@ pub enum MachineOpcode {
     POP64,
     RET,
 
-    // Memory
     Load,
     Store,
     Copy,
 
-    LoadFiConstOff,
-    LoadFiOff,
-    LoadRegOff,
     StoreFiConstOff,
     StoreFiOff,
     StoreRegOff,
@@ -496,6 +496,20 @@ impl MachineOperand {
     pub fn is_virtual_register(&self) -> bool {
         match self {
             MachineOperand::Register(r) => r.is_vreg(),
+            _ => false,
+        }
+    }
+
+    pub fn is_register(&self, rc: RegisterClassKind) -> bool {
+        match self {
+            MachineOperand::Register(r) => r.get_reg_class() == rc,
+            _ => false,
+        }
+    }
+
+    pub fn is_const_i32(&self) -> bool {
+        match self {
+            MachineOperand::Constant(constant) => matches!(constant, MachineConstant::Int32(_)),
             _ => false,
         }
     }

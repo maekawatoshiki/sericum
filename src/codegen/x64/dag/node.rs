@@ -24,13 +24,7 @@ pub enum NodeKind {
     None,
 }
 
-// x64 dependent
-#[derive(Debug, Clone, PartialEq)]
-pub enum MINodeKind {
-    MOVrmi32,  // out = mov [rbp - fi.off + const_off]
-    MOVrmri32, // out = mov [rbp - fi.off + off * align]
-    MOVrrri32, // out = mov [base + off * align]
-}
+pub type MINodeKind = MachineOpcode;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum OperandNodeKind {

@@ -227,6 +227,7 @@ impl JITCompiler {
                     MachineOpcode::RET => self.compile_ret(),
                     MachineOpcode::PUSH64 => self.compile_push64(instr),
                     MachineOpcode::POP64 => self.compile_pop64(instr),
+                    MachineOpcode::ADDrr32 => self.compile_add_rr32(instr),
                     MachineOpcode::Add => self.compile_add(&frame_objects, instr),
                     MachineOpcode::Sub => self.compile_sub(&frame_objects, instr),
                     MachineOpcode::Mul => self.compile_mul(&frame_objects, instr),
@@ -234,11 +235,11 @@ impl JITCompiler {
                     MachineOpcode::IDIV => self.compile_idiv(&frame_objects, instr),
                     MachineOpcode::CDQ => self.compile_cdq(&frame_objects, instr),
                     MachineOpcode::Load => self.compile_load(&frame_objects, instr),
-                    MachineOpcode::LoadFiConstOff => {
+                    MachineOpcode::MOVrmi32 => {
                         self.compile_load_fi_const_off(&frame_objects, instr)
                     }
-                    MachineOpcode::LoadFiOff => self.compile_load_fi_off(&frame_objects, instr),
-                    MachineOpcode::LoadRegOff => self.compile_load_reg_off(&frame_objects, instr),
+                    MachineOpcode::MOVrmri32 => self.compile_load_fi_off(&frame_objects, instr),
+                    MachineOpcode::MOVrrri32 => self.compile_load_reg_off(&frame_objects, instr),
                     MachineOpcode::Store => self.compile_store(&frame_objects, instr),
                     MachineOpcode::StoreFiConstOff => {
                         self.compile_store_fi_const_off(&frame_objects, instr)
@@ -564,6 +565,13 @@ impl JITCompiler {
         // for save_reg in save_regs.iter().rev() {
         //     dynasm!(self.asm; pop Ra(*save_reg));
         // }
+    }
+
+    fn compile_add_rr32(&mut self, instr: &MachineInstr) {
+        // instr.operand[0] must be the same as instr.def[0] (they're tied)
+        let r0 = phys_reg_to_dynasm_reg(instr.def[0].get_reg().unwrap());
+        let r1 = phys_reg_to_dynasm_reg(instr.operand[1].as_register().get_reg().unwrap());
+        dynasm!(self.asm; add Rd(r0), Rd(r1));
     }
 
     fn compile_add(&mut self, fo: &FrameObjectsInfo, instr: &MachineInstr) {
