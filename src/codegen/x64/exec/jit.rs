@@ -46,6 +46,7 @@ impl JITExecutor {
         let mut dag_module = dag::convert::ConvertToDAG::new(module).convert_module();
 
         dag::combine::Combine::new().combine_module(&mut dag_module);
+        dag::isel::MISelector::new().run_on_module(&mut dag_module);
 
         debug!(
             println!("DAG:");

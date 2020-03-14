@@ -155,6 +155,13 @@ impl DAGNode {
         matches!(self.kind, NodeKind::Operand(OperandNodeKind::FrameIndex(_)))
     }
 
+    pub fn is_maybe_register(&self) -> bool {
+        self.is_operation()
+            || matches!(self.kind,
+                 NodeKind::Operand(OperandNodeKind::GlobalAddress(_)) |
+                 NodeKind::Operand(OperandNodeKind::Register(_)))
+    }
+
     pub fn is_operation(&self) -> bool {
         match self.kind {
             NodeKind::Operand(OperandNodeKind::CondKind(_))
@@ -162,6 +169,7 @@ impl DAGNode {
             | NodeKind::Operand(OperandNodeKind::Constant(_))
             | NodeKind::Operand(OperandNodeKind::GlobalAddress(_))
             | NodeKind::Operand(OperandNodeKind::BasicBlock(_))
+            | NodeKind::Operand(OperandNodeKind::Register(_))
             | NodeKind::None => false,
             _ => true,
         }

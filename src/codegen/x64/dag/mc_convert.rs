@@ -329,16 +329,23 @@ impl MIConverter {
                 let op1 = self.usual_operand(conv_info, node.operand[0]);
                 let op2 = self.usual_operand(conv_info, node.operand[1]);
                 let op1_reg = op1.as_register().clone();
-                let opcode = if op1.is_register(RegisterClassKind::GR32)
-                    && op2.is_register(RegisterClassKind::GR32)
-                {
-                    MachineOpcode::ADDrr32
-                } else {
-                    MachineOpcode::Add
-                };
                 let inst = MachineInstr::new(
                     &conv_info.cur_func.vreg_gen,
-                    opcode,
+                    MachineOpcode::Add,
+                    vec![op1, op2],
+                    ty2rc(&node.ty),
+                    conv_info.cur_bb,
+                );
+                let inst_tied = inst.set_tie_with_def(op1_reg);
+                Some(conv_info.push_instr(inst_tied))
+            }
+            NodeKind::MI(MINodeKind::ADDrr32) => {
+                let op1 = self.usual_operand(conv_info, node.operand[0]);
+                let op2 = self.usual_operand(conv_info, node.operand[1]);
+                let op1_reg = op1.as_register().clone();
+                let inst = MachineInstr::new(
+                    &conv_info.cur_func.vreg_gen,
+                    MachineOpcode::ADDrr32,
                     vec![op1, op2],
                     ty2rc(&node.ty),
                     conv_info.cur_bb,
