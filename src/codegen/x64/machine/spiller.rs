@@ -1,4 +1,4 @@
-use super::super::dag::mc_convert::mov_rx;
+use super::super::dag::mc_convert::{mov_mx, mov_rx};
 use super::super::{
     frame_object::FrameIndexInfo,
     register::{rc2ty, VirtReg},
@@ -6,7 +6,7 @@ use super::super::{
 use super::{
     builder::{BuilderTrait, BuilderWithLiveInfoEdit},
     function::MachineFunction,
-    instr::{MachineInstr, MachineOpcode, MachineOperand, MachineRegister},
+    instr::{MachineInstr, MachineOperand, MachineRegister},
     liveness::LiveRegMatrix,
 };
 
@@ -36,15 +36,10 @@ impl<'a> Spiller<'a> {
             })
             .unwrap();
 
-        let def_instr = &mut self.func.instr_arena[def_id];
-        let store = MachineInstr::new_simple(
-            MachineOpcode::Store,
-            vec![
-                MachineOperand::FrameIndex(slot.clone()),
-                MachineOperand::Register(r.clone()),
-            ],
-            def_instr.parent,
-        );
+        let bb = self.func.instr_arena[def_id].parent;
+        let dst = MachineOperand::FrameIndex(slot.clone());
+        let src = MachineOperand::Register(r.clone());
+        let store = MachineInstr::new_simple(mov_mx(&src).unwrap(), vec![dst, src], bb);
 
         let mut builder = BuilderWithLiveInfoEdit::new(self.matrix, self.func);
         builder.set_insert_point_after_instr(def_id).unwrap();

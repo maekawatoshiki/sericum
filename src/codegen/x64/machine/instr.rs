@@ -52,6 +52,8 @@ pub enum MachineOpcode {
     MOVrr32,
     MOVri32,
     MOVrm32,
+    MOVmr32,
+    MOVmi32,
     MOVrr64,
     MOVri64,
     MOVrm64,
@@ -61,7 +63,6 @@ pub enum MachineOpcode {
     POP64,
     RET,
 
-    Store,
     Copy,
 
     StoreFiConstOff,
@@ -73,8 +74,6 @@ pub enum MachineOpcode {
 
     // Binary arithmetics
     Add,
-    Sub,
-    Mul,
 
     // Comparison
     Seteq,

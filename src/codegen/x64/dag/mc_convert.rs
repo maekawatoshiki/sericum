@@ -244,17 +244,28 @@ impl MIConverter {
                     conv_info.cur_bb,
                 )))
             }
-            NodeKind::IR(IRNodeKind::Store) => {
-                let new_dst = self.usual_operand(conv_info, node.operand[0]);
-                let new_src = self.usual_operand(conv_info, node.operand[1]);
+            NodeKind::MI(MINodeKind::MOVmr32) | NodeKind::MI(MINodeKind::MOVmi32) => {
+                let op0 = self.usual_operand(conv_info, node.operand[0]);
+                let op1 = self.usual_operand(conv_info, node.operand[1]);
                 Some(conv_info.push_instr(MachineInstr::new(
                     &conv_info.cur_func.vreg_gen,
-                    MachineOpcode::Store,
-                    vec![new_dst, new_src],
+                    node.kind.as_mi(),
+                    vec![op0, op1],
                     None,
                     conv_info.cur_bb,
                 )))
             }
+            // NodeKind::IR(IRNodeKind::Store) => {
+            //     let new_dst = self.usual_operand(conv_info, node.operand[0]);
+            //     let new_src = self.usual_operand(conv_info, node.operand[1]);
+            //     Some(conv_info.push_instr(MachineInstr::new(
+            //         &conv_info.cur_func.vreg_gen,
+            //         MachineOpcode::Store,
+            //         vec![new_dst, new_src],
+            //         None,
+            //         conv_info.cur_bb,
+            //     )))
+            // }
             NodeKind::IR(IRNodeKind::Call) => Some(self.convert_call_dag(conv_info, &*node)),
             NodeKind::IR(IRNodeKind::Phi) => {
                 let mut operands = vec![];
@@ -349,20 +360,6 @@ impl MIConverter {
                 let inst = MachineInstr::new(
                     &conv_info.cur_func.vreg_gen,
                     node.kind.as_mi(),
-                    vec![op1, op2],
-                    ty2rc(&node.ty),
-                    conv_info.cur_bb,
-                );
-                let inst_tied = inst.set_tie_with_def(op1_reg);
-                Some(conv_info.push_instr(inst_tied))
-            }
-            NodeKind::IR(IRNodeKind::Sub) => {
-                let op1 = self.usual_operand(conv_info, node.operand[0]);
-                let op2 = self.usual_operand(conv_info, node.operand[1]);
-                let op1_reg = op1.as_register().clone();
-                let inst = MachineInstr::new(
-                    &conv_info.cur_func.vreg_gen,
-                    MachineOpcode::Sub,
                     vec![op1, op2],
                     ty2rc(&node.ty),
                     conv_info.cur_bb,
@@ -634,6 +631,25 @@ pub fn mov_rx(x: &MachineOperand) -> Option<MachineOpcode> {
     match bit {
         32 => Some(mov32rx[xidx]),
         64 => Some(mov64rx[xidx]),
+        _ => None,
+    }
+}
+
+pub fn mov_mx(x: &MachineOperand) -> Option<MachineOpcode> {
+    let mov32mx = [MachineOpcode::MOVmr32, MachineOpcode::MOVmi32];
+    // let mov64rx = [
+    //     MachineOpcode::MOVrr64,
+    //     MachineOpcode::MOVri64,
+    //     MachineOpcode::MOVrm64,
+    // ];
+    let (bit, n) = match x {
+        MachineOperand::Register(r) => (r.info_ref().reg_class.size_in_bits(), 0),
+        MachineOperand::Constant(c) => (c.size_in_bits(), 1),
+        _ => return None, // TODO: Support GlobalAddress?
+    };
+    match bit {
+        32 => Some(mov32mx[n]),
+        // 64 => Some(mov64rx[xidx]),
         _ => None,
     }
 }

@@ -1,4 +1,4 @@
-use super::super::{frame_object::*, register::*};
+use super::super::{dag::mc_convert::mov_mx, frame_object::*, register::*};
 use super::{builder::*, function::MachineFunction, instr::*, module::MachineModule};
 use crate::codegen::x64::exec::roundup;
 use crate::ir::types::*;
@@ -89,21 +89,17 @@ impl PrologueEpilogueInserter {
         {
             match ty {
                 Type::Int32 => {
-                    // let off = finfo.offset(-(i as i32 + 1)).unwrap();
+                    let dst =
+                        MachineOperand::FrameIndex(FrameIndexInfo::new(ty, FrameIndexKind::Arg(i)));
+                    let src = MachineOperand::Register(
+                        RegisterInfo::new_phy_reg(
+                            RegisterClassKind::GR32.get_nth_arg_reg(i).unwrap(),
+                        )
+                        .into_machine_register(),
+                    );
                     let inst = MachineInstr::new_simple(
-                        MachineOpcode::Store,
-                        vec![
-                            MachineOperand::FrameIndex(FrameIndexInfo::new(
-                                ty,
-                                FrameIndexKind::Arg(i),
-                            )),
-                            MachineOperand::Register(
-                                RegisterInfo::new_phy_reg(
-                                    RegisterClassKind::GR32.get_nth_arg_reg(i).unwrap(),
-                                )
-                                .into_machine_register(),
-                            ),
-                        ],
+                        mov_mx(&src).unwrap(),
+                        vec![dst, src],
                         builder.get_cur_bb().unwrap(),
                     );
                     builder.insert(inst)

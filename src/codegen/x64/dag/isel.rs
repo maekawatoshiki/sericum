@@ -40,6 +40,14 @@ impl MISelector {
                 is_const!($node) && $node.ty == $ty
             };
         }
+        macro_rules! is_fi {
+            ($node:expr) => {
+                $node.is_frame_index()
+            };
+            ($node:expr, $ty:expr) => {
+                is_fi!($node) && $node.ty == $ty
+            };
+        }
         macro_rules! is_maybe_reg {
             ($node:expr) => {
                 $node.is_maybe_register()
@@ -128,6 +136,22 @@ impl MISelector {
                 };
                 let op0 = self.run_on_node(heap, node.operand[0]);
                 heap.alloc(DAGNode::new(kind, vec![op0], node.ty.clone()))
+            }
+            NodeKind::IR(IRNodeKind::Store) => {
+                let kind = if is_fi!(node.operand[0], Type::Int32)
+                    && is_maybe_reg!(node.operand[1], Type::Int32)
+                {
+                    NodeKind::MI(MINodeKind::MOVmr32)
+                } else if is_fi!(node.operand[0], Type::Int32)
+                    && is_const!(node.operand[1], Type::Int32)
+                {
+                    NodeKind::MI(MINodeKind::MOVmi32)
+                } else {
+                    unimplemented!()
+                };
+                let op0 = self.run_on_node(heap, node.operand[0]);
+                let op1 = self.run_on_node(heap, node.operand[1]);
+                heap.alloc(DAGNode::new(kind, vec![op0, op1], node.ty.clone()))
             }
             _ => {
                 node.operand = node

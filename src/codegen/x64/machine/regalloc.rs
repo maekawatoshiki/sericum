@@ -1,4 +1,8 @@
-use super::super::{dag::mc_convert::mov_rx, frame_object::*, register::*};
+use super::super::{
+    dag::mc_convert::{mov_mx, mov_rx},
+    frame_object::*,
+    register::*,
+};
 use super::{builder::*, function::*, instr::*, liveness::*, module::*, spiller::Spiller};
 use rustc_hash::FxHashSet;
 use std::collections::VecDeque;
@@ -182,13 +186,12 @@ impl RegisterAllocator {
         let call_instr_parent = cur_func.instr_arena[call_instr_id].parent;
 
         for (frinfo, reg) in slots_to_save_regs.into_iter().zip(regs_to_save.iter()) {
+            let dst = MachineOperand::FrameIndex(frinfo.clone());
+            let src = MachineOperand::Register(reg.clone());
             let store_instr_id = cur_func.instr_arena.alloc(MachineInstr::new(
                 &cur_func.vreg_gen,
-                MachineOpcode::Store,
-                vec![
-                    MachineOperand::FrameIndex(frinfo.clone()),
-                    MachineOperand::Register(reg.clone()),
-                ],
+                mov_mx(&src).unwrap(),
+                vec![dst, src],
                 None,
                 call_instr_parent,
             ));

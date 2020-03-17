@@ -193,21 +193,6 @@ impl JITCompiler {
             // ; sub rsp, roundup(frame_objects.total_size() + /*push rbp=*/8, 16) - 8
         );
 
-        // for (i, ty) in f.ty.get_function_ty().unwrap().params_ty.iter().enumerate() {
-        //     match ty {
-        //         Type::Int32 => {
-        //             let off = frame_objects.offset(-(i as i32 + 1)).unwrap();
-        //             dynasm!(self.asm; mov [rbp - off], Rd(get_arg_reg(i).unwrap()));
-        //         }
-        //         Type::Pointer(_) => {
-        //             let off = frame_objects.offset(-(i as i32 + 1)).unwrap();
-        //             dynasm!(self.asm; mov [rbp - off], Ra(get_arg_reg(i).unwrap()));
-        //         }
-        //         _ => unimplemented!(),
-        //     }
-        // }
-        // body
-
         for bb_id in &f.basic_blocks {
             let bb = &f.basic_block_arena[*bb_id];
 
@@ -225,6 +210,8 @@ impl JITCompiler {
                     MachineOpcode::MOVrr64 => self.compile_mov_rr64(instr),
                     MachineOpcode::MOVrm32 => self.compile_mov_rm32(&frame_objects, instr),
                     MachineOpcode::MOVrm64 => self.compile_mov_rm64(&frame_objects, instr),
+                    MachineOpcode::MOVmr32 => self.compile_mov_mr32(&frame_objects, instr),
+                    MachineOpcode::MOVmi32 => self.compile_mov_mi32(&frame_objects, instr),
                     MachineOpcode::LEA64 => self.compile_lea64(&frame_objects, instr),
                     MachineOpcode::RET => self.compile_ret(),
                     MachineOpcode::PUSH64 => self.compile_push64(instr),
@@ -242,7 +229,7 @@ impl JITCompiler {
                     MachineOpcode::MOVrmi32 => self.compile_mov_rmi32(&frame_objects, instr),
                     MachineOpcode::MOVrmri32 => self.compile_mov_rmri32(&frame_objects, instr),
                     MachineOpcode::MOVrrri32 => self.compile_mov_rrri32(&frame_objects, instr),
-                    MachineOpcode::Store => self.compile_store(&frame_objects, instr),
+                    // MachineOpcode::Store => self.compile_store(&frame_objects, instr),
                     MachineOpcode::StoreFiConstOff => {
                         self.compile_store_fi_const_off(&frame_objects, instr)
                     }
@@ -309,6 +296,18 @@ impl JITCompiler {
         let r0 = phys_reg_to_dynasm_reg(instr.def[0].get_reg().unwrap());
         let m1 = instr.operand[0].as_frame_index();
         dynasm!(self.asm; mov Rd(r0), [rbp - fo.offset(m1.idx).unwrap()]);
+    }
+
+    fn compile_mov_mr32(&mut self, fo: &FrameObjectsInfo, instr: &MachineInstr) {
+        let m0 = instr.operand[0].as_frame_index();
+        let r1 = phys_reg_to_dynasm_reg(instr.operand[1].as_register().get_reg().unwrap());
+        dynasm!(self.asm; mov DWORD [rbp - fo.offset(m0.idx).unwrap()], Rd(r1));
+    }
+
+    fn compile_mov_mi32(&mut self, fo: &FrameObjectsInfo, instr: &MachineInstr) {
+        let m0 = instr.operand[0].as_frame_index();
+        let i1 = instr.operand[1].as_constant().as_i32();
+        dynasm!(self.asm; mov DWORD [rbp - fo.offset(m0.idx).unwrap()], i1);
     }
 
     fn compile_lea64(&mut self, fo: &FrameObjectsInfo, instr: &MachineInstr) {
@@ -425,28 +424,6 @@ impl JITCompiler {
                 }
                 _ => unimplemented!(),
             },
-            _ => unimplemented!(),
-        }
-    }
-
-    fn compile_store(&mut self, fo: &FrameObjectsInfo, instr: &MachineInstr) {
-        let dst = &instr.operand[0];
-        let src = &instr.operand[1];
-        match dst {
-            MachineOperand::FrameIndex(fi) => {
-                let off = fo.offset(fi.idx).unwrap();
-                match src {
-                    MachineOperand::Constant(c) => match c {
-                        MachineConstant::Int32(i) => dynasm!(self.asm; mov DWORD [rbp - off], *i),
-                        _ => unimplemented!(),
-                    },
-                    MachineOperand::Register(i) => match fi.ty {
-                        Type::Int32 => dynasm!(self.asm; mov [rbp - off], Rd(register!(i))),
-                        _ => unimplemented!(),
-                    },
-                    _ => unreachable!(),
-                }
-            }
             _ => unimplemented!(),
         }
     }
