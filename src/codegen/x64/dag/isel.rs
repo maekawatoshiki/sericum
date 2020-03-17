@@ -116,6 +116,19 @@ impl MISelector {
                 let op1 = self.run_on_node(heap, node.operand[1]);
                 heap.alloc(DAGNode::new(kind, vec![op0, op1], node.ty.clone()))
             }
+            NodeKind::IR(IRNodeKind::Load) => {
+                let kind = if node.operand[0].is_frame_index() {
+                    match node.operand[0].ty {
+                        Type::Int32 => NodeKind::MI(MINodeKind::MOVrm32),
+                        Type::Pointer(_) | Type::Int64 => NodeKind::MI(MINodeKind::MOVrm64),
+                        _ => unimplemented!(),
+                    }
+                } else {
+                    unimplemented!()
+                };
+                let op0 = self.run_on_node(heap, node.operand[0]);
+                heap.alloc(DAGNode::new(kind, vec![op0], node.ty.clone()))
+            }
             _ => {
                 node.operand = node
                     .operand

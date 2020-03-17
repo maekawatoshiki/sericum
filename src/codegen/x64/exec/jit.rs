@@ -219,32 +219,29 @@ impl JITCompiler {
             for instr in &*bb.iseq_ref() {
                 let instr = &f.instr_arena[*instr];
                 match instr.opcode {
-                    MachineOpcode::MOV32ri => self.compile_mov32ri(instr),
-                    MachineOpcode::MOV32rr => self.compile_mov32rr(instr),
-                    MachineOpcode::MOV64ri => self.compile_mov64ri(instr),
-                    MachineOpcode::MOV64rr => self.compile_mov64rr(instr),
+                    MachineOpcode::MOVri32 => self.compile_mov_ri32(instr),
+                    MachineOpcode::MOVrr32 => self.compile_mov_rr32(instr),
+                    MachineOpcode::MOVri64 => self.compile_mov_ri64(instr),
+                    MachineOpcode::MOVrr64 => self.compile_mov_rr64(instr),
+                    MachineOpcode::MOVrm32 => self.compile_mov_rm32(&frame_objects, instr),
+                    MachineOpcode::MOVrm64 => self.compile_mov_rm64(&frame_objects, instr),
                     MachineOpcode::LEA64 => self.compile_lea64(&frame_objects, instr),
                     MachineOpcode::RET => self.compile_ret(),
                     MachineOpcode::PUSH64 => self.compile_push64(instr),
                     MachineOpcode::POP64 => self.compile_pop64(instr),
                     MachineOpcode::Add => self.compile_add(&frame_objects, instr),
-                    MachineOpcode::Sub => self.compile_sub(&frame_objects, instr),
-                    MachineOpcode::Mul => self.compile_mul(&frame_objects, instr),
                     MachineOpcode::ADDrr32 => self.compile_add_rr32(instr),
                     MachineOpcode::ADDri32 => self.compile_add_ri32(instr),
                     MachineOpcode::SUBrr32 => self.compile_sub_rr32(instr),
                     MachineOpcode::SUBri32 => self.compile_sub_ri32(instr),
+                    MachineOpcode::SUBr64i32 => self.compile_sub_r64i32(instr),
                     MachineOpcode::IMULrr32 => self.compile_imul_rr32(instr),
                     MachineOpcode::IMULrri32 => self.compile_imul_rri32(instr),
-                    MachineOpcode::Rem => self.compile_rem(&frame_objects, instr),
                     MachineOpcode::IDIV => self.compile_idiv(&frame_objects, instr),
                     MachineOpcode::CDQ => self.compile_cdq(&frame_objects, instr),
-                    MachineOpcode::Load => self.compile_load(&frame_objects, instr),
-                    MachineOpcode::MOVrmi32 => {
-                        self.compile_load_fi_const_off(&frame_objects, instr)
-                    }
-                    MachineOpcode::MOVrmri32 => self.compile_load_fi_off(&frame_objects, instr),
-                    MachineOpcode::MOVrrri32 => self.compile_load_reg_off(&frame_objects, instr),
+                    MachineOpcode::MOVrmi32 => self.compile_mov_rmi32(&frame_objects, instr),
+                    MachineOpcode::MOVrmri32 => self.compile_mov_rmri32(&frame_objects, instr),
+                    MachineOpcode::MOVrrri32 => self.compile_mov_rrri32(&frame_objects, instr),
                     MachineOpcode::Store => self.compile_store(&frame_objects, instr),
                     MachineOpcode::StoreFiConstOff => {
                         self.compile_store_fi_const_off(&frame_objects, instr)
@@ -264,27 +261,25 @@ impl JITCompiler {
         }
     }
 
-    fn compile_mov32ri(&mut self, instr: &MachineInstr) {
+    fn compile_mov_ri32(&mut self, instr: &MachineInstr) {
         assert!(matches!(instr.operand[0], MachineOperand::Constant(_)));
         assert!(matches!(
             instr.operand[0].as_constant(),
             MachineConstant::Int32(_)
         ));
-
         let r = phys_reg_to_dynasm_reg(instr.def[0].get_reg().unwrap());
         let i = instr.operand[0].as_constant().as_i32();
         dynasm!(self.asm; mov Rd(r), i);
     }
 
-    fn compile_mov32rr(&mut self, instr: &MachineInstr) {
+    fn compile_mov_rr32(&mut self, instr: &MachineInstr) {
         assert!(matches!(instr.operand[0], MachineOperand::Register(_)));
-
         let r0 = phys_reg_to_dynasm_reg(instr.def[0].get_reg().unwrap());
         let r1 = phys_reg_to_dynasm_reg(instr.operand[0].as_register().get_reg().unwrap());
         self.reg_copy(RegisterClassKind::GR32, r0, r1);
     }
 
-    fn compile_mov64ri(&mut self, _instr: &MachineInstr) {
+    fn compile_mov_ri64(&mut self, _instr: &MachineInstr) {
         unimplemented!()
         // assert!(matches!(instr.operand[0], MachineOperand::Constant(_)));
         // assert!(matches!(
@@ -297,12 +292,23 @@ impl JITCompiler {
         // dynasm!(self.asm; mov Ra(r), i);
     }
 
-    fn compile_mov64rr(&mut self, instr: &MachineInstr) {
+    fn compile_mov_rr64(&mut self, instr: &MachineInstr) {
         assert!(matches!(instr.operand[0], MachineOperand::Register(_)));
-
         let r0 = phys_reg_to_dynasm_reg(instr.def[0].get_reg().unwrap());
         let r1 = phys_reg_to_dynasm_reg(instr.operand[0].as_register().get_reg().unwrap());
         self.reg_copy(RegisterClassKind::GR64, r0, r1);
+    }
+
+    fn compile_mov_rm32(&mut self, fo: &FrameObjectsInfo, instr: &MachineInstr) {
+        let r0 = phys_reg_to_dynasm_reg(instr.def[0].get_reg().unwrap());
+        let m1 = instr.operand[0].as_frame_index();
+        dynasm!(self.asm; mov Rd(r0), [rbp - fo.offset(m1.idx).unwrap()]);
+    }
+
+    fn compile_mov_rm64(&mut self, fo: &FrameObjectsInfo, instr: &MachineInstr) {
+        let r0 = phys_reg_to_dynasm_reg(instr.def[0].get_reg().unwrap());
+        let m1 = instr.operand[0].as_frame_index();
+        dynasm!(self.asm; mov Rd(r0), [rbp - fo.offset(m1.idx).unwrap()]);
     }
 
     fn compile_lea64(&mut self, fo: &FrameObjectsInfo, instr: &MachineInstr) {
@@ -370,24 +376,7 @@ impl JITCompiler {
         }
     }
 
-    fn compile_load(&mut self, fo: &FrameObjectsInfo, instr: &MachineInstr) {
-        let rn = register!(instr);
-        let op0 = &instr.operand[0];
-        match op0 {
-            MachineOperand::FrameIndex(fi) => {
-                let off = fo.offset(fi.idx).unwrap();
-                match fi.ty {
-                    Type::Int32 => dynasm!(self.asm; mov Rd(rn), [rbp - off]),
-                    Type::Pointer(_) => dynasm!(self.asm; mov Ra(rn),[rbp - off]),
-                    _ => unimplemented!(),
-                }
-            }
-            MachineOperand::Register(_) => unimplemented!(),
-            _ => unreachable!(),
-        }
-    }
-
-    fn compile_load_fi_const_off(&mut self, fo: &FrameObjectsInfo, instr: &MachineInstr) {
+    fn compile_mov_rmi32(&mut self, fo: &FrameObjectsInfo, instr: &MachineInstr) {
         let rn = register!(instr);
         let fi = instr.operand[0].as_frame_index();
         let off = &instr.operand[1];
@@ -404,7 +393,7 @@ impl JITCompiler {
         }
     }
 
-    fn compile_load_fi_off(&mut self, fo: &FrameObjectsInfo, instr: &MachineInstr) {
+    fn compile_mov_rmri32(&mut self, fo: &FrameObjectsInfo, instr: &MachineInstr) {
         let rn = register!(instr);
         let fi = instr.operand[0].as_frame_index();
         let off = register!(instr.operand[1].as_register());
@@ -423,7 +412,7 @@ impl JITCompiler {
         }
     }
 
-    fn compile_load_reg_off(&mut self, _fo: &FrameObjectsInfo, instr: &MachineInstr) {
+    fn compile_mov_rrri32(&mut self, _fo: &FrameObjectsInfo, instr: &MachineInstr) {
         let rn = register!(instr);
         let base = register!(instr.operand[0].as_register());
         let off = register!(instr.operand[1].as_register());
@@ -600,6 +589,13 @@ impl JITCompiler {
         dynasm!(self.asm; sub Rd(r0), i1);
     }
 
+    fn compile_sub_r64i32(&mut self, instr: &MachineInstr) {
+        // instr.operand[0] must be the same as instr.def[0] (they're tied)
+        let r0 = phys_reg_to_dynasm_reg(instr.def[0].get_reg().unwrap());
+        let i1 = instr.operand[1].as_constant().as_i32();
+        dynasm!(self.asm; sub Rq(r0), i1);
+    }
+
     fn compile_imul_rr32(&mut self, instr: &MachineInstr) {
         // instr.operand[0] must be the same as instr.def[0] (they're tied)
         let r0 = phys_reg_to_dynasm_reg(instr.def[0].get_reg().unwrap());
@@ -634,85 +630,6 @@ impl JITCompiler {
                 }
                 _ => unimplemented!(),
             },
-            _ => unimplemented!(),
-        }
-    }
-
-    fn compile_sub(&mut self, _fo: &FrameObjectsInfo, instr: &MachineInstr) {
-        let rn = register!(instr);
-        let op0 = &instr.operand[0];
-        let op1 = &instr.operand[1];
-        match op0 {
-            MachineOperand::FrameIndex(_) => unimplemented!(), // TODO: Address
-            MachineOperand::Register(i0) => {
-                self.reg_copy(i0.get_reg_class(), rn, register!(i0));
-                match op1 {
-                    // TODO: SUB32ri, SUB64ri32
-                    MachineOperand::Constant(MachineConstant::Int32(x)) => match i0.get_reg_class()
-                    {
-                        RegisterClassKind::GR32 => dynasm!(self.asm; sub Ra(rn), *x),
-                        RegisterClassKind::GR64 => dynasm!(self.asm; sub Rq(rn), *x),
-                    },
-                    MachineOperand::Register(i1) => match i1.get_reg_class() {
-                        RegisterClassKind::GR32 => dynasm!(self.asm; sub Rd(rn), Rd(register!(i1))),
-                        _ => unimplemented!(),
-                    },
-                    _ => unimplemented!(),
-                };
-            }
-            _ => unimplemented!(),
-        }
-    }
-
-    fn compile_mul(&mut self, _fo: &FrameObjectsInfo, instr: &MachineInstr) {
-        let rn = register!(instr);
-        let op0 = &instr.operand[0];
-        let op1 = &instr.operand[1];
-        match op0 {
-            MachineOperand::Register(i0) => {
-                match op1 {
-                    MachineOperand::Constant(MachineConstant::Int32(x)) => {
-                        dynasm!(self.asm; imul Rd(rn),Rd(register!(i0)), *x)
-                    }
-                    MachineOperand::Register(i1) => match i1.get_reg_class() {
-                        RegisterClassKind::GR32 => {
-                            self.reg_copy(i0.get_reg_class(), rn, register!(i0));
-                            dynasm!(self.asm; imul Rd(rn), Rd(register!(i1)))
-                        }
-                        _ => unimplemented!(),
-                    },
-                    _ => unimplemented!(),
-                };
-            }
-            _ => unimplemented!(),
-        }
-    }
-
-    fn compile_rem(&mut self, _fo: &FrameObjectsInfo, instr: &MachineInstr) {
-        let rn = register!(instr);
-        let op0 = &instr.operand[0];
-        let op1 = &instr.operand[1];
-        match op0 {
-            MachineOperand::Register(i0) => {
-                self.reg_copy(i0.get_reg_class(), 0, register!(i0));
-                match op1 {
-                    MachineOperand::Constant(MachineConstant::Int32(x)) => dynasm!(self.asm
-                        ; mov Rd(rn), *x
-                        ; mov edx, 0
-                        ; div Rd(rn)
-                        ; mov Rd(rn), edx
-                    ),
-                    MachineOperand::Register(i1) => match i1.get_reg_class() {
-                        RegisterClassKind::GR32 => dynasm!(self.asm
-                            ; mov edx, 0
-                            ; div Rd(register!(i1))
-                            ; mov Rd(rn), edx
-                        ),
-                        _ => unimplemented!(),
-                    },
-                    _ => unimplemented!(),
-                };
-            }
             _ => unimplemented!(),
         }
     }

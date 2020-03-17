@@ -37,7 +37,7 @@ pub struct RegisterInfo {
 
 #[derive(Debug, Clone, PartialEq, Copy)]
 pub enum MachineOpcode {
-    MOVrmi32,  // out = mov [rbp - fi.off + const_off]
+    MOVrmi32,  // out = mov [rbp - fi.off + const.off]
     MOVrmri32, // out = mov [rbp - fi.off + off * align]
     MOVrrri32, // out = mov [base + off * align]
 
@@ -45,20 +45,22 @@ pub enum MachineOpcode {
     ADDri32,
     SUBrr32,
     SUBri32,
+    SUBr64i32,
     IMULrr32,
     IMULrri32,
     CDQ,
-    MOV32rr,
-    MOV32ri,
-    MOV64rr,
-    MOV64ri,
+    MOVrr32,
+    MOVri32,
+    MOVrm32,
+    MOVrr64,
+    MOVri64,
+    MOVrm64,
     LEA64,
     IDIV,
     PUSH64,
     POP64,
     RET,
 
-    Load,
     Store,
     Copy,
 
@@ -73,7 +75,6 @@ pub enum MachineOpcode {
     Add,
     Sub,
     Mul,
-    Rem,
 
     // Comparison
     Seteq,

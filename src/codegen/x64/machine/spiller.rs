@@ -1,3 +1,4 @@
+use super::super::dag::mc_convert::mov_rx;
 use super::super::{
     frame_object::FrameIndexInfo,
     register::{rc2ty, VirtReg},
@@ -64,12 +65,9 @@ impl<'a> Spiller<'a> {
             use_instr.replace_operand_reg(&r, &new_r);
             new_r.add_use(use_id);
 
-            let load = MachineInstr::new_simple(
-                MachineOpcode::Load,
-                vec![MachineOperand::FrameIndex(slot.clone())],
-                use_instr.parent,
-            )
-            .with_def(vec![new_r.clone()]);
+            let src = MachineOperand::FrameIndex(slot.clone());
+            let load = MachineInstr::new_simple(mov_rx(&src).unwrap(), vec![src], use_instr.parent)
+                .with_def(vec![new_r.clone()]);
 
             let mut builder = BuilderWithLiveInfoEdit::new(self.matrix, self.func);
             builder.set_insert_point_before_instr(use_id);

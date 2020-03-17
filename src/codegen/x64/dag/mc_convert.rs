@@ -234,12 +234,12 @@ impl MIConverter {
                     conv_info.cur_bb,
                 )))
             }
-            NodeKind::IR(IRNodeKind::Load) => {
-                let new_op1 = self.usual_operand(conv_info, node.operand[0]);
+            NodeKind::MI(MINodeKind::MOVrm32) | NodeKind::MI(MINodeKind::MOVrm64) => {
+                let op0 = self.usual_operand(conv_info, node.operand[0]);
                 Some(conv_info.push_instr(MachineInstr::new(
                     &conv_info.cur_func.vreg_gen,
-                    MachineOpcode::Load,
-                    vec![new_op1],
+                    node.kind.as_mi(),
+                    vec![op0],
                     ty2rc(&node.ty),
                     conv_info.cur_bb,
                 )))
@@ -602,7 +602,7 @@ pub fn mov_n_rx(bit: usize, x: &MachineOperand) -> Option<MachineOpcode> {
     // TODO: refine code
     assert!(bit > 0 && ((bit & (bit - 1)) == 0));
 
-    let mov32rx = [MachineOpcode::MOV32rr, MachineOpcode::MOV32ri];
+    let mov32rx = [MachineOpcode::MOVrr32, MachineOpcode::MOVri32];
     let xidx = match x {
         MachineOperand::Register(_) => 0,
         MachineOperand::Constant(_) => 1,
@@ -615,11 +615,20 @@ pub fn mov_n_rx(bit: usize, x: &MachineOperand) -> Option<MachineOpcode> {
 }
 
 pub fn mov_rx(x: &MachineOperand) -> Option<MachineOpcode> {
-    let mov32rx = [MachineOpcode::MOV32rr, MachineOpcode::MOV32ri];
-    let mov64rx = [MachineOpcode::MOV64rr, MachineOpcode::MOV64ri];
+    let mov32rx = [
+        MachineOpcode::MOVrr32,
+        MachineOpcode::MOVri32,
+        MachineOpcode::MOVrm64,
+    ];
+    let mov64rx = [
+        MachineOpcode::MOVrr64,
+        MachineOpcode::MOVri64,
+        MachineOpcode::MOVrm64,
+    ];
     let (bit, xidx) = match x {
         MachineOperand::Register(r) => (r.info_ref().reg_class.size_in_bits(), 0),
         MachineOperand::Constant(c) => (c.size_in_bits(), 1),
+        MachineOperand::FrameIndex(f) => (f.ty.size_in_bits(), 2),
         _ => return None, // TODO: Support GlobalAddress?
     };
     match bit {

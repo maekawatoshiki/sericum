@@ -43,7 +43,7 @@ impl PrologueEpilogueInserter {
 
         // mov rbp, rsp
         let mov_rbp_rsp = MachineInstr::new_simple(
-            MachineOpcode::MOV64rr,
+            MachineOpcode::MOVrr64,
             vec![MachineOperand::Register(
                 RegisterInfo::new_phy_reg(GR64::RSP).into_machine_register(),
             )],
@@ -58,7 +58,7 @@ impl PrologueEpilogueInserter {
         // sub rsp, adjust
         let adjust = roundup(finfo.total_size() + /*push rbp=*/8, 16) - 8;
         let mov_rsp_i = MachineInstr::new_simple(
-            MachineOpcode::Sub,
+            MachineOpcode::SUBr64i32,
             vec![
                 MachineOperand::Register(
                     RegisterInfo::new_phy_reg(GR64::RSP).into_machine_register(),
@@ -140,7 +140,7 @@ impl PrologueEpilogueInserter {
                     MachineConstant::Int32(i) => iseq.push(
                         cur_func.instr_arena.alloc(
                             MachineInstr::new_simple(
-                                MachineOpcode::MOV32ri,
+                                MachineOpcode::MOVri32,
                                 vec![MachineOperand::Constant(MachineConstant::Int32(*i))],
                                 *bb_id,
                             )
@@ -156,7 +156,7 @@ impl PrologueEpilogueInserter {
                     iseq.push(
                         cur_func.instr_arena.alloc(
                             MachineInstr::new_simple(
-                                MachineOpcode::MOV32rr,
+                                MachineOpcode::MOVrr32,
                                 vec![MachineOperand::Register(r.clone())],
                                 *bb_id,
                             )
@@ -166,28 +166,13 @@ impl PrologueEpilogueInserter {
                         ),
                     )
                 }
-                MachineOperand::FrameIndex(fi) => {
-                    iseq.push(
-                        cur_func.instr_arena.alloc(
-                            MachineInstr::new_simple(
-                                MachineOpcode::Load,
-                                vec![MachineOperand::FrameIndex(fi.clone())],
-                                *bb_id,
-                            )
-                            .with_def(vec![
-                                RegisterInfo::new_phy_reg(GR32::EAX).into_machine_register()
-                            ]),
-                        ),
-                    )
-                    // dynasm!(self.asm; mov rax, [rbp - fo.offset(fi.idx).unwrap()])
-                }
                 MachineOperand::None => {}
                 _ => unreachable!(),
             }
 
             // mov rsp, rbp
             let i = MachineInstr::new_simple(
-                MachineOpcode::MOV64rr,
+                MachineOpcode::MOVrr64,
                 vec![MachineOperand::Register(
                     RegisterInfo::new_phy_reg(GR64::RBP).into_machine_register(),
                 )],
