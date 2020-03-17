@@ -46,7 +46,7 @@ impl Combine {
 
         // TODO: Macro for pattern matching?
         let mut replaced = match &node.kind {
-            NodeKind::IR(IRNodeKind::Load) => self.combine_node_load(heap, node),
+            NodeKind::IR(IRNodeKind::Load) => self.combine_node_load(heap, node), // TODO: legalize?
             NodeKind::IR(IRNodeKind::Store) => self.combine_node_store(heap, node),
             NodeKind::IR(IRNodeKind::Add) => self.combine_node_add(replace, heap, node),
             NodeKind::IR(IRNodeKind::BrCond) => self.combine_node_brcond(heap, node),
@@ -54,10 +54,9 @@ impl Combine {
         };
         replace.insert(node, replaced);
 
-        replaced.next = match node.next {
-            Some(next) => Some(self.combine_node(replace, heap, next)),
-            None => return replaced,
-        };
+        if let Some(next) = node.next {
+            replaced.next = Some(self.combine_node(replace, heap, next));
+        }
 
         replaced
     }

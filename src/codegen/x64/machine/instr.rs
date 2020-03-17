@@ -42,6 +42,11 @@ pub enum MachineOpcode {
     MOVrrri32, // out = mov [base + off * align]
 
     ADDrr32,
+    ADDri32,
+    SUBrr32,
+    SUBri32,
+    IMULrr32,
+    IMULrri32,
     CDQ,
     MOV32rr,
     MOV32ri,

@@ -475,11 +475,11 @@ impl<'a> ConvertToDAG<'a> {
         }
     }
 
-    fn make_chain_with_copying(&mut self, node_id: Raw<DAGNode>) -> Raw<DAGNode> {
+    fn make_chain_with_copying(&mut self, node: Raw<DAGNode>) -> Raw<DAGNode> {
         let copy_to_live_out = self.cur_conv_info_mut().dag_heap.alloc(DAGNode::new(
             NodeKind::IR(IRNodeKind::CopyToLiveOut),
-            vec![node_id],
-            Type::Void,
+            vec![node],
+            node.ty.clone(),
         ));
 
         self.make_chain(copy_to_live_out);

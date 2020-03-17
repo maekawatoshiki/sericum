@@ -227,10 +227,15 @@ impl JITCompiler {
                     MachineOpcode::RET => self.compile_ret(),
                     MachineOpcode::PUSH64 => self.compile_push64(instr),
                     MachineOpcode::POP64 => self.compile_pop64(instr),
-                    MachineOpcode::ADDrr32 => self.compile_add_rr32(instr),
                     MachineOpcode::Add => self.compile_add(&frame_objects, instr),
                     MachineOpcode::Sub => self.compile_sub(&frame_objects, instr),
                     MachineOpcode::Mul => self.compile_mul(&frame_objects, instr),
+                    MachineOpcode::ADDrr32 => self.compile_add_rr32(instr),
+                    MachineOpcode::ADDri32 => self.compile_add_ri32(instr),
+                    MachineOpcode::SUBrr32 => self.compile_sub_rr32(instr),
+                    MachineOpcode::SUBri32 => self.compile_sub_ri32(instr),
+                    MachineOpcode::IMULrr32 => self.compile_imul_rr32(instr),
+                    MachineOpcode::IMULrri32 => self.compile_imul_rri32(instr),
                     MachineOpcode::Rem => self.compile_rem(&frame_objects, instr),
                     MachineOpcode::IDIV => self.compile_idiv(&frame_objects, instr),
                     MachineOpcode::CDQ => self.compile_cdq(&frame_objects, instr),
@@ -574,6 +579,42 @@ impl JITCompiler {
         dynasm!(self.asm; add Rd(r0), Rd(r1));
     }
 
+    fn compile_add_ri32(&mut self, instr: &MachineInstr) {
+        // instr.operand[0] must be the same as instr.def[0] (they're tied)
+        let r0 = phys_reg_to_dynasm_reg(instr.def[0].get_reg().unwrap());
+        let i1 = instr.operand[1].as_constant().as_i32();
+        dynasm!(self.asm; add Rd(r0), i1);
+    }
+
+    fn compile_sub_rr32(&mut self, instr: &MachineInstr) {
+        // instr.operand[0] must be the same as instr.def[0] (they're tied)
+        let r0 = phys_reg_to_dynasm_reg(instr.def[0].get_reg().unwrap());
+        let r1 = phys_reg_to_dynasm_reg(instr.operand[1].as_register().get_reg().unwrap());
+        dynasm!(self.asm; sub Rd(r0), Rd(r1));
+    }
+
+    fn compile_sub_ri32(&mut self, instr: &MachineInstr) {
+        // instr.operand[0] must be the same as instr.def[0] (they're tied)
+        let r0 = phys_reg_to_dynasm_reg(instr.def[0].get_reg().unwrap());
+        let i1 = instr.operand[1].as_constant().as_i32();
+        dynasm!(self.asm; sub Rd(r0), i1);
+    }
+
+    fn compile_imul_rr32(&mut self, instr: &MachineInstr) {
+        // instr.operand[0] must be the same as instr.def[0] (they're tied)
+        let r0 = phys_reg_to_dynasm_reg(instr.def[0].get_reg().unwrap());
+        let r1 = phys_reg_to_dynasm_reg(instr.operand[1].as_register().get_reg().unwrap());
+        dynasm!(self.asm; imul Rd(r0), Rd(r1))
+    }
+
+    fn compile_imul_rri32(&mut self, instr: &MachineInstr) {
+        // instr.operand[0] must be the same as instr.def[0] (they're tied)
+        let r0 = phys_reg_to_dynasm_reg(instr.def[0].get_reg().unwrap());
+        let r1 = phys_reg_to_dynasm_reg(instr.operand[0].as_register().get_reg().unwrap());
+        let i2 = instr.operand[1].as_constant().as_i32();
+        dynasm!(self.asm; imul Rd(r0), Rd(r1), i2);
+    }
+
     fn compile_add(&mut self, fo: &FrameObjectsInfo, instr: &MachineInstr) {
         let rn = register!(instr);
         let op0 = &instr.operand[0];
@@ -593,21 +634,6 @@ impl JITCompiler {
                 }
                 _ => unimplemented!(),
             },
-            // unimplemented!(), // TODO: Address
-            MachineOperand::Register(i0) => {
-                self.reg_copy(i0.get_reg_class(), rn, register!(i0));
-                match op1 {
-                    MachineOperand::Constant(c) => match c {
-                        MachineConstant::Int32(x) => dynasm!(self.asm; add Rd(rn), *x),
-                        _ => unimplemented!(),
-                    },
-                    MachineOperand::Register(i1) => match i1.get_reg_class() {
-                        RegisterClassKind::GR32 => dynasm!(self.asm; add Rd(rn), Rd(register!(i1))),
-                        _ => unimplemented!(),
-                    },
-                    _ => unimplemented!(),
-                };
-            }
             _ => unimplemented!(),
         }
     }

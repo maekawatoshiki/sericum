@@ -175,3 +175,12 @@ impl DAGNode {
         }
     }
 }
+
+impl NodeKind {
+    pub fn as_mi(&self) -> MINodeKind {
+        match self {
+            NodeKind::MI(mi) => *mi,
+            _ => panic!(),
+        }
+    }
+}

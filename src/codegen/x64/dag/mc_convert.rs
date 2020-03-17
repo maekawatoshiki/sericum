@@ -339,13 +339,16 @@ impl MIConverter {
                 let inst_tied = inst.set_tie_with_def(op1_reg);
                 Some(conv_info.push_instr(inst_tied))
             }
-            NodeKind::MI(MINodeKind::ADDrr32) => {
+            NodeKind::MI(MINodeKind::ADDrr32)
+            | NodeKind::MI(MINodeKind::ADDri32)
+            | NodeKind::MI(MINodeKind::SUBri32)
+            | NodeKind::MI(MINodeKind::SUBrr32) => {
                 let op1 = self.usual_operand(conv_info, node.operand[0]);
                 let op2 = self.usual_operand(conv_info, node.operand[1]);
                 let op1_reg = op1.as_register().clone();
                 let inst = MachineInstr::new(
                     &conv_info.cur_func.vreg_gen,
-                    MachineOpcode::ADDrr32,
+                    node.kind.as_mi(),
                     vec![op1, op2],
                     ty2rc(&node.ty),
                     conv_info.cur_bb,
@@ -353,27 +356,45 @@ impl MIConverter {
                 let inst_tied = inst.set_tie_with_def(op1_reg);
                 Some(conv_info.push_instr(inst_tied))
             }
-            NodeKind::IR(IRNodeKind::Sub) | NodeKind::IR(IRNodeKind::Mul) => {
+            NodeKind::IR(IRNodeKind::Sub) => {
                 let op1 = self.usual_operand(conv_info, node.operand[0]);
                 let op2 = self.usual_operand(conv_info, node.operand[1]);
                 let op1_reg = op1.as_register().clone();
-                let instr = MachineInstr::new(
+                let inst = MachineInstr::new(
                     &conv_info.cur_func.vreg_gen,
-                    match node.kind {
-                        NodeKind::IR(IRNodeKind::Sub) => MachineOpcode::Sub,
-                        NodeKind::IR(IRNodeKind::Mul) => MachineOpcode::Mul,
-                        NodeKind::IR(IRNodeKind::Rem) => MachineOpcode::Rem,
-                        _ => unreachable!(),
-                    },
+                    MachineOpcode::Sub,
                     vec![op1, op2],
                     ty2rc(&node.ty),
                     conv_info.cur_bb,
                 );
-                let instr_tied = match node.kind {
-                    NodeKind::IR(IRNodeKind::Sub) => instr.set_tie_with_def(op1_reg),
-                    _ => instr,
-                };
-                Some(conv_info.push_instr(instr_tied))
+                let inst_tied = inst.set_tie_with_def(op1_reg);
+                Some(conv_info.push_instr(inst_tied))
+            }
+            NodeKind::MI(MINodeKind::IMULrr32) => {
+                let op1 = self.usual_operand(conv_info, node.operand[0]);
+                let op2 = self.usual_operand(conv_info, node.operand[1]);
+                let op1_reg = op1.as_register().clone();
+                let inst = MachineInstr::new(
+                    &conv_info.cur_func.vreg_gen,
+                    MachineOpcode::IMULrr32,
+                    vec![op1, op2],
+                    ty2rc(&node.ty),
+                    conv_info.cur_bb,
+                );
+                let inst_tied = inst.set_tie_with_def(op1_reg);
+                Some(conv_info.push_instr(inst_tied))
+            }
+            NodeKind::MI(MINodeKind::IMULrri32) => {
+                let op0 = self.usual_operand(conv_info, node.operand[0]);
+                let op1 = self.usual_operand(conv_info, node.operand[1]);
+                let inst = MachineInstr::new(
+                    &conv_info.cur_func.vreg_gen,
+                    MachineOpcode::IMULrri32,
+                    vec![op0, op1],
+                    ty2rc(&node.ty),
+                    conv_info.cur_bb,
+                );
+                Some(conv_info.push_instr(inst))
             }
             NodeKind::IR(IRNodeKind::Setcc) => {
                 let new_op1 = self.usual_operand(conv_info, node.operand[1]);
