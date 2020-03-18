@@ -229,10 +229,8 @@ impl JITCompiler {
                     MachineOpcode::MOVrmi32 => self.compile_mov_rmi32(&frame_objects, instr),
                     MachineOpcode::MOVrmri32 => self.compile_mov_rmri32(&frame_objects, instr),
                     MachineOpcode::MOVrrri32 => self.compile_mov_rrri32(&frame_objects, instr),
-                    // MachineOpcode::Store => self.compile_store(&frame_objects, instr),
-                    MachineOpcode::StoreFiConstOff => {
-                        self.compile_store_fi_const_off(&frame_objects, instr)
-                    }
+                    MachineOpcode::MOVmi32r32 => self.compile_mov_mi32r32(&frame_objects, instr),
+                    MachineOpcode::MOVmi32i32 => self.compile_mov_mi32i32(&frame_objects, instr),
                     MachineOpcode::StoreFiOff => self.compile_store_fi_off(&frame_objects, instr),
                     MachineOpcode::StoreRegOff => self.compile_store_reg_off(&frame_objects, instr),
                     MachineOpcode::Call => self.compile_call(module, &frame_objects, instr),
@@ -428,30 +426,18 @@ impl JITCompiler {
         }
     }
 
-    fn compile_store_fi_const_off(&mut self, fo: &FrameObjectsInfo, instr: &MachineInstr) {
-        let fi = fo.offset(instr.operand[0].as_frame_index().idx).unwrap();
-        let off = &instr.operand[1];
-        let src = &instr.operand[2];
-        match src {
-            MachineOperand::Constant(MachineConstant::Int32(i)) => match off {
-                MachineOperand::Constant(MachineConstant::Int32(off)) => {
-                    dynasm!(self.asm; mov DWORD [rbp - fi + off], *i)
-                }
-                _ => unimplemented!(),
-            },
-            MachineOperand::Register(r) => match off {
-                MachineOperand::Constant(MachineConstant::Int32(off)) => {
-                    match r.info_ref().reg_class {
-                        RegisterClassKind::GR32 => {
-                            dynasm!(self.asm; mov [rbp - fi + off], Rd(register!(r)))
-                        }
-                        _ => unimplemented!(),
-                    }
-                }
-                _ => unimplemented!(),
-            },
-            _ => unimplemented!(),
-        }
+    fn compile_mov_mi32r32(&mut self, fo: &FrameObjectsInfo, instr: &MachineInstr) {
+        let m0 = fo.offset(instr.operand[0].as_frame_index().idx).unwrap();
+        let i1 = instr.operand[1].as_constant().as_i32();
+        let r2 = phys_reg_to_dynasm_reg(instr.operand[2].as_register().get_reg().unwrap());
+        dynasm!(self.asm; mov DWORD [rbp - m0 + i1], Rd(r2));
+    }
+
+    fn compile_mov_mi32i32(&mut self, fo: &FrameObjectsInfo, instr: &MachineInstr) {
+        let m0 = fo.offset(instr.operand[0].as_frame_index().idx).unwrap();
+        let i1 = instr.operand[1].as_constant().as_i32();
+        let i2 = instr.operand[2].as_constant().as_i32();
+        dynasm!(self.asm; mov DWORD [rbp - m0 + i1], i2);
     }
 
     fn compile_store_fi_off(&mut self, fo: &FrameObjectsInfo, instr: &MachineInstr) {

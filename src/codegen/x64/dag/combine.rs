@@ -47,7 +47,7 @@ impl Combine {
         // TODO: Macro for pattern matching?
         let mut replaced = match &node.kind {
             NodeKind::IR(IRNodeKind::Load) => self.combine_node_load(heap, node), // TODO: legalize?
-            NodeKind::IR(IRNodeKind::Store) => self.combine_node_store(heap, node),
+            NodeKind::IR(IRNodeKind::Store) => self.combine_node_store(heap, node), // TODO: legalize?
             NodeKind::IR(IRNodeKind::Add) => self.combine_node_add(replace, heap, node),
             NodeKind::IR(IRNodeKind::BrCond) => self.combine_node_brcond(heap, node),
             _ => node,
@@ -165,7 +165,13 @@ impl Combine {
 
             if op0.is_frame_index() && op1.is_constant() {
                 return heap.alloc(DAGNode::new(
-                    NodeKind::IR(IRNodeKind::StoreFiConstOff),
+                    if new_src.is_maybe_register() && new_src.ty == Type::Int32 {
+                        NodeKind::MI(MINodeKind::MOVmi32r32)
+                    } else if new_src.is_constant() && new_src.ty == Type::Int32 {
+                        NodeKind::MI(MINodeKind::MOVmi32i32)
+                    } else {
+                        unimplemented!()
+                    },
                     vec![op0, op1, new_src],
                     node.ty.clone(),
                 ));

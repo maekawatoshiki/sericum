@@ -37,9 +37,13 @@ pub struct RegisterInfo {
 
 #[derive(Debug, Clone, PartialEq, Copy)]
 pub enum MachineOpcode {
-    MOVrmi32,  // out = mov [rbp - fi.off + const.off]
-    MOVrmri32, // out = mov [rbp - fi.off + off * align]
-    MOVrrri32, // out = mov [base + off * align]
+    MOVrmi32,   // out = mov [rbp - fi.off + const.off]
+    MOVrmri32,  // out = mov [rbp - fi.off + off * align]
+    MOVrrri32,  // out = mov [base + off * align]
+    MOVmi32r32, // mov [rbp - fi.off + const.off], reg
+    MOVmi32i32, // mov [rbp - fi.off + const.off], const.val
+    StoreFiOff,
+    StoreRegOff,
 
     ADDrr32,
     ADDri32,
@@ -65,10 +69,6 @@ pub enum MachineOpcode {
 
     Copy,
 
-    StoreFiConstOff,
-    StoreFiOff,
-    StoreRegOff,
-
     // Call
     Call,
 
@@ -87,10 +87,8 @@ pub enum MachineOpcode {
     BrccLe,
     BrccLt,
 
-    // Phi
     Phi,
 
-    // Return
     Ret,
 }
 

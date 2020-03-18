@@ -222,14 +222,14 @@ impl MIConverter {
                     conv_info.cur_bb,
                 )))
             }
-            NodeKind::IR(IRNodeKind::StoreFiConstOff) => {
+            NodeKind::MI(MINodeKind::MOVmi32r32) | NodeKind::MI(MINodeKind::MOVmi32i32) => {
                 let fi = self.usual_operand(conv_info, node.operand[0]);
                 let off = self.usual_operand(conv_info, node.operand[1]);
-                let new_src = self.usual_operand(conv_info, node.operand[2]);
+                let src = self.usual_operand(conv_info, node.operand[2]);
                 Some(conv_info.push_instr(MachineInstr::new(
                     &conv_info.cur_func.vreg_gen,
-                    MachineOpcode::StoreFiConstOff,
-                    vec![fi, off, new_src],
+                    node.kind.as_mi(),
+                    vec![fi, off, src],
                     None,
                     conv_info.cur_bb,
                 )))
