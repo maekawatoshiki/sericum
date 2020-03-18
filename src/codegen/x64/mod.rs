@@ -12,6 +12,7 @@ impl TypeSize for Type {
             Type::Int1 => 1,
             Type::Int32 => 4,
             Type::Int64 => 8,
+            Type::F64 => 8,
             Type::Array(arrty) => arrty.size_in_byte(),
             Type::Pointer(_) => 8,
             Type::Function(_) => unimplemented!(),

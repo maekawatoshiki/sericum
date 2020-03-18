@@ -564,13 +564,14 @@ impl MIConverter {
         match node.kind {
             NodeKind::Operand(OperandNodeKind::Constant(c)) => match c {
                 ConstantKind::Int32(i) => MachineOperand::Constant(MachineConstant::Int32(i)),
+                ConstantKind::F64(f) => MachineOperand::Constant(MachineConstant::F64(f)),
             },
             NodeKind::Operand(OperandNodeKind::FrameIndex(ref kind)) => {
                 MachineOperand::FrameIndex(kind.clone())
             }
-            NodeKind::Operand(OperandNodeKind::GlobalAddress(ref g)) => match g {
-                GlobalValueKind::FunctionName(n) => {
-                    MachineOperand::GlobalAddress(GlobalValueInfo::FunctionName(n.clone()))
+            NodeKind::Operand(OperandNodeKind::Address(ref g)) => match g {
+                AddressKind::FunctionName(n) => {
+                    MachineOperand::Address(AddressInfo::FunctionName(n.clone()))
                 }
             },
             NodeKind::Operand(OperandNodeKind::BasicBlock(_)) => unimplemented!(),
@@ -603,7 +604,7 @@ pub fn mov_n_rx(bit: usize, x: &MachineOperand) -> Option<MachineOpcode> {
     let xidx = match x {
         MachineOperand::Register(_) => 0,
         MachineOperand::Constant(_) => 1,
-        _ => return None, // TODO: Support GlobalAddress?
+        _ => return None, // TODO: Support Address?
     };
     match bit {
         32 => Some(mov32rx[xidx]),
@@ -626,7 +627,7 @@ pub fn mov_rx(x: &MachineOperand) -> Option<MachineOpcode> {
         MachineOperand::Register(r) => (r.info_ref().reg_class.size_in_bits(), 0),
         MachineOperand::Constant(c) => (c.size_in_bits(), 1),
         MachineOperand::FrameIndex(f) => (f.ty.size_in_bits(), 2),
-        _ => return None, // TODO: Support GlobalAddress?
+        _ => return None, // TODO: Support Address?
     };
     match bit {
         32 => Some(mov32rx[xidx]),
@@ -645,7 +646,7 @@ pub fn mov_mx(x: &MachineOperand) -> Option<MachineOpcode> {
     let (bit, n) = match x {
         MachineOperand::Register(r) => (r.info_ref().reg_class.size_in_bits(), 0),
         MachineOperand::Constant(c) => (c.size_in_bits(), 1),
-        _ => return None, // TODO: Support GlobalAddress?
+        _ => return None, // TODO: Support Address?
     };
     match bit {
         32 => Some(mov32mx[n]),

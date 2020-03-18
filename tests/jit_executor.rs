@@ -684,3 +684,19 @@ fn spill() {
     println!("return: {:?}", res);
     assert_eq!(res, exec::jit::GenericValue::Int32(90));
 }
+
+#[test]
+fn floating_point() {
+    let mut m = module::Module::new("cilk");
+
+    let _ = cilk_ir!(m; define [f64] func [] {
+        entry:
+            ret (f64 3.14);
+    });
+
+    let mut jit = exec::jit::JITExecutor::new(&m);
+    let func = jit.find_function_by_name("func").unwrap();
+    let res = jit.run(func, vec![]);
+    println!("return: {:?}", res);
+    assert_eq!(res, exec::jit::GenericValue::F64(3.14));
+}

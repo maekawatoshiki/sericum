@@ -145,7 +145,19 @@ impl PrologueEpilogueInserter {
                             ]),
                         ),
                     ),
-                    _ => unimplemented!(),
+                    MachineConstant::Int64(_) => unimplemented!(), // TODO
+                    MachineConstant::F64(f) => iseq.push(
+                        cur_func.instr_arena.alloc(
+                            MachineInstr::new_simple(
+                                MachineOpcode::MOVSDrm64,
+                                vec![MachineOperand::Constant(MachineConstant::F64(*f))],
+                                *bb_id,
+                            )
+                            .with_def(vec![
+                                RegisterInfo::new_phy_reg(XMM::XMM0).into_machine_register()
+                            ]),
+                        ),
+                    ),
                 },
                 MachineOperand::Register(r) => {
                     // dynasm!(self.asm; mov rax, Ra(register!(i)))

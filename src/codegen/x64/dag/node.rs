@@ -31,7 +31,7 @@ pub enum OperandNodeKind {
     CondKind(CondKind),
     FrameIndex(FrameIndexInfo), // TODO
     Constant(ConstantKind),
-    GlobalAddress(GlobalValueKind),
+    Address(AddressKind),
     BasicBlock(DAGBasicBlockId),
     Register(RegisterInfoRef),
 }
@@ -66,6 +66,7 @@ pub enum IRNodeKind {
 #[derive(Debug, Clone, PartialEq, Copy)]
 pub enum ConstantKind {
     Int32(i32),
+    F64(f64),
 }
 
 #[derive(Debug, Clone, PartialEq, Copy)]
@@ -76,7 +77,7 @@ pub enum CondKind {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum GlobalValueKind {
+pub enum AddressKind {
     FunctionName(String),
 }
 
@@ -94,18 +95,22 @@ impl ConstantKind {
     pub fn add(self, n: ConstantKind) -> ConstantKind {
         match (self, n) {
             (ConstantKind::Int32(x), ConstantKind::Int32(y)) => ConstantKind::Int32(x + y),
+            (ConstantKind::F64(x), ConstantKind::F64(y)) => ConstantKind::F64(x + y),
+            _ => unimplemented!(),
         }
     }
 
     pub fn get_type(&self) -> Type {
         match self {
             ConstantKind::Int32(_) => Type::Int32,
+            ConstantKind::F64(_) => Type::F64,
         }
     }
 
     pub fn is_null(&self) -> bool {
         match self {
             ConstantKind::Int32(0) => true,
+            ConstantKind::F64(f) if *f == 0.0 => true,
             _ => false,
         }
     }
@@ -158,7 +163,7 @@ impl DAGNode {
     pub fn is_maybe_register(&self) -> bool {
         self.is_operation()
             || matches!(self.kind,
-                 NodeKind::Operand(OperandNodeKind::GlobalAddress(_)) |
+                 NodeKind::Operand(OperandNodeKind::Address(_)) |
                  NodeKind::Operand(OperandNodeKind::Register(_)))
     }
 
@@ -167,7 +172,7 @@ impl DAGNode {
             NodeKind::Operand(OperandNodeKind::CondKind(_))
             | NodeKind::Operand(OperandNodeKind::FrameIndex(_))
             | NodeKind::Operand(OperandNodeKind::Constant(_))
-            | NodeKind::Operand(OperandNodeKind::GlobalAddress(_))
+            | NodeKind::Operand(OperandNodeKind::Address(_))
             | NodeKind::Operand(OperandNodeKind::BasicBlock(_))
             | NodeKind::Operand(OperandNodeKind::Register(_))
             | NodeKind::None => false,

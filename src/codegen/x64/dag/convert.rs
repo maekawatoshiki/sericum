@@ -92,11 +92,15 @@ impl<'a> ConvertToDAG<'a> {
     pub fn get_dag_id_from_value(&mut self, v: &Value, arg_load: bool) -> Raw<DAGNode> {
         match v {
             Value::Instruction(iv) => self.instr_id_node_id[&iv.id],
-            Value::Immediate(ImmediateValue::Int32(i)) => {
+            Value::Immediate(imm) => {
+                let imm = match imm {
+                    ImmediateValue::Int32(i) => ConstantKind::Int32(*i),
+                    ImmediateValue::F64(f) => ConstantKind::F64(*f),
+                };
                 self.cur_conv_info_mut().dag_heap.alloc(DAGNode::new(
-                    NodeKind::Operand(OperandNodeKind::Constant(ConstantKind::Int32(*i))),
+                    NodeKind::Operand(OperandNodeKind::Constant(imm)),
                     vec![],
-                    Type::Int32,
+                    imm.get_type(),
                 ))
             }
             Value::Argument(av) => {
@@ -128,9 +132,9 @@ impl<'a> ConvertToDAG<'a> {
             Value::Function(FunctionValue { func_id }) => {
                 let f = self.module.function_ref(*func_id);
                 self.cur_conv_info_mut().dag_heap.alloc(DAGNode::new(
-                    NodeKind::Operand(OperandNodeKind::GlobalAddress(
-                        GlobalValueKind::FunctionName(f.name.to_string()),
-                    )),
+                    NodeKind::Operand(OperandNodeKind::Address(AddressKind::FunctionName(
+                        f.name.to_string(),
+                    ))),
                     vec![],
                     Type::Void, // TODO
                 ))
@@ -404,7 +408,7 @@ impl<'a> ConvertToDAG<'a> {
                 }
                 NodeKind::Operand(OperandNodeKind::CondKind(_))
                 | NodeKind::Operand(OperandNodeKind::FrameIndex(_))
-                | NodeKind::Operand(OperandNodeKind::GlobalAddress(_))
+                | NodeKind::Operand(OperandNodeKind::Address(_))
                 | NodeKind::Operand(OperandNodeKind::BasicBlock(_)) => idx,
                 _ => {
                     let tysz = heap.alloc(DAGNode::new(

@@ -3,7 +3,7 @@
 use super::super::register::{PhysReg, RegisterClassKind};
 use super::roundup;
 use crate::codegen::x64::machine::{
-    basic_block::*, frame_object::*, function::*, instr::*, module::*,
+    basic_block::*, const_data::*, frame_object::*, function::*, instr::*, module::*,
 };
 use crate::ir;
 use crate::{codegen::internal_function_names, ir::types::*};
@@ -24,6 +24,7 @@ fn phys_reg_to_dynasm_reg(r: PhysReg) -> u8 {
 #[derive(Debug, Clone, PartialEq)]
 pub enum GenericValue {
     Int32(i32),
+    F64(f64),
     None,
 }
 
@@ -36,6 +37,7 @@ pub struct JITCompiler {
     asm: x64::Assembler,
     function_map: FxHashMap<MachineFunctionId, DynamicLabel>,
     bb_to_label: FxHashMap<MachineBasicBlockId, DynamicLabel>,
+    data_id_to_label: FxHashMap<DataId, DynamicLabel>,
     internal_functions: FxHashMap<String, u64>, // name -> fn address
 }
 
@@ -65,6 +67,7 @@ impl JITExecutor {
         machine::regalloc::RegisterAllocator::new().run_on_module(&mut machine_module);
         machine::pro_epi_inserter::PrologueEpilogueInserter::new()
             .run_on_module(&mut machine_module);
+        machine::replace_data::ConstDataReplacer::new().run_on_module(&mut machine_module);
 
         debug!(
             println!("MachineModule dump:");
@@ -107,6 +110,7 @@ impl JITCompiler {
             asm: x64::Assembler::new().unwrap(),
             function_map: FxHashMap::default(),
             bb_to_label: FxHashMap::default(),
+            data_id_to_label: FxHashMap::default(),
             internal_functions: {
                 let internal_names = internal_function_names();
                 let internals = vec![
@@ -141,6 +145,7 @@ impl JITCompiler {
             match arg {
                 GenericValue::Int32(i) => dynasm!(self.asm; mov Ra(phys_reg_to_dynasm_reg(
                     RegisterClassKind::GR32.get_nth_arg_reg(idx).unwrap())), *i),
+                GenericValue::F64(_) => unimplemented!(),
                 GenericValue::None => unreachable!(),
             }
         }
@@ -156,6 +161,10 @@ impl JITCompiler {
 
         match &module.function_ref(id).ty.get_function_ty().unwrap().ret_ty {
             Type::Int32 => GenericValue::Int32(f() as i32),
+            Type::F64 => {
+                let f: extern "C" fn() -> f64 = unsafe { ::std::mem::transmute(buf.ptr(entry)) };
+                GenericValue::F64(f() as f64)
+            }
             Type::Void => {
                 f();
                 GenericValue::None
@@ -165,6 +174,16 @@ impl JITCompiler {
     }
 
     pub fn compile_module(&mut self, module: &MachineModule) {
+        // TODO:
+        for (id, c) in module.const_data.arena.iter().enumerate() {
+            let x = unsafe { ::std::mem::transmute::<f64, u64>(c.as_f64()) };
+            let h = (x >> 32) as i32;
+            let l = (x & 0xffff_ffff) as i32;
+            let label = self.asm.new_dynamic_label();
+            self.data_id_to_label.insert(id, label);
+            dynasm!(self.asm; =>label; .dword l, h);
+        }
+
         for (f_id, _) in &module.functions {
             self.compile_function(module, f_id);
         }
@@ -212,6 +231,7 @@ impl JITCompiler {
                     MachineOpcode::MOVrm64 => self.compile_mov_rm64(&frame_objects, instr),
                     MachineOpcode::MOVmr32 => self.compile_mov_mr32(&frame_objects, instr),
                     MachineOpcode::MOVmi32 => self.compile_mov_mi32(&frame_objects, instr),
+                    MachineOpcode::MOVSDrm64 => self.compile_movsd_rm64(&frame_objects, instr),
                     MachineOpcode::LEA64 => self.compile_lea64(&frame_objects, instr),
                     MachineOpcode::RET => self.compile_ret(),
                     MachineOpcode::PUSH64 => self.compile_push64(instr),
@@ -308,6 +328,13 @@ impl JITCompiler {
         dynasm!(self.asm; mov DWORD [rbp - fo.offset(m0.idx).unwrap()], i1);
     }
 
+    fn compile_movsd_rm64(&mut self, fo: &FrameObjectsInfo, instr: &MachineInstr) {
+        let r0 = phys_reg_to_dynasm_reg(instr.def[0].get_reg().unwrap());
+        let m1 = instr.operand[0].as_address().as_absolute();
+        let lbl = self.data_id_to_label.get(&m1).unwrap();
+        dynasm!(self.asm; movsd Rx(r0), [=>*lbl]);
+    }
+
     fn compile_lea64(&mut self, fo: &FrameObjectsInfo, instr: &MachineInstr) {
         let r0 = phys_reg_to_dynasm_reg(instr.def[0].get_reg().unwrap());
         let fi = instr.operand[0].as_frame_index();
@@ -348,6 +375,7 @@ impl JITCompiler {
                 MachineOperand::Constant(c) => match c {
                     MachineConstant::Int32(x) => dynasm!(self.asm; cmp Rd(register!(i0)), *x),
                     MachineConstant::Int64(_) => unimplemented!(),
+                    MachineConstant::F64(_) => unimplemented!(),
                 },
                 MachineOperand::Register(i1) => match i0.get_reg_class() {
                     RegisterClassKind::GR32 => {
@@ -488,7 +516,7 @@ impl JITCompiler {
     ) {
         let callee_id = module
             .find_function_by_name(match &instr.operand[0] {
-                MachineOperand::GlobalAddress(GlobalValueInfo::FunctionName(n)) => n.as_str(),
+                MachineOperand::Address(AddressInfo::FunctionName(n)) => n.as_str(),
                 _ => unimplemented!(),
             })
             .unwrap();
@@ -671,6 +699,7 @@ impl JITCompiler {
         match rc {
             RegisterClassKind::GR32 => dynasm!(self.asm; mov Rd(r0), Rd(r1)),
             RegisterClassKind::GR64 => dynasm!(self.asm; mov Rq(r0), Rq(r1)),
+            _ => unimplemented!(),
         }
     }
 

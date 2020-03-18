@@ -1,16 +1,24 @@
 use super::{function::*, module::*, opcode::*, types::*, DumpToString};
 
-macro_rules! const_op { ($name:ident, $op:tt) => {
+macro_rules! const_op {
+    ($name:ident, $op:tt) => {
     pub fn $name(&self, v: &Value) -> Option<Value> {
         use ImmediateValue::*;
         match (self, v) {
-            (Value::Immediate(imm1), Value::Immediate(imm2)) => match (imm1, imm2) {
-                (Int32(i1), Int32(i2)) => Some(Value::Immediate(Int32(i1 $op i2))),
-            },
+            (Value::Immediate(Int32(i1)), Value::Immediate(Int32(i2))) => Some(Value::Immediate(Int32(i1 $op i2))),
+            (Value::Immediate(F64(i1)), Value::Immediate(F64(i2))) => Some(Value::Immediate(F64(i1 $op i2))),
             _ => None,
         }
-    }
-}}
+    } };
+    (int_only $name:ident, $op:tt) => {
+    pub fn $name(&self, v: &Value) -> Option<Value> {
+        use ImmediateValue::*;
+        match (self, v) {
+            (Value::Immediate(Int32(i1)), Value::Immediate(Int32(i2))) => Some(Value::Immediate(Int32(i1 $op i2))),
+            _ => None,
+        }
+    } }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Value {
@@ -44,11 +52,16 @@ pub struct FunctionValue {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ImmediateValue {
     Int32(i32),
+    F64(f64),
 }
 
 impl Value {
     pub fn new_imm_int32(i: i32) -> Self {
         Self::Immediate(ImmediateValue::Int32(i))
+    }
+
+    pub fn new_imm_f64(f: f64) -> Self {
+        Self::Immediate(ImmediateValue::F64(f))
     }
 
     pub fn new_func(f: FunctionValue) -> Self {
@@ -91,7 +104,7 @@ impl Value {
     const_op!(const_add, +);
     const_op!(const_sub, -);
     const_op!(const_mul, *);
-    const_op!(const_rem, %);
+    const_op!(int_only const_rem, %);
 
     // Utils
 
@@ -108,6 +121,7 @@ impl Value {
             }
             Value::Immediate(iv) => match iv {
                 ImmediateValue::Int32(i) => format!("i32 {}", i),
+                ImmediateValue::F64(f) => format!("f64 {}", f),
             },
             Value::Instruction(InstructionValue {
                 func_id,
@@ -144,12 +158,21 @@ impl ImmediateValue {
     pub fn get_type(&self) -> &Type {
         match self {
             ImmediateValue::Int32(_) => &Type::Int32,
+            ImmediateValue::F64(_) => &Type::F64,
         }
     }
 
     pub fn as_int32(&self) -> i32 {
         match self {
             ImmediateValue::Int32(i) => *i,
+            _ => panic!(),
+        }
+    }
+
+    pub fn as_f64(&self) -> f64 {
+        match self {
+            ImmediateValue::F64(f) => *f,
+            _ => panic!(),
         }
     }
 }

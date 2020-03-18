@@ -6,6 +6,7 @@ pub enum Type {
     Int1,
     Int32,
     Int64,
+    F64,
     Pointer(Box<Type>),
     Array(Box<ArrayType>),
     Function(Box<FunctionType>),
@@ -54,7 +55,9 @@ impl Type {
 
     pub fn get_element_ty_with_indices(&self, indices: &[Value]) -> Option<&Type> {
         match self {
-            Type::Void | Type::Int1 | Type::Int32 | Type::Int64 | Type::Function(_) => None,
+            Type::Void | Type::Int1 | Type::Int32 | Type::Int64 | Type::F64 | Type::Function(_) => {
+                None
+            }
             Type::Pointer(p) => {
                 match indices.len() {
                     0 => Some(self),
@@ -77,6 +80,7 @@ impl Type {
             Type::Int1 => "i1".to_string(),
             Type::Int32 => "i32".to_string(),
             Type::Int64 => "i64".to_string(),
+            Type::F64 => "f64".to_string(),
             Type::Pointer(e) => format!("{}*", e.to_string()),
             Type::Array(a) => a.to_string(),
             Type::Function(f) => f.to_string(),

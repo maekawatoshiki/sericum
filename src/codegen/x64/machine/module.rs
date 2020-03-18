@@ -1,10 +1,11 @@
+use super::const_data::ConstDataArena;
 use super::function::*;
 use id_arena::*;
 
-#[derive(Clone, Debug)]
 pub struct MachineModule {
     pub name: String,
     pub functions: Arena<MachineFunction>,
+    pub const_data: ConstDataArena,
 }
 
 impl MachineModule {
@@ -12,6 +13,7 @@ impl MachineModule {
         Self {
             name: name.to_string(),
             functions: Arena::new(),
+            const_data: ConstDataArena::new(),
         }
     }
 

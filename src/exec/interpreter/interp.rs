@@ -1,3 +1,5 @@
+// TODO: CAUTION: this code is no longer usable
+
 use crate::ir::{function::*, module::*, opcode::*, types::*, value::*};
 use rustc_hash::FxHashMap;
 
@@ -46,6 +48,7 @@ impl<'a> Interpreter<'a> {
                 Value::Instruction(InstructionValue { id, .. }) => mem.get(&id).unwrap().clone(),
                 Value::Immediate(im) => match im {
                     ImmediateValue::Int32(i) => ConcreteValue::Int32(*i),
+                    _ => unimplemented!(),
                 },
                 Value::Function(_id) => unimplemented!(),
                 Value::None => ConcreteValue::Void,
@@ -88,6 +91,7 @@ impl<'a> Interpreter<'a> {
                                     Type::Int1 => Box::into_raw(Box::new(0u8)) as *mut u8,
                                     Type::Int32 => Box::into_raw(Box::new(0u32)) as *mut u8,
                                     Type::Int64 => Box::into_raw(Box::new(0u64)) as *mut u8,
+                                    Type::F64 => unimplemented!(),
                                     Type::Pointer(_) => unimplemented!(),
                                     Type::Void => unreachable!(),
                                     Type::Function(_) => unimplemented!(),

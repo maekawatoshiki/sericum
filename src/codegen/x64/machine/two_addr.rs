@@ -51,7 +51,7 @@ impl TwoAddressConverter {
         for (instr_id, def, use_) in tied {
             let instr_bb = f.instr_arena[instr_id].parent;
 
-            // before: v1 = add v2, 1 (tied: v1 and v2)
+            // before: v1 = add v1, 1
             // after:  v1 = copy v2
             //         v1 = add v1, 1
 

@@ -1,7 +1,7 @@
 use super::super::register::{
     rc2ty, PhysReg, RegisterClassKind, TargetRegisterTrait, VirtReg, VirtRegGen,
 };
-use super::{basic_block::*, frame_object::*};
+use super::{basic_block::*, const_data::DataId, frame_object::*};
 use crate::ir::types::*;
 use id_arena::*;
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -37,6 +37,7 @@ pub struct RegisterInfo {
 
 #[derive(Debug, Clone, PartialEq, Copy)]
 pub enum MachineOpcode {
+    MOVSDrm64,  // out(xmm) = movsd [memory]
     MOVrmi32,   // out = mov [rbp - fi.off + const.off]
     MOVrmri32,  // out = mov [rbp - fi.off + off * align]
     MOVrrri32,  // out = mov [base + off * align]
@@ -97,7 +98,7 @@ pub enum MachineOperand {
     Register(MachineRegister),
     Constant(MachineConstant),
     FrameIndex(FrameIndexInfo),
-    GlobalAddress(GlobalValueInfo),
+    Address(AddressInfo),
     Branch(MachineBasicBlockId),
     None,
 }
@@ -106,11 +107,13 @@ pub enum MachineOperand {
 pub enum MachineConstant {
     Int32(i32),
     Int64(i64),
+    F64(f64),
 }
 
 #[derive(Clone)]
-pub enum GlobalValueInfo {
+pub enum AddressInfo {
     FunctionName(String),
+    Absolute(DataId),
 }
 
 #[derive(Clone, PartialEq)]
@@ -496,6 +499,13 @@ impl MachineOperand {
         }
     }
 
+    pub fn as_address(&self) -> &AddressInfo {
+        match self {
+            MachineOperand::Address(addr) => addr,
+            _ => panic!(),
+        }
+    }
+
     pub fn is_virtual_register(&self) -> bool {
         match self {
             MachineOperand::Register(r) => r.is_vreg(),
@@ -522,8 +532,9 @@ impl MachineOperand {
             MachineOperand::Branch(_) => None,
             MachineOperand::Constant(MachineConstant::Int32(_)) => Some(Type::Int32),
             MachineOperand::Constant(MachineConstant::Int64(_)) => Some(Type::Int64),
+            MachineOperand::Constant(MachineConstant::F64(_)) => Some(Type::F64),
             MachineOperand::FrameIndex(fi) => Some(fi.ty.clone()),
-            MachineOperand::GlobalAddress(_) => None, // TODO
+            MachineOperand::Address(_) => None, // TODO
             MachineOperand::None => None,
             // TODO
             MachineOperand::Register(r) => Some(rc2ty(r.info_ref().reg_class)),
@@ -535,14 +546,30 @@ impl MachineConstant {
     pub fn as_i32(&self) -> i32 {
         match self {
             MachineConstant::Int32(i) => *i,
-            _ => unimplemented!(),
+            _ => panic!(),
         }
     }
 
     pub fn as_i64(&self) -> i64 {
         match self {
             MachineConstant::Int64(i) => *i,
-            _ => unimplemented!(),
+            _ => panic!(),
+        }
+    }
+
+    pub fn as_f64(&self) -> f64 {
+        match self {
+            MachineConstant::F64(f) => *f,
+            _ => panic!(),
+        }
+    }
+}
+
+impl AddressInfo {
+    pub fn as_absolute(&self) -> DataId {
+        match self {
+            AddressInfo::Absolute(id) => *id,
+            _ => panic!(),
         }
     }
 }
@@ -552,6 +579,7 @@ impl TypeSize for MachineConstant {
         match self {
             MachineConstant::Int32(_) => 4,
             MachineConstant::Int64(_) => 8,
+            MachineConstant::F64(_) => 8,
         }
     }
 
@@ -619,7 +647,7 @@ impl fmt::Debug for MachineOperand {
             MachineOperand::Register(r) => r.fmt(f),
             MachineOperand::Constant(c) => c.fmt(f),
             MachineOperand::FrameIndex(fi) => fi.fmt(f),
-            MachineOperand::GlobalAddress(g) => g.fmt(f),
+            MachineOperand::Address(g) => g.fmt(f),
             MachineOperand::Branch(id) => write!(f, "BB#{}", id.index()),
             MachineOperand::None => write!(f, ""),
         }
@@ -645,16 +673,18 @@ impl fmt::Debug for RegisterInfo {
 impl fmt::Debug for MachineConstant {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            MachineConstant::Int32(i) => write!(f, "i32 {}", i),
-            MachineConstant::Int64(i) => write!(f, "i64 {}", i),
+            MachineConstant::Int32(x) => write!(f, "i32 {}", x),
+            MachineConstant::Int64(x) => write!(f, "i64 {}", x),
+            MachineConstant::F64(x) => write!(f, "f64 {}", x),
         }
     }
 }
 
-impl fmt::Debug for GlobalValueInfo {
+impl fmt::Debug for AddressInfo {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            GlobalValueInfo::FunctionName(name) => write!(f, "ga<{}>", name),
+            AddressInfo::FunctionName(name) => write!(f, "addr<fn:{}>", name),
+            AddressInfo::Absolute(id) => write!(f, "addr<lbl:{}>", id),
         }
     }
 }
