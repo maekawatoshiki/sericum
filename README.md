@@ -70,6 +70,7 @@ builder.set_insert_point(br2);
     builder.build_ret(add);
 
 println!("Function dump:\n{}", m.dump(fibo));
+}
 
 // Function dump:
 // define i32 fibo(i32) {       
