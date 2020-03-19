@@ -83,7 +83,7 @@ pub fn run(item: TokenStream) -> TokenStream {
     let mut reader = TokenStreamReader::new(item.into_iter());
 
     while reader.skip_if_cur_is_ident("RegisterClass") {
-        let reg_class = reader.get_ident().unwrap();
+        let _reg_class = reader.get_ident().unwrap();
         // panic!("reg class name: {}", reg_class);
     }
 

@@ -201,7 +201,7 @@ impl RegisterClassKind {
     }
 }
 
-// TODO
+// TODO: The definition of GR32 is now hard coded in ROOT/defs/src/register.rs
 use defs::define_registers;
 define_registers!(
     RegisterClass GR32 (i32) {
