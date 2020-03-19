@@ -35,9 +35,7 @@ pub struct JITExecutor {
 
 pub struct JITCompiler {
     asm: x64::Assembler,
-    function_map: FxHashMap<MachineFunctionId, DynamicLabel>,
-    bb_to_label: FxHashMap<MachineBasicBlockId, DynamicLabel>,
-    data_id_to_label: FxHashMap<DataId, DynamicLabel>,
+    labels: FxHashMap<LabelKey, DynamicLabel>,
     internal_functions: FxHashMap<String, u64>, // name -> fn address
 }
 
@@ -108,9 +106,7 @@ impl JITCompiler {
     pub fn new() -> Self {
         Self {
             asm: x64::Assembler::new().unwrap(),
-            function_map: FxHashMap::default(),
-            bb_to_label: FxHashMap::default(),
-            data_id_to_label: FxHashMap::default(),
+            labels: FxHashMap::default(),
             internal_functions: {
                 let internal_names = internal_function_names();
                 let internals = vec![
@@ -138,7 +134,7 @@ impl JITCompiler {
         id: MachineFunctionId,
         args: Vec<GenericValue>,
     ) -> GenericValue {
-        let f_entry = self.get_function_entry_label(id);
+        let f_entry = self.get_label(id);
         let entry = self.asm.offset();
 
         for (idx, arg) in args.iter().enumerate() {
@@ -174,13 +170,12 @@ impl JITCompiler {
     }
 
     pub fn compile_module(&mut self, module: &MachineModule) {
-        // TODO:
-        for (id, c) in module.const_data.arena.iter().enumerate() {
-            let x = unsafe { ::std::mem::transmute::<f64, u64>(c.as_f64()) };
+        // Place constant data in memory
+        for (id, c) in module.const_data.id_and_data() {
+            let x = unsafe { ::std::mem::transmute::<f64, u64>(c.as_f64()) }; // TODO: now support only for f64
             let h = (x >> 32) as i32;
             let l = (x & 0xffff_ffff) as i32;
-            let label = self.asm.new_dynamic_label();
-            self.data_id_to_label.insert(id, label);
+            let label = self.get_label(id);
             dynasm!(self.asm; =>label; .dword l, h);
         }
 
@@ -190,36 +185,27 @@ impl JITCompiler {
     }
 
     fn compile_function(&mut self, module: &MachineModule, id: MachineFunctionId) {
-        self.bb_to_label.clear();
-
         let f = module.function_ref(id);
 
         if f.internal {
             return;
         }
 
-        let f_entry = self.get_function_entry_label(id);
+        let f_entry = self.get_label(id);
 
         let frame_objects = FrameObjectsInfo::new(f);
 
-        // prologue
-        // TODO: Create PrologueInserter for machine code
-
         dynasm!(self.asm
-            ; => f_entry
-            // ; push rbp
-            // ; mov rbp, rsp
-            // ; sub rsp, roundup(frame_objects.total_size() + /*push rbp=*/8, 16) - 8
+            ; =>f_entry
         );
 
         for bb_id in &f.basic_blocks {
             let bb = &f.basic_block_arena[*bb_id];
 
             if bb_id.index() != 0 {
-                let label = self.get_label_of_bb(*bb_id);
+                let label = self.get_label(*bb_id);
                 dynasm!(self.asm; =>label);
             }
-
             for instr in &*bb.iseq_ref() {
                 let instr = &f.instr_arena[*instr];
                 match instr.opcode {
@@ -231,7 +217,12 @@ impl JITCompiler {
                     MachineOpcode::MOVrm64 => self.compile_mov_rm64(&frame_objects, instr),
                     MachineOpcode::MOVmr32 => self.compile_mov_mr32(&frame_objects, instr),
                     MachineOpcode::MOVmi32 => self.compile_mov_mi32(&frame_objects, instr),
-                    MachineOpcode::MOVSDrm64 => self.compile_movsd_rm64(&frame_objects, instr),
+                    MachineOpcode::MOVrmi32 => self.compile_mov_rmi32(&frame_objects, instr),
+                    MachineOpcode::MOVrmri32 => self.compile_mov_rmri32(&frame_objects, instr),
+                    MachineOpcode::MOVrrri32 => self.compile_mov_rrri32(&frame_objects, instr),
+                    MachineOpcode::MOVmi32r32 => self.compile_mov_mi32r32(&frame_objects, instr),
+                    MachineOpcode::MOVmi32i32 => self.compile_mov_mi32i32(&frame_objects, instr),
+                    MachineOpcode::MOVSDrm64 => self.compile_movsd_rm64(instr),
                     MachineOpcode::LEA64 => self.compile_lea64(&frame_objects, instr),
                     MachineOpcode::RET => self.compile_ret(),
                     MachineOpcode::PUSH64 => self.compile_push64(instr),
@@ -246,11 +237,6 @@ impl JITCompiler {
                     MachineOpcode::IMULrri32 => self.compile_imul_rri32(instr),
                     MachineOpcode::IDIV => self.compile_idiv(&frame_objects, instr),
                     MachineOpcode::CDQ => self.compile_cdq(&frame_objects, instr),
-                    MachineOpcode::MOVrmi32 => self.compile_mov_rmi32(&frame_objects, instr),
-                    MachineOpcode::MOVrmri32 => self.compile_mov_rmri32(&frame_objects, instr),
-                    MachineOpcode::MOVrrri32 => self.compile_mov_rrri32(&frame_objects, instr),
-                    MachineOpcode::MOVmi32r32 => self.compile_mov_mi32r32(&frame_objects, instr),
-                    MachineOpcode::MOVmi32i32 => self.compile_mov_mi32i32(&frame_objects, instr),
                     MachineOpcode::StoreFiOff => self.compile_store_fi_off(&frame_objects, instr),
                     MachineOpcode::StoreRegOff => self.compile_store_reg_off(&frame_objects, instr),
                     MachineOpcode::Call => self.compile_call(module, &frame_objects, instr),
@@ -328,11 +314,11 @@ impl JITCompiler {
         dynasm!(self.asm; mov DWORD [rbp - fo.offset(m0.idx).unwrap()], i1);
     }
 
-    fn compile_movsd_rm64(&mut self, fo: &FrameObjectsInfo, instr: &MachineInstr) {
+    fn compile_movsd_rm64(&mut self, instr: &MachineInstr) {
         let r0 = phys_reg_to_dynasm_reg(instr.def[0].get_reg().unwrap());
         let m1 = instr.operand[0].as_address().as_absolute();
-        let lbl = self.data_id_to_label.get(&m1).unwrap();
-        dynasm!(self.asm; movsd Rx(r0), [=>*lbl]);
+        let l1 = self.get_label(m1);
+        dynasm!(self.asm; movsd Rx(r0), [=>l1]);
     }
 
     fn compile_lea64(&mut self, fo: &FrameObjectsInfo, instr: &MachineInstr) {
@@ -389,7 +375,7 @@ impl JITCompiler {
         }
         match br {
             MachineOperand::Branch(bb) => {
-                let l = self.get_label_of_bb(*bb);
+                let l = self.get_label(*bb);
                 match instr.opcode {
                     MachineOpcode::BrccEq => dynasm!(self.asm; jz => l),
                     MachineOpcode::BrccLe => dynasm!(self.asm; jle => l),
@@ -537,7 +523,7 @@ impl JITCompiler {
                 ; add rsp, rsp_adjust
             );
         } else {
-            let f_entry = self.get_function_entry_label(callee_id);
+            let f_entry = self.get_label(callee_id);
             dynasm!(self.asm; call => f_entry);
         }
 
@@ -646,7 +632,7 @@ impl JITCompiler {
     fn compile_br(&mut self, instr: &MachineInstr) {
         match &instr.operand[0] {
             MachineOperand::Branch(bb) => {
-                let label = self.get_label_of_bb(*bb);
+                let label = self.get_label(*bb);
                 dynasm!(self.asm; jmp =>label)
             }
             _ => unimplemented!(),
@@ -703,24 +689,41 @@ impl JITCompiler {
         }
     }
 
-    fn get_label_of_bb(&mut self, bb_id: MachineBasicBlockId) -> DynamicLabel {
-        if let Some(label) = self.bb_to_label.get(&bb_id) {
+    fn get_label<K: Into<LabelKey>>(&mut self, key: K) -> DynamicLabel {
+        let key = key.into();
+
+        if let Some(label) = self.labels.get(&key) {
             return *label;
         }
 
         let new_label = self.asm.new_dynamic_label();
-        self.bb_to_label.insert(bb_id, new_label);
+        self.labels.insert(key, new_label);
         new_label
     }
+}
 
-    fn get_function_entry_label(&mut self, f_id: MachineFunctionId) -> DynamicLabel {
-        if self.function_map.contains_key(&f_id) {
-            return *self.function_map.get(&f_id).unwrap();
-        }
+#[derive(Debug, Clone, Copy, PartialEq, Hash, Eq)]
+enum LabelKey {
+    Data(DataId),
+    BB(MachineBasicBlockId),
+    Func(MachineFunctionId),
+}
 
-        let f_entry = self.asm.new_dynamic_label();
-        self.function_map.insert(f_id, f_entry);
-        f_entry
+impl From<MachineBasicBlockId> for LabelKey {
+    fn from(id: MachineBasicBlockId) -> Self {
+        LabelKey::BB(id)
+    }
+}
+
+impl From<DataId> for LabelKey {
+    fn from(id: DataId) -> Self {
+        LabelKey::Data(id)
+    }
+}
+
+impl From<MachineFunctionId> for LabelKey {
+    fn from(id: MachineFunctionId) -> Self {
+        LabelKey::Func(id)
     }
 }
 

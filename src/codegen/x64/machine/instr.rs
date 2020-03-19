@@ -684,7 +684,7 @@ impl fmt::Debug for AddressInfo {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             AddressInfo::FunctionName(name) => write!(f, "addr<fn:{}>", name),
-            AddressInfo::Absolute(id) => write!(f, "addr<lbl:{}>", id),
+            AddressInfo::Absolute(id) => write!(f, "addr<{}>", id),
         }
     }
 }
