@@ -339,7 +339,7 @@ impl MIConverter {
             NodeKind::IR(IRNodeKind::Add) => {
                 let op1 = self.usual_operand(conv_info, node.operand[0]);
                 let op2 = self.usual_operand(conv_info, node.operand[1]);
-                let op1_reg = op1.as_register().clone();
+                let op1_reg = op1.as_register().clone(); // todo: may be frame index
                 let inst = MachineInstr::new(
                     &conv_info.cur_func.vreg_gen,
                     MachineOpcode::Add,

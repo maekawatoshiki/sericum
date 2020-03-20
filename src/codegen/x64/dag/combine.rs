@@ -46,8 +46,6 @@ impl Combine {
 
         // TODO: Macro for pattern matching?
         let mut replaced = match &node.kind {
-            NodeKind::IR(IRNodeKind::Load) => self.combine_node_load(heap, node), // TODO: legalize?
-            NodeKind::IR(IRNodeKind::Store) => self.combine_node_store(heap, node), // TODO: legalize?
             NodeKind::IR(IRNodeKind::Add) => self.combine_node_add(replace, heap, node),
             NodeKind::IR(IRNodeKind::BrCond) => self.combine_node_brcond(heap, node),
             _ => node,
@@ -103,101 +101,6 @@ impl Combine {
                 vec![op0, c],
                 node.ty.clone(),
             ));
-        }
-
-        node
-    }
-
-    fn combine_node_load(
-        &mut self,
-        heap: &mut RawAllocator<DAGNode>,
-        node: Raw<DAGNode>,
-    ) -> Raw<DAGNode> {
-        if node.operand[0].is_operation() && node.operand[0].kind == NodeKind::IR(IRNodeKind::Add) {
-            let add = node.operand[0].clone();
-            let op0 = add.operand[0];
-            let op1 = add.operand[1];
-
-            if op0.is_frame_index() && op1.is_constant() {
-                return heap.alloc(DAGNode::new(
-                    NodeKind::MI(MINodeKind::MOVrmi32),
-                    vec![op0, op1],
-                    node.ty.clone(),
-                ));
-            }
-
-            if op0.is_frame_index()
-                && op1.kind == NodeKind::IR(IRNodeKind::Mul)
-                && op1.operand[1].is_constant()
-            {
-                return heap.alloc(DAGNode::new(
-                    NodeKind::MI(MINodeKind::MOVrmri32),
-                    vec![op0, op1.operand[0], op1.operand[1]],
-                    node.ty.clone(),
-                ));
-            }
-
-            if op0.is_operation()
-                && op1.kind == NodeKind::IR(IRNodeKind::Mul)
-                && op1.operand[1].is_constant()
-            {
-                return heap.alloc(DAGNode::new(
-                    NodeKind::MI(MINodeKind::MOVrrri32),
-                    vec![op0, op1.operand[0], op1.operand[1]],
-                    node.ty.clone(),
-                ));
-            }
-        }
-
-        node
-    }
-
-    fn combine_node_store(
-        &mut self,
-        heap: &mut RawAllocator<DAGNode>,
-        node: Raw<DAGNode>,
-    ) -> Raw<DAGNode> {
-        if node.operand[0].kind == NodeKind::IR(IRNodeKind::Add) {
-            let add = node.operand[0].clone();
-            let op0 = add.operand[0];
-            let op1 = add.operand[1];
-            let new_src = node.operand[1];
-
-            if op0.is_frame_index() && op1.is_constant() {
-                return heap.alloc(DAGNode::new(
-                    if new_src.is_maybe_register() && new_src.ty == Type::Int32 {
-                        NodeKind::MI(MINodeKind::MOVmi32r32)
-                    } else if new_src.is_constant() && new_src.ty == Type::Int32 {
-                        NodeKind::MI(MINodeKind::MOVmi32i32)
-                    } else {
-                        unimplemented!()
-                    },
-                    vec![op0, op1, new_src],
-                    node.ty.clone(),
-                ));
-            }
-
-            if op0.is_frame_index()
-                && op1.kind == NodeKind::IR(IRNodeKind::Mul)
-                && op1.operand[1].is_constant()
-            {
-                return heap.alloc(DAGNode::new(
-                    NodeKind::IR(IRNodeKind::StoreFiOff),
-                    vec![op0, op1.operand[0], op1.operand[1], new_src],
-                    node.ty.clone(),
-                ));
-            }
-
-            if op0.is_operation()
-                && op1.kind == NodeKind::IR(IRNodeKind::Mul)
-                && op1.operand[1].is_constant()
-            {
-                return heap.alloc(DAGNode::new(
-                    NodeKind::IR(IRNodeKind::StoreRegOff),
-                    vec![op0, op1.operand[0], op1.operand[1], new_src],
-                    node.ty.clone(),
-                ));
-            }
         }
 
         node

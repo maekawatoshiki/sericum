@@ -1,6 +1,7 @@
 use super::value::Value;
+use std::fmt;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub enum Type {
     Void,
     Int1,
@@ -112,5 +113,11 @@ impl ArrayType {
 
     pub fn to_string(&self) -> String {
         format!("[{} x {}]", self.len, self.elem_ty.to_string(),)
+    }
+}
+
+impl fmt::Debug for Type {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.to_string())
     }
 }

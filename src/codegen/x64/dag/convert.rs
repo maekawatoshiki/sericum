@@ -123,7 +123,7 @@ impl<'a> ConvertToDAG<'a> {
                         vec![fi],
                         ty.clone(),
                     ));
-                    self.make_chain(load_id);
+                    // self.make_chain(load_id);
                     load_id
                 } else {
                     fi
@@ -199,7 +199,7 @@ impl<'a> ConvertToDAG<'a> {
                         self.instr_id_to_copy_node.insert(instr_id, copy_from_reg);
                         self.instr_id_node_id.insert(instr_id, load_id);
                     } else {
-                        make_chain!(load_id);
+                        // make_chain!(load_id);
                         self.instr_id_node_id.insert(instr_id, load_id);
                     }
                 }
@@ -236,7 +236,9 @@ impl<'a> ConvertToDAG<'a> {
                         self.instr_id_to_copy_node.insert(instr_id, copy_from_reg);
                         self.instr_id_node_id.insert(instr_id, id);
                     } else {
-                        make_chain!(id);
+                        if instr.ty == Type::Void {
+                            make_chain!(id);
+                        }
                         self.instr_id_node_id.insert(instr_id, id);
                     }
                 }

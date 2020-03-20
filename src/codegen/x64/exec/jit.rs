@@ -45,18 +45,17 @@ impl JITExecutor {
 
         let mut dag_module = dag::convert::ConvertToDAG::new(module).convert_module();
 
-        dag::combine::Combine::new().combine_module(&mut dag_module);
-        dag::isel::MISelector::new().run_on_module(&mut dag_module);
-
+        // TODO: refine
         debug!(
             println!("DAG:");
             for (_, dag_func) in &dag_module.functions {
-                for id in &dag_func.dag_basic_blocks {
-                    let bb = &dag_func.dag_basic_block_arena[*id];
-                    println!("{}: {:?}", id.index(), bb);
-                }
+                println!("{:?}", dag_func);
             }
         );
+
+        dag::combine::Combine::new().combine_module(&mut dag_module);
+        dag::legalize::Legalize::new().run_on_module(&mut dag_module);
+        dag::isel::MISelector::new().run_on_module(&mut dag_module);
 
         let mut machine_module = dag::mc_convert::MIConverter::new().convert_module(dag_module);
 
@@ -67,6 +66,7 @@ impl JITExecutor {
             .run_on_module(&mut machine_module);
         machine::replace_data::ConstDataReplacer::new().run_on_module(&mut machine_module);
 
+        // TODO: refine
         debug!(
             println!("MachineModule dump:");
             for (_, machine_func) in &machine_module.functions {

@@ -2,6 +2,8 @@ use super::{super::frame_object::FrameIndexInfo, super::machine::instr::*, basic
 use crate::ir::{opcode::*, types::*};
 use crate::util::allocator::*;
 use id_arena::*;
+use rustc_hash::FxHashMap;
+use std::fmt;
 
 pub type DAGNodeId = Id<DAGNode>;
 
@@ -179,12 +181,61 @@ impl DAGNode {
             _ => true,
         }
     }
+
+    pub fn debug(
+        &self,
+        f: &mut fmt::Formatter<'_>,
+        s: &mut FxHashMap<Raw<DAGNode>, usize>,
+        self_id: usize, // 0 is entry
+        indent: usize,
+    ) -> fmt::Result {
+        #[rustfmt::skip]
+        macro_rules! id4op { ($op:expr) => {{
+            let l=s.len()+1; s.entry($op).or_insert(l)
+        }}}
+        write!(f, "{}", " ".repeat(indent))?;
+        write!(f, "id{}({:?}) = ", self_id, self.ty)?;
+        write!(f, "{:?}", self.kind)?;
+        for (i, op) in self.operand.iter().enumerate() {
+            if i > 0 {
+                write!(f, ",")?
+            }
+            if op.kind == NodeKind::None {
+                continue;
+            }
+            if op.is_operation() {
+                write!(f, " id{}", id4op!(*op))?;
+            } else {
+                write!(f, " {:?}", op.kind.as_operand())?;
+            }
+        }
+        write!(f, "\n")?;
+        for op in &self.operand {
+            if !op.is_operation() || op.kind == NodeKind::None {
+                continue;
+            }
+            let id = *id4op!(*op);
+            op.debug(f, s, id, indent + 2)?;
+        }
+        if let Some(next) = self.next {
+            let id = *id4op!(next);
+            next.debug(f, s, id, indent)?;
+        }
+        fmt::Result::Ok(())
+    }
 }
 
 impl NodeKind {
     pub fn as_mi(&self) -> MINodeKind {
         match self {
             NodeKind::MI(mi) => *mi,
+            _ => panic!(),
+        }
+    }
+
+    pub fn as_operand(&self) -> &OperandNodeKind {
+        match self {
+            NodeKind::Operand(o) => o,
             _ => panic!(),
         }
     }

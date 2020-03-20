@@ -328,9 +328,57 @@ fn pointer() {
 }
 
 #[test]
+#[should_panic] // TODO: for now
+fn arr_2d() {
+    let mut m = module::Module::new("cilk");
+
+    // Internal function must be defined before you use it
+
+    let _ = cilk_ir!(m; define [i32] func [(i32)] {
+    // for (int i = 0; i < 2; i++)
+    //   for (int k = 0; k < 2; k++)
+    //     a[i][k] = i + k;
+    entry:
+        a = alloca_ ([2; [2; i32]]);
+        i = alloca i32;
+        k = alloca i32;
+        store (i32 0), (%i);
+        store (i32 0), (%k);
+        br l1;
+    l1:
+        li = load (%i);
+        c = icmp lt (%li), (i32 2);
+        br (%c) l2, l3;
+    l2:
+        lk = load (%k);
+        c = icmp lt (%lk), (i32 2);
+        br (%c) l4, l5;
+    l4:
+        g = gep (%a), [(i32 0), (%li), (%lk)];
+        x = add (%li), (%lk);
+        store (%x), (%g);
+        x = add (%lk), (i32 1);
+        store (%x), (%k);
+        br l2;
+    l5:
+        store (i32 0), (%k);
+        x = add (%li), (i32 1);
+        store (%x), (%i);
+        br l1;
+    l3:
+        r = gep (%a), [(i32 0), (i32 1), (i32 1)];
+        r = load (%r);
+        ret (%r);
+    });
+
+    let mut jit = exec::jit::JITExecutor::new(&m);
+    let main = jit.find_function_by_name("main").unwrap();
+    let ret = jit.run(main, vec![]);
+    println!("return: {:?}", ret);
+}
+
+#[test]
 fn jit_executor1() {
-    // let mut ctx = context::Context::new();
-    // let mut m = ctx.create_module("cilk");
     let mut m = module::Module::new("cilk");
 
     // Internal function must be defined before you use it
@@ -362,6 +410,20 @@ fn jit_executor1() {
         //     ret (%y);
         // l2:
         //     ret (i32 1);
+
+         // entry:
+         //     a = alloca_ ([8; i32]);
+         //     // a = alloca_ ([2; [2; i32]]);
+         //     i = alloca i32;
+         //     store (i32 1), (%i);
+         //     li = load (%i);
+         //
+         //     idx = gep (%a), [(i32 0), (%li)];
+         //     store (i32 123), (%idx);
+         //
+         //     idx = gep (%a), [(i32 0), (i32 1)];
+         //     l = load (%idx);
+         //     ret (%l);
 
         // entry:
         //     // i = alloca i32;
@@ -433,40 +495,6 @@ fn jit_executor1() {
         //     __ = call (->cilk_println_i32) [(%li)];
         //     ret (%li2);
 
-        // for (int i = 0; i < 2; i++)
-        //   for (int k = 0; k < 2; k++)
-        //     a[i][k] = i + k;
-        // entry:
-        //     a = alloca_ ([2; [2; i32]]);
-        //     i = alloca i32;
-        //     k = alloca i32;
-        //     store (i32 0), (%i);
-        //     store (i32 0), (%k);
-        //     br l1;
-        // l1:
-        //     li = load (%i);
-        //     c = icmp lt (%li), (i32 2);
-        //     br (%c) l2, l3;
-        // l2:
-        //     lk = load (%k);
-        //     c = icmp lt (%lk), (i32 2);
-        //     br (%c) l4, l5;
-        // l4:
-        //     g = gep (%a), [(i32 0), (%li), (%lk)];
-        //     a = add (%li), (%lk);
-        //     store (%a), (%g);
-        //     a = add (%lk), (i32 1);
-        //     store (%a), (%k);
-        //     lg = load (%g);
-        //     __ = call (->cilk_println_i32) [(%lg)];
-        //     br l2;
-        // l5:
-        //     store (i32 0), (%k);
-        //     a = add (%li), (i32 1);
-        //     store (%a), (%i);
-        //     br l1;
-        // l3:
-        //     ret (i32 0);
 
         // entry:
         //     a = add (%arg.0), (i32 123);
@@ -510,19 +538,6 @@ fn jit_executor1() {
         //     a = add (%arg.0), (%li);
         //     ret (%a);
 
-         // entry:
-         //     a = alloca_ ([8; i32]);
-         //     // a = alloca_ ([2; [2; i32]]);
-         //     i = alloca i32;
-         //     store (i32 1), (%i);
-         //     li = load (%i);
-         //
-         //     idx = gep (%a), [(i32 0), (%li)];
-         //     store (i32 123), (%idx);
-         //
-         //     idx = gep (%a), [(i32 0), (i32 1)];
-         //     l = load (%idx);
-         //     ret (%l);
 
 
         // entry:

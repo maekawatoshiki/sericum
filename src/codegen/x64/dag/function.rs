@@ -3,6 +3,7 @@ use super::{basic_block::*, frame_object::*, node::*};
 use crate::ir::{function::*, types::*};
 use crate::util::allocator::*;
 use id_arena::*;
+use std::fmt;
 
 pub type DAGFunctionId = Id<DAGFunction>;
 
@@ -48,5 +49,18 @@ impl DAGFunction {
             local_mgr,
             vreg_gen,
         }
+    }
+}
+
+impl fmt::Debug for DAGFunction {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "DAGFunc(name: {}, ty: {:?}):", self.name, self.ty)?;
+
+        for bb_id in &self.dag_basic_blocks {
+            let bb = &self.dag_basic_block_arena[*bb_id];
+            bb.debug(f, bb_id.index())?;
+        }
+
+        fmt::Result::Ok(())
     }
 }
