@@ -423,7 +423,7 @@ impl<'a> ConvertToDAG<'a> {
                     heap.alloc(DAGNode::new(
                         NodeKind::IR(IRNodeKind::Mul),
                         vec![idx, tysz],
-                        ty.clone(),
+                        Type::Int64, // TODO
                     ))
                 }
             };
@@ -431,7 +431,7 @@ impl<'a> ConvertToDAG<'a> {
             gep = self.cur_conv_info_mut().dag_heap.alloc(DAGNode::new(
                 NodeKind::IR(IRNodeKind::Add),
                 vec![gep, idx],
-                ty.clone(), // TODO
+                Type::Pointer(Box::new(ty.clone())),
             ));
         }
 

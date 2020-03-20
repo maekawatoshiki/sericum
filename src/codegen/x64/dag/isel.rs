@@ -78,6 +78,14 @@ impl MISelector {
                     } else {
                         NodeKind::IR(IRNodeKind::Add)
                     }
+                } else if is_maybe_reg!(node.operand[0])
+                    && matches!(node.operand[0].ty,Type::Int64|Type::Pointer(_))
+                {
+                    if is_const!(node.operand[1], Type::Int32) {
+                        NodeKind::MI(MINodeKind::ADDr64i32)
+                    } else {
+                        NodeKind::IR(IRNodeKind::Add)
+                    }
                 } else {
                     NodeKind::IR(IRNodeKind::Add)
                 };
@@ -131,6 +139,10 @@ impl MISelector {
                         Type::Pointer(_) | Type::Int64 => NodeKind::MI(MINodeKind::MOVrm64),
                         _ => unimplemented!(),
                     }
+                } else if node.operand[0].is_maybe_register()
+                    && matches!(node.operand[0].ty, Type::Pointer(_))
+                {
+                    NodeKind::MI(MINodeKind::MOVrp32)
                 } else {
                     unimplemented!()
                 };
@@ -146,6 +158,16 @@ impl MISelector {
                     && is_const!(node.operand[1], Type::Int32)
                 {
                     NodeKind::MI(MINodeKind::MOVmi32)
+                } else if node.operand[0].is_maybe_register()
+                    && matches!(node.operand[0].ty, Type::Pointer(_))
+                    && is_const!(node.operand[1], Type::Int32)
+                {
+                    NodeKind::MI(MINodeKind::MOVpi32)
+                } else if node.operand[0].is_maybe_register()
+                    && matches!(node.operand[0].ty, Type::Pointer(_))
+                    && is_maybe_reg!(node.operand[1], Type::Int32)
+                {
+                    NodeKind::MI(MINodeKind::MOVpr32)
                 } else {
                     unimplemented!()
                 };

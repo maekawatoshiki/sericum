@@ -10,9 +10,12 @@ pub struct LiveRegMatrix {
     pub vreg2entity: FxHashMap<VirtReg, MachineRegister>,
     pub id2pp: FxHashMap<MachineInstrId, ProgramPoint>,
     pub vreg_interval: FxHashMap<VirtReg, LiveInterval>,
-    pub reg_range: FxHashMap<PhysReg, LiveRange>,
+    pub reg_range: FxHashMap<RegKey, LiveRange>,
     pub program_points: ProgramPoints,
 }
+
+#[derive(Copy, Clone, PartialEq, Eq, Hash)]
+pub struct RegKey(pub usize);
 
 #[derive(Debug, Clone)]
 pub struct LiveInterval {
@@ -55,7 +58,7 @@ impl LiveRegMatrix {
         vreg2entity: FxHashMap<VirtReg, MachineRegister>,
         id2pp: FxHashMap<MachineInstrId, ProgramPoint>,
         vreg_interval: FxHashMap<VirtReg, LiveInterval>,
-        reg_range: FxHashMap<PhysReg, LiveRange>,
+        reg_range: FxHashMap<RegKey, LiveRange>,
         program_points: ProgramPoints,
     ) -> Self {
         Self {
@@ -89,19 +92,11 @@ impl LiveRegMatrix {
 
     /// Return false if it's legal to allocate reg for vreg
     pub fn interferes(&self, vreg: VirtReg, reg: PhysReg) -> bool {
-        if !self.reg_range.contains_key(&reg) {
+        if !self.reg_range.contains_key(&reg.into()) {
             return false;
         }
 
-        // TODO: cost so much
-        if !reg
-            .reg_class()
-            .shares_same_register_file(self.get_entity_by_vreg(vreg).unwrap().get_reg_class())
-        {
-            return false;
-        }
-
-        let r1 = self.reg_range.get(&reg).unwrap();
+        let r1 = self.get_reg_live_range(reg).unwrap();
         let r2 = &self.vreg_interval.get(&vreg).unwrap().range;
 
         r1.interferes(r2)
@@ -207,7 +202,19 @@ impl LiveRegMatrix {
     }
 
     pub fn get_or_create_reg_live_range(&mut self, reg: PhysReg) -> &mut LiveRange {
-        self.reg_range.entry(reg).or_insert(LiveRange::new_empty())
+        self.reg_range
+            .entry(reg.into())
+            .or_insert(LiveRange::new_empty())
+    }
+
+    pub fn get_reg_live_range(&self, reg: PhysReg) -> Option<&LiveRange> {
+        self.reg_range.get(&reg.into())
+    }
+}
+
+impl From<PhysReg> for RegKey {
+    fn from(r: PhysReg) -> Self {
+        RegKey(r.retrieve() - r.reg_class() as usize)
     }
 }
 
@@ -574,7 +581,7 @@ impl LivenessAnalysis {
 
     pub fn construct_live_reg_matrix(&self, cur_func: &MachineFunction) -> LiveRegMatrix {
         let mut vreg2range: FxHashMap<VirtReg, LiveRange> = FxHashMap::default();
-        let mut reg2range: FxHashMap<PhysReg, LiveRange> = FxHashMap::default();
+        let mut reg2range: FxHashMap<RegKey, LiveRange> = FxHashMap::default();
         let mut id2pp: FxHashMap<MachineInstrId, ProgramPoint> = FxHashMap::default();
         let mut vreg2entity: FxHashMap<VirtReg, MachineRegister> = FxHashMap::default();
         let mut program_points = ProgramPoints::new();
@@ -618,7 +625,7 @@ impl LivenessAnalysis {
                 for operand in &instr.operand {
                     if let MachineOperand::Register(reg) = operand {
                         if let Some(phy_reg) = reg.get_reg() {
-                            if let Some(range) = reg2range.get_mut(&phy_reg) {
+                            if let Some(range) = reg2range.get_mut(&phy_reg.into()) {
                                 range.segments.last_mut().unwrap().end = cur_pp!();
                             }
                         }
@@ -639,7 +646,7 @@ impl LivenessAnalysis {
                 if instr.def.len() > 0 {
                     if instr.def[0].get_reg().is_some() {
                         reg2range
-                            .entry(instr.def[0].get_reg().unwrap())
+                            .entry(instr.def[0].get_reg().unwrap().into())
                             .or_insert_with(|| LiveRange::new_empty())
                             .add_segment(LiveSegment::new(cur_pp!(), cur_pp!()));
                     } else {
@@ -651,14 +658,14 @@ impl LivenessAnalysis {
                 }
 
                 for use_ in &instr.imp_use {
-                    if let Some(range) = reg2range.get_mut(&use_.get_reg().unwrap()) {
+                    if let Some(range) = reg2range.get_mut(&use_.get_reg().unwrap().into()) {
                         range.segments.last_mut().unwrap().end = cur_pp!();
                     }
                 }
 
                 for def in &instr.imp_def {
                     reg2range
-                        .entry(def.get_reg().unwrap())
+                        .entry(def.get_reg().unwrap().into())
                         .or_insert_with(|| LiveRange::new_empty())
                         .add_segment(LiveSegment::new(cur_pp!(), cur_pp!()))
                 }

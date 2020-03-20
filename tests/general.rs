@@ -328,16 +328,16 @@ fn pointer() {
 }
 
 #[test]
-#[should_panic] // TODO: for now
 fn arr_2d() {
     let mut m = module::Module::new("cilk");
 
     // Internal function must be defined before you use it
 
-    let _ = cilk_ir!(m; define [i32] func [(i32)] {
+    let _ = cilk_ir!(m; define [i32] func [] {
     // for (int i = 0; i < 2; i++)
     //   for (int k = 0; k < 2; k++)
     //     a[i][k] = i + k;
+
     entry:
         a = alloca_ ([2; [2; i32]]);
         i = alloca i32;
@@ -372,9 +372,10 @@ fn arr_2d() {
     });
 
     let mut jit = exec::jit::JITExecutor::new(&m);
-    let main = jit.find_function_by_name("main").unwrap();
-    let ret = jit.run(main, vec![]);
+    let func = jit.find_function_by_name("func").unwrap();
+    let ret = jit.run(func, vec![]);
     println!("return: {:?}", ret);
+    assert_eq!(ret, exec::jit::GenericValue::Int32(2));
 }
 
 #[test]

@@ -44,6 +44,15 @@ impl JITExecutor {
         use super::super::{dag, machine};
 
         let mut dag_module = dag::convert::ConvertToDAG::new(module).convert_module();
+        // TODO: refine
+        debug!(
+            println!("DAG:");
+            for (_, dag_func) in &dag_module.functions {
+                println!("{:?}", dag_func);
+            }
+        );
+        dag::combine::Combine::new().combine_module(&mut dag_module);
+        dag::legalize::Legalize::new().run_on_module(&mut dag_module);
 
         // TODO: refine
         debug!(
@@ -53,11 +62,26 @@ impl JITExecutor {
             }
         );
 
-        dag::combine::Combine::new().combine_module(&mut dag_module);
-        dag::legalize::Legalize::new().run_on_module(&mut dag_module);
         dag::isel::MISelector::new().run_on_module(&mut dag_module);
 
         let mut machine_module = dag::mc_convert::MIConverter::new().convert_module(dag_module);
+
+        debug!(
+            println!("MachineModule dump:");
+            for (_, machine_func) in &machine_module.functions {
+                let mut idx = 0;
+                println!("Machine function '{}':", machine_func.name);
+                for bb_id in &machine_func.basic_blocks {
+                    let bb = &machine_func.basic_block_arena[*bb_id];
+                    println!("Machine basic block: {:?}", bb);
+                    for instr in &*bb.iseq_ref() {
+                        println!("{}: {:?}", idx, machine_func.instr_arena[*instr]);
+                        idx += 1;
+                    }
+                    println!()
+                }
+            }
+        );
 
         machine::phi_elimination::PhiElimination::new().run_on_module(&mut machine_module);
         machine::two_addr::TwoAddressConverter::new().run_on_module(&mut machine_module);
@@ -222,14 +246,20 @@ impl JITCompiler {
                     MachineOpcode::MOVrrri32 => self.compile_mov_rrri32(&frame_objects, instr),
                     MachineOpcode::MOVmi32r32 => self.compile_mov_mi32r32(&frame_objects, instr),
                     MachineOpcode::MOVmi32i32 => self.compile_mov_mi32i32(&frame_objects, instr),
+                    MachineOpcode::MOVpi32 => self.compile_mov_pi32(instr),
+                    MachineOpcode::MOVpr32 => self.compile_mov_pr32(instr),
+                    MachineOpcode::MOVrp32 => self.compile_mov_rp32(instr),
                     MachineOpcode::MOVSDrm64 => self.compile_movsd_rm64(instr),
                     MachineOpcode::LEA64 => self.compile_lea64(&frame_objects, instr),
+                    MachineOpcode::LEArmi32 => self.compile_lea_rmi32(&frame_objects, instr),
+                    MachineOpcode::LEArmr64 => self.compile_lea_rmr64(&frame_objects, instr),
                     MachineOpcode::RET => self.compile_ret(),
                     MachineOpcode::PUSH64 => self.compile_push64(instr),
                     MachineOpcode::POP64 => self.compile_pop64(instr),
                     MachineOpcode::Add => self.compile_add(&frame_objects, instr),
                     MachineOpcode::ADDrr32 => self.compile_add_rr32(instr),
                     MachineOpcode::ADDri32 => self.compile_add_ri32(instr),
+                    MachineOpcode::ADDr64i32 => self.compile_add_r64i32(instr),
                     MachineOpcode::SUBrr32 => self.compile_sub_rr32(instr),
                     MachineOpcode::SUBri32 => self.compile_sub_ri32(instr),
                     MachineOpcode::SUBr64i32 => self.compile_sub_r64i32(instr),
@@ -325,6 +355,20 @@ impl JITCompiler {
         let r0 = phys_reg_to_dynasm_reg(instr.def[0].get_reg().unwrap());
         let fi = instr.operand[0].as_frame_index();
         dynasm!(self.asm; lea Ra(r0), [rbp - fo.offset(fi.idx).unwrap()]);
+    }
+
+    fn compile_lea_rmi32(&mut self, fo: &FrameObjectsInfo, instr: &MachineInstr) {
+        let r0 = phys_reg_to_dynasm_reg(instr.def[0].get_reg().unwrap());
+        let m1 = fo.offset(instr.operand[0].as_frame_index().idx).unwrap();
+        let i2 = instr.operand[1].as_constant().as_i32();
+        dynasm!(self.asm; lea Rq(r0), [rbp - m1 + i2]);
+    }
+
+    fn compile_lea_rmr64(&mut self, fo: &FrameObjectsInfo, instr: &MachineInstr) {
+        let r0 = phys_reg_to_dynasm_reg(instr.def[0].get_reg().unwrap());
+        let m1 = fo.offset(instr.operand[0].as_frame_index().idx).unwrap();
+        let r2 = phys_reg_to_dynasm_reg(instr.operand[1].as_register().get_reg().unwrap());
+        dynasm!(self.asm; lea Rq(r0), [rbp + Rq(r2) - m1 ]);
     }
 
     fn compile_push64(&mut self, instr: &MachineInstr) {
@@ -454,6 +498,24 @@ impl JITCompiler {
         dynasm!(self.asm; mov DWORD [rbp - m0 + i1], i2);
     }
 
+    fn compile_mov_pr32(&mut self, instr: &MachineInstr) {
+        let p0 = phys_reg_to_dynasm_reg(instr.operand[0].as_register().get_reg().unwrap());
+        let r1 = phys_reg_to_dynasm_reg(instr.operand[1].as_register().get_reg().unwrap());
+        dynasm!(self.asm; mov DWORD [Rq(p0)], Rd(r1));
+    }
+
+    fn compile_mov_pi32(&mut self, instr: &MachineInstr) {
+        let p0 = phys_reg_to_dynasm_reg(instr.operand[0].as_register().get_reg().unwrap());
+        let i1 = instr.operand[1].as_constant().as_i32();
+        dynasm!(self.asm; mov DWORD [Rq(p0)], i1);
+    }
+
+    fn compile_mov_rp32(&mut self, instr: &MachineInstr) {
+        let r0 = phys_reg_to_dynasm_reg(instr.def[0].get_reg().unwrap());
+        let p1 = phys_reg_to_dynasm_reg(instr.operand[0].as_register().get_reg().unwrap());
+        dynasm!(self.asm; mov Rd(r0), [Rq(p1)]);
+    }
+
     fn compile_store_fi_off(&mut self, fo: &FrameObjectsInfo, instr: &MachineInstr) {
         let fi = fo.offset(instr.operand[0].as_frame_index().idx).unwrap();
         let off = instr.operand[1].as_register();
@@ -552,6 +614,13 @@ impl JITCompiler {
         dynasm!(self.asm; add Rd(r0), i1);
     }
 
+    fn compile_add_r64i32(&mut self, instr: &MachineInstr) {
+        // instr.operand[0] must be the same as instr.def[0] (they're tied)
+        let r0 = phys_reg_to_dynasm_reg(instr.def[0].get_reg().unwrap());
+        let i1 = instr.operand[1].as_constant().as_i32();
+        dynasm!(self.asm; add Rq(r0), i1);
+    }
+
     fn compile_sub_rr32(&mut self, instr: &MachineInstr) {
         // instr.operand[0] must be the same as instr.def[0] (they're tied)
         let r0 = phys_reg_to_dynasm_reg(instr.def[0].get_reg().unwrap());
@@ -581,7 +650,6 @@ impl JITCompiler {
     }
 
     fn compile_imul_rri32(&mut self, instr: &MachineInstr) {
-        // instr.operand[0] must be the same as instr.def[0] (they're tied)
         let r0 = phys_reg_to_dynasm_reg(instr.def[0].get_reg().unwrap());
         let r1 = phys_reg_to_dynasm_reg(instr.operand[0].as_register().get_reg().unwrap());
         let i2 = instr.operand[1].as_constant().as_i32();

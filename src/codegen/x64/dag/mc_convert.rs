@@ -255,17 +255,27 @@ impl MIConverter {
                     conv_info.cur_bb,
                 )))
             }
-            // NodeKind::IR(IRNodeKind::Store) => {
-            //     let new_dst = self.usual_operand(conv_info, node.operand[0]);
-            //     let new_src = self.usual_operand(conv_info, node.operand[1]);
-            //     Some(conv_info.push_instr(MachineInstr::new(
-            //         &conv_info.cur_func.vreg_gen,
-            //         MachineOpcode::Store,
-            //         vec![new_dst, new_src],
-            //         None,
-            //         conv_info.cur_bb,
-            //     )))
-            // }
+            NodeKind::MI(MINodeKind::MOVrp32) => {
+                let op0 = self.usual_operand(conv_info, node.operand[0]);
+                Some(conv_info.push_instr(MachineInstr::new(
+                    &conv_info.cur_func.vreg_gen,
+                    node.kind.as_mi(),
+                    vec![op0],
+                    ty2rc(&node.ty),
+                    conv_info.cur_bb,
+                )))
+            }
+            NodeKind::MI(MINodeKind::MOVpr32) | NodeKind::MI(MINodeKind::MOVpi32) => {
+                let op0 = self.usual_operand(conv_info, node.operand[0]);
+                let op1 = self.usual_operand(conv_info, node.operand[1]);
+                Some(conv_info.push_instr(MachineInstr::new(
+                    &conv_info.cur_func.vreg_gen,
+                    node.kind.as_mi(),
+                    vec![op0, op1],
+                    ty2rc(&node.ty),
+                    conv_info.cur_bb,
+                )))
+            }
             NodeKind::IR(IRNodeKind::Call) => Some(self.convert_call_dag(conv_info, &*node)),
             NodeKind::IR(IRNodeKind::Phi) => {
                 let mut operands = vec![];
@@ -352,6 +362,7 @@ impl MIConverter {
             }
             NodeKind::MI(MINodeKind::ADDrr32)
             | NodeKind::MI(MINodeKind::ADDri32)
+            | NodeKind::MI(MINodeKind::ADDr64i32)
             | NodeKind::MI(MINodeKind::SUBri32)
             | NodeKind::MI(MINodeKind::SUBrr32) => {
                 let op1 = self.usual_operand(conv_info, node.operand[0]);
@@ -387,6 +398,18 @@ impl MIConverter {
                 let inst = MachineInstr::new(
                     &conv_info.cur_func.vreg_gen,
                     MachineOpcode::IMULrri32,
+                    vec![op0, op1],
+                    ty2rc(&node.ty),
+                    conv_info.cur_bb,
+                );
+                Some(conv_info.push_instr(inst))
+            }
+            NodeKind::MI(MINodeKind::LEArmi32) | NodeKind::MI(MINodeKind::LEArmr64) => {
+                let op0 = self.usual_operand(conv_info, node.operand[0]);
+                let op1 = self.usual_operand(conv_info, node.operand[1]);
+                let inst = MachineInstr::new(
+                    &conv_info.cur_func.vreg_gen,
+                    node.kind.as_mi(),
                     vec![op0, op1],
                     ty2rc(&node.ty),
                     conv_info.cur_bb,

@@ -35,6 +35,10 @@ pub struct RegisterInfo {
     pub def_list: FxHashSet<MachineInstrId>,
 }
 
+// r => register
+// i => constant integer
+// m => TODO: [memory] or [rbp - fi.off]
+// p => [register]
 #[derive(Debug, Clone, PartialEq, Copy)]
 pub enum MachineOpcode {
     MOVSDrm64,  // out(xmm) = movsd [memory]
@@ -43,11 +47,18 @@ pub enum MachineOpcode {
     MOVrrri32,  // out = mov [base + off * align]
     MOVmi32r32, // mov [rbp - fi.off + const.off], reg
     MOVmi32i32, // mov [rbp - fi.off + const.off], const.val
+    MOVpi32,    // mov [reg], const.val
+    MOVpr32,    // mov [reg], reg
+    MOVrp32,    // mov reg, [reg]
     StoreFiOff,
     StoreRegOff,
 
+    LEArmi32, // out = lea [rbp - fi.off + const.off]
+    LEArmr64, // out = lea [rbp - fi.off + reg]
+
     ADDrr32,
     ADDri32,
+    ADDr64i32,
     SUBrr32,
     SUBri32,
     SUBr64i32,
