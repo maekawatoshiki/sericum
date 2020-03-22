@@ -340,42 +340,55 @@ fn arr_2d() {
 
     entry:
         a = alloca_ ([2; [2; i32]]);
-        i = alloca i32;
-        k = alloca i32;
-        store (i32 0), (%i);
-        store (i32 0), (%k);
-        br l1;
-    l1:
-        li = load (%i);
-        c = icmp lt (%li), (i32 2);
-        br (%c) l2, l3;
-    l2:
-        lk = load (%k);
-        c = icmp lt (%lk), (i32 2);
-        br (%c) l4, l5;
-    l4:
-        g = gep (%a), [(i32 0), (%li), (%lk)];
-        x = add (%li), (%lk);
-        store (%x), (%g);
-        x = add (%lk), (i32 1);
-        store (%x), (%k);
-        br l2;
-    l5:
-        store (i32 0), (%k);
-        x = add (%li), (i32 1);
-        store (%x), (%i);
-        br l1;
-    l3:
-        r = gep (%a), [(i32 0), (i32 1), (i32 1)];
-        r = load (%r);
-        ret (%r);
+        v1 = alloca i32;
+        v2 = alloca i32;
+        store (i32 1), (%v1);
+        store (i32 1), (%v2);
+        v1 = load (%v1);
+        v2 = load (%v2);
+        x = gep (%a), [(i32 0), (%v1), (%v2)];
+        store (i32 31), (%x);
+        x2 = load (%x);
+        ret (%x2);
+
+    // entry:
+    //     a = alloca_ ([2; [2; i32]]);
+    //     i = alloca i32;
+    //     k = alloca i32;
+    //     store (i32 0), (%i);
+    //     store (i32 0), (%k);
+    //     br l1;
+    // l1:
+    //     li = load (%i);
+    //     c = icmp lt (%li), (i32 2);
+    //     br (%c) l2, l3;
+    // l2:
+    //     lk = load (%k);
+    //     c = icmp lt (%lk), (i32 2);
+    //     br (%c) l4, l5;
+    // l4:
+    //     g = gep (%a), [(i32 0), (%li), (%lk)];
+    //     x = add (%li), (%lk);
+    //     store (%x), (%g);
+    //     x = add (%lk), (i32 1);
+    //     store (%x), (%k);
+    //     br l2;
+    // l5:
+    //     store (i32 0), (%k);
+    //     x = add (%li), (i32 1);
+    //     store (%x), (%i);
+    //     br l1;
+    // l3:
+    //     r = gep (%a), [(i32 0), (i32 1), (i32 1)];
+    //     r = load (%r);
+    //     ret (%r);
     });
 
     let mut jit = exec::jit::JITExecutor::new(&m);
     let func = jit.find_function_by_name("func").unwrap();
     let ret = jit.run(func, vec![]);
     println!("return: {:?}", ret);
-    assert_eq!(ret, exec::jit::GenericValue::Int32(2));
+    assert_eq!(ret, exec::jit::GenericValue::Int32(31));
 }
 
 #[test]

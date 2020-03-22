@@ -55,6 +55,7 @@ pub enum IRNodeKind {
     Brcc,
     Br,
     Ret,
+    Bitcast,
 
     CopyToReg,
     CopyFromReg,
