@@ -45,6 +45,7 @@ impl Legalize {
             NodeKind::IR(IRNodeKind::Load) => self.run_on_node_load(heap, node),
             NodeKind::IR(IRNodeKind::Store) => self.run_on_node_store(heap, node),
             NodeKind::IR(IRNodeKind::Add) => self.run_on_node_add(heap, node),
+            NodeKind::IR(IRNodeKind::Sext) => self.run_on_node_sext(heap, node),
             _ => {
                 self.run_on_node_operand(heap, node);
                 node
@@ -189,6 +190,26 @@ impl Legalize {
                 ));
             }
             // println!("T {:?}", node.ty);
+        }
+
+        self.run_on_node_operand(heap, node);
+        node
+    }
+
+    fn run_on_node_sext(
+        &mut self,
+        heap: &mut RawAllocator<DAGNode>,
+        node: Raw<DAGNode>,
+    ) -> Raw<DAGNode> {
+        if node.ty == Type::Int64
+            && node.operand[0].kind == NodeKind::IR(IRNodeKind::Load)
+            && node.operand[0].operand[0].is_frame_index()
+        {
+            return heap.alloc(DAGNode::new(
+                NodeKind::MI(MINodeKind::MOVSXDr64m32),
+                vec![node.operand[0].operand[0]],
+                node.ty.clone(),
+            ));
         }
 
         self.run_on_node_operand(heap, node);

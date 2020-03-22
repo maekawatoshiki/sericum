@@ -53,6 +53,8 @@ pub enum MachineOpcode {
     StoreFiOff,
     StoreRegOff,
 
+    MOVSXDr64m32, // out = movsxd [rbp - fi.off]
+
     LEArmi32, // out = lea [rbp - fi.off + const.off]
     LEArmr64, // out = lea [rbp - fi.off + reg]
 
@@ -64,6 +66,7 @@ pub enum MachineOpcode {
     SUBr64i32,
     IMULrr32,
     IMULrri32,
+    IMULrr64i32,
     CDQ,
     MOVrr32,
     MOVri32,

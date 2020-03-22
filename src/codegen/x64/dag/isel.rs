@@ -124,6 +124,13 @@ impl MISelector {
                     } else {
                         NodeKind::IR(IRNodeKind::Mul)
                     }
+                } else if is_maybe_reg!(node.operand[0], Type::Int64) {
+                    if is_const!(node.operand[1], Type::Int32) {
+                        // (Mul $a:GR64 $b:const.i32) => (IMULrr64i32 $a $b)
+                        NodeKind::MI(MINodeKind::IMULrr64i32)
+                    } else {
+                        NodeKind::IR(IRNodeKind::Mul)
+                    }
                 } else {
                     NodeKind::IR(IRNodeKind::Mul)
                 };

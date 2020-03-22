@@ -420,10 +420,10 @@ impl<'a> ConvertToDAG<'a> {
                         vec![],
                         Type::Int32,
                     ));
-                    // let cast = bitcast_if_necessary(heap, idx, Type::Int64);
+                    let cast = sext_if_necessary(heap, idx, Type::Int64);
                     heap.alloc(DAGNode::new(
                         NodeKind::IR(IRNodeKind::Mul),
-                        vec![idx, tysz],
+                        vec![cast, tysz],
                         Type::Int64, // TODO
                     ))
                 }
@@ -495,20 +495,16 @@ impl<'a> ConvertToDAG<'a> {
     }
 }
 
-fn bitcast_if_necessary(
+fn sext_if_necessary(
     heap: &mut RawAllocator<DAGNode>,
     node: Raw<DAGNode>,
     to: Type,
 ) -> Raw<DAGNode> {
-    if node.ty == to {
+    if node.ty == to || node.ty.size_in_bits() >= to.size_in_bits() {
         return node;
     }
 
-    heap.alloc(DAGNode::new(
-        NodeKind::IR(IRNodeKind::Bitcast),
-        vec![node],
-        to,
-    ))
+    heap.alloc(DAGNode::new(NodeKind::IR(IRNodeKind::Sext), vec![node], to))
 }
 
 impl ConversionInfo {

@@ -379,25 +379,25 @@ impl MIConverter {
                 Some(conv_info.push_instr(inst_tied))
             }
             NodeKind::MI(MINodeKind::IMULrr32) => {
-                let op1 = self.usual_operand(conv_info, node.operand[0]);
-                let op2 = self.usual_operand(conv_info, node.operand[1]);
-                let op1_reg = op1.as_register().clone();
+                let op0 = self.usual_operand(conv_info, node.operand[0]);
+                let op1 = self.usual_operand(conv_info, node.operand[1]);
+                let op0_reg = op0.as_register().clone();
                 let inst = MachineInstr::new(
                     &conv_info.cur_func.vreg_gen,
                     MachineOpcode::IMULrr32,
-                    vec![op1, op2],
+                    vec![op0, op1],
                     ty2rc(&node.ty),
                     conv_info.cur_bb,
                 );
-                let inst_tied = inst.set_tie_with_def(op1_reg);
+                let inst_tied = inst.set_tie_with_def(op0_reg);
                 Some(conv_info.push_instr(inst_tied))
             }
-            NodeKind::MI(MINodeKind::IMULrri32) => {
+            NodeKind::MI(MINodeKind::IMULrri32) | NodeKind::MI(MINodeKind::IMULrr64i32) => {
                 let op0 = self.usual_operand(conv_info, node.operand[0]);
                 let op1 = self.usual_operand(conv_info, node.operand[1]);
                 let inst = MachineInstr::new(
                     &conv_info.cur_func.vreg_gen,
-                    MachineOpcode::IMULrri32,
+                    node.kind.as_mi(),
                     vec![op0, op1],
                     ty2rc(&node.ty),
                     conv_info.cur_bb,
@@ -411,6 +411,17 @@ impl MIConverter {
                     &conv_info.cur_func.vreg_gen,
                     node.kind.as_mi(),
                     vec![op0, op1],
+                    ty2rc(&node.ty),
+                    conv_info.cur_bb,
+                );
+                Some(conv_info.push_instr(inst))
+            }
+            NodeKind::MI(MINodeKind::MOVSXDr64m32) => {
+                let op0 = self.usual_operand(conv_info, node.operand[0]);
+                let inst = MachineInstr::new(
+                    &conv_info.cur_func.vreg_gen,
+                    node.kind.as_mi(),
+                    vec![op0],
                     ty2rc(&node.ty),
                     conv_info.cur_bb,
                 );
@@ -545,8 +556,7 @@ impl MIConverter {
 
         let ret_reg = RegisterInfo::new_phy_reg(GR32::EAX)
             .with_vreg(conv_info.cur_func.vreg_gen.next_vreg())
-            .into_machine_register(); // i.g. EAX
-                                      // TODO: support types other than int.
+            .into_machine_register(); // TODO: support types other than int.
                                       //       what about struct or union? they won't be assigned to register.
 
         let call_instr = conv_info.push_instr(
