@@ -1,3 +1,4 @@
+pub use super::super::inst::{TargetImmediate, TargetOpcode};
 use super::super::register::{
     rc2ty, PhysReg, RegisterClassKind, TargetRegisterTrait, VirtReg, VirtRegGen,
 };
@@ -11,6 +12,8 @@ use std::{
     rc::Rc,
 };
 
+pub type MachineOpcode = TargetOpcode;
+pub type MachineConstant = TargetImmediate;
 pub type RegisterInfoRef = Rc<RefCell<RegisterInfo>>;
 pub type MachineInstrId = Id<MachineInstr>;
 
@@ -35,76 +38,15 @@ pub struct RegisterInfo {
     pub def_list: FxHashSet<MachineInstrId>,
 }
 
-// r => register
-// i => constant integer
-// m => TODO: [memory] or [rbp - fi.off]
-// p => [register]
-#[derive(Debug, Clone, PartialEq, Copy)]
-pub enum MachineOpcode {
-    MOVSDrm64,  // out(xmm) = movsd [memory]
-    MOVrmi32,   // out = mov [rbp - fi.off + const.off]
-    MOVrmri32,  // out = mov [rbp - fi.off + off * align]
-    MOVrrri32,  // out = mov [base + off * align]
-    MOVmi32r32, // mov [rbp - fi.off + const.off], reg
-    MOVmi32i32, // mov [rbp - fi.off + const.off], const.val
-    MOVpi32,    // mov [reg], const.val
-    MOVpr32,    // mov [reg], reg
-    MOVrp32,    // mov reg, [reg]
-    StoreFiOff,
-    StoreRegOff,
-
-    MOVSXDr64m32, // out = movsxd [rbp - fi.off]
-
-    LEArmi32, // out = lea [rbp - fi.off + const.off]
-    LEArmr64, // out = lea [rbp - fi.off + reg]
-
-    ADDrr32,
-    ADDri32,
-    ADDr64i32,
-    SUBrr32,
-    SUBri32,
-    SUBr64i32,
-    IMULrr32,
-    IMULrri32,
-    IMULrr64i32,
-    CDQ,
-    MOVrr32,
-    MOVri32,
-    MOVrm32,
-    MOVmr32,
-    MOVmi32,
-    MOVrr64,
-    MOVri64,
-    MOVrm64,
-    LEA64,
-    IDIV,
-    PUSH64,
-    POP64,
-    RET,
-
-    Copy,
-
-    // Call
-    Call,
-
-    // Binary arithmetics
-    Add,
-
-    // Comparison
-    Seteq,
-    Setle,
-    Setlt,
-
-    // Branch
-    BrCond,
-    Br,
-    BrccEq,
-    BrccLe,
-    BrccLt,
-
-    Phi,
-
-    Ret,
+#[derive(Clone)]
+pub struct MachineInstDef {
+    pub opcode: MachineOpcode,
+    pub operand: Vec<MachineOperand>, // reg|imm|
+    pub def: Vec<MachineRegister>,
+    pub tie: FxHashMap<MachineRegister, MachineRegister>, // def -> use
+    pub imp_use: Vec<MachineRegister>,
+    pub imp_def: Vec<MachineRegister>,
+    pub parent: MachineBasicBlockId,
 }
 
 #[derive(Clone)]
@@ -115,13 +57,6 @@ pub enum MachineOperand {
     Address(AddressInfo),
     Branch(MachineBasicBlockId),
     None,
-}
-
-#[derive(Clone, Copy, PartialEq)]
-pub enum MachineConstant {
-    Int32(i32),
-    Int64(i64),
-    F64(f64),
 }
 
 #[derive(Clone)]
@@ -556,29 +491,6 @@ impl MachineOperand {
     }
 }
 
-impl MachineConstant {
-    pub fn as_i32(&self) -> i32 {
-        match self {
-            MachineConstant::Int32(i) => *i,
-            _ => panic!(),
-        }
-    }
-
-    pub fn as_i64(&self) -> i64 {
-        match self {
-            MachineConstant::Int64(i) => *i,
-            _ => panic!(),
-        }
-    }
-
-    pub fn as_f64(&self) -> f64 {
-        match self {
-            MachineConstant::F64(f) => *f,
-            _ => panic!(),
-        }
-    }
-}
-
 impl AddressInfo {
     pub fn as_absolute(&self) -> DataId {
         match self {
@@ -680,16 +592,6 @@ impl fmt::Debug for RegisterInfo {
             Some(phy_reg) => phy_reg.fmt(f),
 
             None => self.vreg.fmt(f),
-        }
-    }
-}
-
-impl fmt::Debug for MachineConstant {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            MachineConstant::Int32(x) => write!(f, "i32 {}", x),
-            MachineConstant::Int64(x) => write!(f, "i64 {}", x),
-            MachineConstant::F64(x) => write!(f, "f64 {}", x),
         }
     }
 }

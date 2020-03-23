@@ -214,8 +214,10 @@ impl LiveRegMatrix {
 
 impl From<PhysReg> for RegKey {
     fn from(r: PhysReg) -> Self {
-        // TODO: bug
-        RegKey(r.retrieve() - r.reg_class() as usize)
+        RegKey(
+            r.retrieve() - r.reg_class() as usize
+                + r.reg_class().register_file_base_class() as usize,
+        )
     }
 }
 

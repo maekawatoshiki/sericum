@@ -1,6 +1,7 @@
 pub mod dag;
 pub mod exec;
 pub mod frame_object;
+pub mod inst;
 pub mod machine;
 pub mod register;
 
