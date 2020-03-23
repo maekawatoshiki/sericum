@@ -200,19 +200,6 @@ impl MIConverter {
                     conv_info.cur_bb,
                 )))
             }
-            NodeKind::IR(IRNodeKind::StoreFiOff) => {
-                let fi = self.usual_operand(conv_info, node.operand[0]);
-                let off = self.usual_operand(conv_info, node.operand[1]);
-                let align = self.usual_operand(conv_info, node.operand[2]);
-                let new_src = self.usual_operand(conv_info, node.operand[3]);
-                Some(conv_info.push_instr(MachineInstr::new(
-                    &conv_info.cur_func.vreg_gen,
-                    MachineOpcode::StoreFiOff,
-                    vec![fi, off, align, new_src],
-                    None,
-                    conv_info.cur_bb,
-                )))
-            }
             NodeKind::IR(IRNodeKind::Call) => Some(self.convert_call_dag(conv_info, &*node)),
             NodeKind::IR(IRNodeKind::Phi) => {
                 let mut operands = vec![];
