@@ -358,7 +358,7 @@ impl JITCompiler {
     fn compile_lea64(&mut self, fo: &FrameObjectsInfo, instr: &MachineInstr) {
         let r0 = phys_reg_to_dynasm_reg(instr.def[0].get_reg().unwrap());
         let fi = instr.operand[0].as_frame_index();
-        dynasm!(self.asm; lea Ra(r0), [rbp - fo.offset(fi.idx).unwrap()]);
+        dynasm!(self.asm; lea Rq(r0), [rbp - fo.offset(fi.idx).unwrap()]);
     }
 
     fn compile_lea_rmi32(&mut self, fo: &FrameObjectsInfo, instr: &MachineInstr) {

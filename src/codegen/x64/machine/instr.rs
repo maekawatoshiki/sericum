@@ -13,7 +13,6 @@ use std::{
 };
 
 pub type MachineOpcode = TargetOpcode;
-pub type MachineConstant = TargetImmediate;
 pub type RegisterInfoRef = Rc<RefCell<RegisterInfo>>;
 pub type MachineInstrId = Id<MachineInstr>;
 
@@ -63,6 +62,13 @@ pub enum MachineOperand {
 pub enum AddressInfo {
     FunctionName(String),
     Absolute(DataId),
+}
+
+#[derive(Clone, Copy, PartialEq)]
+pub enum MachineConstant {
+    Int32(i32),
+    Int64(i64),
+    F64(f64),
 }
 
 #[derive(Clone, PartialEq)]
@@ -511,6 +517,39 @@ impl TypeSize for MachineConstant {
 
     fn size_in_bits(&self) -> usize {
         self.size_in_byte() * 8
+    }
+}
+
+impl MachineConstant {
+    pub fn as_i32(&self) -> i32 {
+        match self {
+            Self::Int32(i) => *i,
+            _ => panic!(),
+        }
+    }
+
+    pub fn as_i64(&self) -> i64 {
+        match self {
+            Self::Int64(i) => *i,
+            _ => panic!(),
+        }
+    }
+
+    pub fn as_f64(&self) -> f64 {
+        match self {
+            Self::F64(f) => *f,
+            _ => panic!(),
+        }
+    }
+}
+
+impl fmt::Debug for MachineConstant {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Int32(x) => write!(f, "i32 {}", x),
+            Self::Int64(x) => write!(f, "i64 {}", x),
+            Self::F64(x) => write!(f, "f64 {}", x),
+        }
     }
 }
 
