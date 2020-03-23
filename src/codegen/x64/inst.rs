@@ -350,6 +350,8 @@ pub enum TargetOpcode {
     Ret,
 }
 
+impl TargetOpcode {}
+
 impl TargetInstDef {
     pub fn new(opcode: TargetOpcode) -> Self {
         Self {
