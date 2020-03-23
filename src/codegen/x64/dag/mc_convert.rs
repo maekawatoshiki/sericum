@@ -1,5 +1,6 @@
 // TODO: dirty code
 
+use super::super::inst::DefOrUseReg;
 use super::super::machine::{basic_block::*, function::*, instr::*, module::*};
 use super::super::register::*;
 use super::{basic_block::*, function::*, module::*, node::*};
@@ -134,6 +135,32 @@ impl MIConverter {
         // there should be no NodeKind::IRs here
         let machine_instr_id = match &node.kind {
             NodeKind::IR(IRNodeKind::Entry) => None,
+            NodeKind::MI(_) => {
+                fn reg(inst: &MachineInstr, x: &DefOrUseReg) -> MachineRegister {
+                    match x {
+                        DefOrUseReg::Def(i) => inst.def[*i].clone(),
+                        DefOrUseReg::Use(i) => inst.operand[*i].as_register().clone(),
+                    }
+                }
+                let mi = node.kind.as_mi();
+                let inst_def = mi.inst_def().unwrap();
+                let operands = node
+                    .operand
+                    .iter()
+                    .map(|op| self.usual_operand(conv_info, *op))
+                    .collect();
+                let mut inst = MachineInstr::new(
+                    &conv_info.cur_func.vreg_gen,
+                    mi,
+                    operands,
+                    ty2rc(&node.ty),
+                    conv_info.cur_bb,
+                );
+                for (def_, use_) in &inst_def.tie {
+                    inst.tie_regs(reg(&inst, def_), reg(&inst, use_));
+                }
+                Some(conv_info.push_instr(inst))
+            }
             NodeKind::IR(IRNodeKind::CopyToReg) => {
                 let val = self.usual_operand(conv_info, node.operand[1]);
                 let dst = match &node.operand[0].kind {
@@ -156,42 +183,6 @@ impl MIConverter {
                     &conv_info.cur_func.vreg_gen,
                     MachineOpcode::Copy,
                     vec![reg],
-                    ty2rc(&node.ty),
-                    conv_info.cur_bb,
-                )))
-            }
-            NodeKind::MI(MINodeKind::MOVrrri32) => {
-                let base = self.usual_operand(conv_info, node.operand[0]);
-                let off = self.usual_operand(conv_info, node.operand[1]);
-                let align = self.usual_operand(conv_info, node.operand[2]);
-                // MachineOperand::Mem(base, off, align);
-                Some(conv_info.push_instr(MachineInstr::new(
-                    &conv_info.cur_func.vreg_gen,
-                    MachineOpcode::MOVrrri32,
-                    vec![base, off, align],
-                    ty2rc(&node.ty),
-                    conv_info.cur_bb,
-                )))
-            }
-            NodeKind::MI(MINodeKind::MOVrmri32) => {
-                let fi = self.usual_operand(conv_info, node.operand[0]);
-                let off = self.usual_operand(conv_info, node.operand[1]);
-                let align = self.usual_operand(conv_info, node.operand[2]);
-                Some(conv_info.push_instr(MachineInstr::new(
-                    &conv_info.cur_func.vreg_gen,
-                    MachineOpcode::MOVrmri32,
-                    vec![fi, off, align],
-                    ty2rc(&node.ty),
-                    conv_info.cur_bb,
-                )))
-            }
-            NodeKind::MI(MINodeKind::MOVrmi32) => {
-                let fi = self.usual_operand(conv_info, node.operand[0]);
-                let off = self.usual_operand(conv_info, node.operand[1]);
-                Some(conv_info.push_instr(MachineInstr::new(
-                    &conv_info.cur_func.vreg_gen,
-                    MachineOpcode::MOVrmi32,
-                    vec![fi, off],
                     ty2rc(&node.ty),
                     conv_info.cur_bb,
                 )))
@@ -219,60 +210,6 @@ impl MIConverter {
                     MachineOpcode::StoreFiOff,
                     vec![fi, off, align, new_src],
                     None,
-                    conv_info.cur_bb,
-                )))
-            }
-            NodeKind::MI(MINodeKind::MOVmi32r32) | NodeKind::MI(MINodeKind::MOVmi32i32) => {
-                let fi = self.usual_operand(conv_info, node.operand[0]);
-                let off = self.usual_operand(conv_info, node.operand[1]);
-                let src = self.usual_operand(conv_info, node.operand[2]);
-                Some(conv_info.push_instr(MachineInstr::new(
-                    &conv_info.cur_func.vreg_gen,
-                    node.kind.as_mi(),
-                    vec![fi, off, src],
-                    None,
-                    conv_info.cur_bb,
-                )))
-            }
-            NodeKind::MI(MINodeKind::MOVrm32) | NodeKind::MI(MINodeKind::MOVrm64) => {
-                let op0 = self.usual_operand(conv_info, node.operand[0]);
-                Some(conv_info.push_instr(MachineInstr::new(
-                    &conv_info.cur_func.vreg_gen,
-                    node.kind.as_mi(),
-                    vec![op0],
-                    ty2rc(&node.ty),
-                    conv_info.cur_bb,
-                )))
-            }
-            NodeKind::MI(MINodeKind::MOVmr32) | NodeKind::MI(MINodeKind::MOVmi32) => {
-                let op0 = self.usual_operand(conv_info, node.operand[0]);
-                let op1 = self.usual_operand(conv_info, node.operand[1]);
-                Some(conv_info.push_instr(MachineInstr::new(
-                    &conv_info.cur_func.vreg_gen,
-                    node.kind.as_mi(),
-                    vec![op0, op1],
-                    None,
-                    conv_info.cur_bb,
-                )))
-            }
-            NodeKind::MI(MINodeKind::MOVrp32) => {
-                let op0 = self.usual_operand(conv_info, node.operand[0]);
-                Some(conv_info.push_instr(MachineInstr::new(
-                    &conv_info.cur_func.vreg_gen,
-                    node.kind.as_mi(),
-                    vec![op0],
-                    ty2rc(&node.ty),
-                    conv_info.cur_bb,
-                )))
-            }
-            NodeKind::MI(MINodeKind::MOVpr32) | NodeKind::MI(MINodeKind::MOVpi32) => {
-                let op0 = self.usual_operand(conv_info, node.operand[0]);
-                let op1 = self.usual_operand(conv_info, node.operand[1]);
-                Some(conv_info.push_instr(MachineInstr::new(
-                    &conv_info.cur_func.vreg_gen,
-                    node.kind.as_mi(),
-                    vec![op0, op1],
-                    ty2rc(&node.ty),
                     conv_info.cur_bb,
                 )))
             }
@@ -359,73 +296,6 @@ impl MIConverter {
                 );
                 let inst_tied = inst.set_tie_with_def(op1_reg);
                 Some(conv_info.push_instr(inst_tied))
-            }
-            NodeKind::MI(MINodeKind::ADDrr32)
-            | NodeKind::MI(MINodeKind::ADDri32)
-            | NodeKind::MI(MINodeKind::ADDr64i32)
-            | NodeKind::MI(MINodeKind::SUBri32)
-            | NodeKind::MI(MINodeKind::SUBrr32) => {
-                let op1 = self.usual_operand(conv_info, node.operand[0]);
-                let op2 = self.usual_operand(conv_info, node.operand[1]);
-                let op1_reg = op1.as_register().clone();
-                let inst = MachineInstr::new(
-                    &conv_info.cur_func.vreg_gen,
-                    node.kind.as_mi(),
-                    vec![op1, op2],
-                    ty2rc(&node.ty),
-                    conv_info.cur_bb,
-                );
-                let inst_tied = inst.set_tie_with_def(op1_reg);
-                Some(conv_info.push_instr(inst_tied))
-            }
-            NodeKind::MI(MINodeKind::IMULrr32) => {
-                let op0 = self.usual_operand(conv_info, node.operand[0]);
-                let op1 = self.usual_operand(conv_info, node.operand[1]);
-                let op0_reg = op0.as_register().clone();
-                let inst = MachineInstr::new(
-                    &conv_info.cur_func.vreg_gen,
-                    MachineOpcode::IMULrr32,
-                    vec![op0, op1],
-                    ty2rc(&node.ty),
-                    conv_info.cur_bb,
-                );
-                let inst_tied = inst.set_tie_with_def(op0_reg);
-                Some(conv_info.push_instr(inst_tied))
-            }
-            NodeKind::MI(MINodeKind::IMULrri32) | NodeKind::MI(MINodeKind::IMULrr64i32) => {
-                let op0 = self.usual_operand(conv_info, node.operand[0]);
-                let op1 = self.usual_operand(conv_info, node.operand[1]);
-                let inst = MachineInstr::new(
-                    &conv_info.cur_func.vreg_gen,
-                    node.kind.as_mi(),
-                    vec![op0, op1],
-                    ty2rc(&node.ty),
-                    conv_info.cur_bb,
-                );
-                Some(conv_info.push_instr(inst))
-            }
-            NodeKind::MI(MINodeKind::LEArmi32) | NodeKind::MI(MINodeKind::LEArmr64) => {
-                let op0 = self.usual_operand(conv_info, node.operand[0]);
-                let op1 = self.usual_operand(conv_info, node.operand[1]);
-                let inst = MachineInstr::new(
-                    &conv_info.cur_func.vreg_gen,
-                    node.kind.as_mi(),
-                    vec![op0, op1],
-                    ty2rc(&node.ty),
-                    conv_info.cur_bb,
-                );
-                Some(conv_info.push_instr(inst))
-            }
-            NodeKind::MI(MINodeKind::MOVSXDr64m32) => {
-                let op0 = self.usual_operand(conv_info, node.operand[0]);
-                let inst = MachineInstr::new(
-                    &conv_info.cur_func.vreg_gen,
-                    node.kind.as_mi(),
-                    vec![op0],
-                    ty2rc(&node.ty),
-                    conv_info.cur_bb,
-                );
-                Some(conv_info.push_instr(inst))
             }
             NodeKind::IR(IRNodeKind::Setcc) => {
                 let new_op1 = self.usual_operand(conv_info, node.operand[1]);

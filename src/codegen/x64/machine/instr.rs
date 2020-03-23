@@ -220,6 +220,10 @@ impl MachineInstr {
         }
     }
 
+    pub fn tie_regs(&mut self, def: MachineRegister, use_: MachineRegister) {
+        self.tie.insert(def, use_);
+    }
+
     pub fn set_tie(mut self, def: MachineRegister, use_: MachineRegister) -> Self {
         self.tie.insert(def, use_);
         self

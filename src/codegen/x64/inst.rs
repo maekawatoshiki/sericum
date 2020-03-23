@@ -45,6 +45,13 @@ mod inst {
                 TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR32)),
             ])
         };
+        pub static ref MOVmi32i32: TargetInstDef = {
+            TargetInstDef::new(TargetOpcode::MOVmi32i32).set_uses(vec![
+                TargetOperand::FrameIndex,
+                TargetOperand::Immediate(TargetImmediate::I32),
+                TargetOperand::Immediate(TargetImmediate::I32),
+            ])
+        };
         pub static ref MOVpi32: TargetInstDef = {
             TargetInstDef::new(TargetOpcode::MOVpi32).set_uses(vec![
                 TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR64)),
@@ -74,6 +81,14 @@ mod inst {
                 .set_uses(vec![
                     TargetOperand::FrameIndex,
                     TargetOperand::Immediate(TargetImmediate::I32),
+                ])
+                .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR64)])
+        };
+        pub static ref LEArmr64: TargetInstDef = {
+            TargetInstDef::new(TargetOpcode::LEArmr64)
+                .set_uses(vec![
+                    TargetOperand::FrameIndex,
+                    TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR64)),
                 ])
                 .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR64)])
         };
@@ -350,7 +365,50 @@ pub enum TargetOpcode {
     Ret,
 }
 
-impl TargetOpcode {}
+impl TargetOpcode {
+    pub fn inst_def(&self) -> Option<&TargetInstDef> {
+        match self {
+            Self::MOVSDrm64 => Some(&*inst::MOVSDrm64),
+            Self::MOVrmi32 => Some(&*inst::MOVrmi32),
+            Self::MOVrmri32 => Some(&*inst::MOVrmri32),
+            Self::MOVrrri32 => Some(&*inst::MOVrrri32),
+            Self::MOVmi32r32 => Some(&*inst::MOVmi32r32),
+            // Self::MOVmi32i32  => Some(&*inst::MOVmi32i32   ),
+            Self::MOVpi32 => Some(&*inst::MOVpi32),
+            Self::MOVpr32 => Some(&*inst::MOVpr32),
+            Self::MOVrp32 => Some(&*inst::MOVrp32),
+            // Self::StoreFiOff  => Some(&*inst::StoreFiOff   ),
+            // Self::StoreRegOff => Some(&*inst::StoreRegOff  ),
+            Self::MOVSXDr64m32 => Some(&*inst::MOVSXDr64m32),
+            Self::LEArmi32 => Some(&*inst::LEArmi32),
+            Self::LEArmr64 => Some(&*inst::LEArmr64),
+            Self::ADDrr32 => Some(&*inst::ADDrr32),
+            Self::ADDri32 => Some(&*inst::ADDri32),
+            Self::ADDr64i32 => Some(&*inst::ADDr64i32),
+            Self::SUBrr32 => Some(&*inst::SUBrr32),
+            Self::SUBri32 => Some(&*inst::SUBri32),
+            Self::SUBr64i32 => Some(&*inst::SUBr64i32),
+            Self::IMULrr32 => Some(&*inst::IMULrr32),
+            Self::IMULrri32 => Some(&*inst::IMULrri32),
+            Self::IMULrr64i32 => Some(&*inst::IMULrr64i32),
+            Self::CDQ => Some(&*inst::CDQ),
+            Self::MOVrr32 => Some(&*inst::MOVrr32),
+            Self::MOVri32 => Some(&*inst::MOVri32),
+            Self::MOVrm32 => Some(&*inst::MOVrm32),
+            Self::MOVmr32 => Some(&*inst::MOVmr32),
+            Self::MOVmi32 => Some(&*inst::MOVmi32),
+            Self::MOVrr64 => Some(&*inst::MOVrr64),
+            Self::MOVri64 => Some(&*inst::MOVri64),
+            Self::MOVrm64 => Some(&*inst::MOVrm64),
+            Self::LEA64 => Some(&*inst::LEA64),
+            Self::IDIV => Some(&*inst::IDIV),
+            Self::PUSH64 => Some(&*inst::PUSH64),
+            Self::POP64 => Some(&*inst::POP64),
+            Self::RET => Some(&*inst::RET),
+            _ => None,
+        }
+    }
+}
 
 impl TargetInstDef {
     pub fn new(opcode: TargetOpcode) -> Self {
