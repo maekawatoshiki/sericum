@@ -182,6 +182,14 @@ impl MISelector {
                 let op1 = self.run_on_node(heap, node.operand[1]);
                 heap.alloc(DAGNode::new(kind, vec![op0, op1], node.ty.clone()))
             }
+            NodeKind::IR(IRNodeKind::CopyFromReg) => {
+                let op0 = self.run_on_node(heap, node.operand[0]);
+                heap.alloc(DAGNode::new(
+                    NodeKind::MI(MINodeKind::Copy),
+                    vec![op0],
+                    node.ty.clone(),
+                ))
+            }
             _ => {
                 node.operand = node
                     .operand

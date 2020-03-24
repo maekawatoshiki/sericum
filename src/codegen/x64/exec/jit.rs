@@ -66,6 +66,7 @@ impl JITExecutor {
 
         let mut machine_module = dag::mc_convert::MIConverter::new().convert_module(dag_module);
 
+        // TODO: refine!!!!!
         debug!(
             println!("MachineModule dump:");
             for (_, machine_func) in &machine_module.functions {
@@ -89,6 +90,7 @@ impl JITExecutor {
         machine::pro_epi_inserter::PrologueEpilogueInserter::new()
             .run_on_module(&mut machine_module);
         machine::replace_data::ConstDataReplacer::new().run_on_module(&mut machine_module);
+        machine::copy_to_minst::CopyToMachineInst::new().run_on_module(&mut machine_module);
 
         // TODO: refine
         debug!(
@@ -263,7 +265,6 @@ impl JITCompiler {
                     MachineOpcode::RET => self.compile_ret(),
                     MachineOpcode::PUSH64 => self.compile_push64(instr),
                     MachineOpcode::POP64 => self.compile_pop64(instr),
-                    MachineOpcode::Add => self.compile_add(&frame_objects, instr),
                     MachineOpcode::ADDrr32 => self.compile_add_rr32(instr),
                     MachineOpcode::ADDri32 => self.compile_add_ri32(instr),
                     MachineOpcode::ADDr64i32 => self.compile_add_r64i32(instr),
@@ -677,29 +678,6 @@ impl JITCompiler {
         let r1 = phys_reg_to_dynasm_reg(instr.operand[0].as_register().get_reg().unwrap());
         let i2 = instr.operand[1].as_constant().as_i32();
         dynasm!(self.asm; imul Rq(r0), Rq(r1), i2);
-    }
-
-    fn compile_add(&mut self, fo: &FrameObjectsInfo, instr: &MachineInstr) {
-        let rn = register!(instr);
-        let op0 = &instr.operand[0];
-        let op1 = &instr.operand[1];
-        match op0 {
-            MachineOperand::FrameIndex(fi) => match op1 {
-                MachineOperand::Constant(c) => match c {
-                    MachineConstant::Int32(i) => {
-                        dynasm!(self.asm;
-                            lea Ra(rn), [rbp + i - fo.offset(fi.idx).unwrap()]);
-                    }
-                    _ => unimplemented!(),
-                },
-                MachineOperand::Register(r) => {
-                    dynasm!(self.asm;
-                        lea Ra(rn), [rbp + Ra(register!(r)) - fo.offset(fi.idx).unwrap()]);
-                }
-                _ => unimplemented!(),
-            },
-            _ => unimplemented!(),
-        }
     }
 
     fn compile_cdq(&mut self, _fo: &FrameObjectsInfo, _instr: &MachineInstr) {

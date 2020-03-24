@@ -379,9 +379,6 @@ pub enum TargetOpcode {
     // Call
     Call,
 
-    // Binary arithmetics
-    Add,
-
     // Comparison
     Seteq,
     Setle,

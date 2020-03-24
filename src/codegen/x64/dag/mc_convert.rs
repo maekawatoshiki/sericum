@@ -134,7 +134,6 @@ impl MIConverter {
 
         // there should be no NodeKind::IRs here
         let machine_instr_id = match &node.kind {
-            NodeKind::IR(IRNodeKind::Entry) => None,
             NodeKind::MI(_) => {
                 fn reg(inst: &MachineInstr, x: &DefOrUseReg) -> MachineRegister {
                     match x {
@@ -161,6 +160,7 @@ impl MIConverter {
                 }
                 Some(conv_info.push_instr(inst))
             }
+            NodeKind::IR(IRNodeKind::Entry) => None,
             NodeKind::IR(IRNodeKind::CopyToReg) => {
                 let val = self.usual_operand(conv_info, node.operand[1]);
                 let dst = match &node.operand[0].kind {
@@ -169,21 +169,10 @@ impl MIConverter {
                     }
                     _ => unreachable!(),
                 };
-
                 Some(conv_info.push_instr(MachineInstr::new_with_def_reg(
                     MachineOpcode::Copy,
                     vec![val],
                     vec![dst],
-                    conv_info.cur_bb,
-                )))
-            }
-            NodeKind::IR(IRNodeKind::CopyFromReg) => {
-                let reg = self.usual_operand(conv_info, node.operand[0]);
-                Some(conv_info.push_instr(MachineInstr::new(
-                    &conv_info.cur_func.vreg_gen,
-                    MachineOpcode::Copy,
-                    vec![reg],
-                    ty2rc(&node.ty),
                     conv_info.cur_bb,
                 )))
             }
@@ -256,20 +245,6 @@ impl MIConverter {
                     Some(RegisterClassKind::GR32), // TODO
                     conv_info.cur_bb,
                 )))
-            }
-            NodeKind::IR(IRNodeKind::Add) => {
-                let op1 = self.usual_operand(conv_info, node.operand[0]);
-                let op2 = self.usual_operand(conv_info, node.operand[1]);
-                let op1_reg = op1.as_register().clone(); // todo: may be frame index
-                let inst = MachineInstr::new(
-                    &conv_info.cur_func.vreg_gen,
-                    MachineOpcode::Add,
-                    vec![op1, op2],
-                    ty2rc(&node.ty),
-                    conv_info.cur_bb,
-                );
-                let inst_tied = inst.set_tie_with_def(op1_reg);
-                Some(conv_info.push_instr(inst_tied))
             }
             NodeKind::IR(IRNodeKind::Setcc) => {
                 let new_op1 = self.usual_operand(conv_info, node.operand[1]);
