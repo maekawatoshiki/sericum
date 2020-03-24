@@ -1,4 +1,3 @@
-use super::super::dag::mc_convert::mov_rx;
 use super::{basic_block::*, function::*, instr::*, module::*};
 use rustc_hash::FxHashMap;
 
@@ -42,7 +41,7 @@ impl PhiElimination {
 
                 let mut copy = MachineInstr::new(
                     &f.vreg_gen,
-                    mov_rx(&val).unwrap(),
+                    MachineOpcode::Copy,
                     vec![val.clone()],
                     Some(phi.def[0].info_ref().reg_class),
                     bb,
