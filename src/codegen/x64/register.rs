@@ -34,6 +34,7 @@ pub fn ty2rc(ty: &Type) -> Option<RegisterClassKind> {
         Type::Void => None,
         Type::Int32 => Some(RegisterClassKind::GR32),
         Type::Int64 => Some(RegisterClassKind::GR64),
+        Type::F64 => Some(RegisterClassKind::XMM),
         Type::Pointer(_) => Some(RegisterClassKind::GR64),
         Type::Array(_) => Some(RegisterClassKind::GR64),
         e => unimplemented!("{:?}", e),
@@ -92,7 +93,6 @@ impl RegisterClassKind {
         self.size_in_bits() / 8
     }
 
-    // TODO: proper name?
     pub fn shares_same_register_file(&self, rc: RegisterClassKind) -> bool {
         self.register_file_base_class() == rc.register_file_base_class()
     }
@@ -191,6 +191,14 @@ impl RegisterClassKind {
                 XMM::XMM14,
                 XMM::XMM15
             ),
+        }
+    }
+
+    pub fn return_value_register(&self) -> PhysReg {
+        match self {
+            Self::GR32 => GR32::EAX.as_phys_reg(),
+            Self::GR64 => GR64::RAX.as_phys_reg(),
+            Self::XMM => XMM::XMM0.as_phys_reg(),
         }
     }
 }

@@ -146,7 +146,7 @@ impl MIConverter {
                 let operands = node
                     .operand
                     .iter()
-                    .map(|op| self.usual_operand(conv_info, *op))
+                    .map(|op| self.normal_operand(conv_info, *op))
                     .collect();
                 let mut inst = MachineInstr::new(
                     &conv_info.cur_func.vreg_gen,
@@ -162,7 +162,7 @@ impl MIConverter {
             }
             NodeKind::IR(IRNodeKind::Entry) => None,
             NodeKind::IR(IRNodeKind::CopyToReg) => {
-                let val = self.usual_operand(conv_info, node.operand[1]);
+                let val = self.normal_operand(conv_info, node.operand[1]);
                 let dst = match &node.operand[0].kind {
                     NodeKind::Operand(OperandNodeKind::Register(r)) => {
                         MachineRegister::new(r.clone())
@@ -181,7 +181,7 @@ impl MIConverter {
                 let mut operands = vec![];
                 let mut i = 0;
                 while i < node.operand.len() {
-                    operands.push(self.usual_operand(conv_info, node.operand[i]));
+                    operands.push(self.normal_operand(conv_info, node.operand[i]));
                     operands.push(MachineOperand::Branch(
                         self.get_machine_bb(bb!(node.operand[i + 1])),
                     ));
@@ -203,8 +203,8 @@ impl MIConverter {
                     .with_vreg(conv_info.cur_func.vreg_gen.next_vreg())
                     .into_machine_register();
 
-                let op1 = self.usual_operand(conv_info, node.operand[0]);
-                let op2 = self.usual_operand(conv_info, node.operand[1]);
+                let op1 = self.normal_operand(conv_info, node.operand[0]);
+                let op2 = self.normal_operand(conv_info, node.operand[1]);
 
                 conv_info.push_instr(
                     MachineInstr::new_simple(
@@ -247,8 +247,8 @@ impl MIConverter {
                 )))
             }
             NodeKind::IR(IRNodeKind::Setcc) => {
-                let new_op1 = self.usual_operand(conv_info, node.operand[1]);
-                let new_op2 = self.usual_operand(conv_info, node.operand[2]);
+                let new_op1 = self.normal_operand(conv_info, node.operand[1]);
+                let new_op2 = self.normal_operand(conv_info, node.operand[2]);
                 Some(conv_info.push_instr(MachineInstr::new(
                     &conv_info.cur_func.vreg_gen,
                     match cond_kind!(node.operand[0]) {
@@ -271,7 +271,7 @@ impl MIConverter {
                 conv_info.cur_bb,
             ))),
             NodeKind::IR(IRNodeKind::BrCond) => {
-                let new_cond = self.usual_operand(conv_info, node.operand[0]);
+                let new_cond = self.normal_operand(conv_info, node.operand[0]);
                 Some(conv_info.push_instr(MachineInstr::new(
                     &conv_info.cur_func.vreg_gen,
                     MachineOpcode::BrCond,
@@ -284,8 +284,8 @@ impl MIConverter {
                 )))
             }
             NodeKind::IR(IRNodeKind::Brcc) => {
-                let new_op0 = self.usual_operand(conv_info, node.operand[1]);
-                let new_op1 = self.usual_operand(conv_info, node.operand[2]);
+                let new_op0 = self.normal_operand(conv_info, node.operand[1]);
+                let new_op1 = self.normal_operand(conv_info, node.operand[2]);
                 Some(conv_info.push_instr(MachineInstr::new(
                     &conv_info.cur_func.vreg_gen,
                     match cond_kind!(node.operand[0]) {
@@ -302,16 +302,7 @@ impl MIConverter {
                     conv_info.cur_bb,
                 )))
             }
-            NodeKind::IR(IRNodeKind::Ret) => {
-                let new_op1 = self.usual_operand(conv_info, node.operand[0]);
-                Some(conv_info.push_instr(MachineInstr::new(
-                    &conv_info.cur_func.vreg_gen,
-                    MachineOpcode::Ret,
-                    vec![new_op1],
-                    None,
-                    conv_info.cur_bb,
-                )))
-            }
+            NodeKind::IR(IRNodeKind::Ret) => Some(self.convert_ret(conv_info, &*node)),
             NodeKind::IR(IRNodeKind::CopyToLiveOut) => {
                 self.convert_dag_to_machine_instr(conv_info, node.operand[0])
             }
@@ -324,6 +315,24 @@ impl MIConverter {
         }
 
         machine_instr_id
+    }
+
+    fn convert_ret(&mut self, conv_info: &mut ConversionInfo, node: &DAGNode) -> MachineInstrId {
+        let val = self.normal_operand(conv_info, node.operand[0]);
+        if let Some(ty) = val.get_type() {
+            let ret_reg = ty2rc(&ty).unwrap().return_value_register();
+            let set_ret_val =
+                MachineInstr::new_simple(mov_rx(&val).unwrap(), vec![val], conv_info.cur_bb)
+                    .with_def(vec![
+                        RegisterInfo::new_phy_reg(ret_reg).into_machine_register()
+                    ]);
+            conv_info.push_instr(set_ret_val);
+        }
+        conv_info.push_instr(MachineInstr::new_simple(
+            MachineOpcode::RET,
+            vec![],
+            conv_info.cur_bb,
+        ))
     }
 
     fn convert_call_dag(
@@ -356,7 +365,7 @@ impl MIConverter {
         let mut arg_regs = vec![];
         // TODO: We have to push remaining arguments on stack
         for (i, operand) in node.operand[1..].iter().enumerate() {
-            let arg = self.usual_operand(conv_info, *operand);
+            let arg = self.normal_operand(conv_info, *operand);
             let ty = arg.get_type().unwrap();
 
             // TODO: not simple
@@ -371,7 +380,7 @@ impl MIConverter {
             conv_info.push_instr(instr);
         }
 
-        let callee = self.usual_operand(conv_info, node.operand[0]);
+        let callee = self.normal_operand(conv_info, node.operand[0]);
 
         let ret_reg = RegisterInfo::new_phy_reg(GR32::EAX)
             .with_vreg(conv_info.cur_func.vreg_gen.next_vreg())
@@ -408,7 +417,7 @@ impl MIConverter {
         }
     }
 
-    fn usual_operand(
+    fn normal_operand(
         &mut self,
         conv_info: &mut ConversionInfo,
         node: Raw<DAGNode>,
@@ -465,6 +474,11 @@ pub fn mov_n_rx(bit: usize, x: &MachineOperand) -> Option<MachineOpcode> {
 }
 
 pub fn mov_rx(x: &MachineOperand) -> Option<MachineOpcode> {
+    // TODO: special handling for float
+    if x.get_type().unwrap() == Type::F64 {
+        return Some(MachineOpcode::MOVSDrm64);
+    }
+
     let mov32rx = [
         MachineOpcode::MOVrr32,
         MachineOpcode::MOVri32,

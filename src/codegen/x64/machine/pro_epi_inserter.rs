@@ -119,64 +119,14 @@ impl PrologueEpilogueInserter {
 
         for bb_id in &cur_func.basic_blocks {
             let bb = &cur_func.basic_block_arena[*bb_id];
-            let last_instr_id = *bb.iseq_ref().last().unwrap();
-            let last_instr = &cur_func.instr_arena[last_instr_id];
+            let last_inst_id = *bb.iseq_ref().last().unwrap();
+            let last_inst = &cur_func.instr_arena[last_inst_id];
 
-            if last_instr.opcode != MachineOpcode::Ret {
+            if last_inst.opcode != MachineOpcode::RET {
                 continue;
             }
 
-            let ret = last_instr.clone();
             let mut iseq = vec![];
-
-            bb.iseq_ref_mut().pop(); // Ret
-
-            match &ret.operand[0] {
-                MachineOperand::Constant(c) => match c {
-                    MachineConstant::Int32(i) => iseq.push(
-                        cur_func.instr_arena.alloc(
-                            MachineInstr::new_simple(
-                                MachineOpcode::MOVri32,
-                                vec![MachineOperand::Constant(MachineConstant::Int32(*i))],
-                                *bb_id,
-                            )
-                            .with_def(vec![
-                                RegisterInfo::new_phy_reg(GR32::EAX).into_machine_register()
-                            ]),
-                        ),
-                    ),
-                    MachineConstant::Int64(_) => unimplemented!(), // TODO
-                    MachineConstant::F64(f) => iseq.push(
-                        cur_func.instr_arena.alloc(
-                            MachineInstr::new_simple(
-                                MachineOpcode::MOVSDrm64,
-                                vec![MachineOperand::Constant(MachineConstant::F64(*f))],
-                                *bb_id,
-                            )
-                            .with_def(vec![
-                                RegisterInfo::new_phy_reg(XMM::XMM0).into_machine_register()
-                            ]),
-                        ),
-                    ),
-                },
-                MachineOperand::Register(r) => {
-                    // dynasm!(self.asm; mov rax, Ra(register!(i)))
-                    iseq.push(
-                        cur_func.instr_arena.alloc(
-                            MachineInstr::new_simple(
-                                MachineOpcode::MOVrr32,
-                                vec![MachineOperand::Register(r.clone())],
-                                *bb_id,
-                            )
-                            .with_def(vec![
-                                RegisterInfo::new_phy_reg(GR32::EAX).into_machine_register()
-                            ]),
-                        ),
-                    )
-                }
-                MachineOperand::None => {}
-                _ => unreachable!(),
-            }
 
             // mov rsp, rbp
             let i = MachineInstr::new_simple(
@@ -201,16 +151,12 @@ impl PrologueEpilogueInserter {
             );
             iseq.push(cur_func.instr_arena.alloc(i));
 
-            // ret
-            let i = MachineInstr::new_simple(MachineOpcode::RET, vec![], *bb_id);
-            iseq.push(cur_func.instr_arena.alloc(i));
-
-            bb_iseq.push((*bb_id, iseq));
+            bb_iseq.push((last_inst_id, iseq));
         }
 
-        for (bb_id, iseq) in bb_iseq {
+        for (ret_id, iseq) in bb_iseq {
             let mut builder = Builder::new(cur_func);
-            builder.set_insert_point_at_end(bb_id);
+            builder.set_insert_point_before_instr(ret_id);
             for inst in iseq {
                 builder.insert(inst)
             }
