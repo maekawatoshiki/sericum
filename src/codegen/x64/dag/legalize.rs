@@ -161,7 +161,13 @@ impl Legalize {
                 let op1_op0 = self.run_on_node(heap, op1.operand[0]);
                 let op1_op1 = op1.operand[1];
                 return heap.alloc(DAGNode::new(
-                    NodeKind::IR(IRNodeKind::StoreRegOff),
+                    if new_src.is_maybe_register() && new_src.ty == Type::Int32 {
+                        NodeKind::MI(MINodeKind::MOVrri32r32)
+                    } else if new_src.is_constant() && new_src.ty == Type::Int32 {
+                        NodeKind::MI(MINodeKind::MOVrri32i32)
+                    } else {
+                        unimplemented!()
+                    },
                     vec![op0, op1_op0, op1_op1, new_src],
                     node.ty.clone(),
                 ));

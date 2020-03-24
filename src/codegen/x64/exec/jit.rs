@@ -248,6 +248,8 @@ impl JITCompiler {
                     MachineOpcode::MOVmi32i32 => self.compile_mov_mi32i32(&frame_objects, instr),
                     MachineOpcode::MOVmri32i32 => self.compile_mov_mri32i32(&frame_objects, instr),
                     MachineOpcode::MOVmri32r32 => self.compile_mov_mri32r32(&frame_objects, instr),
+                    MachineOpcode::MOVrri32i32 => self.compile_mov_rri32i32(instr),
+                    MachineOpcode::MOVrri32r32 => self.compile_mov_rri32r32(instr),
                     MachineOpcode::MOVSXDr64m32 => {
                         self.compile_movsxd_r64m32(&frame_objects, instr)
                     }
@@ -273,7 +275,6 @@ impl JITCompiler {
                     MachineOpcode::IMULrr64i32 => self.compile_imul_rr64i32(instr),
                     MachineOpcode::IDIV => self.compile_idiv(&frame_objects, instr),
                     MachineOpcode::CDQ => self.compile_cdq(&frame_objects, instr),
-                    MachineOpcode::StoreRegOff => self.compile_store_reg_off(&frame_objects, instr),
                     MachineOpcode::Call => self.compile_call(module, &frame_objects, instr),
                     MachineOpcode::Copy => self.compile_copy(instr),
                     MachineOpcode::BrccEq | MachineOpcode::BrccLe | MachineOpcode::BrccLt => {
@@ -549,22 +550,24 @@ impl JITCompiler {
         }
     }
 
-    fn compile_store_reg_off(&mut self, _fo: &FrameObjectsInfo, instr: &MachineInstr) {
-        let base = register!(instr.operand[0].as_register());
-        let off = register!(instr.operand[1].as_register());
-        let align = instr.operand[2].as_constant();
-        let src = &instr.operand[3];
-        match src {
-            MachineOperand::Constant(MachineConstant::Int32(i)) => {
-                assert_eq!(align, &MachineConstant::Int32(4));
-                dynasm!(self.asm; mov DWORD [Ra(base) + 4*Ra(off)], *i)
-            }
-            MachineOperand::Register(r) => match align {
-                MachineConstant::Int32(4) => {
-                    dynasm!(self.asm; mov DWORD [Ra(base) + 4*Ra(off)], Rd(register!(r)))
-                }
-                _ => unimplemented!(),
-            },
+    fn compile_mov_rri32i32(&mut self, instr: &MachineInstr) {
+        let r0 = phys_reg_to_dynasm_reg(instr.operand[0].as_register().get_reg().unwrap());
+        let r1 = phys_reg_to_dynasm_reg(instr.operand[1].as_register().get_reg().unwrap());
+        let i2 = instr.operand[2].as_constant().as_i32();
+        let i3 = instr.operand[3].as_constant().as_i32();
+        match i2 {
+            4 => dynasm!(self.asm; mov DWORD [Rq(r0) + 4*Rq(r1)], i3),
+            _ => unimplemented!(),
+        }
+    }
+
+    fn compile_mov_rri32r32(&mut self, instr: &MachineInstr) {
+        let r0 = phys_reg_to_dynasm_reg(instr.operand[0].as_register().get_reg().unwrap());
+        let r1 = phys_reg_to_dynasm_reg(instr.operand[1].as_register().get_reg().unwrap());
+        let i2 = instr.operand[2].as_constant().as_i32();
+        let r3 = phys_reg_to_dynasm_reg(instr.operand[3].as_register().get_reg().unwrap());
+        match i2 {
+            4 => dynasm!(self.asm; mov DWORD [Rq(r0) + 4*Rq(r1)], Rd(r3)),
             _ => unimplemented!(),
         }
     }
