@@ -328,6 +328,33 @@ fn pointer() {
 }
 
 #[test]
+fn phi() {
+    let mut m = module::Module::new("cilk");
+
+    let _ = cilk_ir!(m; define [i32] func [(i32)] {
+        entry:
+            c = icmp eq (%arg.0), (i32 8);
+            br (%c) l1, l2;
+        l1:
+            a = add (%arg.0), (i32 2);
+            br merge;
+        l2:
+            s = sub (%arg.0), (i32 1);
+            br merge;
+        merge:
+            p = phi [ [(%a), l1], [(%s), l2] ];
+            ret (%p);
+    });
+
+    let mut jit = exec::jit::JITExecutor::new(&m);
+    let func = jit.find_function_by_name("func").unwrap();
+    let ret = jit.run(func, vec![exec::jit::GenericValue::Int32(8)]);
+    assert_eq!(ret, exec::jit::GenericValue::Int32(10));
+    let ret = jit.run(func, vec![exec::jit::GenericValue::Int32(7)]);
+    assert_eq!(ret, exec::jit::GenericValue::Int32(6));
+}
+
+#[test]
 fn arr_2d() {
     let mut m = module::Module::new("cilk");
 
@@ -452,18 +479,6 @@ fn jit_executor1() {
         // l2:
         //     ret (i32 1);
 
-        // entry:
-        //     c = icmp eq (%arg.0), (i32 8);
-        //     br (%c) l1, l2;
-        // l1:
-        //     a = add (%arg.0), (i32 2);
-        //     br merge;
-        // l2:
-        //     s = sub (%arg.0), (i32 1);
-        //     br merge;
-        // merge:
-        //     p = phi [ [(%a), l1], [(%s), l2] ];
-        //     ret (%p);
 
         // primarity test
         entry:

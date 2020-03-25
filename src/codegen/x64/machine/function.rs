@@ -7,6 +7,7 @@ use std::ops::{Index, IndexMut};
 
 pub type MachineFunctionId = Id<MachineFunction>;
 
+// TODO: Documents in detail
 #[derive(Debug, Clone)]
 pub struct MachineFunction {
     /// Function name
@@ -15,11 +16,7 @@ pub struct MachineFunction {
     /// Function type
     pub ty: Type,
 
-    // /// Machine Basic blocks list
-    // pub basic_blocks: Vec<MachineBasicBlockId>,
-    //
-    // /// Machine Basic block arena
-    // pub basic_block_arena: Arena<MachineBasicBlock>,
+    /// Machine Basic Blocks
     pub basic_blocks: MachineBasicBlocks,
 
     /// Instruction arena
@@ -58,13 +55,17 @@ impl MachineFunction {
     }
 
     pub fn find_instr_pos(&self, instr_id: MachineInstrId) -> Option<(MachineBasicBlockId, usize)> {
-        for bb_id in &self.basic_blocks.order {
-            let bb = &self.basic_blocks.arena[*bb_id];
+        for (bb_id, bb) in self.basic_blocks.id_and_block() {
             if let Some(pos) = bb.find_instr_pos(instr_id) {
-                return Some((*bb_id, pos));
+                return Some((bb_id, pos));
             }
         }
         None
+    }
+
+    pub fn remove_inst(&self, inst_id: MachineInstrId) {
+        let (bb_id, pos) = self.find_instr_pos(inst_id).unwrap();
+        self.basic_blocks.arena[bb_id].iseq_ref_mut().remove(pos);
     }
 
     pub fn get_entry_bb(&self) -> Option<&MachineBasicBlockId> {

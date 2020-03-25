@@ -1,5 +1,4 @@
-use super::{basic_block::*, function::*, instr::*, module::*};
-use rustc_hash::FxHashMap;
+use super::{builder::*, function::*, instr::*, module::*};
 
 pub struct PhiElimination {}
 
@@ -15,58 +14,36 @@ impl PhiElimination {
     }
 
     pub fn run_on_function(&mut self, f: &mut MachineFunction) {
-        // TODO: Rewrite with MachineInstr Builder
-        let phi_pos = self.collect_phi(f);
+        let phi_list: Vec<_> = f
+            .basic_blocks
+            .id_and_block()
+            .map(|(_, bb)| {
+                bb.iseq_ref()
+                    .iter()
+                    .filter(|&&id| f.instr_arena[id].opcode == MachineOpcode::Phi)
+                    .map(|&id| (id, f.instr_arena[id].clone()))
+                    .collect::<Vec<_>>()
+            })
+            .flatten()
+            .collect();
 
-        for (bb_id, bb) in f.basic_blocks.id_and_block() {
-            let (phi, pos) = if let Some(phi_pos) = phi_pos.get(&bb_id) {
-                (f.instr_arena[bb.iseq_ref()[*phi_pos]].clone(), *phi_pos)
-            } else {
-                continue;
-            };
-            let mut i = 0;
-            while i < phi.operand.len() {
+        for (phi_id, phi) in phi_list {
+            for i in (0..phi.operand.len()).step_by(2) {
                 let val = &phi.operand[i + 0];
-                let bb = match phi.operand[i + 1] {
-                    MachineOperand::Branch(bb) => bb,
-                    _ => unreachable!(),
-                };
+                let incoming_bb_id = phi.operand[i + 1].as_basic_block();
 
-                debug!(println!("PHI {:?}", val));
-
-                let mut iseq = f.basic_blocks.arena[bb].iseq_ref_mut();
-                assert!(
-                    iseq.len() > 0 && f.instr_arena[*iseq.last().unwrap()].opcode.is_terminator()
-                );
-
-                let mut copy = MachineInstr::new(
-                    &f.vreg_gen,
+                let copy = MachineInstr::new_simple(
                     MachineOpcode::Copy,
                     vec![val.clone()],
-                    Some(phi.def[0].info_ref().reg_class),
-                    bb,
-                );
-                copy.def = phi.def.clone();
-                let id = f.instr_arena.alloc(copy);
-                let pt = if iseq.len() >= 2 { iseq.len() - 1 } else { 0 };
-                iseq.insert(pt, id);
+                    incoming_bb_id,
+                )
+                .with_def(phi.def.clone());
 
-                i += 2;
+                let mut builder = Builder::new(f);
+                builder.set_insert_point_at_end(incoming_bb_id);
+                builder.insert(copy);
             }
-
-            bb.iseq_ref_mut().remove(pos);
+            f.remove_inst(phi_id);
         }
-    }
-
-    fn collect_phi(&mut self, f: &MachineFunction) -> FxHashMap<MachineBasicBlockId, usize> {
-        let mut phi_pos = FxHashMap::default();
-        for (bb_id, bb) in f.basic_blocks.id_and_block() {
-            for (i, instr) in bb.iseq_ref().iter().enumerate() {
-                if f.instr_arena[*instr].opcode == MachineOpcode::Phi {
-                    phi_pos.insert(bb_id, i);
-                }
-            }
-        }
-        phi_pos
     }
 }
