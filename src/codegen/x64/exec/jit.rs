@@ -90,7 +90,7 @@ impl JITExecutor {
         machine::pro_epi_inserter::PrologueEpilogueInserter::new()
             .run_on_module(&mut machine_module);
         machine::replace_data::ConstDataReplacer::new().run_on_module(&mut machine_module);
-        machine::copy_to_minst::CopyToMachineInst::new().run_on_module(&mut machine_module);
+        machine::replace_copy::ReplaceCopyWithProperMInst::new().run_on_module(&mut machine_module);
 
         // TODO: refine
         debug!(

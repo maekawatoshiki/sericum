@@ -1,7 +1,6 @@
 pub mod basic_block;
 pub mod builder;
 pub mod const_data;
-pub mod copy_to_minst;
 pub mod function;
 pub mod instr;
 pub mod liveness;
@@ -10,6 +9,7 @@ pub mod phi_elimination;
 pub mod pro_epi_inserter;
 pub mod reg_coalescer;
 pub mod regalloc;
+pub mod replace_copy;
 pub mod replace_data;
 pub mod spiller;
 pub mod two_addr;

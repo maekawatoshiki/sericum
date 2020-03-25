@@ -6,9 +6,9 @@ use super::{
     module::MachineModule,
 };
 
-pub struct CopyToMachineInst {}
+pub struct ReplaceCopyWithProperMInst {}
 
-impl CopyToMachineInst {
+impl ReplaceCopyWithProperMInst {
     pub fn new() -> Self {
         Self {}
     }
