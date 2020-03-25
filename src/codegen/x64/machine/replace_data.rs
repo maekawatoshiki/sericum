@@ -15,8 +15,7 @@ impl ConstDataReplacer {
     }
 
     pub fn run_on_function(&mut self, data: &mut ConstDataArena, cur_func: &mut MachineFunction) {
-        for bb_id in &cur_func.basic_blocks {
-            let bb = &cur_func.basic_block_arena[*bb_id];
+        for (_, bb) in cur_func.basic_blocks.id_and_block() {
             for inst_id in &*bb.iseq_ref() {
                 let inst = &mut cur_func.instr_arena[*inst_id];
                 let replace = matches!(inst.opcode, MachineOpcode::MOVSDrm64);

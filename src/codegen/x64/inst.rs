@@ -376,7 +376,6 @@ pub enum TargetOpcode {
 
     Copy,
 
-    // Call
     Call,
 
     // Comparison

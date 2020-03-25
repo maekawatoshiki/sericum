@@ -72,8 +72,7 @@ impl JITExecutor {
             for (_, machine_func) in &machine_module.functions {
                 let mut idx = 0;
                 println!("Machine function '{}':", machine_func.name);
-                for bb_id in &machine_func.basic_blocks {
-                    let bb = &machine_func.basic_block_arena[*bb_id];
+                for (_, bb) in machine_func.basic_blocks.id_and_block() {
                     println!("Machine basic block: {:?}", bb);
                     for instr in &*bb.iseq_ref() {
                         println!("{}: {:?}", idx, machine_func.instr_arena[*instr]);
@@ -98,8 +97,7 @@ impl JITExecutor {
             for (_, machine_func) in &machine_module.functions {
                 let mut idx = 0;
                 println!("Machine function '{}':", machine_func.name);
-                for bb_id in &machine_func.basic_blocks {
-                    let bb = &machine_func.basic_block_arena[*bb_id];
+                for (_, bb) in machine_func.basic_blocks.id_and_block() {
                     println!("Machine basic block: {:?}", bb);
                     for instr in &*bb.iseq_ref() {
                         println!("{}: {:?}", idx, machine_func.instr_arena[*instr]);
@@ -225,13 +223,12 @@ impl JITCompiler {
             ; =>f_entry
         );
 
-        for bb_id in &f.basic_blocks {
-            let bb = &f.basic_block_arena[*bb_id];
-
+        for (bb_id, bb) in f.basic_blocks.id_and_block() {
             if bb_id.index() != 0 {
-                let label = self.get_label(*bb_id);
+                let label = self.get_label(bb_id);
                 dynasm!(self.asm; =>label);
             }
+
             for instr in &*bb.iseq_ref() {
                 let instr = &f.instr_arena[*instr];
                 match instr.opcode {

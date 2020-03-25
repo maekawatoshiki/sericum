@@ -117,8 +117,7 @@ impl PrologueEpilogueInserter {
     fn insert_epilogue(&mut self, cur_func: &mut MachineFunction) {
         let mut bb_iseq = vec![];
 
-        for bb_id in &cur_func.basic_blocks {
-            let bb = &cur_func.basic_block_arena[*bb_id];
+        for (bb_id, bb) in cur_func.basic_blocks.id_and_block() {
             let last_inst_id = *bb.iseq_ref().last().unwrap();
             let last_inst = &cur_func.instr_arena[last_inst_id];
 
@@ -134,7 +133,7 @@ impl PrologueEpilogueInserter {
                 vec![MachineOperand::Register(
                     RegisterInfo::new_phy_reg(GR64::RBP).into_machine_register(),
                 )],
-                *bb_id,
+                bb_id,
             )
             .with_def(vec![
                 RegisterInfo::new_phy_reg(GR64::RSP).into_machine_register()
@@ -147,7 +146,7 @@ impl PrologueEpilogueInserter {
                 vec![MachineOperand::Register(
                     RegisterInfo::new_phy_reg(GR64::RBP).into_machine_register(),
                 )],
-                *bb_id,
+                bb_id,
             );
             iseq.push(cur_func.instr_arena.alloc(i));
 

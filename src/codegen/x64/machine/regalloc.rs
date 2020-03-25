@@ -87,8 +87,7 @@ impl RegisterAllocator {
             debug!(
                 println!("MachineModule dump:");
                 let mut idx = 0;
-                for bb_id in &cur_func.basic_blocks {
-                    let bb = &cur_func.basic_block_arena[*bb_id];
+                for (_, bb) in cur_func.basic_blocks.id_and_block() {
                     println!("Machine basic block: {:?}", bb);
                     for instr in &*bb.iseq_ref() {
                         println!("{}: {:?}", idx, cur_func.instr_arena[*instr]);
@@ -107,8 +106,7 @@ impl RegisterAllocator {
     }
 
     fn rewrite_vregs(&mut self, cur_func: &mut MachineFunction, matrix: &LiveRegMatrix) {
-        for bb_id in &cur_func.basic_blocks {
-            let bb = &cur_func.basic_block_arena[*bb_id];
+        for (_, bb) in cur_func.basic_blocks.id_and_block() {
             for instr_id in &*bb.iseq_ref() {
                 let instr = &cur_func.instr_arena[*instr_id];
                 for def in &instr.def {
@@ -222,8 +220,7 @@ impl RegisterAllocator {
     ) {
         let mut call_instr_id = vec![];
 
-        for bb_id in &cur_func.basic_blocks {
-            let bb = &cur_func.basic_block_arena[*bb_id];
+        for (_, bb) in cur_func.basic_blocks.id_and_block() {
             for instr_id in bb.iseq_ref().iter() {
                 let instr = &cur_func.instr_arena[*instr_id];
                 if instr.opcode == MachineOpcode::Call {

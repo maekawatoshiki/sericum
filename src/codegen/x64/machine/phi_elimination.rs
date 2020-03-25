@@ -17,9 +17,9 @@ impl PhiElimination {
     pub fn run_on_function(&mut self, f: &mut MachineFunction) {
         // TODO: Rewrite with MachineInstr Builder
         let phi_pos = self.collect_phi(f);
-        for bb_id in &f.basic_blocks {
-            let bb = &f.basic_block_arena[*bb_id];
-            let (phi, pos) = if let Some(phi_pos) = phi_pos.get(bb_id) {
+
+        for (bb_id, bb) in f.basic_blocks.id_and_block() {
+            let (phi, pos) = if let Some(phi_pos) = phi_pos.get(&bb_id) {
                 (f.instr_arena[bb.iseq_ref()[*phi_pos]].clone(), *phi_pos)
             } else {
                 continue;
@@ -34,7 +34,7 @@ impl PhiElimination {
 
                 debug!(println!("PHI {:?}", val));
 
-                let mut iseq = f.basic_block_arena[bb].iseq_ref_mut();
+                let mut iseq = f.basic_blocks.arena[bb].iseq_ref_mut();
                 assert!(
                     iseq.len() > 0 && f.instr_arena[*iseq.last().unwrap()].opcode.is_terminator()
                 );
@@ -60,11 +60,10 @@ impl PhiElimination {
 
     fn collect_phi(&mut self, f: &MachineFunction) -> FxHashMap<MachineBasicBlockId, usize> {
         let mut phi_pos = FxHashMap::default();
-        for bb_id in &f.basic_blocks {
-            let bb = &f.basic_block_arena[*bb_id];
+        for (bb_id, bb) in f.basic_blocks.id_and_block() {
             for (i, instr) in bb.iseq_ref().iter().enumerate() {
                 if f.instr_arena[*instr].opcode == MachineOpcode::Phi {
-                    phi_pos.insert(*bb_id, i);
+                    phi_pos.insert(bb_id, i);
                 }
             }
         }

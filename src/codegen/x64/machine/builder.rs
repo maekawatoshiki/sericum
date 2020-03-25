@@ -55,7 +55,7 @@ impl<'a> BuilderWithLiveInfoEdit<'a> {
 
     fn calc_program_point(&mut self, insert_pt: usize) -> ProgramPoint {
         // calculate program point for given insert point
-        let bb = &self.function.basic_block_arena[self.cur_bb_id.unwrap()];
+        let bb = &self.function.basic_blocks.arena[self.cur_bb_id.unwrap()];
         let iseq = bb.iseq_ref();
         let pp = self.matrix.get_program_point(iseq[insert_pt]).unwrap();
         self.matrix.program_points.prev_of(pp)
@@ -75,7 +75,7 @@ impl<'a> BuilderTrait for BuilderWithLiveInfoEdit<'a> {
 
     fn set_insert_point_at_end(&mut self, bb_id: MachineBasicBlockId) {
         self.cur_bb_id = Some(bb_id);
-        self.insert_point = self.function.basic_block_arena[bb_id].iseq_ref().len();
+        self.insert_point = self.function.basic_blocks.arena[bb_id].iseq_ref().len();
     }
 
     fn set_insert_point_before_instr(&mut self, instr_id: MachineInstrId) -> Option<()> {
@@ -122,7 +122,7 @@ impl<'a> BuilderTrait for BuilderWithLiveInfoEdit<'a> {
             }
         }
 
-        self.function.basic_block_arena[self.cur_bb_id.unwrap()]
+        self.function.basic_blocks.arena[self.cur_bb_id.unwrap()]
             .iseq_ref_mut()
             .insert(insert_pt, instr_id);
     }
@@ -155,7 +155,7 @@ impl<'a> BuilderTrait for Builder<'a> {
 
     fn set_insert_point_at_end(&mut self, bb_id: MachineBasicBlockId) {
         self.cur_bb_id = Some(bb_id);
-        self.insert_point = self.function.basic_block_arena[bb_id].iseq_ref().len();
+        self.insert_point = self.function.basic_blocks.arena[bb_id].iseq_ref().len();
     }
 
     fn set_insert_point_before_instr(&mut self, instr_id: MachineInstrId) -> Option<()> {
@@ -174,7 +174,7 @@ impl<'a> BuilderTrait for Builder<'a> {
         let insert_pt = self.insert_point;
         let instr_id = inst.into_id(&mut self.function);
         self.insert_point += 1;
-        self.function.basic_block_arena[self.cur_bb_id.unwrap()]
+        self.function.basic_blocks.arena[self.cur_bb_id.unwrap()]
             .iseq_ref_mut()
             .insert(insert_pt, instr_id);
     }

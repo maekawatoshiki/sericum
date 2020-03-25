@@ -6,7 +6,6 @@ use super::super::register::*;
 use super::{basic_block::*, function::*, module::*, node::*};
 use crate::ir::types::*;
 use crate::util::allocator::*;
-use id_arena::*;
 use rustc_hash::FxHashMap;
 use std::cell::RefCell;
 
@@ -42,22 +41,21 @@ impl MIConverter {
     pub fn convert_function(&mut self, dag_func: DAGFunction) -> MachineFunction {
         self.dag_bb_to_machine_bb.clear();
 
-        let mut machine_bb_arena: Arena<MachineBasicBlock> = Arena::new();
-        let mut machine_bb_list: Vec<MachineBasicBlockId> = vec![];
+        let mut mbbs = MachineBasicBlocks::new();
 
         for dag_bb_id in &dag_func.dag_basic_blocks {
-            let machine_bb_id = machine_bb_arena.alloc(MachineBasicBlock::new());
-            self.dag_bb_to_machine_bb.insert(*dag_bb_id, machine_bb_id);
-            machine_bb_list.push(machine_bb_id);
+            let mbb_id = mbbs.arena.alloc(MachineBasicBlock::new());
+            self.dag_bb_to_machine_bb.insert(*dag_bb_id, mbb_id);
+            mbbs.order.push(mbb_id);
         }
 
         for (dag_bb, machine_bb) in &self.dag_bb_to_machine_bb {
-            machine_bb_arena[*machine_bb].pred = dag_func.dag_basic_block_arena[*dag_bb]
+            mbbs.arena[*machine_bb].pred = dag_func.dag_basic_block_arena[*dag_bb]
                 .pred
                 .iter()
                 .map(|bb| self.get_machine_bb(*bb))
                 .collect();
-            machine_bb_arena[*machine_bb].succ = dag_func.dag_basic_block_arena[*dag_bb]
+            mbbs.arena[*machine_bb].succ = dag_func.dag_basic_block_arena[*dag_bb]
                 .succ
                 .iter()
                 .map(|bb| self.get_machine_bb(*bb))
@@ -82,15 +80,10 @@ impl MIConverter {
                 node.entry.unwrap(),
             );
 
-            machine_bb_arena[bb_id].iseq = RefCell::new(iseq);
+            mbbs.arena[bb_id].iseq = RefCell::new(iseq);
         }
 
-        MachineFunction::new(
-            dag_func,
-            machine_bb_arena,
-            machine_bb_list,
-            machine_instr_arena,
-        )
+        MachineFunction::new(dag_func, mbbs, machine_instr_arena)
     }
 
     pub fn convert_dag(

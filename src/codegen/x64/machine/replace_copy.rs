@@ -20,8 +20,7 @@ impl ReplaceCopyWithProperMInst {
     }
 
     pub fn run_on_function(&mut self, f: &mut MachineFunction) {
-        for bb_id in &f.basic_blocks {
-            let bb = &f.basic_block_arena[*bb_id];
+        for (_, bb) in f.basic_blocks.id_and_block() {
             for inst_id in &*bb.iseq_ref() {
                 let inst = &mut f.instr_arena[*inst_id];
 

@@ -482,14 +482,13 @@ impl LivenessAnalysis {
     }
 
     fn clear_bb_liveness_info(&mut self, cur_func: &MachineFunction) {
-        for (_, bb) in &cur_func.basic_block_arena {
+        for (_, bb) in &cur_func.basic_blocks.arena {
             bb.liveness_ref_mut().clear();
         }
     }
 
     fn set_def(&mut self, cur_func: &MachineFunction) {
-        for bb_id in &cur_func.basic_blocks {
-            let bb = &cur_func.basic_block_arena[*bb_id];
+        for (_, bb) in cur_func.basic_blocks.id_and_block() {
             for instr_id in &*bb.iseq_ref() {
                 self.set_def_on_instr(cur_func, bb, *instr_id);
             }
@@ -510,10 +509,9 @@ impl LivenessAnalysis {
     }
 
     fn visit(&mut self, cur_func: &MachineFunction) {
-        for bb_id in &cur_func.basic_blocks {
-            let bb = &cur_func.basic_block_arena[*bb_id];
+        for (bb_id, bb) in cur_func.basic_blocks.id_and_block() {
             for instr_id in &*bb.iseq_ref() {
-                self.visit_instr(cur_func, *bb_id, *instr_id);
+                self.visit_instr(cur_func, bb_id, *instr_id);
             }
         }
     }
@@ -549,7 +547,7 @@ impl LivenessAnalysis {
         pred_bb: Option<MachineBasicBlockId>,
         reg: &MachineRegister,
     ) {
-        let bb = &cur_func.basic_block_arena[bb];
+        let bb = &cur_func.basic_blocks.arena[bb];
 
         {
             let mut bb_liveness = bb.liveness.borrow_mut();
@@ -565,7 +563,7 @@ impl LivenessAnalysis {
         }
 
         if let Some(pred_bb) = pred_bb {
-            let pred = &cur_func.basic_block_arena[pred_bb];
+            let pred = &cur_func.basic_blocks.arena[pred_bb];
             if pred.liveness.borrow_mut().live_out.insert(reg.clone()) {
                 // live_out didn't have the reg
                 self.propagate(cur_func, pred_bb, None, reg);
@@ -574,7 +572,7 @@ impl LivenessAnalysis {
         }
 
         for pred_id in &bb.pred {
-            let pred = &cur_func.basic_block_arena[*pred_id];
+            let pred = &cur_func.basic_blocks.arena[*pred_id];
             if pred.liveness.borrow_mut().live_out.insert(reg.clone()) {
                 // live_out didn't have the reg
                 self.propagate(cur_func, *pred_id, None, reg);
@@ -592,9 +590,10 @@ impl LivenessAnalysis {
         let mut last_pp: Option<ProgramPoint> = None;
         let mut bb_idx = 0;
 
-        for bb_id in &cur_func.basic_blocks {
+        // TODO: Refine code
+
+        for (_, bb) in cur_func.basic_blocks.id_and_block() {
             let mut index = 0;
-            let bb = &cur_func.basic_block_arena[*bb_id];
             let liveness = bb.liveness_ref();
 
             #[rustfmt::skip]

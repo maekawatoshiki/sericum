@@ -17,9 +17,7 @@ impl TwoAddressConverter {
     pub fn run_on_function(&mut self, f: &mut MachineFunction) {
         let mut tied = vec![];
 
-        for bb_id in &f.basic_blocks {
-            let bb = &f.basic_block_arena[*bb_id];
-
+        for (_, bb) in f.basic_blocks.id_and_block() {
             for instr_id in &*bb.iseq_ref() {
                 let instr = &mut f.instr_arena[*instr_id];
 
