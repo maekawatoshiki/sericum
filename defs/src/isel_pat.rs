@@ -12,23 +12,20 @@ use proc_quote::quote;
 
 pub fn run(item: TokenStream) -> TokenStream {
     let mut reader = TokenStreamReader::new(item.into_iter());
-    let mut parser = ISelPatParser::new(&mut reader, quote! {node}, quote! { node });
-
-    let output = parser.parse();
-
+    let output = ISelPatParser::new(&mut reader, &quote! {node}, quote! { node }).parse();
     TokenStream::from(output)
 }
 
 struct ISelPatParser<'a> {
     reader: &'a mut TokenStreamReader,
-    root: proc_macro2::TokenStream,
+    root: &'a proc_macro2::TokenStream,
     parent: proc_macro2::TokenStream,
 }
 
 impl<'a> ISelPatParser<'a> {
     pub fn new(
         reader: &'a mut TokenStreamReader,
-        root: proc_macro2::TokenStream,
+        root: &'a proc_macro2::TokenStream,
         parent: proc_macro2::TokenStream,
     ) -> Self {
         Self {
@@ -66,14 +63,9 @@ impl<'a> ISelPatParser<'a> {
             return output;
         }
 
-        if depth > 0 {
-            return quote! { #output else { unimplemented!() } };
-        }
-
-        // depth == 0
         let root = &self.root;
         return quote! {
-            #output else  {
+            #output else {
                 #root.operand = #root
                     .operand
                     .iter()
@@ -100,12 +92,12 @@ impl<'a> ISelPatParser<'a> {
         let body = if self.reader.cur_is_group('{') {
             let group = self.reader.get().unwrap();
             let mut reader = TokenStreamReader::new(group_stream(group).into_iter());
-            let mut parser = ISelPatParser::new(&mut reader, self.root.clone(), quote! { #node });
+            let mut parser = ISelPatParser::new(&mut reader, &self.root, quote! { #node });
             parser.parse_pats(depth + 1)
         } else if self.reader.skip_punct('=') && self.reader.skip_punct('>') {
             let group = self.reader.get().unwrap();
             let mut reader = TokenStreamReader::new(group_stream(group).into_iter());
-            let mut parser = ISelPatParser::new(&mut reader, self.root.clone(), quote! { #node });
+            let mut parser = ISelPatParser::new(&mut reader, &self.root, quote! { #node });
             parser.parse_selected_inst_pat()
         } else {
             abort!(0, "expected ':' or '=>'")
@@ -189,20 +181,12 @@ impl<'a> ISelPatParser<'a> {
             _ => abort!(0, "expected 'ir' or 'mi'"),
         };
 
-        let mut operands = quote! {};
-
-        let mut i = 0usize;
+        let mut operand_names = vec![];
         loop {
-            let op_name = ident_tok(reader.get_ident().unwrap().as_str());
-            let p = &self.parent;
-            operands = quote! {
-                #operands
-                let #op_name = #p.operand[#i];
-            };
+            operand_names.push(ident_tok(reader.get_ident().unwrap().as_str()));
             if !reader.skip_punct(',') {
                 break;
             }
-            i += 1
         }
 
         let new_parent = if depth > 0 {
@@ -212,23 +196,30 @@ impl<'a> ISelPatParser<'a> {
             self.parent.clone()
         };
 
+        let mut operands = quote! {};
+        for (i, op_name) in operand_names.iter().enumerate() {
+            operands = quote! {
+                #operands
+                let #op_name = #new_parent.operand[#i];
+            };
+        }
+
         let body = if self.reader.cur_is_group('{') {
             let group = self.reader.get().unwrap();
             let mut reader = TokenStreamReader::new(group_stream(group).into_iter());
-            let mut parser = ISelPatParser::new(&mut reader, self.root.clone(), new_parent);
+            let mut parser = ISelPatParser::new(&mut reader, &self.root, new_parent.clone());
             parser.parse_pats(depth + 1)
         } else if self.reader.skip_punct('=') && self.reader.skip_punct('>') {
             let group = self.reader.get().unwrap();
             let mut reader = TokenStreamReader::new(group_stream(group).into_iter());
-            let mut parser = ISelPatParser::new(&mut reader, self.root.clone(), new_parent);
+            let mut parser = ISelPatParser::new(&mut reader, &self.root, new_parent.clone());
             parser.parse_selected_inst_pat()
         } else {
             abort!(0, "expected ':' or '=>'")
         };
 
-        let p = &self.parent;
         quote! {
-            if #p.kind == #inst {
+            if #new_parent.kind == #inst {
                 #operands
                 #body
             }

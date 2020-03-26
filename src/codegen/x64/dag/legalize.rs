@@ -1,6 +1,8 @@
+use super::super::register::*;
 use super::{function::DAGFunction, module::DAGModule, node::*};
 use crate::ir::types::*;
 use crate::util::allocator::*;
+use defs::isel_pat;
 use rustc_hash::FxHashMap;
 
 pub struct Legalize {
@@ -113,69 +115,24 @@ impl Legalize {
     fn run_on_node_store(
         &mut self,
         heap: &mut RawAllocator<DAGNode>,
-        node: Raw<DAGNode>,
+        mut node: Raw<DAGNode>,
     ) -> Raw<DAGNode> {
-        if node.operand[0].kind == NodeKind::IR(IRNodeKind::Add) {
-            let add = node.operand[0];
-            let op0 = self.run_on_node(heap, add.operand[0]);
-            let op1 = self.run_on_node(heap, add.operand[1]);
-            let new_src = self.run_on_node(heap, node.operand[1]);
-
-            if op0.is_frame_index() && op1.is_constant() {
-                return heap.alloc(DAGNode::new(
-                    if new_src.is_maybe_register() && new_src.ty == Type::Int32 {
-                        NodeKind::MI(MINodeKind::MOVmi32r32)
-                    } else if new_src.is_constant() && new_src.ty == Type::Int32 {
-                        NodeKind::MI(MINodeKind::MOVmi32i32)
-                    } else {
-                        unimplemented!()
-                    },
-                    vec![op0, op1, new_src],
-                    node.ty.clone(),
-                ));
-            }
-
-            if op0.is_frame_index()
-                && op1.kind == NodeKind::IR(IRNodeKind::Mul)
-                && op1.operand[1].is_constant()
-            {
-                let op1_op0 = self.run_on_node(heap, op1.operand[0]);
-                let op1_op1 = op1.operand[1];
-                return heap.alloc(DAGNode::new(
-                    if new_src.is_maybe_register() && new_src.ty == Type::Int32 {
-                        NodeKind::MI(MINodeKind::MOVmri32r32)
-                    } else if new_src.is_constant() && new_src.ty == Type::Int32 {
-                        NodeKind::MI(MINodeKind::MOVmri32i32)
-                    } else {
-                        unimplemented!()
-                    },
-                    vec![op0, op1_op0, op1_op1, new_src],
-                    node.ty.clone(),
-                ));
-            }
-
-            if op0.is_operation()
-                && op1.kind == NodeKind::IR(IRNodeKind::Mul)
-                && op1.operand[1].is_constant()
-            {
-                let op1_op0 = self.run_on_node(heap, op1.operand[0]);
-                let op1_op1 = op1.operand[1];
-                return heap.alloc(DAGNode::new(
-                    if new_src.is_maybe_register() && new_src.ty == Type::Int32 {
-                        NodeKind::MI(MINodeKind::MOVrri32r32)
-                    } else if new_src.is_constant() && new_src.ty == Type::Int32 {
-                        NodeKind::MI(MINodeKind::MOVrri32i32)
-                    } else {
-                        unimplemented!()
-                    },
-                    vec![op0, op1_op0, op1_op1, new_src],
-                    node.ty.clone(),
-                ));
-            }
-        }
-
-        self.run_on_node_operand(heap, node);
-        node
+        isel_pat! {
+        (ir.Store dst, src) {
+            (ir.Add a1, a2) dst {
+                i32mem a1 {
+                    imm32 a2 {
+                        GR32  src => (mi.MOVmi32r32 a1, a2, src)
+                        imm32 src => (mi.MOVmi32i32 a1, a2, src) }
+                    (ir.Mul m1, m2) a2 {
+                        imm32 m2 {
+                            GR32  src => (mi.MOVmri32r32 a1, m1, m2, src)
+                            imm32 src => (mi.MOVmri32i32 a1, m1, m2, src) } } }
+                GR64 a1 {
+                    (ir.Mul m1, m2) a2 {
+                        imm32 m2 {
+                            GR32  src => (mi.MOVrri32r32 a1, m1, m2, src)
+                            imm32 src => (mi.MOVrri32i32 a1, m1, m2, src) } } } } } }
     }
 
     fn run_on_node_add(
