@@ -8,6 +8,7 @@ edition = "2018"
 
 [dependencies]
 proc-quote = "0.3.0"
+proc-macro-error = "1.0.0"
 
 [lib]
 proc-macro = true
