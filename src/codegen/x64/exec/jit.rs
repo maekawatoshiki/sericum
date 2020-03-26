@@ -254,7 +254,7 @@ impl JITCompiler {
                     }
                     MachineOpcode::MOVpi32 => self.compile_mov_pi32(instr),
                     MachineOpcode::MOVpr32 => self.compile_mov_pr32(instr),
-                    MachineOpcode::MOVrp32 => self.compile_mov_rp32(instr),
+                    MachineOpcode::MOVr32p => self.compile_mov_r32p(instr),
                     MachineOpcode::MOVSDrm64 => self.compile_movsd_rm64(instr),
                     MachineOpcode::LEA64 => self.compile_lea64(&frame_objects, instr),
                     MachineOpcode::LEArmi32 => self.compile_lea_rmi32(&frame_objects, instr),
@@ -520,7 +520,7 @@ impl JITCompiler {
         dynasm!(self.asm; mov DWORD [Rq(p0)], i1);
     }
 
-    fn compile_mov_rp32(&mut self, instr: &MachineInstr) {
+    fn compile_mov_r32p(&mut self, instr: &MachineInstr) {
         let r0 = phys_reg_to_dynasm_reg(instr.def[0].get_reg().unwrap());
         let p1 = phys_reg_to_dynasm_reg(instr.operand[0].as_register().get_reg().unwrap());
         dynasm!(self.asm; mov Rd(r0), [Rq(p1)]);

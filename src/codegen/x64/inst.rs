@@ -96,8 +96,8 @@ mod inst {
                 TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR32)),
             ])
         };
-        pub static ref MOVrp32: TargetInstDef = {
-            TargetInstDef::new(TargetOpcode::MOVrp32)
+        pub static ref MOVr32p: TargetInstDef = {
+            TargetInstDef::new(TargetOpcode::MOVr32p)
                 .set_uses(vec![TargetOperand::Register(TargetRegister::RegClass(
                     RegisterClassKind::GR64,
                 ))])
@@ -343,7 +343,7 @@ pub enum TargetOpcode {
     MOVrri32i32, // mov [base + off * align], const.val
     MOVpi32,     // mov [reg], const.val
     MOVpr32,     // mov [reg], reg
-    MOVrp32,     // mov reg, [reg]
+    MOVr32p,     // mov reg, [reg]
 
     MOVSXDr64m32, // out = movsxd [rbp - fi.off]
 
@@ -407,7 +407,7 @@ impl TargetOpcode {
             Self::MOVmri32i32 => Some(&*inst::MOVmri32i32),
             Self::MOVpi32 => Some(&*inst::MOVpi32),
             Self::MOVpr32 => Some(&*inst::MOVpr32),
-            Self::MOVrp32 => Some(&*inst::MOVrp32),
+            Self::MOVr32p => Some(&*inst::MOVr32p),
             Self::MOVrri32i32 => Some(&*inst::MOVrri32i32),
             Self::MOVrri32r32 => Some(&*inst::MOVrri32r32),
             Self::MOVSXDr64m32 => Some(&*inst::MOVSXDr64m32),
