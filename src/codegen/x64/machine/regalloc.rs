@@ -186,10 +186,13 @@ impl RegisterAllocator {
         for (frinfo, reg) in slots_to_save_regs.into_iter().zip(regs_to_save.iter()) {
             let dst = MachineOperand::FrameIndex(frinfo.clone());
             let src = MachineOperand::Register(reg.clone());
+            let rbp = MachineOperand::Register(
+                RegisterInfo::new_phy_reg(GR64::RBP).into_machine_register(),
+            );
             let store_instr_id = cur_func.instr_arena.alloc(MachineInstr::new(
                 &cur_func.vreg_gen,
                 mov_mx(&src).unwrap(),
-                vec![dst, src],
+                vec![rbp, dst, MachineOperand::None, MachineOperand::None, src],
                 None,
                 call_instr_parent,
             ));
@@ -197,9 +200,17 @@ impl RegisterAllocator {
             cur_func.instr_arena[store_instr_id].add_def(store_instr_id);
 
             let src = MachineOperand::FrameIndex(frinfo);
+            let rbp = MachineOperand::Register(
+                RegisterInfo::new_phy_reg(GR64::RBP).into_machine_register(),
+            );
+
             let load_instr_id = cur_func.instr_arena.alloc(
-                MachineInstr::new_simple(mov_rx(&src).unwrap(), vec![src], call_instr_parent)
-                    .with_def(vec![reg.clone()]),
+                MachineInstr::new_simple(
+                    mov_rx(&src).unwrap(),
+                    vec![rbp, src, MachineOperand::None, MachineOperand::None],
+                    call_instr_parent,
+                )
+                .with_def(vec![reg.clone()]),
             );
             cur_func.instr_arena[load_instr_id].add_def(load_instr_id); // TODO: is this needed?
 

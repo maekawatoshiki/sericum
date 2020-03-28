@@ -130,6 +130,15 @@ impl DAGNode {
         }
     }
 
+    pub fn new_none() -> Self {
+        Self {
+            kind: NodeKind::None,
+            ty: Type::Void,
+            next: None,
+            operand: vec![],
+        }
+    }
+
     pub fn new_phys_reg<T: TargetRegisterTrait>(reg: T) -> Self {
         Self {
             kind: NodeKind::Operand(OperandNodeKind::Register(

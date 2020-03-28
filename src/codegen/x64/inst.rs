@@ -12,97 +12,6 @@ mod inst {
                 .set_uses(vec![TargetOperand::Addr])
                 .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::XMM)])
         };
-        pub static ref MOVrmi32: TargetInstDef = {
-            TargetInstDef::new(TargetOpcode::MOVrmi32)
-                .set_uses(vec![
-                    TargetOperand::FrameIndex,
-                    TargetOperand::Immediate(TargetImmediate::I32),
-                ])
-                .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR32)])
-        };
-        pub static ref MOVrmri32: TargetInstDef = {
-            TargetInstDef::new(TargetOpcode::MOVrmri32)
-                .set_uses(vec![
-                    TargetOperand::FrameIndex,
-                    TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR64)),
-                    TargetOperand::Immediate(TargetImmediate::I32),
-                ])
-                .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR32)])
-        };
-        pub static ref MOVrrri32: TargetInstDef = {
-            TargetInstDef::new(TargetOpcode::MOVrrri32)
-                .set_uses(vec![
-                    TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR64)),
-                    TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR64)),
-                    TargetOperand::Immediate(TargetImmediate::I32),
-                ])
-                .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR32)])
-        };
-        pub static ref MOVmi32r32: TargetInstDef = {
-            TargetInstDef::new(TargetOpcode::MOVmi32r32).set_uses(vec![
-                TargetOperand::FrameIndex,
-                TargetOperand::Immediate(TargetImmediate::I32),
-                TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR32)),
-            ])
-        };
-        pub static ref MOVmi32i32: TargetInstDef = {
-            TargetInstDef::new(TargetOpcode::MOVmi32i32).set_uses(vec![
-                TargetOperand::FrameIndex,
-                TargetOperand::Immediate(TargetImmediate::I32),
-                TargetOperand::Immediate(TargetImmediate::I32),
-            ])
-        };
-        pub static ref MOVmri32r32: TargetInstDef = {
-            TargetInstDef::new(TargetOpcode::MOVmri32r32).set_uses(vec![
-                TargetOperand::FrameIndex,
-                TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR64)),
-                TargetOperand::Immediate(TargetImmediate::I32),
-                TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR32)),
-            ])
-        };
-        pub static ref MOVmri32i32: TargetInstDef = {
-            TargetInstDef::new(TargetOpcode::MOVmri32i32).set_uses(vec![
-                TargetOperand::FrameIndex,
-                TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR64)),
-                TargetOperand::Immediate(TargetImmediate::I32),
-                TargetOperand::Immediate(TargetImmediate::I32),
-            ])
-        };
-        pub static ref MOVrri32r32: TargetInstDef = {
-            TargetInstDef::new(TargetOpcode::MOVrri32r32).set_uses(vec![
-                TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR64)),
-                TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR64)),
-                TargetOperand::Immediate(TargetImmediate::I32),
-                TargetOperand::Immediate(TargetImmediate::I32),
-            ])
-        };
-        pub static ref MOVrri32i32: TargetInstDef = {
-            TargetInstDef::new(TargetOpcode::MOVrri32i32).set_uses(vec![
-                TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR64)),
-                TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR64)),
-                TargetOperand::Immediate(TargetImmediate::I32),
-                TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR32)),
-            ])
-        };
-        pub static ref MOVpi32: TargetInstDef = {
-            TargetInstDef::new(TargetOpcode::MOVpi32).set_uses(vec![
-                TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR64)),
-                TargetOperand::Immediate(TargetImmediate::I32),
-            ])
-        };
-        pub static ref MOVpr32: TargetInstDef = {
-            TargetInstDef::new(TargetOpcode::MOVpr32).set_uses(vec![
-                TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR64)),
-                TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR32)),
-            ])
-        };
-        pub static ref MOVr32p: TargetInstDef = {
-            TargetInstDef::new(TargetOpcode::MOVr32p)
-                .set_uses(vec![TargetOperand::Register(TargetRegister::RegClass(
-                    RegisterClassKind::GR64,
-                ))])
-                .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR32)])
-        };
         pub static ref MOVSXDr64m32: TargetInstDef = {
             TargetInstDef::new(TargetOpcode::MOVSXDr64m32)
                 .set_uses(vec![TargetOperand::FrameIndex])
@@ -221,8 +130,8 @@ mod inst {
                 .set_uses(vec![TargetOperand::Immediate(TargetImmediate::I32)])
                 .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR32)])
         };
-        pub static ref MOVrm32x: TargetInstDef = {
-            TargetInstDef::new(TargetOpcode::MOVrm32x)
+        pub static ref MOVrm32: TargetInstDef = {
+            TargetInstDef::new(TargetOpcode::MOVrm32)
                 .set_uses(vec![
                     TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR64)),
                     TargetOperand::Any,
@@ -231,20 +140,21 @@ mod inst {
                 ])
                 .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR32)])
         };
-        pub static ref MOVrm32: TargetInstDef = {
-            TargetInstDef::new(TargetOpcode::MOVrm32)
-                .set_uses(vec![TargetOperand::FrameIndex])
-                .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR32)])
-        };
         pub static ref MOVmr32: TargetInstDef = {
             TargetInstDef::new(TargetOpcode::MOVmr32).set_uses(vec![
-                TargetOperand::FrameIndex,
+                TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR64)),
+                TargetOperand::Any,
+                TargetOperand::Any,
+                TargetOperand::Any,
                 TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR32)),
             ])
         };
         pub static ref MOVmi32: TargetInstDef = {
             TargetInstDef::new(TargetOpcode::MOVmi32).set_uses(vec![
-                TargetOperand::FrameIndex,
+                TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR64)),
+                TargetOperand::Any,
+                TargetOperand::Any,
+                TargetOperand::Any,
                 TargetOperand::Immediate(TargetImmediate::I32),
             ])
         };
@@ -262,7 +172,12 @@ mod inst {
         };
         pub static ref MOVrm64: TargetInstDef = {
             TargetInstDef::new(TargetOpcode::MOVrm64)
-                .set_uses(vec![TargetOperand::FrameIndex])
+                .set_uses(vec![
+                    TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR64)),
+                    TargetOperand::Any,
+                    TargetOperand::Any,
+                    TargetOperand::Any,
+                ])
                 .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR64)])
         };
         pub static ref LEA64: TargetInstDef = {
@@ -342,25 +257,22 @@ pub enum TargetImmediate {
 // p => [register]
 #[derive(Debug, Clone, PartialEq, Copy)]
 pub enum TargetOpcode {
-    MOVSDrm64,   // out(xmm) = movsd [memory]
-    MOVrmi32,    // out = mov [rbp - fi.off + const.off]
-    MOVrmri32,   // out = mov [rbp - fi.off + off * align]
-    MOVrrri32,   // out = mov [base + off * align]
-    MOVmi32r32,  // mov [rbp - fi.off + const.off], reg
-    MOVmi32i32,  // mov [rbp - fi.off + const.off], const.val
-    MOVmri32r32, // mov [rbp - fi.off + off * align], reg
-    MOVmri32i32, // mov [rbp - fi.off + off * align], const.val
-    // out = mov [rbp  - fi.off]               | out = mov rbp,  fi,   none,  none
-    // out = mov [rbp  - fi.off + const.off]   | out = mov rbp,  fi,   none,  off
+    MOVSDrm64, // out(xmm) = movsd [memory64]
+
+    // out = mov [rbp  - fi.off              ] | out = mov rbp,  fi,   none,  none
+    // out = mov [rbp  - fi.off + const.off  ] | out = mov rbp,  fi,   none,  off
     // out = mov [rbp  - fi.off + align * off] | out = mov rbp,  fi,   align, off
     // out = mov [base          + align * off] | out = mov base, none, align, off
-    // out = mov [base]                        | out = mov base, none, none,  none
-    MOVrm32x,
-    MOVrri32r32, // mov [base + off * align], reg
-    MOVrri32i32, // mov [base + off * align], const.val
-    MOVpi32,     // mov [reg], const.val
-    MOVpr32,     // mov [reg], reg
-    MOVr32p,     // mov reg, [reg]
+    // out = mov [base                       ] | out = mov base, none, none,  none
+    MOVrm32,
+
+    // mov [rbp  - fi.off              ], r | mov rbp,  fi,   none,  none, r
+    // mov [rbp  - fi.off + const.off  ], r | mov rbp,  fi,   none,  off,  r
+    // mov [rbp  - fi.off + align * off], r | mov rbp,  fi,   align, off,  r
+    // mov [base          + align * off], r | mov base, none, align, off,  r
+    // mov [base                       ], r | mov base, none, none,  none, r
+    MOVmr32,
+    MOVmi32,
 
     MOVSXDr64m32, // out = movsxd [rbp - fi.off]
 
@@ -379,9 +291,6 @@ pub enum TargetOpcode {
     CDQ,
     MOVrr32,
     MOVri32,
-    MOVrm32,
-    MOVmr32,
-    MOVmi32,
     MOVrr64,
     MOVri64,
     MOVrm64,
@@ -416,17 +325,6 @@ impl TargetOpcode {
     pub fn inst_def(&self) -> Option<&TargetInstDef> {
         match self {
             Self::MOVSDrm64 => Some(&*inst::MOVSDrm64),
-            Self::MOVrmi32 => Some(&*inst::MOVrmi32),
-            Self::MOVrmri32 => Some(&*inst::MOVrmri32),
-            Self::MOVrrri32 => Some(&*inst::MOVrrri32),
-            Self::MOVmi32r32 => Some(&*inst::MOVmi32r32),
-            Self::MOVmri32r32 => Some(&*inst::MOVmri32r32),
-            Self::MOVmri32i32 => Some(&*inst::MOVmri32i32),
-            Self::MOVpi32 => Some(&*inst::MOVpi32),
-            Self::MOVpr32 => Some(&*inst::MOVpr32),
-            Self::MOVr32p => Some(&*inst::MOVr32p),
-            Self::MOVrri32i32 => Some(&*inst::MOVrri32i32),
-            Self::MOVrri32r32 => Some(&*inst::MOVrri32r32),
             Self::MOVSXDr64m32 => Some(&*inst::MOVSXDr64m32),
             Self::LEArmi32 => Some(&*inst::LEArmi32),
             Self::LEArmr64 => Some(&*inst::LEArmr64),
@@ -442,7 +340,6 @@ impl TargetOpcode {
             Self::CDQ => Some(&*inst::CDQ),
             Self::MOVrr32 => Some(&*inst::MOVrr32),
             Self::MOVri32 => Some(&*inst::MOVri32),
-            Self::MOVrm32x => Some(&*inst::MOVrm32x), // *********
             Self::MOVrm32 => Some(&*inst::MOVrm32),
             Self::MOVmr32 => Some(&*inst::MOVmr32),
             Self::MOVmi32 => Some(&*inst::MOVmi32),

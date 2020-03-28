@@ -273,7 +273,11 @@ impl MachineInstr {
         let mut regs = vec![];
         for operand in &self.operand {
             match operand {
-                MachineOperand::Register(r) => regs.push(r.clone()),
+                MachineOperand::Register(r) => {
+                    if r.get_reg().is_none() {
+                        regs.push(r.clone()) // TODO
+                    }
+                }
                 _ => {}
             }
         }

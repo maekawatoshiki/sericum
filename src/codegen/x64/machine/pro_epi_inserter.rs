@@ -97,9 +97,12 @@ impl PrologueEpilogueInserter {
                         )
                         .into_machine_register(),
                     );
+                    let rbp = MachineOperand::Register(
+                        RegisterInfo::new_phy_reg(GR64::RBP).into_machine_register(),
+                    );
                     let inst = MachineInstr::new_simple(
                         mov_mx(&src).unwrap(),
-                        vec![dst, src],
+                        vec![rbp, dst, MachineOperand::None, MachineOperand::None, src],
                         builder.get_cur_bb().unwrap(),
                     );
                     builder.insert(inst)

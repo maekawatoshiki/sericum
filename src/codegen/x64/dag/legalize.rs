@@ -72,11 +72,13 @@ impl Legalize {
             let add = node.operand[0];
             let op0 = self.run_on_node(heap, add.operand[0]);
             let op1 = self.run_on_node(heap, add.operand[1]);
+            let none = heap.alloc(DAGNode::new_none());
+            let rbp = heap.alloc(DAGNode::new_phys_reg(GR64::RSP));
 
             if op0.is_frame_index() && op1.is_constant() {
                 return heap.alloc(DAGNode::new(
-                    NodeKind::MI(MINodeKind::MOVrmi32),
-                    vec![op0, op1],
+                    NodeKind::MI(MINodeKind::MOVrm32),
+                    vec![rbp, op0, none, op1],
                     node.ty.clone(),
                 ));
             }
@@ -88,8 +90,8 @@ impl Legalize {
                 let op1_op0 = self.run_on_node(heap, op1.operand[0]);
                 let op1_op1 = op1.operand[1];
                 return heap.alloc(DAGNode::new(
-                    NodeKind::MI(MINodeKind::MOVrmri32),
-                    vec![op0, op1_op0, op1_op1],
+                    NodeKind::MI(MINodeKind::MOVrm32),
+                    vec![rbp, op0, op1_op1, op1_op0],
                     node.ty.clone(),
                 ));
             }
@@ -101,8 +103,8 @@ impl Legalize {
                 let op1_op0 = self.run_on_node(heap, op1.operand[0]);
                 let op1_op1 = op1.operand[1];
                 return heap.alloc(DAGNode::new(
-                    NodeKind::MI(MINodeKind::MOVrrri32),
-                    vec![op0, op1_op0, op1_op1],
+                    NodeKind::MI(MINodeKind::MOVrm32),
+                    vec![op0, none, op1_op1, op1_op0],
                     node.ty.clone(),
                 ));
             }
@@ -122,17 +124,17 @@ impl Legalize {
             (ir.Add a1, a2) dst {
                 mem32 a1 {
                     imm32 a2 {
-                        GR32  src => (mi.MOVmi32r32 a1, a2, src)
-                        imm32 src => (mi.MOVmi32i32 a1, a2, src) }
+                        GR32  src => (mi.MOVmr32 %rbp, a1, none, a2, src)
+                        imm32 src => (mi.MOVmi32 %rbp, a1, none, a2, src) }
                     (ir.Mul m1, m2) a2 {
                         imm32 m2 {
-                            GR32  src => (mi.MOVmri32r32 a1, m1, m2, src)
-                            imm32 src => (mi.MOVmri32i32 a1, m1, m2, src) } } }
+                            GR32  src => (mi.MOVmr32 %rbp, a1, m2, m1, src)
+                            imm32 src => (mi.MOVmi32 %rbp, a1, m2, m1, src) } } }
                 GR64 a1 {
                     (ir.Mul m1, m2) a2 {
                         imm32 m2 {
-                            GR32  src => (mi.MOVrri32r32 a1, m1, m2, src)
-                            imm32 src => (mi.MOVrri32i32 a1, m1, m2, src) } } } } } }
+                            GR32  src => (mi.MOVmr32 a1, none, m2, m1, src)
+                            imm32 src => (mi.MOVmi32 a1, none, m2, m1, src) } } } } } }
     }
 
     fn run_on_node_add(

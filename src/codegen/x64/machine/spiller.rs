@@ -1,12 +1,12 @@
 use super::super::dag::mc_convert::{mov_mx, mov_rx};
 use super::super::{
     frame_object::FrameIndexInfo,
-    register::{rc2ty, VirtReg},
+    register::{rc2ty, VirtReg, GR64},
 };
 use super::{
     builder::{BuilderTrait, BuilderWithLiveInfoEdit},
     function::MachineFunction,
-    instr::{MachineInstr, MachineOperand, MachineRegister},
+    instr::{MachineInstr, MachineOperand, MachineRegister, RegisterInfo},
     liveness::LiveRegMatrix,
 };
 
@@ -39,7 +39,13 @@ impl<'a> Spiller<'a> {
         let bb = self.func.instr_arena[def_id].parent;
         let dst = MachineOperand::FrameIndex(slot.clone());
         let src = MachineOperand::Register(r.clone());
-        let store = MachineInstr::new_simple(mov_mx(&src).unwrap(), vec![dst, src], bb);
+        let rbp =
+            MachineOperand::Register(RegisterInfo::new_phy_reg(GR64::RBP).into_machine_register());
+        let store = MachineInstr::new_simple(
+            mov_mx(&src).unwrap(),
+            vec![rbp, dst, MachineOperand::None, MachineOperand::None, src],
+            bb,
+        );
 
         let mut builder = BuilderWithLiveInfoEdit::new(self.matrix, self.func);
         builder.set_insert_point_after_instr(def_id).unwrap();
@@ -61,8 +67,15 @@ impl<'a> Spiller<'a> {
             new_r.add_use(use_id);
 
             let src = MachineOperand::FrameIndex(slot.clone());
-            let load = MachineInstr::new_simple(mov_rx(&src).unwrap(), vec![src], use_instr.parent)
-                .with_def(vec![new_r.clone()]);
+            let rbp = MachineOperand::Register(
+                RegisterInfo::new_phy_reg(GR64::RBP).into_machine_register(),
+            );
+            let load = MachineInstr::new_simple(
+                mov_rx(&src).unwrap(),
+                vec![rbp, src, MachineOperand::None, MachineOperand::None],
+                use_instr.parent,
+            )
+            .with_def(vec![new_r.clone()]);
 
             let mut builder = BuilderWithLiveInfoEdit::new(self.matrix, self.func);
             builder.set_insert_point_before_instr(use_id);

@@ -62,18 +62,17 @@ impl MISelector {
                 GR64 a {
                     imm32 b => (mi.IMULrr64i32 a, b) } }
             (ir.Load a) {
-                mem32 a => (mi.MOVrm32x %rbp, a, none, none)
-                // mem32 a => (mi.MOVrm32 a)
-                mem64 a => (mi.MOVrm64 a)
-                GR64  a => (mi.MOVr32p a)
+                mem32 a => (mi.MOVrm32 %rbp, a, none, none)
+                mem64 a => (mi.MOVrm64 %rbp, a, none, none)
+                GR64  a => (mi.MOVrm32 a, none, none, none)
             }
             (ir.Store a, b) {
                 mem32 a {
-                    GR32  b => (mi.MOVmr32 a, b)
-                    imm32 b => (mi.MOVmi32 a, b) }
+                    GR32  b => (mi.MOVmr32 %rbp, a, none, none, b)
+                    imm32 b => (mi.MOVmi32 %rbp, a, none, none, b) }
                 GR64   a {
-                    imm32 b => (mi.MOVpi32 a, b)
-                    GR32  b => (mi.MOVpr32 a, b) }
+                    imm32 b => (mi.MOVmi32 a, none, none, none, b)
+                    GR32  b => (mi.MOVmr32 a, none, none, none, b) }
             }
             (ir.CopyFromReg a) => (mi.Copy a)
         );
