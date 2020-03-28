@@ -244,9 +244,7 @@ impl JITCompiler {
                         self.compile_movsxd_r64m32(&frame_objects, instr)
                     }
                     MachineOpcode::MOVSDrm64 => self.compile_movsd_rm64(instr),
-                    MachineOpcode::LEA64 => self.compile_lea64(&frame_objects, instr),
-                    MachineOpcode::LEArmi32 => self.compile_lea_rmi32(&frame_objects, instr),
-                    MachineOpcode::LEArmr64 => self.compile_lea_rmr64(&frame_objects, instr),
+                    MachineOpcode::LEAr64m => self.compile_lea_r64m(&frame_objects, instr),
                     MachineOpcode::RET => self.compile_ret(),
                     MachineOpcode::PUSH64 => self.compile_push64(instr),
                     MachineOpcode::POP64 => self.compile_pop64(instr),
@@ -605,24 +603,74 @@ impl JITCompiler {
         dynasm!(self.asm; movsd Rx(r0), [=>l1]);
     }
 
-    fn compile_lea64(&mut self, fo: &FrameObjectsInfo, instr: &MachineInstr) {
-        let r0 = phys_reg_to_dynasm_reg(instr.def[0].get_reg().unwrap());
-        let fi = instr.operand[0].as_frame_index();
-        dynasm!(self.asm; lea Rq(r0), [rbp - fo.offset(fi.idx).unwrap()]);
-    }
+    fn compile_lea_r64m(&mut self, fo: &FrameObjectsInfo, instr: &MachineInstr) {
+        // out = lea rbp, fi, none, none
+        if instr.operand[0].is_register() // must be rbp
+            && instr.operand[1].is_frame_index()
+            && instr.operand[2].is_none()
+            && instr.operand[3].is_none()
+        {
+            let r0 = phys_reg_to_dynasm_reg(instr.def[0].get_reg().unwrap());
+            let m1 = instr.operand[1].as_frame_index();
+            dynasm!(self.asm; lea Rq(r0), [rbp - fo.offset(m1.idx).unwrap()]);
+        }
 
-    fn compile_lea_rmi32(&mut self, fo: &FrameObjectsInfo, instr: &MachineInstr) {
-        let r0 = phys_reg_to_dynasm_reg(instr.def[0].get_reg().unwrap());
-        let m1 = fo.offset(instr.operand[0].as_frame_index().idx).unwrap();
-        let i2 = instr.operand[1].as_constant().as_i32();
-        dynasm!(self.asm; lea Rq(r0), [rbp - m1 + i2]);
-    }
+        // out = lea rbp, fi, none, const.off
+        if instr.operand[0].is_register() // must be rbp
+            && instr.operand[1].is_frame_index()
+            && instr.operand[2].is_none()
+            && instr.operand[3].is_const_i32()
+        {
+            let r0 = phys_reg_to_dynasm_reg(instr.def[0].get_reg().unwrap());
+            let m1 = fo.offset(instr.operand[1].as_frame_index().idx).unwrap();
+            let i2 = instr.operand[3].as_constant().as_i32();
+            dynasm!(self.asm; lea Rq(r0), [rbp - m1 + i2]);
+        }
 
-    fn compile_lea_rmr64(&mut self, fo: &FrameObjectsInfo, instr: &MachineInstr) {
-        let r0 = phys_reg_to_dynasm_reg(instr.def[0].get_reg().unwrap());
-        let m1 = fo.offset(instr.operand[0].as_frame_index().idx).unwrap();
-        let r2 = phys_reg_to_dynasm_reg(instr.operand[1].as_register().get_reg().unwrap());
-        dynasm!(self.asm; lea Rq(r0), [rbp + Rq(r2) - m1 ]);
+        // out = lea rbp, fi, align, off
+        if instr.operand[0].is_register() // must be rbp
+            && instr.operand[1].is_frame_index()
+            && instr.operand[2].is_const_i32()
+            && instr.operand[3].is_register()
+        {
+            let r0 = phys_reg_to_dynasm_reg(instr.def[0].get_reg().unwrap());
+            let m1 = fo.offset(instr.operand[1].as_frame_index().idx).unwrap();
+            let i2 = instr.operand[2].as_constant().as_i32();
+            let r3 = phys_reg_to_dynasm_reg(instr.operand[3].as_register().get_reg().unwrap());
+
+            match i2 {
+                1 => dynasm!(self.asm; lea Rq(r0), [rbp - m1 + Rq(r3)]),
+                _ => unimplemented!(),
+            }
+        }
+
+        // out = lea base, none, align, off
+        if instr.operand[0].is_register()
+            && instr.operand[1].is_none()
+            && instr.operand[2].is_const_i32()
+            && instr.operand[3].is_register()
+        {
+            let r0 = phys_reg_to_dynasm_reg(instr.def[0].get_reg().unwrap());
+            let r1 = phys_reg_to_dynasm_reg(instr.operand[0].as_register().get_reg().unwrap());
+            let i2 = instr.operand[2].as_constant().as_i32();
+            let r3 = phys_reg_to_dynasm_reg(instr.operand[3].as_register().get_reg().unwrap());
+
+            match i2 {
+                1 => dynasm!(self.asm; lea Rq(r0), [Rq(r1) + Rq(r3)]),
+                _ => unimplemented!(),
+            }
+        }
+
+        // out = lea base, none, none, none
+        if instr.operand[0].is_register()
+            && instr.operand[1].is_none()
+            && instr.operand[2].is_none()
+            && instr.operand[3].is_none()
+        {
+            let r0 = phys_reg_to_dynasm_reg(instr.def[0].get_reg().unwrap());
+            let r1 = phys_reg_to_dynasm_reg(instr.operand[0].as_register().get_reg().unwrap());
+            dynasm!(self.asm; lea Rq(r0), [Rq(r1)]);
+        }
     }
 
     fn compile_push64(&mut self, instr: &MachineInstr) {

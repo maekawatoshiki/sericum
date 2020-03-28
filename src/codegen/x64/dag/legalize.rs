@@ -144,23 +144,29 @@ impl Legalize {
     ) -> Raw<DAGNode> {
         if node.operand[0].is_frame_index() {
             let op0 = node.operand[0];
+            let none = heap.alloc(DAGNode::new_none());
+            let rbp = heap.alloc(DAGNode::new_phys_reg(GR64::RSP));
+            let one = heap.alloc(DAGNode::new(
+                NodeKind::Operand(OperandNodeKind::Constant(ConstantKind::Int32(1))),
+                vec![],
+                Type::Int32,
+            ));
 
             if node.operand[1].is_maybe_register() {
                 let op1 = self.run_on_node(heap, node.operand[1]);
                 return heap.alloc(DAGNode::new(
-                    NodeKind::MI(MINodeKind::LEArmr64),
-                    vec![op0, op1],
+                    NodeKind::MI(MINodeKind::LEAr64m),
+                    vec![rbp, op0, one, op1],
                     node.ty.clone(),
                 ));
             } else if node.operand[1].is_constant() {
                 let op1 = node.operand[1];
                 return heap.alloc(DAGNode::new(
-                    NodeKind::MI(MINodeKind::LEArmi32),
-                    vec![op0, op1],
+                    NodeKind::MI(MINodeKind::LEAr64m),
+                    vec![rbp, op0, none, op1],
                     node.ty.clone(),
                 ));
             }
-            // println!("T {:?}", node.ty);
         }
 
         self.run_on_node_operand(heap, node);

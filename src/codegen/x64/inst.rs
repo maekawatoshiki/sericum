@@ -17,19 +17,13 @@ mod inst {
                 .set_uses(vec![TargetOperand::FrameIndex])
                 .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR64)])
         };
-        pub static ref LEArmi32: TargetInstDef = {
-            TargetInstDef::new(TargetOpcode::LEArmi32)
+        pub static ref LEAr64m: TargetInstDef = {
+            TargetInstDef::new(TargetOpcode::LEAr64m)
                 .set_uses(vec![
-                    TargetOperand::FrameIndex,
-                    TargetOperand::Immediate(TargetImmediate::I32),
-                ])
-                .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR64)])
-        };
-        pub static ref LEArmr64: TargetInstDef = {
-            TargetInstDef::new(TargetOpcode::LEArmr64)
-                .set_uses(vec![
-                    TargetOperand::FrameIndex,
                     TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR64)),
+                    TargetOperand::Any,
+                    TargetOperand::Any,
+                    TargetOperand::Any,
                 ])
                 .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR64)])
         };
@@ -180,11 +174,6 @@ mod inst {
                 ])
                 .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR64)])
         };
-        pub static ref LEA64: TargetInstDef = {
-            TargetInstDef::new(TargetOpcode::LEA64)
-                .set_uses(vec![TargetOperand::FrameIndex])
-                .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR64)])
-        };
         pub static ref IDIV: TargetInstDef = {
             TargetInstDef::new(TargetOpcode::IDIV)
                 .set_uses(vec![TargetOperand::Register(TargetRegister::RegClass(
@@ -276,8 +265,12 @@ pub enum TargetOpcode {
 
     MOVSXDr64m32, // out = movsxd [rbp - fi.off]
 
-    LEArmi32, // out = lea [rbp - fi.off + const.off]
-    LEArmr64, // out = lea [rbp - fi.off + reg]
+    // out = lea [rbp  - fi.off              ] | out = lea rbp,  fi,   none,  none
+    // out = lea [rbp  - fi.off + const.off  ] | out = lea rbp,  fi,   none,  off
+    // out = lea [rbp  - fi.off + align * off] | out = lea rbp,  fi,   align, off
+    // out = lea [base          + align * off] | out = lea base, none, align, off
+    // out = lea [base                       ] | out = lea base, none, none,  none
+    LEAr64m,
 
     ADDrr32,
     ADDri32,
@@ -294,7 +287,6 @@ pub enum TargetOpcode {
     MOVrr64,
     MOVri64,
     MOVrm64,
-    LEA64,
     IDIV,
     PUSH64,
     POP64,
@@ -326,8 +318,7 @@ impl TargetOpcode {
         match self {
             Self::MOVSDrm64 => Some(&*inst::MOVSDrm64),
             Self::MOVSXDr64m32 => Some(&*inst::MOVSXDr64m32),
-            Self::LEArmi32 => Some(&*inst::LEArmi32),
-            Self::LEArmr64 => Some(&*inst::LEArmr64),
+            Self::LEAr64m => Some(&*inst::LEAr64m),
             Self::ADDrr32 => Some(&*inst::ADDrr32),
             Self::ADDri32 => Some(&*inst::ADDri32),
             Self::ADDr64i32 => Some(&*inst::ADDr64i32),
@@ -346,7 +337,6 @@ impl TargetOpcode {
             Self::MOVrr64 => Some(&*inst::MOVrr64),
             Self::MOVri64 => Some(&*inst::MOVri64),
             Self::MOVrm64 => Some(&*inst::MOVrm64),
-            Self::LEA64 => Some(&*inst::LEA64),
             Self::IDIV => Some(&*inst::IDIV),
             Self::PUSH64 => Some(&*inst::PUSH64),
             Self::POP64 => Some(&*inst::POP64),

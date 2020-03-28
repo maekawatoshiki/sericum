@@ -344,9 +344,12 @@ impl MIConverter {
                     MachineInstr::new_with_def_reg(mov_rx(&op).unwrap(), vec![op], vec![r], bb)
                 }
                 MachineOperand::FrameIndex(_) => {
+                    let rbp = MachineOperand::Register(
+                        RegisterInfo::new_phy_reg(GR64::RBP).into_machine_register(),
+                    );
                     MachineInstr::new_with_def_reg(
-                        MachineOpcode::LEA64, // TODO
-                        vec![op],
+                        MachineOpcode::LEAr64m,
+                        vec![rbp, op, MachineOperand::None, MachineOperand::None],
                         vec![r],
                         bb,
                     )
