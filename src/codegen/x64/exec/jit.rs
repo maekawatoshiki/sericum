@@ -232,6 +232,7 @@ impl JITCompiler {
             for instr in &*bb.iseq_ref() {
                 let instr = &f.instr_arena[*instr];
                 match instr.opcode {
+                    MachineOpcode::MOVrm32x => self.compile_mov_rm32x(&frame_objects, instr),
                     MachineOpcode::MOVri32 => self.compile_mov_ri32(instr),
                     MachineOpcode::MOVrr32 => self.compile_mov_rr32(instr),
                     MachineOpcode::MOVri64 => self.compile_mov_ri64(instr),
@@ -282,6 +283,48 @@ impl JITCompiler {
                     MachineOpcode::Ret => self.compile_return(&frame_objects, instr),
                     op => unimplemented!("{:?}", op),
                 }
+            }
+        }
+    }
+
+    fn compile_mov_rm32x(&mut self, fo: &FrameObjectsInfo, instr: &MachineInstr) {
+        // mov rbp, fi, none, none
+        if instr.operand[0].is_register() // must be rbp
+            && instr.operand[1].is_frame_index()
+            && instr.operand[2].is_none()
+            && instr.operand[3].is_none()
+        {
+            let r0 = phys_reg_to_dynasm_reg(instr.def[0].get_reg().unwrap());
+            let m1 = instr.operand[1].as_frame_index();
+            dynasm!(self.asm; mov Rd(r0), [rbp - fo.offset(m1.idx).unwrap()]);
+        }
+
+        // out = mov rbp, fi, none, const.off
+        if instr.operand[0].is_register() // must be rbp
+            && instr.operand[1].is_frame_index()
+            && instr.operand[2].is_none()
+            && instr.operand[3].is_const_i32()
+        {
+            let r0 = phys_reg_to_dynasm_reg(instr.def[0].get_reg().unwrap());
+            let m1 = fo.offset(instr.operand[1].as_frame_index().idx).unwrap();
+            let i2 = instr.operand[3].as_constant().as_i32();
+            dynasm!(self.asm; lea Rq(r0), [rbp - m1 + i2]);
+        }
+
+        // out = mov rbp, fi, align, off
+        if instr.operand[0].is_register() // must be rbp
+            && instr.operand[1].is_frame_index()
+            && instr.operand[2].is_const_i32()
+            && instr.operand[3].is_register()
+        {
+            let r0 = phys_reg_to_dynasm_reg(instr.def[0].get_reg().unwrap());
+            let m1 = fo.offset(instr.operand[1].as_frame_index().idx).unwrap();
+            let i2 = instr.operand[2].as_constant().as_i32();
+            let r3 = phys_reg_to_dynasm_reg(instr.operand[3].as_register().get_reg().unwrap());
+
+            match i2 {
+                4 => dynasm!(self.asm; mov Rd(r0), DWORD [rbp - m1 + 4*Rq(r3)]),
+                _ => unimplemented!(),
             }
         }
     }

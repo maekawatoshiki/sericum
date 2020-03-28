@@ -1,3 +1,4 @@
+use super::super::register::*;
 use super::{super::frame_object::FrameIndexInfo, super::machine::instr::*, basic_block::*};
 use crate::ir::{opcode::*, types::*};
 use crate::util::allocator::*;
@@ -126,6 +127,17 @@ impl DAGNode {
             ty,
             next: None,
             operand,
+        }
+    }
+
+    pub fn new_phys_reg<T: TargetRegisterTrait>(reg: T) -> Self {
+        Self {
+            kind: NodeKind::Operand(OperandNodeKind::Register(
+                RegisterInfo::new_phy_reg(reg).into_ref(),
+            )),
+            ty: rc2ty(reg.as_phys_reg().reg_class()),
+            next: None,
+            operand: vec![],
         }
     }
 

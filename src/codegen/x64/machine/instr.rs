@@ -472,11 +472,16 @@ impl MachineOperand {
         }
     }
 
-    pub fn is_register(&self, rc: RegisterClassKind) -> bool {
-        match self {
-            MachineOperand::Register(r) => r.get_reg_class() == rc,
-            _ => false,
-        }
+    pub fn is_register(&self) -> bool {
+        matches!(self, MachineOperand::Register(_))
+    }
+
+    pub fn is_frame_index(&self) -> bool {
+        matches!(self, MachineOperand::FrameIndex(_))
+    }
+
+    pub fn is_none(&self) -> bool {
+        matches!(self, MachineOperand::None)
     }
 
     pub fn is_const_i32(&self) -> bool {

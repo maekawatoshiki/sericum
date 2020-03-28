@@ -132,6 +132,7 @@ impl<'a> ISelPatParser<'a> {
         }
     }
 
+    // TODO: refine code asap
     pub fn parse_selected_inst_pat(&mut self) -> proc_macro2::TokenStream {
         let ir_or_mi = self.reader.get_ident().unwrap();
         assert!(self.reader.skip_punct('.'));
@@ -145,13 +146,43 @@ impl<'a> ISelPatParser<'a> {
         let mut def_operands = quote! {};
         let mut operands = quote! {};
 
+        let mut none = false;
         loop {
-            let op = ident_tok(self.reader.get_ident().unwrap().as_str());
-            def_operands = quote! {
-                #def_operands
-                let #op = self.run_on_node(heap, #op);
-            };
-            operands = quote! { #operands #op, };
+            if self.reader.skip_punct('%') {
+                let reg_s = self.reader.get_ident().unwrap();
+                let reg = ident_tok(reg_s.as_str());
+                def_operands = quote! {
+                    #def_operands
+                    let #reg = heap.alloc(DAGNode::new_phys_reg(str2reg(#reg_s).unwrap()));
+                };
+                operands = quote! {
+                    #operands #reg,
+                };
+            } else {
+                let name = self.reader.get_ident().unwrap();
+                let op = ident_tok(name.as_str());
+                if name == "none" {
+                    if !none {
+                        def_operands = quote! {
+                            #def_operands
+                            let none__ = heap.alloc(DAGNode::new(
+                                NodeKind::None, vec![], Type::Void));
+                        };
+                    }
+                    operands = quote! {
+                        #operands
+                        none__,
+                    };
+                    none = true;
+                } else {
+                    def_operands = quote! {
+                        #def_operands
+                        let #op = self.run_on_node(heap, #op);
+                    };
+                    operands = quote! { #operands #op, };
+                }
+            }
+
             if !self.reader.skip_punct(',') {
                 break;
             }

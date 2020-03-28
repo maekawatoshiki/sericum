@@ -221,6 +221,16 @@ mod inst {
                 .set_uses(vec![TargetOperand::Immediate(TargetImmediate::I32)])
                 .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR32)])
         };
+        pub static ref MOVrm32x: TargetInstDef = {
+            TargetInstDef::new(TargetOpcode::MOVrm32x)
+                .set_uses(vec![
+                    TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR64)),
+                    TargetOperand::Any,
+                    TargetOperand::Any,
+                    TargetOperand::Any,
+                ])
+                .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR32)])
+        };
         pub static ref MOVrm32: TargetInstDef = {
             TargetInstDef::new(TargetOpcode::MOVrm32)
                 .set_uses(vec![TargetOperand::FrameIndex])
@@ -310,6 +320,7 @@ pub enum TargetOperand {
     Immediate(TargetImmediate),
     Addr,
     FrameIndex,
+    Any,
 }
 
 #[derive(Clone)]
@@ -339,6 +350,12 @@ pub enum TargetOpcode {
     MOVmi32i32,  // mov [rbp - fi.off + const.off], const.val
     MOVmri32r32, // mov [rbp - fi.off + off * align], reg
     MOVmri32i32, // mov [rbp - fi.off + off * align], const.val
+    // out = mov [rbp  - fi.off]               | out = mov rbp,  fi,   none,  none
+    // out = mov [rbp  - fi.off + const.off]   | out = mov rbp,  fi,   none,  off
+    // out = mov [rbp  - fi.off + align * off] | out = mov rbp,  fi,   align, off
+    // out = mov [base          + align * off] | out = mov base, none, align, off
+    // out = mov [base]                        | out = mov base, none, none,  none
+    MOVrm32x,
     MOVrri32r32, // mov [base + off * align], reg
     MOVrri32i32, // mov [base + off * align], const.val
     MOVpi32,     // mov [reg], const.val
@@ -425,6 +442,7 @@ impl TargetOpcode {
             Self::CDQ => Some(&*inst::CDQ),
             Self::MOVrr32 => Some(&*inst::MOVrr32),
             Self::MOVri32 => Some(&*inst::MOVri32),
+            Self::MOVrm32x => Some(&*inst::MOVrm32x), // *********
             Self::MOVrm32 => Some(&*inst::MOVrm32),
             Self::MOVmr32 => Some(&*inst::MOVmr32),
             Self::MOVmi32 => Some(&*inst::MOVmi32),

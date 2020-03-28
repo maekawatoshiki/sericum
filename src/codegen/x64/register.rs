@@ -250,7 +250,7 @@ pub enum XMM {
     XMM15,
 }
 
-pub trait TargetRegisterTrait {
+pub trait TargetRegisterTrait: Copy + Clone {
     fn as_phys_reg(&self) -> PhysReg;
 }
 
@@ -404,6 +404,60 @@ impl VirtReg {
     pub fn retrieve(&self) -> usize {
         self.0
     }
+}
+
+pub fn str2reg(s: &str) -> Option<PhysReg> {
+    Some(match s.to_ascii_uppercase().as_str() {
+        "EAX" => GR32::EAX.as_phys_reg(),
+        "ECX" => GR32::ECX.as_phys_reg(),
+        "EDX" => GR32::EDX.as_phys_reg(),
+        "EBX" => GR32::EBX.as_phys_reg(),
+        "ESP" => GR32::ESP.as_phys_reg(),
+        "EBP" => GR32::EBP.as_phys_reg(),
+        "ESI" => GR32::ESI.as_phys_reg(),
+        "EDI" => GR32::EDI.as_phys_reg(),
+        "R8D" => GR32::R8D.as_phys_reg(),
+        "R9D" => GR32::R9D.as_phys_reg(),
+        "R10D" => GR32::R10D.as_phys_reg(),
+        "R11D" => GR32::R11D.as_phys_reg(),
+        "R12D" => GR32::R12D.as_phys_reg(),
+        "R13D" => GR32::R13D.as_phys_reg(),
+        "R14D" => GR32::R14D.as_phys_reg(),
+        "R15D" => GR32::R15D.as_phys_reg(),
+        "RAX" => GR64::RAX.as_phys_reg(),
+        "RCX" => GR64::RCX.as_phys_reg(),
+        "RDX" => GR64::RDX.as_phys_reg(),
+        "RBX" => GR64::RBX.as_phys_reg(),
+        "RSP" => GR64::RSP.as_phys_reg(),
+        "RBP" => GR64::RBP.as_phys_reg(),
+        "RSI" => GR64::RSI.as_phys_reg(),
+        "RDI" => GR64::RDI.as_phys_reg(),
+        "R8" => GR64::R8.as_phys_reg(),
+        "R9" => GR64::R9.as_phys_reg(),
+        "R10" => GR64::R10.as_phys_reg(),
+        "R11" => GR64::R11.as_phys_reg(),
+        "R12" => GR64::R12.as_phys_reg(),
+        "R13" => GR64::R13.as_phys_reg(),
+        "R14" => GR64::R14.as_phys_reg(),
+        "R15" => GR64::R15.as_phys_reg(),
+        "XMM0" => XMM::XMM0.as_phys_reg(),
+        "XMM1" => XMM::XMM1.as_phys_reg(),
+        "XMM2" => XMM::XMM2.as_phys_reg(),
+        "XMM3" => XMM::XMM3.as_phys_reg(),
+        "XMM4" => XMM::XMM4.as_phys_reg(),
+        "XMM5" => XMM::XMM5.as_phys_reg(),
+        "XMM6" => XMM::XMM6.as_phys_reg(),
+        "XMM7" => XMM::XMM7.as_phys_reg(),
+        "XMM8" => XMM::XMM8.as_phys_reg(),
+        "XMM9" => XMM::XMM9.as_phys_reg(),
+        "XMM10" => XMM::XMM10.as_phys_reg(),
+        "XMM11" => XMM::XMM11.as_phys_reg(),
+        "XMM12" => XMM::XMM12.as_phys_reg(),
+        "XMM13" => XMM::XMM13.as_phys_reg(),
+        "XMM14" => XMM::XMM14.as_phys_reg(),
+        "XMM15" => XMM::XMM15.as_phys_reg(),
+        _ => return None,
+    })
 }
 
 impl fmt::Debug for PhysReg {
