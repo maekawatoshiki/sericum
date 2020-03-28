@@ -62,12 +62,12 @@ impl MISelector {
                 GR64 a {
                     imm32 b => (mi.IMULrr64i32 a, b) } }
             (ir.Load a) {
-                i32mem a => (mi.MOVrm32 a)
-                i64mem a => (mi.MOVrm64 a)
+                mem32 a => (mi.MOVrm32 a)
+                mem64 a => (mi.MOVrm64 a)
                 GR64   a => (mi.MOVr32p a)
             }
             (ir.Store a, b) {
-                i32mem a {
+                mem32 a {
                     GR32  b => (mi.MOVmr32 a, b)
                     imm32 b => (mi.MOVmi32 a, b) }
                 GR64   a {

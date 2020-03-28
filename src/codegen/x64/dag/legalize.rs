@@ -120,7 +120,7 @@ impl Legalize {
         isel_pat! {
         (ir.Store dst, src) {
             (ir.Add a1, a2) dst {
-                i32mem a1 {
+                mem32 a1 {
                     imm32 a2 {
                         GR32  src => (mi.MOVmi32r32 a1, a2, src)
                         imm32 src => (mi.MOVmi32i32 a1, a2, src) }

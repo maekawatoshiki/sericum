@@ -107,10 +107,10 @@ impl<'a> ISelPatParser<'a> {
             "imm32" => quote! {
                 if #node.is_constant() && matches!(#node.ty, Type::Int32) { #body }
             },
-            "i32mem" | "i64mem" => {
+            "mem32" | "mem64" => {
                 let bits = match ty.as_str() {
-                    "i32mem" => 32usize,
-                    "i64mem" => 64usize,
+                    "mem32" => 32usize,
+                    "mem64" => 64usize,
                     _ => unimplemented!(),
                 };
                 quote! {
