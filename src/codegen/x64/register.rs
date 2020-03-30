@@ -398,6 +398,17 @@ impl PhysReg {
     pub fn retrieve(&self) -> usize {
         self.0
     }
+
+    pub fn name(&self) -> &str {
+        let reg_names = [
+            "eax", "ecx", "edx", "ebx", "esp", "ebp", "esi", "edi", "r8d", "r9d", "r10d", "r11d",
+            "r12d", "r13d", "r14d", "r15d", "rax", "rcx", "rdx", "rbx", "rsp", "rbp", "rsi", "rdi",
+            "r8", "r9", "r10", "r11", "r12", "r13", "r14", "r15", "xmm0", "xmm1", "xmm2", "xmm3",
+            "xmm4", "xmm5", "xmm6", "xmm7", "xmm8", "xmm9", "xmm10", "xmm11", "xmm12", "xmm13",
+            "xmm14", "xmm15",
+        ];
+        reg_names[self.retrieve()]
+    }
 }
 
 impl VirtReg {
@@ -407,69 +418,62 @@ impl VirtReg {
 }
 
 pub fn str2reg(s: &str) -> Option<PhysReg> {
-    Some(match s.to_ascii_uppercase().as_str() {
-        "EAX" => GR32::EAX.as_phys_reg(),
-        "ECX" => GR32::ECX.as_phys_reg(),
-        "EDX" => GR32::EDX.as_phys_reg(),
-        "EBX" => GR32::EBX.as_phys_reg(),
-        "ESP" => GR32::ESP.as_phys_reg(),
-        "EBP" => GR32::EBP.as_phys_reg(),
-        "ESI" => GR32::ESI.as_phys_reg(),
-        "EDI" => GR32::EDI.as_phys_reg(),
-        "R8D" => GR32::R8D.as_phys_reg(),
-        "R9D" => GR32::R9D.as_phys_reg(),
-        "R10D" => GR32::R10D.as_phys_reg(),
-        "R11D" => GR32::R11D.as_phys_reg(),
-        "R12D" => GR32::R12D.as_phys_reg(),
-        "R13D" => GR32::R13D.as_phys_reg(),
-        "R14D" => GR32::R14D.as_phys_reg(),
-        "R15D" => GR32::R15D.as_phys_reg(),
-        "RAX" => GR64::RAX.as_phys_reg(),
-        "RCX" => GR64::RCX.as_phys_reg(),
-        "RDX" => GR64::RDX.as_phys_reg(),
-        "RBX" => GR64::RBX.as_phys_reg(),
-        "RSP" => GR64::RSP.as_phys_reg(),
-        "RBP" => GR64::RBP.as_phys_reg(),
-        "RSI" => GR64::RSI.as_phys_reg(),
-        "RDI" => GR64::RDI.as_phys_reg(),
-        "R8" => GR64::R8.as_phys_reg(),
-        "R9" => GR64::R9.as_phys_reg(),
-        "R10" => GR64::R10.as_phys_reg(),
-        "R11" => GR64::R11.as_phys_reg(),
-        "R12" => GR64::R12.as_phys_reg(),
-        "R13" => GR64::R13.as_phys_reg(),
-        "R14" => GR64::R14.as_phys_reg(),
-        "R15" => GR64::R15.as_phys_reg(),
-        "XMM0" => XMM::XMM0.as_phys_reg(),
-        "XMM1" => XMM::XMM1.as_phys_reg(),
-        "XMM2" => XMM::XMM2.as_phys_reg(),
-        "XMM3" => XMM::XMM3.as_phys_reg(),
-        "XMM4" => XMM::XMM4.as_phys_reg(),
-        "XMM5" => XMM::XMM5.as_phys_reg(),
-        "XMM6" => XMM::XMM6.as_phys_reg(),
-        "XMM7" => XMM::XMM7.as_phys_reg(),
-        "XMM8" => XMM::XMM8.as_phys_reg(),
-        "XMM9" => XMM::XMM9.as_phys_reg(),
-        "XMM10" => XMM::XMM10.as_phys_reg(),
-        "XMM11" => XMM::XMM11.as_phys_reg(),
-        "XMM12" => XMM::XMM12.as_phys_reg(),
-        "XMM13" => XMM::XMM13.as_phys_reg(),
-        "XMM14" => XMM::XMM14.as_phys_reg(),
-        "XMM15" => XMM::XMM15.as_phys_reg(),
+    Some(match s.to_ascii_lowercase().as_str() {
+        "eax" => GR32::EAX.as_phys_reg(),
+        "ecx" => GR32::ECX.as_phys_reg(),
+        "edx" => GR32::EDX.as_phys_reg(),
+        "ebx" => GR32::EBX.as_phys_reg(),
+        "esp" => GR32::ESP.as_phys_reg(),
+        "ebp" => GR32::EBP.as_phys_reg(),
+        "esi" => GR32::ESI.as_phys_reg(),
+        "edi" => GR32::EDI.as_phys_reg(),
+        "r8d" => GR32::R8D.as_phys_reg(),
+        "r9d" => GR32::R9D.as_phys_reg(),
+        "r10d" => GR32::R10D.as_phys_reg(),
+        "r11d" => GR32::R11D.as_phys_reg(),
+        "r12d" => GR32::R12D.as_phys_reg(),
+        "r13d" => GR32::R13D.as_phys_reg(),
+        "r14d" => GR32::R14D.as_phys_reg(),
+        "r15d" => GR32::R15D.as_phys_reg(),
+        "rax" => GR64::RAX.as_phys_reg(),
+        "rcx" => GR64::RCX.as_phys_reg(),
+        "rdx" => GR64::RDX.as_phys_reg(),
+        "rbx" => GR64::RBX.as_phys_reg(),
+        "rsp" => GR64::RSP.as_phys_reg(),
+        "rbp" => GR64::RBP.as_phys_reg(),
+        "rsi" => GR64::RSI.as_phys_reg(),
+        "rdi" => GR64::RDI.as_phys_reg(),
+        "r8" => GR64::R8.as_phys_reg(),
+        "r9" => GR64::R9.as_phys_reg(),
+        "r10" => GR64::R10.as_phys_reg(),
+        "r11" => GR64::R11.as_phys_reg(),
+        "r12" => GR64::R12.as_phys_reg(),
+        "r13" => GR64::R13.as_phys_reg(),
+        "r14" => GR64::R14.as_phys_reg(),
+        "r15" => GR64::R15.as_phys_reg(),
+        "xmm0" => XMM::XMM0.as_phys_reg(),
+        "xmm1" => XMM::XMM1.as_phys_reg(),
+        "xmm2" => XMM::XMM2.as_phys_reg(),
+        "xmm3" => XMM::XMM3.as_phys_reg(),
+        "xmm4" => XMM::XMM4.as_phys_reg(),
+        "xmm5" => XMM::XMM5.as_phys_reg(),
+        "xmm6" => XMM::XMM6.as_phys_reg(),
+        "xmm7" => XMM::XMM7.as_phys_reg(),
+        "xmm8" => XMM::XMM8.as_phys_reg(),
+        "xmm9" => XMM::XMM9.as_phys_reg(),
+        "xmm10" => XMM::XMM10.as_phys_reg(),
+        "xmm11" => XMM::XMM11.as_phys_reg(),
+        "xmm12" => XMM::XMM12.as_phys_reg(),
+        "xmm13" => XMM::XMM13.as_phys_reg(),
+        "xmm14" => XMM::XMM14.as_phys_reg(),
+        "xmm15" => XMM::XMM15.as_phys_reg(),
         _ => return None,
     })
 }
 
 impl fmt::Debug for PhysReg {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let reg_names = [
-            "EAX", "ECX", "EDX", "EBX", "ESP", "EBP", "ESI", "EDI", "R8D", "R9D", "R10D", "R11D",
-            "R12D", "R13D", "R14D", "R15D", "RAX", "RCX", "RDX", "RBX", "RSP", "RBP", "RSI", "RDI",
-            "R8", "R9", "R10", "R11", "R12", "R13", "R14", "R15", "XMM0", "XMM1", "XMM2", "XMM3",
-            "XMM4", "XMM5", "XMM6", "XMM7", "XMM8", "XMM9", "XMM10", "XMM11", "XMM12", "XMM13",
-            "XMM14", "XMM15",
-        ];
-        write!(f, "%{}", reg_names[self.retrieve()])
+        write!(f, "%{}", self.name())
     }
 }
 

@@ -91,6 +91,11 @@ impl JITExecutor {
         machine::replace_data::ConstDataReplacer::new().run_on_module(&mut machine_module);
         machine::replace_copy::ReplaceCopyWithProperMInst::new().run_on_module(&mut machine_module);
 
+        use crate::codegen::x64::asm::print::MachineAsmPrinter;
+        let mut printer = MachineAsmPrinter::new();
+        printer.run_on_module(&machine_module);
+        println!("ASM DUMP: \n{}\n\n", printer.output);
+
         // TODO: refine
         debug!(
             println!("MachineModule dump:");

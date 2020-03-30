@@ -47,6 +47,12 @@ impl ConstDataArena {
     }
 }
 
+impl DataId {
+    pub fn id(&self) -> usize {
+        self.id
+    }
+}
+
 impl<'a> ConstDataArenaIter<'a> {
     pub fn new(id: usize, arena: &'a Vec<MachineConstant>) -> Self {
         Self { id, arena, nth: 0 }

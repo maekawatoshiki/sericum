@@ -4,6 +4,7 @@ pub mod frame_object;
 pub mod inst;
 pub mod machine;
 pub mod register;
+pub mod asm;
 
 use crate::ir::types::*;
 
