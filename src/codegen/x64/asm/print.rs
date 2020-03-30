@@ -1,17 +1,22 @@
 use super::super::frame_object::FrameObjectsInfo;
 use super::super::machine::{
-    basic_block::MachineBasicBlock, function::MachineFunction, instr::*, module::MachineModule,
+    basic_block::{MachineBasicBlock, MachineBasicBlockId},
+    function::MachineFunction,
+    instr::*,
+    module::MachineModule,
 };
 use crate::ir::types::TypeSize;
 
 pub struct MachineAsmPrinter {
     pub output: String,
+    cur_bb_id_base: usize,
 }
 
 impl MachineAsmPrinter {
     pub fn new() -> Self {
         Self {
             output: "".to_string(),
+            cur_bb_id_base: 0,
         }
     }
 
@@ -43,9 +48,10 @@ impl MachineAsmPrinter {
         let bbs = &f.basic_blocks;
         for (id, bb) in bbs.id_and_block() {
             self.output
-                .push_str(format!(".L{}:\n", id.index()).as_str());
+                .push_str(format!("{}:\n", self.bb_id_to_label_id(&id)).as_str());
             self.run_on_basic_block(f, bb, fo);
         }
+        self.cur_bb_id_base += bbs.order.len();
     }
 
     fn run_on_basic_block(
@@ -56,11 +62,11 @@ impl MachineAsmPrinter {
     ) {
         for inst in &*bb.iseq_ref() {
             let inst = &f.instr_arena[*inst];
-            self.run_on_inst(f, inst, fo);
+            self.run_on_inst(inst, fo);
         }
     }
 
-    fn run_on_inst(&mut self, f: &MachineFunction, inst: &MachineInstr, fo: &FrameObjectsInfo) {
+    fn run_on_inst(&mut self, inst: &MachineInstr, fo: &FrameObjectsInfo) {
         self.output.push_str("  ");
 
         match inst.opcode {
@@ -420,9 +426,7 @@ impl MachineAsmPrinter {
 
     fn run_on_operand(&mut self, operand: &MachineOperand) {
         match operand {
-            MachineOperand::Branch(id) => {
-                self.output.push_str(format!(".L{}", id.index()).as_str())
-            }
+            MachineOperand::Branch(id) => self.output.push_str(self.bb_id_to_label_id(id).as_str()),
             MachineOperand::Constant(MachineConstant::Int32(i)) => {
                 self.output.push_str(format!("{}", i).as_str())
             }
@@ -432,6 +436,10 @@ impl MachineAsmPrinter {
             }
             _ => unimplemented!(),
         }
+    }
+
+    fn bb_id_to_label_id(&self, bb_id: &MachineBasicBlockId) -> String {
+        format!(".L{}", bb_id.index() + self.cur_bb_id_base)
     }
 }
 

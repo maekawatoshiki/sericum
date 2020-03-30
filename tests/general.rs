@@ -689,6 +689,109 @@ fn jit_executor2() {
 }
 
 #[test]
+fn fibo() {
+    use cilk::codegen::x64::{dag, machine};
+
+    let mut m = module::Module::new("cilk");
+
+    let _fibo = cilk_ir!(m; define [i32] fibo [(i32)] {
+        entry:
+            cond = icmp le (%arg.0), (i32 2);
+            br (%cond) l1, l2;
+        l1:
+            ret (i32 1);
+        l2:
+            a1 = sub (%arg.0), (i32 1);
+            r1 = call fibo [(%a1)];
+            a2 = sub (%arg.0), (i32 2);
+            r2 = call fibo [(%a2)];
+            r3 = add (%r1), (%r2);
+            ret (%r3);
+    });
+
+    let _main = cilk_ir!(m; define [i32] main [] {
+        entry:
+            r = call fibo [(i32 10)];
+            ret (%r);
+    });
+
+    let mut dag_module = dag::convert::ConvertToDAG::new(&m).convert_module();
+    dag::combine::Combine::new().combine_module(&mut dag_module);
+    dag::legalize::Legalize::new().run_on_module(&mut dag_module);
+    dag::isel::MISelector::new().run_on_module(&mut dag_module);
+
+    let mut machine_module = dag::mc_convert::MIConverter::new().convert_module(dag_module);
+    machine::phi_elimination::PhiElimination::new().run_on_module(&mut machine_module);
+    machine::two_addr::TwoAddressConverter::new().run_on_module(&mut machine_module);
+    machine::regalloc::RegisterAllocator::new().run_on_module(&mut machine_module);
+    machine::pro_epi_inserter::PrologueEpilogueInserter::new().run_on_module(&mut machine_module);
+    machine::replace_data::ConstDataReplacer::new().run_on_module(&mut machine_module);
+    machine::replace_copy::ReplaceCopyWithProperMInst::new().run_on_module(&mut machine_module);
+
+    use crate::codegen::x64::asm::print::MachineAsmPrinter;
+    let mut printer = MachineAsmPrinter::new();
+    printer.run_on_module(&machine_module);
+    println!("ASM DUMP: \n{}", printer.output);
+
+    assert_eq!(
+        "  .text
+  .intel_syntax noprefix
+  .globl fibo
+fibo:
+.L0:
+  push rbp
+  mov rbp, rsp
+  sub rsp, 8
+  mov dword ptr [rbp - 4], edi
+  mov eax, dword ptr [rbp - 4]
+  cmp eax, 2
+  jle .L1
+  jmp .L2
+.L1:
+  mov eax, 1
+  mov rsp, rbp
+  pop rbp
+  ret
+.L2:
+  mov eax, dword ptr [rbp - 4]
+  mov eax, eax
+  sub eax, 1
+  mov edi, eax
+  call fibo
+  mov ecx, eax
+  mov eax, dword ptr [rbp - 4]
+  mov eax, eax
+  sub eax, 2
+  mov edi, eax
+  mov dword ptr [rbp - 8], ecx
+  call fibo
+  mov ecx, dword ptr [rbp - 8]
+  mov eax, eax
+  mov ecx, ecx
+  add ecx, eax
+  mov eax, ecx
+  mov rsp, rbp
+  pop rbp
+  ret
+  .globl main
+main:
+.L3:
+  push rbp
+  mov rbp, rsp
+  sub rsp, 8
+  mov edi, 10
+  call fibo
+  mov eax, eax
+  mov eax, eax
+  mov rsp, rbp
+  pop rbp
+  ret
+",
+        printer.output
+    );
+}
+
+#[test]
 fn spill() {
     let mut m = module::Module::new("cilk");
 
