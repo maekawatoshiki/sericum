@@ -84,23 +84,13 @@ impl RegisterAllocator {
                 println!(
                     "spill target: {:?}",reg_to_spill
             ));
-            debug!(
-                println!("MachineModule dump:");
-                let mut idx = 0;
-                for (_, bb) in cur_func.basic_blocks.id_and_block() {
-                    println!("Machine basic block: {:?}", bb);
-                    for instr in &*bb.iseq_ref() {
-                        println!("{}: {:?}", idx, cur_func.instr_arena[*instr]);
-                        idx += 1;
-                    }
-                    println!()
-                }
-            );
         }
 
-        debug!(for (_, x) in &matrix.vreg_interval {
-            println!("{:?}", x)
-        });
+        // debug!(for (_, x) in &matrix.vreg_interval {
+        //     println!("{:?}", x)
+        // });
+
+        debug!(println!("{:?}", cur_func));
 
         self.rewrite_vregs(cur_func, &matrix);
     }

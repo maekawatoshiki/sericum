@@ -42,7 +42,7 @@ impl MachineModule {
 
 impl fmt::Debug for MachineModule {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "MachineModule (name: {})", self.name)?;
+        writeln!(f, "MachineModule (name: {})", self.name)?;
 
         for (_, func) in &self.functions {
             func.fmt(f)?;

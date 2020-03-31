@@ -291,8 +291,9 @@ impl MachineOpcode {
             MachineOpcode::Ret
             | MachineOpcode::JMP
             | MachineOpcode::BrCond
-            | MachineOpcode::BrccEq
-            | MachineOpcode::BrccLe => true,
+            | MachineOpcode::JE
+            | MachineOpcode::JL
+            | MachineOpcode::JLE => true,
             _ => false,
         }
     }

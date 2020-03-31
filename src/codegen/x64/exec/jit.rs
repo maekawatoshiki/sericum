@@ -52,8 +52,6 @@ impl JITExecutor {
 
         let mut machine_module = dag::mc_convert::MIConverter::new().convert_module(dag_module);
 
-        debug!(println!("{:?}", machine_module));
-
         machine::phi_elimination::PhiElimination::new().run_on_module(&mut machine_module);
         machine::two_addr::TwoAddressConverter::new().run_on_module(&mut machine_module);
         machine::regalloc::RegisterAllocator::new().run_on_module(&mut machine_module);
@@ -221,9 +219,6 @@ impl JITCompiler {
                     MachineOpcode::CDQ => self.compile_cdq(&frame_objects, instr),
                     MachineOpcode::Call => self.compile_call(module, &frame_objects, instr),
                     MachineOpcode::Copy => self.compile_copy(instr),
-                    MachineOpcode::BrccEq | MachineOpcode::BrccLe | MachineOpcode::BrccLt => {
-                        self.compile_brcc(instr)
-                    }
                     MachineOpcode::CMPri => self.compile_cmp_ri(instr),
                     MachineOpcode::CMPrr => self.compile_cmp_rr(instr),
                     MachineOpcode::JE => self.compile_je(instr),
@@ -659,41 +654,6 @@ impl JITCompiler {
         let op0 = &instr.operand[0];
         match op0 {
             MachineOperand::Register(reg) => self.reg_copy(reg.get_reg_class(), rn, register!(reg)),
-            _ => unimplemented!(),
-        }
-    }
-
-    fn compile_brcc(&mut self, instr: &MachineInstr) {
-        let op0 = &instr.operand[0];
-        let op1 = &instr.operand[1];
-        let br = &instr.operand[2];
-        match op0 {
-            MachineOperand::Register(i0) => match op1 {
-                MachineOperand::Constant(c) => match c {
-                    MachineConstant::Int32(x) => dynasm!(self.asm; cmp Rd(register!(i0)), *x),
-                    MachineConstant::Int64(_) => unimplemented!(),
-                    MachineConstant::F64(_) => unimplemented!(),
-                },
-                MachineOperand::Register(i1) => match i0.get_reg_class() {
-                    RegisterClassKind::GR32 => {
-                        dynasm!(self.asm; cmp Rd(register!(i0)), Rd(register!(i1)))
-                    }
-                    _ => unimplemented!(),
-                },
-                _ => unimplemented!(),
-            },
-            e => unimplemented!("{:?}", e),
-        }
-        match br {
-            MachineOperand::Branch(bb) => {
-                let l = self.get_label(*bb);
-                match instr.opcode {
-                    MachineOpcode::BrccEq => dynasm!(self.asm; jz => l),
-                    MachineOpcode::BrccLe => dynasm!(self.asm; jle => l),
-                    MachineOpcode::BrccLt => dynasm!(self.asm; jl => l),
-                    _ => unreachable!(),
-                }
-            }
             _ => unimplemented!(),
         }
     }

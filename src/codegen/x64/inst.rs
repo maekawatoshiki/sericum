@@ -303,10 +303,9 @@ pub enum TargetOpcode {
 
     // Branch
     BrCond,
-    BrccEq,
-    BrccLe,
-    BrccLt,
-
+    // BrccEq,
+    // BrccLe,
+    // BrccLt,
     CMPrr,
     CMPri,
     JE,
