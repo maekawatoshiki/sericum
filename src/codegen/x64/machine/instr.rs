@@ -631,7 +631,7 @@ impl fmt::Debug for MachineOperand {
             MachineOperand::FrameIndex(fi) => fi.fmt(f),
             MachineOperand::Address(g) => g.fmt(f),
             MachineOperand::Branch(id) => write!(f, "BB#{}", id.index()),
-            MachineOperand::None => write!(f, ""),
+            MachineOperand::None => write!(f, "!"),
         }
     }
 }

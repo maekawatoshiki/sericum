@@ -44,44 +44,15 @@ impl JITExecutor {
         use super::super::{dag, machine};
 
         let mut dag_module = dag::convert::ConvertToDAG::new(module).convert_module();
-        // TODO: refine
-        debug!(
-            println!("DAG:");
-            for (_, dag_func) in &dag_module.functions {
-                println!("{:?}", dag_func);
-            }
-        );
         dag::combine::Combine::new().combine_module(&mut dag_module);
         dag::legalize::Legalize::new().run_on_module(&mut dag_module);
-
-        // TODO: refine
-        debug!(
-            println!("DAG:");
-            for (_, dag_func) in &dag_module.functions {
-                println!("{:?}", dag_func);
-            }
-        );
+        debug!(println!("{:?}", dag_module));
 
         dag::isel::MISelector::new().run_on_module(&mut dag_module);
 
         let mut machine_module = dag::mc_convert::MIConverter::new().convert_module(dag_module);
 
-        // TODO: refine!!!!!
-        debug!(
-            println!("MachineModule dump:");
-            for (_, machine_func) in &machine_module.functions {
-                let mut idx = 0;
-                println!("Machine function '{}':", machine_func.name);
-                for (_, bb) in machine_func.basic_blocks.id_and_block() {
-                    println!("Machine basic block: {:?}", bb);
-                    for instr in &*bb.iseq_ref() {
-                        println!("{}: {:?}", idx, machine_func.instr_arena[*instr]);
-                        idx += 1;
-                    }
-                    println!()
-                }
-            }
-        );
+        debug!(println!("{:?}", machine_module));
 
         machine::phi_elimination::PhiElimination::new().run_on_module(&mut machine_module);
         machine::two_addr::TwoAddressConverter::new().run_on_module(&mut machine_module);
@@ -90,28 +61,12 @@ impl JITExecutor {
             .run_on_module(&mut machine_module);
         machine::replace_data::ConstDataReplacer::new().run_on_module(&mut machine_module);
         machine::replace_copy::ReplaceCopyWithProperMInst::new().run_on_module(&mut machine_module);
+        debug!(println!("{:?}", machine_module));
 
         use crate::codegen::x64::asm::print::MachineAsmPrinter;
         let mut printer = MachineAsmPrinter::new();
         printer.run_on_module(&machine_module);
         println!("ASM DUMP: \n{}\n\n", printer.output);
-
-        // TODO: refine
-        debug!(
-            println!("MachineModule dump:");
-            for (_, machine_func) in &machine_module.functions {
-                let mut idx = 0;
-                println!("Machine function '{}':", machine_func.name);
-                for (_, bb) in machine_func.basic_blocks.id_and_block() {
-                    println!("Machine basic block: {:?}", bb);
-                    for instr in &*bb.iseq_ref() {
-                        println!("{}: {:?}", idx, machine_func.instr_arena[*instr]);
-                        idx += 1;
-                    }
-                    println!()
-                }
-            }
-        );
 
         let mut jit = JITCompiler::new();
         jit.compile_module(&machine_module);

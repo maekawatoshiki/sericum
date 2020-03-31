@@ -3,12 +3,13 @@ use super::super::register::*;
 use super::{basic_block::*, frame_object::*, instr::*};
 use crate::{codegen::is_internal_function, ir::types::*};
 use id_arena::*;
+use std::fmt;
 use std::ops::{Index, IndexMut};
 
 pub type MachineFunctionId = Id<MachineFunction>;
 
 // TODO: Documents in detail
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct MachineFunction {
     /// Function name
     pub name: String,
@@ -100,5 +101,26 @@ impl Index<MachineInstrId> for InstructionArena {
 impl IndexMut<MachineInstrId> for InstructionArena {
     fn index_mut(&mut self, idx: MachineInstrId) -> &mut Self::Output {
         &mut self.arena[idx]
+    }
+}
+
+impl fmt::Debug for MachineFunction {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        writeln!(
+            f,
+            "MachineFunction(name: {}, ty: {:?}):",
+            self.name, self.ty
+        )?;
+
+        let mut idx = 0;
+        for (id, bb) in self.basic_blocks.id_and_block() {
+            writeln!(f, "MachineBasicBlock #{} ({:?})", id.index(), bb)?;
+            for inst in &*bb.iseq_ref() {
+                writeln!(f, "{: ^4}: {:?}", idx, self.instr_arena[*inst])?;
+                idx += 1;
+            }
+        }
+
+        fmt::Result::Ok(())
     }
 }

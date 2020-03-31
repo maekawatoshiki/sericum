@@ -1,6 +1,7 @@
 use super::const_data::ConstDataArena;
 use super::function::*;
 use id_arena::*;
+use std::fmt;
 
 pub struct MachineModule {
     pub name: String,
@@ -36,5 +37,17 @@ impl MachineModule {
             }
         }
         None
+    }
+}
+
+impl fmt::Debug for MachineModule {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "MachineModule (name: {})", self.name)?;
+
+        for (_, func) in &self.functions {
+            func.fmt(f)?;
+        }
+
+        fmt::Result::Ok(())
     }
 }
