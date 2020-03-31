@@ -289,7 +289,7 @@ impl MachineOpcode {
     pub fn is_terminator(&self) -> bool {
         match self {
             MachineOpcode::Ret
-            | MachineOpcode::Br
+            | MachineOpcode::JMP
             | MachineOpcode::BrCond
             | MachineOpcode::BrccEq
             | MachineOpcode::BrccLe => true,
@@ -493,6 +493,10 @@ impl MachineOperand {
             MachineOperand::Constant(constant) => matches!(constant, MachineConstant::Int32(_)),
             _ => false,
         }
+    }
+
+    pub fn is_constant(&self) -> bool {
+        matches!(self, MachineOperand::Constant(_))
     }
 
     pub fn get_type(&self) -> Option<Type> {

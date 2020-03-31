@@ -96,21 +96,12 @@ impl MachineAsmPrinter {
             MachineOpcode::RET => self.run_on_inst_ret(),
             MachineOpcode::Call => self.run_on_inst_call(inst),
             MachineOpcode::Seteq | MachineOpcode::Setle | MachineOpcode::Setlt => {}
-            MachineOpcode::Br => self.run_on_inst_jmp(inst),
+            MachineOpcode::JMP => self.run_on_inst_jmp(inst),
             MachineOpcode::BrCond => {}
-            MachineOpcode::BrccEq | MachineOpcode::BrccLe | MachineOpcode::BrccLt => {
-                self.output.push_str("cmp ");
-                self.run_on_operand(&inst.operand[0]);
-                self.output.push_str(", ");
-                self.run_on_operand(&inst.operand[1]);
-                self.output.push_str("\n  ");
-                match inst.opcode {
-                    MachineOpcode::BrccEq => self.run_on_inst_je(inst),
-                    MachineOpcode::BrccLe => self.run_on_inst_jle(inst),
-                    MachineOpcode::BrccLt => self.run_on_inst_jlt(inst),
-                    _ => unimplemented!(),
-                }
-            }
+            MachineOpcode::CMPri | MachineOpcode::CMPrr => self.run_on_inst_cmp(inst),
+            MachineOpcode::JE => self.run_on_inst_je(inst),
+            MachineOpcode::JLE => self.run_on_inst_jle(inst),
+            MachineOpcode::JL => self.run_on_inst_jl(inst),
             _ => {}
         }
 
@@ -404,6 +395,13 @@ impl MachineAsmPrinter {
         self.run_on_operand(&i.operand[0]);
     }
 
+    fn run_on_inst_cmp(&mut self, i: &MachineInstr) {
+        self.output.push_str("cmp ");
+        self.run_on_operand(&i.operand[0]);
+        self.output.push_str(", ");
+        self.run_on_operand(&i.operand[1]);
+    }
+
     fn run_on_inst_jmp(&mut self, i: &MachineInstr) {
         self.output.push_str("jmp ");
         self.run_on_operand(&i.operand[0]);
@@ -411,17 +409,17 @@ impl MachineAsmPrinter {
 
     fn run_on_inst_je(&mut self, i: &MachineInstr) {
         self.output.push_str("je ");
-        self.run_on_operand(&i.operand[2]);
+        self.run_on_operand(&i.operand[0]);
     }
 
     fn run_on_inst_jle(&mut self, i: &MachineInstr) {
         self.output.push_str("jle ");
-        self.run_on_operand(&i.operand[2]);
+        self.run_on_operand(&i.operand[0]);
     }
 
-    fn run_on_inst_jlt(&mut self, i: &MachineInstr) {
-        self.output.push_str("jlt ");
-        self.run_on_operand(&i.operand[2]);
+    fn run_on_inst_jl(&mut self, i: &MachineInstr) {
+        self.output.push_str("jl ");
+        self.run_on_operand(&i.operand[0]);
     }
 
     fn run_on_operand(&mut self, operand: &MachineOperand) {

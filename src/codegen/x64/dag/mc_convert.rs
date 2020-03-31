@@ -256,7 +256,7 @@ impl MIConverter {
             }
             NodeKind::IR(IRNodeKind::Br) => Some(conv_info.push_instr(MachineInstr::new(
                 &conv_info.cur_func.vreg_gen,
-                MachineOpcode::Br,
+                MachineOpcode::JMP,
                 vec![MachineOperand::Branch(
                     self.get_machine_bb(bb!(node.operand[0])),
                 )],
@@ -277,21 +277,30 @@ impl MIConverter {
                 )))
             }
             NodeKind::IR(IRNodeKind::Brcc) => {
-                let new_op0 = self.normal_operand(conv_info, node.operand[1]);
-                let new_op1 = self.normal_operand(conv_info, node.operand[2]);
-                Some(conv_info.push_instr(MachineInstr::new(
-                    &conv_info.cur_func.vreg_gen,
-                    match cond_kind!(node.operand[0]) {
-                        CondKind::Eq => MachineOpcode::BrccEq,
-                        CondKind::Le => MachineOpcode::BrccLe,
-                        CondKind::Lt => MachineOpcode::BrccLt,
+                let op0 = self.normal_operand(conv_info, node.operand[1]);
+                let op1 = self.normal_operand(conv_info, node.operand[2]);
+
+                conv_info.push_instr(MachineInstr::new_simple(
+                    if op0.is_register() && op1.is_constant() {
+                        MachineOpcode::CMPri
+                    } else if op0.is_register() && op1.is_register() {
+                        MachineOpcode::CMPrr
+                    } else {
+                        unreachable!()
                     },
-                    vec![
-                        new_op0,
-                        new_op1,
-                        MachineOperand::Branch(self.get_machine_bb(bb!(node.operand[3]))),
-                    ],
-                    None,
+                    vec![op0, op1],
+                    conv_info.cur_bb,
+                ));
+
+                Some(conv_info.push_instr(MachineInstr::new_simple(
+                    match cond_kind!(node.operand[0]) {
+                        CondKind::Eq => MachineOpcode::JE,
+                        CondKind::Le => MachineOpcode::JLE,
+                        CondKind::Lt => MachineOpcode::JL,
+                    },
+                    vec![MachineOperand::Branch(
+                        self.get_machine_bb(bb!(node.operand[3])),
+                    )],
                     conv_info.cur_bb,
                 )))
             }

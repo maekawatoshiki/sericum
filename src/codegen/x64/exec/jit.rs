@@ -269,7 +269,12 @@ impl JITCompiler {
                     MachineOpcode::BrccEq | MachineOpcode::BrccLe | MachineOpcode::BrccLt => {
                         self.compile_brcc(instr)
                     }
-                    MachineOpcode::Br => self.compile_br(instr),
+                    MachineOpcode::CMPri => self.compile_cmp_ri(instr),
+                    MachineOpcode::CMPrr => self.compile_cmp_rr(instr),
+                    MachineOpcode::JE => self.compile_je(instr),
+                    MachineOpcode::JLE => self.compile_jle(instr),
+                    MachineOpcode::JL => self.compile_jl(instr),
+                    MachineOpcode::JMP => self.compile_jmp(instr),
                     MachineOpcode::Ret => self.compile_return(&frame_objects, instr),
                     op => unimplemented!("{:?}", op),
                 }
@@ -738,6 +743,53 @@ impl JITCompiler {
         }
     }
 
+    fn compile_cmp_ri(&mut self, inst: &MachineInstr) {
+        let bits = inst.operand[0]
+            .as_register()
+            .get_reg()
+            .unwrap()
+            .reg_class()
+            .size_in_bits();
+        let r0 = phys_reg_to_dynasm_reg(inst.operand[0].as_register().get_reg().unwrap());
+        let i1 = inst.operand[1].as_constant().as_i32();
+        match bits {
+            32 => dynasm!(self.asm; cmp Rd(r0), i1),
+            64 => dynasm!(self.asm; cmp Rq(r0), i1),
+            _ => unimplemented!(),
+        }
+    }
+
+    fn compile_cmp_rr(&mut self, inst: &MachineInstr) {
+        let bits = inst.operand[0]
+            .as_register()
+            .get_reg()
+            .unwrap()
+            .reg_class()
+            .size_in_bits();
+        let r0 = phys_reg_to_dynasm_reg(inst.operand[0].as_register().get_reg().unwrap());
+        let r1 = phys_reg_to_dynasm_reg(inst.operand[1].as_register().get_reg().unwrap());
+        match bits {
+            32 => dynasm!(self.asm; cmp Rd(r0), Rd(r1)),
+            64 => dynasm!(self.asm; cmp Rq(r0), Rq(r1)),
+            _ => unimplemented!(),
+        }
+    }
+
+    fn compile_je(&mut self, inst: &MachineInstr) {
+        let l = self.get_label(inst.operand[0].as_basic_block());
+        dynasm!(self.asm; je => l);
+    }
+
+    fn compile_jle(&mut self, inst: &MachineInstr) {
+        let l = self.get_label(inst.operand[0].as_basic_block());
+        dynasm!(self.asm; jle => l);
+    }
+
+    fn compile_jl(&mut self, inst: &MachineInstr) {
+        let l = self.get_label(inst.operand[0].as_basic_block());
+        dynasm!(self.asm; jl => l);
+    }
+
     fn compile_movsxd_r64m32(&mut self, fo: &FrameObjectsInfo, instr: &MachineInstr) {
         let r0 = phys_reg_to_dynasm_reg(instr.def[0].get_reg().unwrap());
         let m1 = fo.offset(instr.operand[0].as_frame_index().idx).unwrap();
@@ -869,7 +921,7 @@ impl JITCompiler {
         }
     }
 
-    fn compile_br(&mut self, instr: &MachineInstr) {
+    fn compile_jmp(&mut self, instr: &MachineInstr) {
         match &instr.operand[0] {
             MachineOperand::Branch(bb) => {
                 let label = self.get_label(*bb);
