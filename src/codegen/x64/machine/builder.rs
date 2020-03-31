@@ -29,6 +29,7 @@ pub trait BuilderTrait {
     fn set_insert_point_before_instr(&mut self, instr_id: MachineInstrId) -> Option<()>;
     fn set_insert_point_after_instr(&mut self, instr_id: MachineInstrId) -> Option<()>;
     fn insert<T: MachineInstTrait>(&mut self, inst: T);
+    fn back_insert_point(&mut self);
 }
 
 impl MachineInstTrait for MachineInstrId {
@@ -126,6 +127,10 @@ impl<'a> BuilderTrait for BuilderWithLiveInfoEdit<'a> {
             .iseq_ref_mut()
             .insert(insert_pt, instr_id);
     }
+
+    fn back_insert_point(&mut self) {
+        self.insert_point -= 1;
+    }
 }
 
 impl<'a> Builder<'a> {
@@ -177,5 +182,9 @@ impl<'a> BuilderTrait for Builder<'a> {
         self.function.basic_blocks.arena[self.cur_bb_id.unwrap()]
             .iseq_ref_mut()
             .insert(insert_pt, instr_id);
+    }
+
+    fn back_insert_point(&mut self) {
+        self.insert_point -= 1;
     }
 }

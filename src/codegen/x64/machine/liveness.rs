@@ -524,18 +524,14 @@ impl LivenessAnalysis {
     ) {
         let instr = &cur_func.instr_arena[instr_id];
 
-        for (i, operand) in instr.operand.iter().enumerate() {
+        for operand in &instr.operand {
             if let MachineOperand::Register(reg) = operand {
-                self.propagate(
-                    cur_func,
-                    bb,
-                    if instr.opcode == MachineOpcode::Phi {
-                        Some(instr.operand[i + 1].as_basic_block())
-                    } else {
-                        None
-                    },
-                    reg,
-                )
+                // live_in and live_out should contain no assigned registers
+                if reg.is_phys_reg() {
+                    continue;
+                }
+
+                self.propagate(cur_func, bb, reg)
             }
         }
     }
@@ -544,7 +540,6 @@ impl LivenessAnalysis {
         &self,
         cur_func: &MachineFunction,
         bb: MachineBasicBlockId,
-        pred_bb: Option<MachineBasicBlockId>,
         reg: &MachineRegister,
     ) {
         let bb = &cur_func.basic_blocks.arena[bb];
@@ -562,20 +557,11 @@ impl LivenessAnalysis {
             }
         }
 
-        if let Some(pred_bb) = pred_bb {
-            let pred = &cur_func.basic_blocks.arena[pred_bb];
-            if pred.liveness.borrow_mut().live_out.insert(reg.clone()) {
-                // live_out didn't have the reg
-                self.propagate(cur_func, pred_bb, None, reg);
-            }
-            return;
-        }
-
         for pred_id in &bb.pred {
             let pred = &cur_func.basic_blocks.arena[*pred_id];
             if pred.liveness.borrow_mut().live_out.insert(reg.clone()) {
                 // live_out didn't have the reg
-                self.propagate(cur_func, *pred_id, None, reg);
+                self.propagate(cur_func, *pred_id, reg);
             }
         }
     }

@@ -52,6 +52,7 @@ impl JITExecutor {
 
         let mut machine_module = dag::mc_convert::MIConverter::new().convert_module(dag_module);
 
+        debug!(println!("{:?}", machine_module));
         machine::phi_elimination::PhiElimination::new().run_on_module(&mut machine_module);
         machine::two_addr::TwoAddressConverter::new().run_on_module(&mut machine_module);
         machine::regalloc::RegisterAllocator::new().run_on_module(&mut machine_module);

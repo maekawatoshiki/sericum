@@ -109,10 +109,7 @@ impl RegisterAllocator {
                         .unwrap()
                         .reg
                         .unwrap();
-                    // if phys reg is not assigned
-                    if def.get_reg().is_none() {
-                        def.set_phy_reg(reg);
-                    }
+                    def.set_phy_reg(reg);
                 }
             }
         }
@@ -149,16 +146,19 @@ impl RegisterAllocator {
         let mut regs_to_save = FxHashSet::default();
 
         // TODO: It's expensive to check all the elements in ``instr_arena``
-        for (_, instr) in &cur_func.instr_arena.arena {
-            if instr.def.len() == 0 {
-                continue;
-            }
-
-            if matrix.interferes_with_range(
-                instr.get_vreg(),
-                LiveRange::new(vec![LiveSegment::new(call_instr_pp, call_instr_pp)]),
-            ) {
-                regs_to_save.insert(instr.def[0].clone());
+        // IMPROVED A LITTLE: any better ideas?
+        {
+            let bb_including_call =
+                &cur_func.basic_blocks.arena[cur_func.instr_arena[call_instr_id].parent];
+            let liveness = bb_including_call.liveness_ref();
+            let regs_that_may_interfere = &liveness.def | &liveness.live_in;
+            for r in &regs_that_may_interfere {
+                if matrix.interferes_with_range(
+                    r.get_vreg(),
+                    LiveRange::new(vec![LiveSegment::new(call_instr_pp, call_instr_pp)]),
+                ) {
+                    regs_to_save.insert(r.clone());
+                }
             }
         }
 

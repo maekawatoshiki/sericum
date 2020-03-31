@@ -361,6 +361,10 @@ impl MachineRegister {
     pub fn is_vreg(&self) -> bool {
         self.info_ref().reg.is_none()
     }
+
+    pub fn is_phys_reg(&self) -> bool {
+        self.info_ref().reg.is_some()
+    }
 }
 
 impl RegisterInfo {
@@ -647,7 +651,6 @@ impl fmt::Debug for RegisterInfo {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.reg {
             Some(phy_reg) => phy_reg.fmt(f),
-
             None => self.vreg.fmt(f),
         }
     }
