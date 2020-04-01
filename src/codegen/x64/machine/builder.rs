@@ -29,7 +29,7 @@ pub trait BuilderTrait {
     fn set_insert_point_before_instr(&mut self, instr_id: MachineInstrId) -> Option<()>;
     fn set_insert_point_after_instr(&mut self, instr_id: MachineInstrId) -> Option<()>;
     fn insert<T: MachineInstTrait>(&mut self, inst: T);
-    fn back_insert_point(&mut self);
+    fn back_insert_point_while<F: Fn(&MachineInstr) -> bool>(&mut self, f: F);
 }
 
 impl MachineInstTrait for MachineInstrId {
@@ -128,8 +128,19 @@ impl<'a> BuilderTrait for BuilderWithLiveInfoEdit<'a> {
             .insert(insert_pt, instr_id);
     }
 
-    fn back_insert_point(&mut self) {
-        self.insert_point -= 1;
+    fn back_insert_point_while<F: Fn(&MachineInstr) -> bool>(&mut self, f: F) {
+        loop {
+            if self.insert_point > 0 {
+                self.insert_point -= 1;
+            }
+
+            let inst_id = self.function.basic_blocks.arena[self.cur_bb_id.unwrap()].iseq_ref()
+                [self.insert_point];
+            let inst = &self.function.instr_arena[inst_id];
+            if f(inst) {
+                break;
+            }
+        }
     }
 }
 
@@ -184,7 +195,18 @@ impl<'a> BuilderTrait for Builder<'a> {
             .insert(insert_pt, instr_id);
     }
 
-    fn back_insert_point(&mut self) {
-        self.insert_point -= 1;
+    fn back_insert_point_while<F: Fn(&MachineInstr) -> bool>(&mut self, f: F) {
+        loop {
+            if self.insert_point > 0 {
+                self.insert_point -= 1;
+            }
+
+            let inst_id = self.function.basic_blocks.arena[self.cur_bb_id.unwrap()].iseq_ref()
+                [self.insert_point];
+            let inst = &self.function.instr_arena[inst_id];
+            if f(inst) {
+                break;
+            }
+        }
     }
 }

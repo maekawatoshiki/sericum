@@ -55,11 +55,10 @@ impl MachineFunction {
         }
     }
 
-    pub fn find_instr_pos(&self, instr_id: MachineInstrId) -> Option<(MachineBasicBlockId, usize)> {
-        for (bb_id, bb) in self.basic_blocks.id_and_block() {
-            if let Some(pos) = bb.find_instr_pos(instr_id) {
-                return Some((bb_id, pos));
-            }
+    pub fn find_instr_pos(&self, inst_id: MachineInstrId) -> Option<(MachineBasicBlockId, usize)> {
+        let parent = self.instr_arena[inst_id].parent;
+        if let Some(pos) = self.basic_blocks.arena[parent].find_instr_pos(inst_id) {
+            return Some((parent, pos));
         }
         None
     }

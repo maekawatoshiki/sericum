@@ -678,9 +678,9 @@ impl LivenessAnalysis {
             bb_idx += 1;
         }
 
-        debug!(for (vreg, range) in &vreg2range {
-            println!("{:?}: {:?}", vreg, range)
-        });
+        // debug!(for (vreg, range) in &vreg2range {
+        //     println!("{:?}: {:?}", vreg, range)
+        // });
 
         LiveRegMatrix::new(
             vreg2entity,

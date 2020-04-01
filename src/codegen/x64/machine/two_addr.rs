@@ -15,6 +15,10 @@ impl TwoAddressConverter {
     }
 
     pub fn run_on_function(&mut self, f: &mut MachineFunction) {
+        if f.internal {
+            return;
+        }
+
         let mut tied = vec![];
 
         for (_, bb) in f.basic_blocks.id_and_block() {

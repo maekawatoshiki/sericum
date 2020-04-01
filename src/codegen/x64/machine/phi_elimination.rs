@@ -41,7 +41,7 @@ impl PhiElimination {
 
                 let mut builder = Builder::new(f);
                 builder.set_insert_point_at_end(incoming_bb_id);
-                builder.back_insert_point(); // for br
+                builder.back_insert_point_while(|i| i.opcode.is_terminator());
                 builder.insert(copy);
             }
             f.remove_inst(phi_id);

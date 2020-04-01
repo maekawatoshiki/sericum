@@ -286,16 +286,24 @@ impl MachineInstr {
 }
 
 impl MachineOpcode {
+    pub fn is_copy(&self) -> bool {
+        matches!(
+            self,
+            MachineOpcode::MOVrr32 | MachineOpcode::MOVrr64 | MachineOpcode::Copy
+        )
+    }
+
     pub fn is_terminator(&self) -> bool {
-        match self {
+        matches!(
+            self,
             MachineOpcode::Ret
-            | MachineOpcode::JMP
-            | MachineOpcode::BrCond
-            | MachineOpcode::JE
-            | MachineOpcode::JL
-            | MachineOpcode::JLE => true,
-            _ => false,
-        }
+                | MachineOpcode::RET
+                | MachineOpcode::JMP
+                | MachineOpcode::BrCond
+                | MachineOpcode::JE
+                | MachineOpcode::JL
+                | MachineOpcode::JLE
+        )
     }
 }
 
