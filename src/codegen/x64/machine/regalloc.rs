@@ -66,6 +66,7 @@ impl RegisterAllocator {
             }
 
             let interfering = matrix.collect_interfering_vregs(vreg);
+            // let reg_to_spill = *interfering.last().unwrap();
             let reg_to_spill = matrix
                 // TODO: spill weight is coming soon
                 .pick_assigned_and_longest_lived_vreg(&interfering)

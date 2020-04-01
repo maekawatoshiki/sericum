@@ -92,11 +92,10 @@ impl LiveRegMatrix {
 
     /// Return false if it's legal to allocate reg for vreg
     pub fn interferes(&self, vreg: VirtReg, reg: PhysReg) -> bool {
-        if !self.reg_range.contains_key(&reg.into()) {
-            return false;
-        }
-
-        let r1 = self.get_reg_live_range(reg).unwrap();
+        let r1 = match self.get_reg_live_range(reg) {
+            Some(r1) => r1,
+            None => return false,
+        };
         let r2 = &self.vreg_interval.get(&vreg).unwrap().range;
 
         r1.interferes(r2)
@@ -265,11 +264,17 @@ impl LiveRange {
     }
 
     pub fn add_segment(&mut self, seg: LiveSegment) {
-        self.segments.push(seg)
+        let pt = self
+            .segments
+            .binary_search_by(|s| s.start.cmp(&seg.start))
+            .unwrap_or_else(|x| x);
+        self.segments.insert(pt, seg);
     }
 
     pub fn unite_range(&mut self, mut range: LiveRange) {
-        self.segments.append(&mut range.segments)
+        for seg in range.segments {
+            self.add_segment(seg)
+        }
     }
 
     pub fn remove_segment(&mut self, seg: &LiveSegment) {
@@ -304,7 +309,12 @@ impl LiveRange {
     }
 
     pub fn interferes(&self, other: &LiveRange) -> bool {
-        for seg1 in &self.segments {
+        let s = self
+            .segments
+            .binary_search_by(|s| s.start.cmp(&other.segments[0].end))
+            .unwrap_or_else(|x| x);
+        let s = if s > 0 { s - 1 } else { s };
+        for seg1 in &self.segments[s..] {
             for seg2 in &other.segments {
                 if seg1.interferes(seg2) {
                     return true;
