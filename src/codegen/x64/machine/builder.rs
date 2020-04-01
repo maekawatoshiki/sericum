@@ -1,7 +1,7 @@
 use super::{
     basic_block::*,
     function::*,
-    instr::*,
+    inst::*,
     liveness::{LiveRange, LiveRegMatrix, LiveSegment, ProgramPoint},
 };
 
@@ -19,28 +19,28 @@ pub struct Builder<'a> {
 }
 
 pub trait MachineInstTrait {
-    fn into_id(self, f: &mut MachineFunction) -> MachineInstrId;
+    fn into_id(self, f: &mut MachineFunction) -> MachineInstId;
 }
 
 pub trait BuilderTrait {
     fn set_insert_point_at_entry_bb(&mut self);
     fn set_insert_point_at(&mut self, pt: usize, bb_id: MachineBasicBlockId);
     fn set_insert_point_at_end(&mut self, bb_id: MachineBasicBlockId);
-    fn set_insert_point_before_instr(&mut self, instr_id: MachineInstrId) -> Option<()>;
-    fn set_insert_point_after_instr(&mut self, instr_id: MachineInstrId) -> Option<()>;
+    fn set_insert_point_before_inst(&mut self, inst_id: MachineInstId) -> Option<()>;
+    fn set_insert_point_after_inst(&mut self, inst_id: MachineInstId) -> Option<()>;
     fn insert<T: MachineInstTrait>(&mut self, inst: T);
-    fn back_insert_point_while<F: Fn(&MachineInstr) -> bool>(&mut self, f: F);
+    fn back_insert_point_while<F: Fn(&MachineInst) -> bool>(&mut self, f: F);
 }
 
-impl MachineInstTrait for MachineInstrId {
-    fn into_id(self, _: &mut MachineFunction) -> MachineInstrId {
+impl MachineInstTrait for MachineInstId {
+    fn into_id(self, _: &mut MachineFunction) -> MachineInstId {
         self
     }
 }
 
-impl MachineInstTrait for MachineInstr {
-    fn into_id(self, f: &mut MachineFunction) -> MachineInstrId {
-        f.instr_arena.alloc(self)
+impl MachineInstTrait for MachineInst {
+    fn into_id(self, f: &mut MachineFunction) -> MachineInstId {
+        f.inst_arena.alloc(self)
     }
 }
 
@@ -79,15 +79,15 @@ impl<'a> BuilderTrait for BuilderWithLiveInfoEdit<'a> {
         self.insert_point = self.function.basic_blocks.arena[bb_id].iseq_ref().len();
     }
 
-    fn set_insert_point_before_instr(&mut self, instr_id: MachineInstrId) -> Option<()> {
-        let (bb_id, instr_pos) = self.function.find_instr_pos(instr_id)?;
-        self.set_insert_point_at(instr_pos, bb_id);
+    fn set_insert_point_before_inst(&mut self, inst_id: MachineInstId) -> Option<()> {
+        let (bb_id, inst_pos) = self.function.find_inst_pos(inst_id)?;
+        self.set_insert_point_at(inst_pos, bb_id);
         Some(())
     }
 
-    fn set_insert_point_after_instr(&mut self, instr_id: MachineInstrId) -> Option<()> {
-        let (bb_id, instr_pos) = self.function.find_instr_pos(instr_id)?;
-        self.set_insert_point_at(instr_pos + 1, bb_id);
+    fn set_insert_point_after_inst(&mut self, inst_id: MachineInstId) -> Option<()> {
+        let (bb_id, inst_pos) = self.function.find_inst_pos(inst_id)?;
+        self.set_insert_point_at(inst_pos + 1, bb_id);
         Some(())
     }
 
@@ -97,20 +97,20 @@ impl<'a> BuilderTrait for BuilderWithLiveInfoEdit<'a> {
 
         let pp = self.calc_program_point(insert_pt);
 
-        let instr_id = inst.into_id(&mut self.function);
-        self.matrix.id2pp.insert(instr_id, pp);
+        let inst_id = inst.into_id(&mut self.function);
+        self.matrix.id2pp.insert(inst_id, pp);
 
         {
             // update registers' use&def list. TODO: refine code
-            let instr = &self.function.instr_arena[instr_id];
-            for def in &instr.def {
+            let inst = &self.function.inst_arena[inst_id];
+            for def in &inst.def {
                 self.matrix.add_vreg_entity(def.clone());
                 self.matrix.add_live_interval(
                     def.get_vreg(),
                     LiveRange::new(vec![LiveSegment::new(pp, pp)]),
                 );
             }
-            for use_ in instr.collect_used_regs() {
+            for use_ in inst.collect_used_regs() {
                 let end_point = self
                     .matrix
                     .get_vreg_interval_mut(use_.get_vreg())
@@ -125,10 +125,10 @@ impl<'a> BuilderTrait for BuilderWithLiveInfoEdit<'a> {
 
         self.function.basic_blocks.arena[self.cur_bb_id.unwrap()]
             .iseq_ref_mut()
-            .insert(insert_pt, instr_id);
+            .insert(insert_pt, inst_id);
     }
 
-    fn back_insert_point_while<F: Fn(&MachineInstr) -> bool>(&mut self, f: F) {
+    fn back_insert_point_while<F: Fn(&MachineInst) -> bool>(&mut self, f: F) {
         loop {
             if self.insert_point > 0 {
                 self.insert_point -= 1;
@@ -136,7 +136,7 @@ impl<'a> BuilderTrait for BuilderWithLiveInfoEdit<'a> {
 
             let inst_id = self.function.basic_blocks.arena[self.cur_bb_id.unwrap()].iseq_ref()
                 [self.insert_point];
-            let inst = &self.function.instr_arena[inst_id];
+            let inst = &self.function.inst_arena[inst_id];
             if f(inst) {
                 break;
             }
@@ -174,28 +174,28 @@ impl<'a> BuilderTrait for Builder<'a> {
         self.insert_point = self.function.basic_blocks.arena[bb_id].iseq_ref().len();
     }
 
-    fn set_insert_point_before_instr(&mut self, instr_id: MachineInstrId) -> Option<()> {
-        let (bb_id, instr_pos) = self.function.find_instr_pos(instr_id)?;
-        self.set_insert_point_at(instr_pos, bb_id);
+    fn set_insert_point_before_inst(&mut self, inst_id: MachineInstId) -> Option<()> {
+        let (bb_id, inst_pos) = self.function.find_inst_pos(inst_id)?;
+        self.set_insert_point_at(inst_pos, bb_id);
         Some(())
     }
 
-    fn set_insert_point_after_instr(&mut self, instr_id: MachineInstrId) -> Option<()> {
-        let (bb_id, instr_pos) = self.function.find_instr_pos(instr_id)?;
-        self.set_insert_point_at(instr_pos + 1, bb_id);
+    fn set_insert_point_after_inst(&mut self, inst_id: MachineInstId) -> Option<()> {
+        let (bb_id, inst_pos) = self.function.find_inst_pos(inst_id)?;
+        self.set_insert_point_at(inst_pos + 1, bb_id);
         Some(())
     }
 
     fn insert<T: MachineInstTrait>(&mut self, inst: T) {
         let insert_pt = self.insert_point;
-        let instr_id = inst.into_id(&mut self.function);
+        let inst_id = inst.into_id(&mut self.function);
         self.insert_point += 1;
         self.function.basic_blocks.arena[self.cur_bb_id.unwrap()]
             .iseq_ref_mut()
-            .insert(insert_pt, instr_id);
+            .insert(insert_pt, inst_id);
     }
 
-    fn back_insert_point_while<F: Fn(&MachineInstr) -> bool>(&mut self, f: F) {
+    fn back_insert_point_while<F: Fn(&MachineInst) -> bool>(&mut self, f: F) {
         loop {
             if self.insert_point > 0 {
                 self.insert_point -= 1;
@@ -203,7 +203,7 @@ impl<'a> BuilderTrait for Builder<'a> {
 
             let inst_id = self.function.basic_blocks.arena[self.cur_bb_id.unwrap()].iseq_ref()
                 [self.insert_point];
-            let inst = &self.function.instr_arena[inst_id];
+            let inst = &self.function.inst_arena[inst_id];
             if f(inst) {
                 break;
             }

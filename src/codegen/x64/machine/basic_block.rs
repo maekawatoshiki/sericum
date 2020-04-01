@@ -1,5 +1,5 @@
 // use super::{module::*, opcode::*, value::*};
-use super::instr::*;
+use super::inst::*;
 use id_arena::*;
 use rustc_hash::FxHashSet;
 use std::{
@@ -34,7 +34,7 @@ pub struct MachineBasicBlock {
     pub succ: Vec<MachineBasicBlockId>,
 
     /// Instruction list
-    pub iseq: RefCell<Vec<MachineInstrId>>,
+    pub iseq: RefCell<Vec<MachineInstId>>,
 }
 
 #[derive(Clone, Debug)]
@@ -86,15 +86,15 @@ impl MachineBasicBlock {
         }
     }
 
-    pub fn iseq_ref(&self) -> Ref<Vec<MachineInstrId>> {
+    pub fn iseq_ref(&self) -> Ref<Vec<MachineInstId>> {
         self.iseq.borrow()
     }
 
-    pub fn iseq_ref_mut(&self) -> RefMut<Vec<MachineInstrId>> {
+    pub fn iseq_ref_mut(&self) -> RefMut<Vec<MachineInstId>> {
         self.iseq.borrow_mut()
     }
 
-    pub fn find_instr_pos(&self, id2find: MachineInstrId) -> Option<usize> {
+    pub fn find_inst_pos(&self, id2find: MachineInstId) -> Option<usize> {
         self.iseq_ref()
             .iter()
             .enumerate()

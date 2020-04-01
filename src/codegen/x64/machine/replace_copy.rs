@@ -2,7 +2,7 @@ use super::super::dag::mc_convert::mov_rx;
 use super::{
     function::MachineFunction,
     // basic_block::{MachineBasicBlock, MachineBasicBlockId},
-    instr::MachineOpcode,
+    inst::MachineOpcode,
     module::MachineModule,
 };
 
@@ -22,7 +22,7 @@ impl ReplaceCopyWithProperMInst {
     pub fn run_on_function(&mut self, f: &mut MachineFunction) {
         for (_, bb) in f.basic_blocks.id_and_block() {
             for inst_id in &*bb.iseq_ref() {
-                let inst = &mut f.instr_arena[*inst_id];
+                let inst = &mut f.inst_arena[*inst_id];
 
                 if inst.opcode != MachineOpcode::Copy {
                     continue;

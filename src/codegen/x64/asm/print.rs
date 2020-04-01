@@ -2,7 +2,7 @@ use super::super::frame_object::FrameObjectsInfo;
 use super::super::machine::{
     basic_block::{MachineBasicBlock, MachineBasicBlockId},
     function::MachineFunction,
-    instr::*,
+    inst::*,
     module::MachineModule,
 };
 use crate::ir::types::TypeSize;
@@ -61,12 +61,12 @@ impl MachineAsmPrinter {
         fo: &FrameObjectsInfo,
     ) {
         for inst in &*bb.iseq_ref() {
-            let inst = &f.instr_arena[*inst];
+            let inst = &f.inst_arena[*inst];
             self.run_on_inst(inst, fo);
         }
     }
 
-    fn run_on_inst(&mut self, inst: &MachineInstr, fo: &FrameObjectsInfo) {
+    fn run_on_inst(&mut self, inst: &MachineInst, fo: &FrameObjectsInfo) {
         self.output.push_str("  ");
 
         match inst.opcode {
@@ -108,14 +108,14 @@ impl MachineAsmPrinter {
         self.output.push('\n');
     }
 
-    fn run_on_inst_mov_rx(&mut self, i: &MachineInstr) {
+    fn run_on_inst_mov_rx(&mut self, i: &MachineInst) {
         self.output.push_str("mov ");
         self.output
             .push_str(format!("{}, ", i.def[0].get_reg().unwrap().name()).as_str());
         self.run_on_operand(&i.operand[0]);
     }
 
-    fn run_on_inst_mov_rm(&mut self, i: &MachineInstr, fo: &FrameObjectsInfo) {
+    fn run_on_inst_mov_rm(&mut self, i: &MachineInst, fo: &FrameObjectsInfo) {
         let word = byte2word(i.def[0].get_reg_class().size_in_byte());
         self.output.push_str("mov ");
         self.output
@@ -186,7 +186,7 @@ impl MachineAsmPrinter {
         }
     }
 
-    fn run_on_inst_mov_mx(&mut self, i: &MachineInstr, fo: &FrameObjectsInfo) {
+    fn run_on_inst_mov_mx(&mut self, i: &MachineInst, fo: &FrameObjectsInfo) {
         let word = byte2word(i.operand[4].get_type().unwrap().size_in_byte());
 
         self.output.push_str("mov ");
@@ -272,7 +272,7 @@ impl MachineAsmPrinter {
         self.run_on_operand(&i.operand[4]);
     }
 
-    fn run_on_inst_lea_rm(&mut self, i: &MachineInstr, fo: &FrameObjectsInfo) {
+    fn run_on_inst_lea_rm(&mut self, i: &MachineInst, fo: &FrameObjectsInfo) {
         self.output.push_str("lea ");
         self.output
             .push_str(format!("{}, ", i.def[0].get_reg().unwrap().name()).as_str());
@@ -337,28 +337,28 @@ impl MachineAsmPrinter {
         }
     }
 
-    fn run_on_inst_add(&mut self, i: &MachineInstr) {
+    fn run_on_inst_add(&mut self, i: &MachineInst) {
         self.output.push_str("add ");
         self.run_on_operand(&i.operand[0]);
         self.output.push_str(", ");
         self.run_on_operand(&i.operand[1]);
     }
 
-    fn run_on_inst_sub(&mut self, i: &MachineInstr) {
+    fn run_on_inst_sub(&mut self, i: &MachineInst) {
         self.output.push_str("sub ");
         self.run_on_operand(&i.operand[0]);
         self.output.push_str(", ");
         self.run_on_operand(&i.operand[1]);
     }
 
-    fn run_on_inst_imul_rr(&mut self, i: &MachineInstr) {
+    fn run_on_inst_imul_rr(&mut self, i: &MachineInst) {
         self.output.push_str("imul ");
         self.output
             .push_str(format!("{}, ", i.def[0].get_reg().unwrap().name()).as_str());
         self.run_on_operand(&i.operand[0]);
     }
 
-    fn run_on_inst_imul_rri(&mut self, i: &MachineInstr) {
+    fn run_on_inst_imul_rri(&mut self, i: &MachineInst) {
         self.output.push_str("imul ");
         self.output
             .push_str(format!("{}, ", i.def[0].get_reg().unwrap().name()).as_str());
@@ -371,17 +371,17 @@ impl MachineAsmPrinter {
         self.output.push_str("cdq");
     }
 
-    fn run_on_inst_idiv(&mut self, i: &MachineInstr) {
+    fn run_on_inst_idiv(&mut self, i: &MachineInst) {
         self.output.push_str("idiv ");
         self.run_on_operand(&i.operand[0]);
     }
 
-    fn run_on_inst_push(&mut self, i: &MachineInstr) {
+    fn run_on_inst_push(&mut self, i: &MachineInst) {
         self.output.push_str("push ");
         self.run_on_operand(&i.operand[0]);
     }
 
-    fn run_on_inst_pop(&mut self, i: &MachineInstr) {
+    fn run_on_inst_pop(&mut self, i: &MachineInst) {
         self.output.push_str("pop ");
         self.run_on_operand(&i.operand[0]);
     }
@@ -390,34 +390,34 @@ impl MachineAsmPrinter {
         self.output.push_str("ret");
     }
 
-    fn run_on_inst_call(&mut self, i: &MachineInstr) {
+    fn run_on_inst_call(&mut self, i: &MachineInst) {
         self.output.push_str("call ");
         self.run_on_operand(&i.operand[0]);
     }
 
-    fn run_on_inst_cmp(&mut self, i: &MachineInstr) {
+    fn run_on_inst_cmp(&mut self, i: &MachineInst) {
         self.output.push_str("cmp ");
         self.run_on_operand(&i.operand[0]);
         self.output.push_str(", ");
         self.run_on_operand(&i.operand[1]);
     }
 
-    fn run_on_inst_jmp(&mut self, i: &MachineInstr) {
+    fn run_on_inst_jmp(&mut self, i: &MachineInst) {
         self.output.push_str("jmp ");
         self.run_on_operand(&i.operand[0]);
     }
 
-    fn run_on_inst_je(&mut self, i: &MachineInstr) {
+    fn run_on_inst_je(&mut self, i: &MachineInst) {
         self.output.push_str("je ");
         self.run_on_operand(&i.operand[0]);
     }
 
-    fn run_on_inst_jle(&mut self, i: &MachineInstr) {
+    fn run_on_inst_jle(&mut self, i: &MachineInst) {
         self.output.push_str("jle ");
         self.run_on_operand(&i.operand[0]);
     }
 
-    fn run_on_inst_jl(&mut self, i: &MachineInstr) {
+    fn run_on_inst_jl(&mut self, i: &MachineInst) {
         self.output.push_str("jl ");
         self.run_on_operand(&i.operand[0]);
     }

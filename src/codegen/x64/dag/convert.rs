@@ -11,8 +11,8 @@ use rustc_hash::FxHashMap;
 
 pub struct ConvertToDAG<'a> {
     pub module: &'a Module,
-    pub instr_id_node_id: FxHashMap<InstructionId, Raw<DAGNode>>,
-    pub instr_id_to_copy_node: FxHashMap<InstructionId, Raw<DAGNode>>,
+    pub inst_id_node_id: FxHashMap<InstructionId, Raw<DAGNode>>,
+    pub inst_id_to_copy_node: FxHashMap<InstructionId, Raw<DAGNode>>,
     pub cur_conversion_info: Option<ConversionInfo>,
 }
 
@@ -31,8 +31,8 @@ impl<'a> ConvertToDAG<'a> {
 
         Self {
             module,
-            instr_id_node_id: FxHashMap::default(),
-            instr_id_to_copy_node: FxHashMap::default(),
+            inst_id_node_id: FxHashMap::default(),
+            inst_id_to_copy_node: FxHashMap::default(),
             cur_conversion_info: None,
         }
     }
@@ -47,7 +47,7 @@ impl<'a> ConvertToDAG<'a> {
 
     pub fn construct_dag(&mut self, func_id: FunctionId) -> DAGFunction {
         self.cur_conversion_info = Some(ConversionInfo::new());
-        self.instr_id_node_id.clear();
+        self.inst_id_node_id.clear();
 
         let func = self.module.function_ref(func_id);
 
@@ -71,7 +71,7 @@ impl<'a> ConvertToDAG<'a> {
         self.set_dag_bb_pred_and_succ(func, &mut dag_bb_arena);
 
         for bb_id in &func.basic_blocks {
-            self.instr_id_to_copy_node.clear();
+            self.inst_id_to_copy_node.clear();
 
             let bb = &func.basic_block_arena[*bb_id];
             let id = self.construct_dag_from_basic_block(func, bb);
@@ -91,7 +91,7 @@ impl<'a> ConvertToDAG<'a> {
 
     pub fn get_dag_id_from_value(&mut self, v: &Value, arg_load: bool) -> Raw<DAGNode> {
         match v {
-            Value::Instruction(iv) => self.instr_id_node_id[&iv.id],
+            Value::Instruction(iv) => self.inst_id_node_id[&iv.id],
             Value::Immediate(imm) => {
                 let imm = match imm {
                     ImmediateValue::Int32(i) => ConstantKind::Int32(*i),
@@ -170,11 +170,11 @@ impl<'a> ConvertToDAG<'a> {
             }};
         }
 
-        for instr_val in bb.iseq_ref().iter() {
-            let instr_id = instr_val.get_instr_id().unwrap();
-            let instr = &func.instr_table[instr_id];
+        for inst_val in bb.iseq_ref().iter() {
+            let inst_id = inst_val.get_inst_id().unwrap();
+            let inst = &func.inst_table[inst_id];
 
-            match instr.opcode {
+            match inst.opcode {
                 Opcode::Alloca(ref ty) => {
                     let fi = self.cur_conv_info_mut_with(|c| {
                         let frinfo = c.local_mgr.alloc(ty);
@@ -184,23 +184,23 @@ impl<'a> ConvertToDAG<'a> {
                             ty.clone(),
                         ))
                     });
-                    self.instr_id_node_id.insert(instr_id, fi);
+                    self.inst_id_node_id.insert(inst_id, fi);
                 }
                 Opcode::Load(ref v) => {
                     let v = self.get_dag_id_from_value(v, true);
                     let load_id = self.cur_conv_info_mut().dag_heap.alloc(DAGNode::new(
                         NodeKind::IR(IRNodeKind::Load),
                         vec![v],
-                        instr.ty.clone(),
+                        inst.ty.clone(),
                     ));
 
-                    if bb.liveness.borrow().live_out.contains(&instr_id) {
+                    if bb.liveness.borrow().live_out.contains(&inst_id) {
                         let copy_from_reg = self.make_chain_with_copying(load_id);
-                        self.instr_id_to_copy_node.insert(instr_id, copy_from_reg);
-                        self.instr_id_node_id.insert(instr_id, load_id);
+                        self.inst_id_to_copy_node.insert(inst_id, copy_from_reg);
+                        self.inst_id_node_id.insert(inst_id, load_id);
                     } else {
                         // make_chain!(load_id);
-                        self.instr_id_node_id.insert(instr_id, load_id);
+                        self.inst_id_node_id.insert(inst_id, load_id);
                     }
                 }
                 Opcode::Store(ref src, ref dst) => {
@@ -214,11 +214,11 @@ impl<'a> ConvertToDAG<'a> {
                     make_chain!(id);
                 }
                 Opcode::GetElementPtr(ref ptr, ref indices) => {
-                    let gep = self.construct_dag_for_gep(instr, ptr, indices);
-                    if bb.liveness.borrow().live_out.contains(&instr_id) {
+                    let gep = self.construct_dag_for_gep(inst, ptr, indices);
+                    if bb.liveness.borrow().live_out.contains(&inst_id) {
                         make_chain!(gep);
                     }
-                    self.instr_id_node_id.insert(instr_id, gep);
+                    self.inst_id_node_id.insert(inst_id, gep);
                 }
                 Opcode::Call(ref f, ref args) => {
                     let mut operands: Vec<Raw<DAGNode>> = args
@@ -229,17 +229,17 @@ impl<'a> ConvertToDAG<'a> {
                     let id = self.cur_conv_info_mut().dag_heap.alloc(DAGNode::new(
                         NodeKind::IR(IRNodeKind::Call),
                         operands,
-                        instr.ty.clone(),
+                        inst.ty.clone(),
                     ));
-                    if bb.liveness.borrow().live_out.contains(&instr_id) {
+                    if bb.liveness.borrow().live_out.contains(&inst_id) {
                         let copy_from_reg = self.make_chain_with_copying(id);
-                        self.instr_id_to_copy_node.insert(instr_id, copy_from_reg);
-                        self.instr_id_node_id.insert(instr_id, id);
+                        self.inst_id_to_copy_node.insert(inst_id, copy_from_reg);
+                        self.inst_id_node_id.insert(inst_id, id);
                     } else {
-                        if instr.ty == Type::Void {
+                        if inst.ty == Type::Void {
                             make_chain!(id);
                         }
-                        self.instr_id_node_id.insert(instr_id, id);
+                        self.inst_id_node_id.insert(inst_id, id);
                     }
                 }
                 Opcode::Add(ref v1, ref v2)
@@ -249,7 +249,7 @@ impl<'a> ConvertToDAG<'a> {
                     let v1 = self.get_dag_id_from_value(v1, true);
                     let v2 = self.get_dag_id_from_value(v2, true);
                     let bin_id = self.cur_conv_info_mut().dag_heap.alloc(DAGNode::new(
-                        match instr.opcode {
+                        match inst.opcode {
                             Opcode::Add(_, _) => NodeKind::IR(IRNodeKind::Add),
                             Opcode::Sub(_, _) => NodeKind::IR(IRNodeKind::Sub),
                             Opcode::Mul(_, _) => NodeKind::IR(IRNodeKind::Mul),
@@ -257,15 +257,15 @@ impl<'a> ConvertToDAG<'a> {
                             _ => unreachable!(),
                         },
                         vec![v1, v2],
-                        instr.ty.clone(),
+                        inst.ty.clone(),
                     ));
 
-                    if bb.liveness.borrow().live_out.contains(&instr_id) {
+                    if bb.liveness.borrow().live_out.contains(&inst_id) {
                         let copy_from_reg = self.make_chain_with_copying(bin_id);
-                        self.instr_id_to_copy_node.insert(instr_id, copy_from_reg);
-                        self.instr_id_node_id.insert(instr_id, bin_id);
+                        self.inst_id_to_copy_node.insert(inst_id, copy_from_reg);
+                        self.inst_id_node_id.insert(inst_id, bin_id);
                     } else {
-                        self.instr_id_node_id.insert(instr_id, bin_id);
+                        self.inst_id_node_id.insert(inst_id, bin_id);
                     }
                 }
                 Opcode::Br(bb) => make_chain!(self.cur_conv_info_mut_with(|c| {
@@ -319,14 +319,14 @@ impl<'a> ConvertToDAG<'a> {
                     let id = self.cur_conv_info_mut().dag_heap.alloc(DAGNode::new(
                         NodeKind::IR(IRNodeKind::Setcc),
                         vec![cond, v1, v2],
-                        instr.ty.clone(),
+                        inst.ty.clone(),
                     ));
-                    if bb.liveness.borrow().live_out.contains(&instr_id) {
+                    if bb.liveness.borrow().live_out.contains(&inst_id) {
                         let copy_from_reg = self.make_chain_with_copying(id);
-                        self.instr_id_to_copy_node.insert(instr_id, copy_from_reg);
-                        self.instr_id_node_id.insert(instr_id, id);
+                        self.inst_id_to_copy_node.insert(inst_id, copy_from_reg);
+                        self.inst_id_node_id.insert(inst_id, id);
                     } else {
-                        self.instr_id_node_id.insert(instr_id, id);
+                        self.inst_id_node_id.insert(inst_id, id);
                     }
                 }
                 Opcode::Phi(ref pairs) => {
@@ -350,14 +350,14 @@ impl<'a> ConvertToDAG<'a> {
                     let id = self.cur_conv_info_mut().dag_heap.alloc(DAGNode::new(
                         NodeKind::IR(IRNodeKind::Phi),
                         operands,
-                        instr.ty.clone(),
+                        inst.ty.clone(),
                     ));
-                    if bb.liveness.borrow().live_out.contains(&instr_id) {
+                    if bb.liveness.borrow().live_out.contains(&inst_id) {
                         let copy_from_reg = self.make_chain_with_copying(id);
-                        self.instr_id_to_copy_node.insert(instr_id, copy_from_reg);
-                        self.instr_id_node_id.insert(instr_id, id);
+                        self.inst_id_to_copy_node.insert(inst_id, copy_from_reg);
+                        self.inst_id_node_id.insert(inst_id, id);
                     } else {
-                        self.instr_id_node_id.insert(instr_id, id);
+                        self.inst_id_node_id.insert(inst_id, id);
                     }
                 }
                 Opcode::Ret(ref v) => {
@@ -371,14 +371,13 @@ impl<'a> ConvertToDAG<'a> {
             }
         }
 
-        for instr_liveout in &bb.liveness.borrow().live_out {
-            if !self.instr_id_to_copy_node.contains_key(instr_liveout) {
+        for inst_liveout in &bb.liveness.borrow().live_out {
+            if !self.inst_id_to_copy_node.contains_key(inst_liveout) {
                 continue;
             }
 
-            let copy_to_live_out = *self.instr_id_to_copy_node.get(instr_liveout).unwrap();
-            self.instr_id_node_id
-                .insert(*instr_liveout, copy_to_live_out);
+            let copy_to_live_out = *self.inst_id_to_copy_node.get(inst_liveout).unwrap();
+            self.inst_id_node_id.insert(*inst_liveout, copy_to_live_out);
         }
 
         entry_node
@@ -386,7 +385,7 @@ impl<'a> ConvertToDAG<'a> {
 
     fn construct_dag_for_gep(
         &mut self,
-        _instr: &Instruction,
+        _inst: &Instruction,
         ptr: &Value,
         indices: &[Value],
     ) -> Raw<DAGNode> {

@@ -60,32 +60,32 @@ impl<'a> Interpreter<'a> {
 
         let ret = 'main: loop {
             for val in &*bb.iseq.borrow() {
-                let instr_id = val.get_instr_id().unwrap();
-                let instr = &f.instr_table[instr_id];
-                match &instr.opcode {
+                let inst_id = val.get_inst_id().unwrap();
+                let inst = &f.inst_table[inst_id];
+                match &inst.opcode {
                     Opcode::Add(v1, v2) => {
                         let val =
                             get_value(&v1, &args, &mut mem).add(get_value(&v2, &args, &mut mem));
-                        mem.insert(instr_id, val);
+                        mem.insert(inst_id, val);
                     }
                     Opcode::Sub(v1, v2) => {
                         let val =
                             get_value(&v1, &args, &mut mem).sub(get_value(&v2, &args, &mut mem));
-                        mem.insert(instr_id, val);
+                        mem.insert(inst_id, val);
                     }
                     Opcode::Mul(v1, v2) => {
                         let val =
                             get_value(&v1, &args, &mut mem).mul(get_value(&v2, &args, &mut mem));
-                        mem.insert(instr_id, val);
+                        mem.insert(inst_id, val);
                     }
                     Opcode::Rem(v1, v2) => {
                         let val =
                             get_value(&v1, &args, &mut mem).rem(get_value(&v2, &args, &mut mem));
-                        mem.insert(instr_id, val);
+                        mem.insert(inst_id, val);
                     }
                     Opcode::Alloca(ty) => {
                         mem.insert(
-                            instr_id,
+                            inst_id,
                             ConcreteValue::Mem(
                                 match ty {
                                     Type::Int1 => Box::into_raw(Box::new(0u8)) as *mut u8,
@@ -126,7 +126,7 @@ impl<'a> Interpreter<'a> {
                                 ICmpKind::Lt => get_value(&v1, &args, &mut mem)
                                     .lt(get_value(&v2, &args, &mut mem)),
                             };
-                        mem.insert(instr_id, val);
+                        mem.insert(inst_id, val);
                     }
                     Opcode::Br(id) => {
                         last_bb_id = cur_bb_id;
@@ -149,7 +149,7 @@ impl<'a> Interpreter<'a> {
                             &args,
                             &mut mem,
                         );
-                        mem.insert(instr_id, val);
+                        mem.insert(inst_id, val);
                     }
                     Opcode::Call(f, f_args) => match f {
                         Value::Function(FunctionValue { func_id, .. }) => {
@@ -161,7 +161,7 @@ impl<'a> Interpreter<'a> {
                                     .collect(),
                             );
                             if val != ConcreteValue::Void {
-                                mem.insert(instr_id, val);
+                                mem.insert(inst_id, val);
                             }
                         }
                         _ => unimplemented!(),
@@ -182,7 +182,7 @@ impl<'a> Interpreter<'a> {
                             Type::Int32 => ConcreteValue::Int32(unsafe { *(ptr as *mut i32) }),
                             _ => unimplemented!(),
                         };
-                        mem.insert(instr_id, val);
+                        mem.insert(inst_id, val);
                     }
                     Opcode::Store(src, dst) => {
                         let dst_ptr = match get_value(&dst, &args, &mut mem) {
@@ -222,7 +222,7 @@ impl<'a> Interpreter<'a> {
                             }
                             _ => unreachable!(),
                         };
-                        mem.insert(instr_id, ConcreteValue::Mem(ptr, instr.ty.clone()));
+                        mem.insert(inst_id, ConcreteValue::Mem(ptr, inst.ty.clone()));
                     }
                     Opcode::Ret(v) => break 'main get_value(&v, &args, &mut mem),
                 }

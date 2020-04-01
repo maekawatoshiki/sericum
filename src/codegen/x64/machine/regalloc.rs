@@ -3,7 +3,7 @@ use super::super::{
     frame_object::*,
     register::*,
 };
-use super::{builder::*, function::*, instr::*, liveness::*, module::*, spiller::Spiller};
+use super::{builder::*, function::*, inst::*, liveness::*, module::*, spiller::Spiller};
 use rustc_hash::FxHashSet;
 use std::collections::VecDeque;
 
@@ -87,20 +87,14 @@ impl RegisterAllocator {
             ));
         }
 
-        // debug!(for (_, x) in &matrix.vreg_interval {
-        //     println!("{:?}", x)
-        // });
-
-        debug!(println!("{:?}", cur_func));
-
         self.rewrite_vregs(cur_func, &matrix);
     }
 
     fn rewrite_vregs(&mut self, cur_func: &mut MachineFunction, matrix: &LiveRegMatrix) {
         for (_, bb) in cur_func.basic_blocks.id_and_block() {
-            for instr_id in &*bb.iseq_ref() {
-                let instr = &cur_func.instr_arena[*instr_id];
-                for def in &instr.def {
+            for inst_id in &*bb.iseq_ref() {
+                let inst = &cur_func.inst_arena[*inst_id];
+                for def in &inst.def {
                     if def.get_reg().is_some() {
                         continue;
                     }
@@ -116,12 +110,12 @@ impl RegisterAllocator {
         }
     }
 
-    fn insert_instr_to_save_reg(
+    fn insert_inst_to_save_reg(
         &mut self,
         cur_func: &mut MachineFunction,
         matrix: &mut LiveRegMatrix,
         occupied: &mut FxHashSet<FrameIndexKind>,
-        call_instr_id: MachineInstrId,
+        call_inst_id: MachineInstId,
     ) {
         // TODO: Refine code. It's hard to understand.
         fn find_unused_slot(
@@ -143,36 +137,36 @@ impl RegisterAllocator {
             slot
         }
 
-        let call_instr_pp = matrix.get_program_point(call_instr_id).unwrap();
+        let call_inst_pp = matrix.get_program_point(call_inst_id).unwrap();
         let mut regs_to_save = FxHashSet::default();
 
-        // TODO: It's expensive to check all the elements in ``instr_arena``
+        // TODO: It's expensive to check all the elements in ``inst_arena``
         // IMPROVED A LITTLE: any better ideas?
         {
             let bb_including_call =
-                &cur_func.basic_blocks.arena[cur_func.instr_arena[call_instr_id].parent];
+                &cur_func.basic_blocks.arena[cur_func.inst_arena[call_inst_id].parent];
             let liveness = bb_including_call.liveness_ref();
             let regs_that_may_interfere = &liveness.def | &liveness.live_in;
             for r in &regs_that_may_interfere {
                 if matrix.interferes_with_range(
                     r.get_vreg(),
-                    LiveRange::new(vec![LiveSegment::new(call_instr_pp, call_instr_pp)]),
+                    LiveRange::new(vec![LiveSegment::new(call_inst_pp, call_inst_pp)]),
                 ) {
                     regs_to_save.insert(r.clone());
                 }
             }
         }
 
-        debug!(println!("REG TO SAVE: {:?}", regs_to_save));
+        // debug!(println!("REG TO SAVE: {:?}", regs_to_save));
 
         let mut slots_to_save_regs = vec![];
         for r in &regs_to_save {
             slots_to_save_regs.push(find_unused_slot(cur_func, occupied, r));
         }
 
-        debug!(println!("NEW SLOTS: {:?}", slots_to_save_regs));
+        // debug!(println!("NEW SLOTS: {:?}", slots_to_save_regs));
 
-        let call_instr_parent = cur_func.instr_arena[call_instr_id].parent;
+        let call_inst_parent = cur_func.inst_arena[call_inst_id].parent;
 
         for (frinfo, reg) in slots_to_save_regs.into_iter().zip(regs_to_save.iter()) {
             let dst = MachineOperand::FrameIndex(frinfo.clone());
@@ -180,38 +174,38 @@ impl RegisterAllocator {
             let rbp = MachineOperand::Register(
                 RegisterInfo::new_phy_reg(GR64::RBP).into_machine_register(),
             );
-            let store_instr_id = cur_func.instr_arena.alloc(MachineInstr::new(
+            let store_inst_id = cur_func.inst_arena.alloc(MachineInst::new(
                 &cur_func.vreg_gen,
                 mov_mx(&src).unwrap(),
                 vec![rbp, dst, MachineOperand::None, MachineOperand::None, src],
                 None,
-                call_instr_parent,
+                call_inst_parent,
             ));
-            cur_func.instr_arena[store_instr_id].add_use(store_instr_id);
-            cur_func.instr_arena[store_instr_id].add_def(store_instr_id);
+            cur_func.inst_arena[store_inst_id].add_use(store_inst_id);
+            cur_func.inst_arena[store_inst_id].add_def(store_inst_id);
 
             let src = MachineOperand::FrameIndex(frinfo);
             let rbp = MachineOperand::Register(
                 RegisterInfo::new_phy_reg(GR64::RBP).into_machine_register(),
             );
 
-            let load_instr_id = cur_func.instr_arena.alloc(
-                MachineInstr::new_simple(
+            let load_inst_id = cur_func.inst_arena.alloc(
+                MachineInst::new_simple(
                     mov_rx(&src).unwrap(),
                     vec![rbp, src, MachineOperand::None, MachineOperand::None],
-                    call_instr_parent,
+                    call_inst_parent,
                 )
                 .with_def(vec![reg.clone()]),
             );
-            cur_func.instr_arena[load_instr_id].add_def(load_instr_id); // TODO: is this needed?
+            cur_func.inst_arena[load_inst_id].add_def(load_inst_id); // TODO: is this needed?
 
             let mut builder = BuilderWithLiveInfoEdit::new(matrix, cur_func);
 
-            builder.set_insert_point_before_instr(call_instr_id);
-            builder.insert(store_instr_id);
+            builder.set_insert_point_before_inst(call_inst_id);
+            builder.insert(store_inst_id);
 
-            builder.set_insert_point_after_instr(call_instr_id);
-            builder.insert(load_instr_id);
+            builder.set_insert_point_after_inst(call_inst_id);
+            builder.insert(load_inst_id);
         }
     }
 
@@ -220,13 +214,13 @@ impl RegisterAllocator {
         cur_func: &mut MachineFunction,
         matrix: &mut LiveRegMatrix,
     ) {
-        let mut call_instr_id = vec![];
+        let mut call_inst_id = vec![];
 
         for (_, bb) in cur_func.basic_blocks.id_and_block() {
-            for instr_id in bb.iseq_ref().iter() {
-                let instr = &cur_func.instr_arena[*instr_id];
-                if instr.opcode == MachineOpcode::Call {
-                    call_instr_id.push(*instr_id)
+            for inst_id in bb.iseq_ref().iter() {
+                let inst = &cur_func.inst_arena[*inst_id];
+                if inst.opcode == MachineOpcode::Call {
+                    call_inst_id.push(*inst_id)
                 }
             }
         }
@@ -238,8 +232,8 @@ impl RegisterAllocator {
             .map(|l| l.idx)
             .collect::<FxHashSet<_>>();
 
-        for instr_id in call_instr_id {
-            self.insert_instr_to_save_reg(cur_func, matrix, &mut occupied.clone(), instr_id);
+        for inst_id in call_inst_id {
+            self.insert_inst_to_save_reg(cur_func, matrix, &mut occupied.clone(), inst_id);
         }
     }
 }

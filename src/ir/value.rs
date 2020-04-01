@@ -84,7 +84,7 @@ impl Value {
                 // parent,
             }) => {
                 let f = parent.function_ref(*func_id);
-                &f.instr_table[*id].ty
+                &f.inst_table[*id].ty
             }
             Value::Function(FunctionValue { func_id }) => &parent.function_ref(*func_id).ty,
             Value::Immediate(ref im) => im.get_type(),
@@ -92,7 +92,7 @@ impl Value {
         }
     }
 
-    pub fn get_instr_id(&self) -> Option<InstructionId> {
+    pub fn get_inst_id(&self) -> Option<InstructionId> {
         match self {
             Value::Instruction(InstructionValue { id, .. }) => Some(*id),
             _ => None,
@@ -108,7 +108,7 @@ impl Value {
 
     // Utils
 
-    pub fn to_string(&self, parent: &Module, instr: bool) -> String {
+    pub fn to_string(&self, parent: &Module, inst: bool) -> String {
         match self {
             Value::Argument(ArgumentValue {
                 index,
@@ -127,20 +127,20 @@ impl Value {
                 func_id,
                 id,
                 // parent,
-            }) if instr => {
+            }) if inst => {
                 let f = parent.function_ref(*func_id);
-                let instr = &f.instr_table[*id];
-                if instr.ty == Type::Void {
-                    format!("    {}", instr.to_string(parent))
+                let inst = &f.inst_table[*id];
+                if inst.ty == Type::Void {
+                    format!("    {}", inst.to_string(parent))
                 } else {
-                    format!("    %{} = {}", id.index(), instr.to_string(parent))
+                    format!("    %{} = {}", id.index(), inst.to_string(parent))
                 }
             }
             Value::Instruction(InstructionValue { func_id, id }) => {
                 let f = parent.function_ref(*func_id);
-                format!("{} %{}", f.instr_table[*id].ty.to_string(), id.index())
+                format!("{} %{}", f.inst_table[*id].ty.to_string(), id.index())
             }
-            Value::Function(FunctionValue { func_id }) if instr => {
+            Value::Function(FunctionValue { func_id }) if inst => {
                 let f = parent.function_ref(*func_id);
                 f.dump(parent)
             }

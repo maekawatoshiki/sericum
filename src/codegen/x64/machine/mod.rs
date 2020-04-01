@@ -2,7 +2,7 @@ pub mod basic_block;
 pub mod builder;
 pub mod const_data;
 pub mod function;
-pub mod instr;
+pub mod inst;
 pub mod liveness;
 pub mod module;
 pub mod phi_elimination;

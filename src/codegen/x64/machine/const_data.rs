@@ -1,4 +1,4 @@
-use super::instr::MachineConstant;
+use super::inst::MachineConstant;
 use std::fmt;
 use std::ops::{Index, IndexMut};
 use std::sync::atomic::{self, AtomicUsize};

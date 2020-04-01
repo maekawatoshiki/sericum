@@ -1,4 +1,4 @@
-use super::{builder::*, function::*, instr::*, module::*};
+use super::{builder::*, function::*, inst::*, module::*};
 use std::mem;
 
 pub struct TwoAddressConverter {}
@@ -22,22 +22,22 @@ impl TwoAddressConverter {
         let mut tied = vec![];
 
         for (_, bb) in f.basic_blocks.id_and_block() {
-            for instr_id in &*bb.iseq_ref() {
-                let instr = &mut f.instr_arena[*instr_id];
+            for inst_id in &*bb.iseq_ref() {
+                let inst = &mut f.inst_arena[*inst_id];
 
                 // No tied values then skip
-                if instr.tie.len() == 0 {
+                if inst.tie.len() == 0 {
                     continue;
                 }
 
-                for (def, use_) in &mut instr.tie {
-                    tied.push((*instr_id, def.clone(), use_.clone()));
+                for (def, use_) in &mut inst.tie {
+                    tied.push((*inst_id, def.clone(), use_.clone()));
 
                     // Tied registers are assigned to one register (def register).
                     // e.g.
                     //   before: v1 = add v2, 1 (tied: v1 and v2)
                     //   after:  v1 = add v1, 1
-                    *instr
+                    *inst
                         .operand
                         .iter_mut()
                         .find(|op| op.as_register() == use_)
@@ -46,32 +46,32 @@ impl TwoAddressConverter {
 
                 // Delete the map of all the tied registers because they are assigned to one
                 // register so that no registers tied.
-                instr.tie.clear();
+                inst.tie.clear();
             }
         }
 
-        for (instr_id, def, use_) in tied {
-            let instr_bb = f.instr_arena[instr_id].parent;
+        for (inst_id, def, use_) in tied {
+            let inst_bb = f.inst_arena[inst_id].parent;
 
             // before: v1 = add v1, 1
             // after:  v1 = copy v2
             //         v1 = add v1, 1
 
-            let old_instr = mem::replace(
-                &mut f.instr_arena[instr_id],
-                MachineInstr::new_simple(
+            let old_inst = mem::replace(
+                &mut f.inst_arena[inst_id],
+                MachineInst::new_simple(
                     MachineOpcode::Copy,
                     vec![MachineOperand::Register(use_)],
-                    instr_bb,
+                    inst_bb,
                 )
                 .with_def(vec![def]),
             );
 
-            let instr = f.instr_arena.alloc(old_instr);
+            let inst = f.inst_arena.alloc(old_inst);
 
             let mut builder = Builder::new(f);
-            builder.set_insert_point_after_instr(instr_id).unwrap();
-            builder.insert(instr);
+            builder.set_insert_point_after_inst(inst_id).unwrap();
+            builder.insert(inst);
         }
     }
 }

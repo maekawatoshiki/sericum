@@ -19,6 +19,7 @@ macro_rules! debug {
     ($($arg:tt)*) => {
         #[cfg(debug_assertions)]
         {
+            println!("Debug at {}", file!());
             $($arg)*;
         }
     };

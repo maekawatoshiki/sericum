@@ -31,7 +31,7 @@ pub struct Function {
     pub basic_blocks: Vec<BasicBlockId>,
 
     /// Instruction arena
-    pub instr_table: Arena<Instruction>,
+    pub inst_table: Arena<Instruction>,
 
     pub id: Option<FunctionId>,
 }
@@ -43,7 +43,7 @@ impl Function {
             ty: Type::func_ty(ret_ty, params_ty),
             basic_block_arena: Arena::new(),
             basic_blocks: vec![],
-            instr_table: Arena::new(),
+            inst_table: Arena::new(),
             id: None,
             // TODO
             // internal: match name {
@@ -89,8 +89,8 @@ impl Function {
         Some(&params_ty[idx])
     }
 
-    pub fn instr_id(&mut self, instr: Instruction) -> InstructionId {
-        self.instr_table.alloc(instr)
+    pub fn inst_id(&mut self, inst: Instruction) -> InstructionId {
+        self.inst_table.alloc(inst)
     }
 }
 

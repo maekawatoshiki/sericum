@@ -6,7 +6,7 @@ use super::super::{
 use super::{
     builder::{BuilderTrait, BuilderWithLiveInfoEdit},
     function::MachineFunction,
-    instr::{MachineInstr, MachineOperand, MachineRegister, RegisterInfo},
+    inst::{MachineInst, MachineOperand, MachineRegister, RegisterInfo},
     liveness::LiveRegMatrix,
 };
 
@@ -36,19 +36,19 @@ impl<'a> Spiller<'a> {
             })
             .unwrap();
 
-        let bb = self.func.instr_arena[def_id].parent;
+        let bb = self.func.inst_arena[def_id].parent;
         let dst = MachineOperand::FrameIndex(slot.clone());
         let src = MachineOperand::Register(r.clone());
         let rbp =
             MachineOperand::Register(RegisterInfo::new_phy_reg(GR64::RBP).into_machine_register());
-        let store = MachineInstr::new_simple(
+        let store = MachineInst::new_simple(
             mov_mx(&src).unwrap(),
             vec![rbp, dst, MachineOperand::None, MachineOperand::None, src],
             bb,
         );
 
         let mut builder = BuilderWithLiveInfoEdit::new(self.matrix, self.func);
-        builder.set_insert_point_after_instr(def_id).unwrap();
+        builder.set_insert_point_after_inst(def_id).unwrap();
         builder.insert(store);
     }
 
@@ -62,23 +62,23 @@ impl<'a> Spiller<'a> {
             new_regs.push(new_r.get_vreg());
             self.matrix.add_vreg_entity(new_r.clone());
 
-            let use_instr = &mut self.func.instr_arena[use_id];
-            use_instr.replace_operand_reg(&r, &new_r);
+            let use_inst = &mut self.func.inst_arena[use_id];
+            use_inst.replace_operand_reg(&r, &new_r);
             new_r.add_use(use_id);
 
             let src = MachineOperand::FrameIndex(slot.clone());
             let rbp = MachineOperand::Register(
                 RegisterInfo::new_phy_reg(GR64::RBP).into_machine_register(),
             );
-            let load = MachineInstr::new_simple(
+            let load = MachineInst::new_simple(
                 mov_rx(&src).unwrap(),
                 vec![rbp, src, MachineOperand::None, MachineOperand::None],
-                use_instr.parent,
+                use_inst.parent,
             )
             .with_def(vec![new_r.clone()]);
 
             let mut builder = BuilderWithLiveInfoEdit::new(self.matrix, self.func);
-            builder.set_insert_point_before_instr(use_id);
+            builder.set_insert_point_before_inst(use_id);
             builder.insert(load);
         }
 

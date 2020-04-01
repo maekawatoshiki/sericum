@@ -1,4 +1,4 @@
-use super::machine::instr::*;
+use super::machine::inst::*;
 use crate::ir::types::*;
 use std::fmt;
 use std::{cell::RefCell, rc::Rc};

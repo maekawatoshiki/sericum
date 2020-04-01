@@ -14,10 +14,10 @@ use std::{
 
 pub type MachineOpcode = TargetOpcode;
 pub type RegisterInfoRef = Rc<RefCell<RegisterInfo>>;
-pub type MachineInstrId = Id<MachineInstr>;
+pub type MachineInstId = Id<MachineInst>;
 
 #[derive(Clone)]
-pub struct MachineInstr {
+pub struct MachineInst {
     pub opcode: MachineOpcode,
     pub operand: Vec<MachineOperand>,
     pub def: Vec<MachineRegister>,
@@ -33,8 +33,8 @@ pub struct RegisterInfo {
     pub reg: Option<PhysReg>,
     pub reg_class: RegisterClassKind,
     pub tied: Option<RegisterInfoRef>,
-    pub use_list: FxHashSet<MachineInstrId>,
-    pub def_list: FxHashSet<MachineInstrId>,
+    pub use_list: FxHashSet<MachineInstId>,
+    pub def_list: FxHashSet<MachineInstId>,
 }
 
 #[derive(Clone)]
@@ -86,7 +86,7 @@ impl ::std::hash::Hash for MachineRegister {
     }
 }
 
-impl MachineInstr {
+impl MachineInst {
     pub fn new(
         vreg_gen: &VirtRegGen,
         opcode: MachineOpcode,
@@ -185,7 +185,7 @@ impl MachineInstr {
         self
     }
 
-    pub fn add_use(&self, id: MachineInstrId) {
+    pub fn add_use(&self, id: MachineInstId) {
         for operand in &self.operand {
             let reg = match operand {
                 MachineOperand::Register(reg) => reg,
@@ -199,7 +199,7 @@ impl MachineInstr {
         }
     }
 
-    pub fn add_def(&self, id: MachineInstrId) {
+    pub fn add_def(&self, id: MachineInstId) {
         for reg in &self.def {
             reg.info_ref_mut().def_list.insert(id);
         }
@@ -312,11 +312,11 @@ impl MachineRegister {
         Self { info }
     }
 
-    pub fn add_use(&self, use_id: MachineInstrId) {
+    pub fn add_use(&self, use_id: MachineInstId) {
         self.info_ref_mut().use_list.insert(use_id);
     }
 
-    pub fn add_def(&self, def_id: MachineInstrId) {
+    pub fn add_def(&self, def_id: MachineInstId) {
         self.info_ref_mut().def_list.insert(def_id);
     }
 
@@ -583,7 +583,7 @@ impl fmt::Debug for MachineConstant {
     }
 }
 
-impl fmt::Debug for MachineInstr {
+impl fmt::Debug for MachineInst {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for (i, def) in self.def.iter().enumerate() {
             def.fmt(f)?;

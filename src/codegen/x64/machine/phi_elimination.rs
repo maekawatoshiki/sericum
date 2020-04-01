@@ -1,4 +1,4 @@
-use super::{builder::*, function::*, instr::*, module::*};
+use super::{builder::*, function::*, inst::*, module::*};
 
 pub struct PhiElimination {}
 
@@ -20,8 +20,8 @@ impl PhiElimination {
             .map(|(_, bb)| {
                 bb.iseq_ref()
                     .iter()
-                    .filter(|&&id| f.instr_arena[id].opcode == MachineOpcode::Phi)
-                    .map(|&id| (id, f.instr_arena[id].clone()))
+                    .filter(|&&id| f.inst_arena[id].opcode == MachineOpcode::Phi)
+                    .map(|&id| (id, f.inst_arena[id].clone()))
                     .collect::<Vec<_>>()
             })
             .flatten()
@@ -32,12 +32,9 @@ impl PhiElimination {
                 let val = &phi.operand[i + 0];
                 let incoming_bb_id = phi.operand[i + 1].as_basic_block();
 
-                let copy = MachineInstr::new_simple(
-                    MachineOpcode::Copy,
-                    vec![val.clone()],
-                    incoming_bb_id,
-                )
-                .with_def(phi.def.clone());
+                let copy =
+                    MachineInst::new_simple(MachineOpcode::Copy, vec![val.clone()], incoming_bb_id)
+                        .with_def(phi.def.clone());
 
                 let mut builder = Builder::new(f);
                 builder.set_insert_point_at_end(incoming_bb_id);

@@ -52,8 +52,8 @@ impl BasicBlock {
 
 impl DumpToString for BasicBlock {
     fn dump(&self, module: &Module) -> String {
-        self.iseq_ref().iter().fold("".to_string(), |s, instr| {
-            format!("{}{}\n", s, instr.to_string(module, true))
+        self.iseq_ref().iter().fold("".to_string(), |s, inst| {
+            format!("{}{}\n", s, inst.to_string(module, true))
         })
     }
 }
