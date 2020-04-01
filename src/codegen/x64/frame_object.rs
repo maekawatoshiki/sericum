@@ -4,7 +4,7 @@ use rustc_hash::FxHashMap;
 use std::fmt;
 
 #[derive(Debug, Clone)]
-pub struct LocalVariableManager {
+pub struct LocalVariables {
     pub locals: Vec<FrameIndexInfo>,
     pub cur_idx: usize,
 }
@@ -15,7 +15,7 @@ pub struct FrameObjectsInfo {
     total_size: usize,
 }
 
-impl LocalVariableManager {
+impl LocalVariables {
     pub fn new() -> Self {
         Self {
             locals: vec![],

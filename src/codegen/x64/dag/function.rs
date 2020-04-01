@@ -25,7 +25,7 @@ pub struct DAGFunction {
 
     // /// True if internal function
     // pub internal: bool,
-    pub local_mgr: LocalVariableManager,
+    pub local_mgr: LocalVariables,
 
     /// Virtual register generator
     pub vreg_gen: VirtRegGen,
@@ -37,7 +37,7 @@ impl DAGFunction {
         dag_heap: RawAllocator<DAGNode>,
         dag_basic_block_arena: Arena<DAGBasicBlock>,
         dag_basic_blocks: Vec<DAGBasicBlockId>,
-        local_mgr: LocalVariableManager,
+        local_mgr: LocalVariables,
         vreg_gen: VirtRegGen,
     ) -> Self {
         Self {

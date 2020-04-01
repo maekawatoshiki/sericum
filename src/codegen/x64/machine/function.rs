@@ -3,6 +3,7 @@ use super::super::register::*;
 use super::{basic_block::*, frame_object::*, inst::*};
 use crate::{codegen::is_internal_function, ir::types::*};
 use id_arena::*;
+use std::cell::Ref;
 use std::fmt;
 use std::ops::{Index, IndexMut};
 
@@ -17,17 +18,14 @@ pub struct MachineFunction {
     /// Function type
     pub ty: Type,
 
-    /// Machine Basic Blocks
-    pub basic_blocks: MachineBasicBlocks,
-
-    /// Instruction arena
-    pub inst_arena: InstructionArena,
+    /// Include basic blocks and instruction arena
+    pub body: MachineFunctionBody,
 
     /// True if internal function
     pub internal: bool,
 
     /// Local variables info
-    pub local_mgr: LocalVariableManager,
+    pub local_mgr: LocalVariables,
 
     /// Virtual register generator
     pub vreg_gen: VirtRegGen,
@@ -36,6 +34,61 @@ pub struct MachineFunction {
 #[derive(Debug, Clone)]
 pub struct InstructionArena {
     pub arena: Arena<MachineInst>,
+}
+
+#[derive(Debug, Clone)]
+pub struct MachineFunctionBody {
+    pub inst_arena: InstructionArena,
+    pub basic_blocks: MachineBasicBlocks,
+}
+
+pub struct MBBIter<'a> {
+    inst_arena: &'a InstructionArena,
+    basic_blocks: &'a MachineBasicBlocks,
+    nth: usize,
+}
+
+pub struct InstIter<'a> {
+    inst_arena: &'a InstructionArena,
+    inst_id_seq: Ref<'a, Vec<MachineInstId>>,
+    nth: usize,
+}
+
+impl MachineFunctionBody {
+    pub fn mbb_iter<'a>(&'a self) -> MBBIter<'a> {
+        MBBIter {
+            inst_arena: &self.inst_arena,
+            basic_blocks: &self.basic_blocks,
+            nth: 0,
+        }
+    }
+}
+
+impl<'a> Iterator for MBBIter<'a> {
+    type Item = (MachineBasicBlockId, InstIter<'a>);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.nth += 1;
+        let id = *self.basic_blocks.order.get(self.nth - 1)?;
+        Some((
+            id,
+            InstIter {
+                inst_arena: self.inst_arena,
+                inst_id_seq: self.basic_blocks.arena[id].iseq_ref(),
+                nth: 0,
+            },
+        ))
+    }
+}
+
+impl<'a> Iterator for InstIter<'a> {
+    type Item = (MachineInstId, &'a MachineInst);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.nth += 1;
+        let id = *self.inst_id_seq.get(self.nth - 1)?;
+        Some((id, &self.inst_arena[id]))
+    }
 }
 
 impl MachineFunction {
@@ -48,16 +101,20 @@ impl MachineFunction {
             internal: is_internal_function(&f.name),
             name: f.name,
             ty: f.ty,
-            inst_arena,
-            basic_blocks,
+            // inst_arena,
+            // basic_blocks,
+            body: MachineFunctionBody {
+                inst_arena,
+                basic_blocks,
+            },
             local_mgr: f.local_mgr,
             vreg_gen: f.vreg_gen,
         }
     }
 
     pub fn find_inst_pos(&self, inst_id: MachineInstId) -> Option<(MachineBasicBlockId, usize)> {
-        let parent = self.inst_arena[inst_id].parent;
-        match self.basic_blocks.arena[parent].find_inst_pos(inst_id) {
+        let parent = self.body.inst_arena[inst_id].parent;
+        match self.body.basic_blocks.arena[parent].find_inst_pos(inst_id) {
             Some(pos) => Some((parent, pos)),
             None => None,
         }
@@ -65,11 +122,13 @@ impl MachineFunction {
 
     pub fn remove_inst(&self, inst_id: MachineInstId) {
         let (bb_id, pos) = self.find_inst_pos(inst_id).unwrap();
-        self.basic_blocks.arena[bb_id].iseq_ref_mut().remove(pos);
+        self.body.basic_blocks.arena[bb_id]
+            .iseq_ref_mut()
+            .remove(pos);
     }
 
     pub fn get_entry_bb(&self) -> Option<&MachineBasicBlockId> {
-        self.basic_blocks.order.get(0)
+        self.body.basic_blocks.order.get(0)
     }
 }
 
@@ -112,10 +171,10 @@ impl fmt::Debug for MachineFunction {
         )?;
 
         let mut idx = 0;
-        for (id, bb) in self.basic_blocks.id_and_block() {
+        for (id, bb) in self.body.basic_blocks.id_and_block() {
             writeln!(f, "MachineBasicBlock #{} ({:?})", id.index(), bb)?;
             for inst in &*bb.iseq_ref() {
-                writeln!(f, "{: ^4}: {:?}", idx, self.inst_arena[*inst])?;
+                writeln!(f, "{: ^4}: {:?}", idx, self.body.inst_arena[*inst])?;
                 idx += 1;
             }
         }

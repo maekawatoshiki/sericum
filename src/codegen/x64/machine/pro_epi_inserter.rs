@@ -38,7 +38,7 @@ impl PrologueEpilogueInserter {
             )],
             builder.get_cur_bb().unwrap(),
         );
-        let push_rbp = builder.function.inst_arena.alloc(push_rbp);
+        let push_rbp = builder.function.body.inst_arena.alloc(push_rbp);
         builder.insert(push_rbp);
 
         // mov rbp, rsp
@@ -52,7 +52,7 @@ impl PrologueEpilogueInserter {
         .with_def(vec![
             RegisterInfo::new_phy_reg(GR64::RBP).into_machine_register()
         ]);
-        let mov_rbp_rsp = builder.function.inst_arena.alloc(mov_rbp_rsp);
+        let mov_rbp_rsp = builder.function.body.inst_arena.alloc(mov_rbp_rsp);
         builder.insert(mov_rbp_rsp);
 
         // sub rsp, adjust
@@ -70,7 +70,7 @@ impl PrologueEpilogueInserter {
         .with_def(vec![
             RegisterInfo::new_phy_reg(GR64::RSP).into_machine_register()
         ]);
-        let mov_rsp_i = builder.function.inst_arena.alloc(mov_rsp_i);
+        let mov_rsp_i = builder.function.body.inst_arena.alloc(mov_rsp_i);
         builder.insert(mov_rsp_i);
 
         self.insert_arg_copy(&mut builder)
@@ -120,9 +120,9 @@ impl PrologueEpilogueInserter {
     fn insert_epilogue(&mut self, cur_func: &mut MachineFunction) {
         let mut bb_iseq = vec![];
 
-        for (bb_id, bb) in cur_func.basic_blocks.id_and_block() {
+        for (bb_id, bb) in cur_func.body.basic_blocks.id_and_block() {
             let last_inst_id = *bb.iseq_ref().last().unwrap();
-            let last_inst = &cur_func.inst_arena[last_inst_id];
+            let last_inst = &cur_func.body.inst_arena[last_inst_id];
 
             if last_inst.opcode != MachineOpcode::RET {
                 continue;
@@ -141,7 +141,7 @@ impl PrologueEpilogueInserter {
             .with_def(vec![
                 RegisterInfo::new_phy_reg(GR64::RSP).into_machine_register()
             ]);
-            iseq.push(cur_func.inst_arena.alloc(i));
+            iseq.push(cur_func.body.inst_arena.alloc(i));
 
             // pop rbp
             let i = MachineInst::new_simple(
@@ -151,7 +151,7 @@ impl PrologueEpilogueInserter {
                 )],
                 bb_id,
             );
-            iseq.push(cur_func.inst_arena.alloc(i));
+            iseq.push(cur_func.body.inst_arena.alloc(i));
 
             bb_iseq.push((last_inst_id, iseq));
         }

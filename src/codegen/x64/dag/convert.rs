@@ -19,7 +19,7 @@ pub struct ConvertToDAG<'a> {
 pub struct ConversionInfo {
     pub dag_heap: RawAllocator<DAGNode>,
     // pub dag_arena: Arena<DAGNode>,
-    pub local_mgr: LocalVariableManager,
+    pub local_mgr: LocalVariables,
     pub bb_to_dag_bb: FxHashMap<BasicBlockId, DAGBasicBlockId>,
     pub last_chain_node: Option<Raw<DAGNode>>,
     pub vreg_gen: VirtRegGen,
@@ -511,7 +511,7 @@ impl ConversionInfo {
         ConversionInfo {
             dag_heap: RawAllocator::new(),
             // dag_heap: Arena::new(),
-            local_mgr: LocalVariableManager::new(),
+            local_mgr: LocalVariables::new(),
             bb_to_dag_bb: FxHashMap::default(),
             last_chain_node: None,
             vreg_gen: VirtRegGen::new(),

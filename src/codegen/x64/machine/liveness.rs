@@ -312,8 +312,8 @@ impl LiveRange {
         let s = self
             .segments
             .binary_search_by(|s| s.start.cmp(&other.segments[0].end))
-            .unwrap_or_else(|x| x);
-        let s = if s > 0 { s - 1 } else { s };
+            .unwrap_or_else(|x| x)
+            .saturating_sub(1);
         for seg1 in &self.segments[s..] {
             for seg2 in &other.segments {
                 if seg1.interferes(seg2) {
@@ -492,13 +492,13 @@ impl LivenessAnalysis {
     }
 
     fn clear_bb_liveness_info(&mut self, cur_func: &MachineFunction) {
-        for (_, bb) in &cur_func.basic_blocks.arena {
+        for (_, bb) in &cur_func.body.basic_blocks.arena {
             bb.liveness_ref_mut().clear();
         }
     }
 
     fn set_def(&mut self, cur_func: &MachineFunction) {
-        for (_, bb) in cur_func.basic_blocks.id_and_block() {
+        for (_, bb) in cur_func.body.basic_blocks.id_and_block() {
             for inst_id in &*bb.iseq_ref() {
                 self.set_def_on_inst(cur_func, bb, *inst_id);
             }
@@ -511,7 +511,7 @@ impl LivenessAnalysis {
         bb: &MachineBasicBlock,
         inst_id: MachineInstId,
     ) {
-        let inst = &cur_func.inst_arena[inst_id];
+        let inst = &cur_func.body.inst_arena[inst_id];
 
         if inst.def.len() > 0 {
             bb.liveness.borrow_mut().def.insert(inst.def[0].clone());
@@ -519,7 +519,7 @@ impl LivenessAnalysis {
     }
 
     fn visit(&mut self, cur_func: &MachineFunction) {
-        for (bb_id, bb) in cur_func.basic_blocks.id_and_block() {
+        for (bb_id, bb) in cur_func.body.basic_blocks.id_and_block() {
             for inst_id in &*bb.iseq_ref() {
                 self.visit_inst(cur_func, bb_id, *inst_id);
             }
@@ -532,7 +532,7 @@ impl LivenessAnalysis {
         bb: MachineBasicBlockId,
         inst_id: MachineInstId,
     ) {
-        let inst = &cur_func.inst_arena[inst_id];
+        let inst = &cur_func.body.inst_arena[inst_id];
 
         for operand in &inst.operand {
             if let MachineOperand::Register(reg) = operand {
@@ -552,7 +552,7 @@ impl LivenessAnalysis {
         bb: MachineBasicBlockId,
         reg: &MachineRegister,
     ) {
-        let bb = &cur_func.basic_blocks.arena[bb];
+        let bb = &cur_func.body.basic_blocks.arena[bb];
 
         {
             let mut bb_liveness = bb.liveness.borrow_mut();
@@ -568,7 +568,7 @@ impl LivenessAnalysis {
         }
 
         for pred_id in &bb.pred {
-            let pred = &cur_func.basic_blocks.arena[*pred_id];
+            let pred = &cur_func.body.basic_blocks.arena[*pred_id];
             if pred.liveness.borrow_mut().live_out.insert(reg.clone()) {
                 // live_out didn't have the reg
                 self.propagate(cur_func, *pred_id, reg);
@@ -588,7 +588,7 @@ impl LivenessAnalysis {
 
         // TODO: Refine code
 
-        for (_, bb) in cur_func.basic_blocks.id_and_block() {
+        for (_, bb) in cur_func.body.basic_blocks.id_and_block() {
             let mut index = 0;
             let liveness = bb.liveness_ref();
 
@@ -612,7 +612,7 @@ impl LivenessAnalysis {
             }
 
             for inst_id in &*bb.iseq_ref() {
-                let inst = &cur_func.inst_arena[*inst_id];
+                let inst = &cur_func.body.inst_arena[*inst_id];
 
                 id2pp.insert(*inst_id, cur_pp!());
 

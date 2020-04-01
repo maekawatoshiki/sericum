@@ -184,14 +184,14 @@ impl JITCompiler {
             ; =>f_entry
         );
 
-        for (bb_id, bb) in f.basic_blocks.id_and_block() {
+        for (bb_id, bb) in f.body.basic_blocks.id_and_block() {
             if bb_id.index() != 0 {
                 let label = self.get_label(bb_id);
                 dynasm!(self.asm; =>label);
             }
 
             for inst in &*bb.iseq_ref() {
-                let inst = &f.inst_arena[*inst];
+                let inst = &f.body.inst_arena[*inst];
                 match inst.opcode {
                     MachineOpcode::MOVri32 => self.compile_mov_ri32(inst),
                     MachineOpcode::MOVrr32 => self.compile_mov_rr32(inst),

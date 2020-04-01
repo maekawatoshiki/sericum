@@ -40,7 +40,7 @@ impl MachineInstTrait for MachineInstId {
 
 impl MachineInstTrait for MachineInst {
     fn into_id(self, f: &mut MachineFunction) -> MachineInstId {
-        f.inst_arena.alloc(self)
+        f.body.inst_arena.alloc(self)
     }
 }
 
@@ -56,7 +56,7 @@ impl<'a> BuilderWithLiveInfoEdit<'a> {
 
     fn calc_program_point(&mut self, insert_pt: usize) -> ProgramPoint {
         // calculate program point for given insert point
-        let bb = &self.function.basic_blocks.arena[self.cur_bb_id.unwrap()];
+        let bb = &self.function.body.basic_blocks.arena[self.cur_bb_id.unwrap()];
         let iseq = bb.iseq_ref();
         let pp = self.matrix.get_program_point(iseq[insert_pt]).unwrap();
         self.matrix.program_points.prev_of(pp)
@@ -76,7 +76,9 @@ impl<'a> BuilderTrait for BuilderWithLiveInfoEdit<'a> {
 
     fn set_insert_point_at_end(&mut self, bb_id: MachineBasicBlockId) {
         self.cur_bb_id = Some(bb_id);
-        self.insert_point = self.function.basic_blocks.arena[bb_id].iseq_ref().len();
+        self.insert_point = self.function.body.basic_blocks.arena[bb_id]
+            .iseq_ref()
+            .len();
     }
 
     fn set_insert_point_before_inst(&mut self, inst_id: MachineInstId) -> Option<()> {
@@ -102,7 +104,7 @@ impl<'a> BuilderTrait for BuilderWithLiveInfoEdit<'a> {
 
         {
             // update registers' use&def list. TODO: refine code
-            let inst = &self.function.inst_arena[inst_id];
+            let inst = &self.function.body.inst_arena[inst_id];
             for def in &inst.def {
                 self.matrix.add_vreg_entity(def.clone());
                 self.matrix.add_live_interval(
@@ -123,7 +125,7 @@ impl<'a> BuilderTrait for BuilderWithLiveInfoEdit<'a> {
             }
         }
 
-        self.function.basic_blocks.arena[self.cur_bb_id.unwrap()]
+        self.function.body.basic_blocks.arena[self.cur_bb_id.unwrap()]
             .iseq_ref_mut()
             .insert(insert_pt, inst_id);
     }
@@ -134,9 +136,9 @@ impl<'a> BuilderTrait for BuilderWithLiveInfoEdit<'a> {
                 self.insert_point -= 1;
             }
 
-            let inst_id = self.function.basic_blocks.arena[self.cur_bb_id.unwrap()].iseq_ref()
+            let inst_id = self.function.body.basic_blocks.arena[self.cur_bb_id.unwrap()].iseq_ref()
                 [self.insert_point];
-            let inst = &self.function.inst_arena[inst_id];
+            let inst = &self.function.body.inst_arena[inst_id];
             if f(inst) {
                 break;
             }
@@ -171,7 +173,9 @@ impl<'a> BuilderTrait for Builder<'a> {
 
     fn set_insert_point_at_end(&mut self, bb_id: MachineBasicBlockId) {
         self.cur_bb_id = Some(bb_id);
-        self.insert_point = self.function.basic_blocks.arena[bb_id].iseq_ref().len();
+        self.insert_point = self.function.body.basic_blocks.arena[bb_id]
+            .iseq_ref()
+            .len();
     }
 
     fn set_insert_point_before_inst(&mut self, inst_id: MachineInstId) -> Option<()> {
@@ -190,7 +194,7 @@ impl<'a> BuilderTrait for Builder<'a> {
         let insert_pt = self.insert_point;
         let inst_id = inst.into_id(&mut self.function);
         self.insert_point += 1;
-        self.function.basic_blocks.arena[self.cur_bb_id.unwrap()]
+        self.function.body.basic_blocks.arena[self.cur_bb_id.unwrap()]
             .iseq_ref_mut()
             .insert(insert_pt, inst_id);
     }
@@ -201,9 +205,9 @@ impl<'a> BuilderTrait for Builder<'a> {
                 self.insert_point -= 1;
             }
 
-            let inst_id = self.function.basic_blocks.arena[self.cur_bb_id.unwrap()].iseq_ref()
+            let inst_id = self.function.body.basic_blocks.arena[self.cur_bb_id.unwrap()].iseq_ref()
                 [self.insert_point];
-            let inst = &self.function.inst_arena[inst_id];
+            let inst = &self.function.body.inst_arena[inst_id];
             if f(inst) {
                 break;
             }

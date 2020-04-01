@@ -21,9 +21,9 @@ impl TwoAddressConverter {
 
         let mut tied = vec![];
 
-        for (_, bb) in f.basic_blocks.id_and_block() {
+        for (_, bb) in f.body.basic_blocks.id_and_block() {
             for inst_id in &*bb.iseq_ref() {
-                let inst = &mut f.inst_arena[*inst_id];
+                let inst = &mut f.body.inst_arena[*inst_id];
 
                 // No tied values then skip
                 if inst.tie.len() == 0 {
@@ -51,14 +51,14 @@ impl TwoAddressConverter {
         }
 
         for (inst_id, def, use_) in tied {
-            let inst_bb = f.inst_arena[inst_id].parent;
+            let inst_bb = f.body.inst_arena[inst_id].parent;
 
             // before: v1 = add v1, 1
             // after:  v1 = copy v2
             //         v1 = add v1, 1
 
             let old_inst = mem::replace(
-                &mut f.inst_arena[inst_id],
+                &mut f.body.inst_arena[inst_id],
                 MachineInst::new_simple(
                     MachineOpcode::Copy,
                     vec![MachineOperand::Register(use_)],
@@ -67,7 +67,7 @@ impl TwoAddressConverter {
                 .with_def(vec![def]),
             );
 
-            let inst = f.inst_arena.alloc(old_inst);
+            let inst = f.body.inst_arena.alloc(old_inst);
 
             let mut builder = Builder::new(f);
             builder.set_insert_point_after_inst(inst_id).unwrap();

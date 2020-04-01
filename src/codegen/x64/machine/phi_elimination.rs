@@ -15,13 +15,14 @@ impl PhiElimination {
 
     pub fn run_on_function(&mut self, f: &mut MachineFunction) {
         let phi_list: Vec<_> = f
+            .body
             .basic_blocks
             .id_and_block()
             .map(|(_, bb)| {
                 bb.iseq_ref()
                     .iter()
-                    .filter(|&&id| f.inst_arena[id].opcode == MachineOpcode::Phi)
-                    .map(|&id| (id, f.inst_arena[id].clone()))
+                    .filter(|&&id| f.body.inst_arena[id].opcode == MachineOpcode::Phi)
+                    .map(|&id| (id, f.body.inst_arena[id].clone()))
                     .collect::<Vec<_>>()
             })
             .flatten()

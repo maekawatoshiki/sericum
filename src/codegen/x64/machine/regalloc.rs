@@ -91,9 +91,9 @@ impl RegisterAllocator {
     }
 
     fn rewrite_vregs(&mut self, cur_func: &mut MachineFunction, matrix: &LiveRegMatrix) {
-        for (_, bb) in cur_func.basic_blocks.id_and_block() {
+        for (_, bb) in cur_func.body.basic_blocks.id_and_block() {
             for inst_id in &*bb.iseq_ref() {
-                let inst = &cur_func.inst_arena[*inst_id];
+                let inst = &cur_func.body.inst_arena[*inst_id];
                 for def in &inst.def {
                     if def.get_reg().is_some() {
                         continue;
@@ -144,7 +144,7 @@ impl RegisterAllocator {
         // IMPROVED A LITTLE: any better ideas?
         {
             let bb_including_call =
-                &cur_func.basic_blocks.arena[cur_func.inst_arena[call_inst_id].parent];
+                &cur_func.body.basic_blocks.arena[cur_func.body.inst_arena[call_inst_id].parent];
             let liveness = bb_including_call.liveness_ref();
             let regs_that_may_interfere = &liveness.def | &liveness.live_in;
             for r in &regs_that_may_interfere {
@@ -166,7 +166,7 @@ impl RegisterAllocator {
 
         // debug!(println!("NEW SLOTS: {:?}", slots_to_save_regs));
 
-        let call_inst_parent = cur_func.inst_arena[call_inst_id].parent;
+        let call_inst_parent = cur_func.body.inst_arena[call_inst_id].parent;
 
         for (frinfo, reg) in slots_to_save_regs.into_iter().zip(regs_to_save.iter()) {
             let dst = MachineOperand::FrameIndex(frinfo.clone());
@@ -174,22 +174,22 @@ impl RegisterAllocator {
             let rbp = MachineOperand::Register(
                 RegisterInfo::new_phy_reg(GR64::RBP).into_machine_register(),
             );
-            let store_inst_id = cur_func.inst_arena.alloc(MachineInst::new(
+            let store_inst_id = cur_func.body.inst_arena.alloc(MachineInst::new(
                 &cur_func.vreg_gen,
                 mov_mx(&src).unwrap(),
                 vec![rbp, dst, MachineOperand::None, MachineOperand::None, src],
                 None,
                 call_inst_parent,
             ));
-            cur_func.inst_arena[store_inst_id].add_use(store_inst_id);
-            cur_func.inst_arena[store_inst_id].add_def(store_inst_id);
+            cur_func.body.inst_arena[store_inst_id].add_use(store_inst_id);
+            cur_func.body.inst_arena[store_inst_id].add_def(store_inst_id);
 
             let src = MachineOperand::FrameIndex(frinfo);
             let rbp = MachineOperand::Register(
                 RegisterInfo::new_phy_reg(GR64::RBP).into_machine_register(),
             );
 
-            let load_inst_id = cur_func.inst_arena.alloc(
+            let load_inst_id = cur_func.body.inst_arena.alloc(
                 MachineInst::new_simple(
                     mov_rx(&src).unwrap(),
                     vec![rbp, src, MachineOperand::None, MachineOperand::None],
@@ -197,7 +197,7 @@ impl RegisterAllocator {
                 )
                 .with_def(vec![reg.clone()]),
             );
-            cur_func.inst_arena[load_inst_id].add_def(load_inst_id); // TODO: is this needed?
+            cur_func.body.inst_arena[load_inst_id].add_def(load_inst_id); // TODO: is this needed?
 
             let mut builder = BuilderWithLiveInfoEdit::new(matrix, cur_func);
 
@@ -216,9 +216,9 @@ impl RegisterAllocator {
     ) {
         let mut call_inst_id = vec![];
 
-        for (_, bb) in cur_func.basic_blocks.id_and_block() {
+        for (_, bb) in cur_func.body.basic_blocks.id_and_block() {
             for inst_id in bb.iseq_ref().iter() {
-                let inst = &cur_func.inst_arena[*inst_id];
+                let inst = &cur_func.body.inst_arena[*inst_id];
                 if inst.opcode == MachineOpcode::Call {
                     call_inst_id.push(*inst_id)
                 }

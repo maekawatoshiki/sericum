@@ -36,7 +36,7 @@ impl<'a> Spiller<'a> {
             })
             .unwrap();
 
-        let bb = self.func.inst_arena[def_id].parent;
+        let bb = self.func.body.inst_arena[def_id].parent;
         let dst = MachineOperand::FrameIndex(slot.clone());
         let src = MachineOperand::Register(r.clone());
         let rbp =
@@ -62,7 +62,7 @@ impl<'a> Spiller<'a> {
             new_regs.push(new_r.get_vreg());
             self.matrix.add_vreg_entity(new_r.clone());
 
-            let use_inst = &mut self.func.inst_arena[use_id];
+            let use_inst = &mut self.func.body.inst_arena[use_id];
             use_inst.replace_operand_reg(&r, &new_r);
             new_r.add_use(use_id);
 
