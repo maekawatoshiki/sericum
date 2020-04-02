@@ -1,6 +1,6 @@
 use super::super::frame_object::FrameObjectsInfo;
 use super::super::machine::{
-    basic_block::{MachineBasicBlock, MachineBasicBlockId},
+    basic_block::MachineBasicBlockId,
     function::{InstIter, MachineFunction},
     inst::*,
     module::MachineModule,
@@ -45,20 +45,15 @@ impl MachineAsmPrinter {
     }
 
     fn run_on_basic_blocks(&mut self, f: &MachineFunction, fo: &FrameObjectsInfo) {
-        for (id, inst_iter) in f.body.mbb_iter() {
+        for (id, _, inst_iter) in f.body.mbb_iter() {
             self.output
                 .push_str(format!("{}:\n", self.bb_id_to_label_id(&id)).as_str());
-            self.run_on_basic_block(f, inst_iter, fo);
+            self.run_on_basic_block(inst_iter, fo);
         }
         self.cur_bb_id_base += f.body.basic_blocks.order.len();
     }
 
-    fn run_on_basic_block<'a>(
-        &mut self,
-        f: &MachineFunction,
-        inst_iter: InstIter<'a>,
-        fo: &FrameObjectsInfo,
-    ) {
+    fn run_on_basic_block<'a>(&mut self, inst_iter: InstIter<'a>, fo: &FrameObjectsInfo) {
         for (_, inst) in inst_iter {
             self.run_on_inst(inst, fo);
         }

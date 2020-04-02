@@ -498,30 +498,23 @@ impl LivenessAnalysis {
     }
 
     fn set_def(&mut self, cur_func: &MachineFunction) {
-        for (_, bb) in cur_func.body.basic_blocks.id_and_block() {
-            for inst_id in &*bb.iseq_ref() {
-                self.set_def_on_inst(cur_func, bb, *inst_id);
+        for (_, bb, iiter) in cur_func.body.mbb_iter() {
+            for (_, inst) in iiter {
+                self.set_def_on_inst(bb, inst);
             }
         }
     }
 
-    fn set_def_on_inst(
-        &mut self,
-        cur_func: &MachineFunction,
-        bb: &MachineBasicBlock,
-        inst_id: MachineInstId,
-    ) {
-        let inst = &cur_func.body.inst_arena[inst_id];
-
+    fn set_def_on_inst(&mut self, bb: &MachineBasicBlock, inst: &MachineInst) {
         if inst.def.len() > 0 {
             bb.liveness.borrow_mut().def.insert(inst.def[0].clone());
         }
     }
 
     fn visit(&mut self, cur_func: &MachineFunction) {
-        for (bb_id, bb) in cur_func.body.basic_blocks.id_and_block() {
-            for inst_id in &*bb.iseq_ref() {
-                self.visit_inst(cur_func, bb_id, *inst_id);
+        for (bb_id, _, iiter) in cur_func.body.mbb_iter() {
+            for (_, inst) in iiter {
+                self.visit_inst(cur_func, bb_id, inst);
             }
         }
     }
@@ -530,10 +523,8 @@ impl LivenessAnalysis {
         &mut self,
         cur_func: &MachineFunction,
         bb: MachineBasicBlockId,
-        inst_id: MachineInstId,
+        inst: &MachineInst,
     ) {
-        let inst = &cur_func.body.inst_arena[inst_id];
-
         for operand in &inst.operand {
             if let MachineOperand::Register(reg) = operand {
                 // live_in and live_out should contain no assigned registers
@@ -588,7 +579,7 @@ impl LivenessAnalysis {
 
         // TODO: Refine code
 
-        for (_, bb) in cur_func.body.basic_blocks.id_and_block() {
+        for (_, bb, iiter) in cur_func.body.mbb_iter() {
             let mut index = 0;
             let liveness = bb.liveness_ref();
 
@@ -611,10 +602,8 @@ impl LivenessAnalysis {
                     .add_segment(LiveSegment::new(cur_pp!(), cur_pp!()))
             }
 
-            for inst_id in &*bb.iseq_ref() {
-                let inst = &cur_func.body.inst_arena[*inst_id];
-
-                id2pp.insert(*inst_id, cur_pp!());
+            for (inst_id, inst) in iiter {
+                id2pp.insert(inst_id, cur_pp!());
 
                 for def_reg in inst.collect_defined_regs() {
                     vreg2entity.insert(def_reg.get_vreg(), def_reg);

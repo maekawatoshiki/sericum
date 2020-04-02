@@ -65,13 +65,14 @@ impl MachineFunctionBody {
 }
 
 impl<'a> Iterator for MBBIter<'a> {
-    type Item = (MachineBasicBlockId, InstIter<'a>);
+    type Item = (MachineBasicBlockId, &'a MachineBasicBlock, InstIter<'a>);
 
     fn next(&mut self) -> Option<Self::Item> {
         self.nth += 1;
         let id = *self.basic_blocks.order.get(self.nth - 1)?;
         Some((
             id,
+            &self.basic_blocks.arena[id],
             InstIter {
                 inst_arena: self.inst_arena,
                 inst_id_seq: self.basic_blocks.arena[id].iseq_ref(),
@@ -171,10 +172,10 @@ impl fmt::Debug for MachineFunction {
         )?;
 
         let mut idx = 0;
-        for (id, bb) in self.body.basic_blocks.id_and_block() {
+        for (id, bb, iiter) in self.body.mbb_iter() {
             writeln!(f, "MachineBasicBlock #{} ({:?})", id.index(), bb)?;
-            for inst in &*bb.iseq_ref() {
-                writeln!(f, "{: ^4}: {:?}", idx, self.body.inst_arena[*inst])?;
+            for (_, inst) in iiter {
+                writeln!(f, "{: ^4}: {:?}", idx, inst)?;
                 idx += 1;
             }
         }
