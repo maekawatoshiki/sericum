@@ -1,7 +1,7 @@
 use super::value::Value;
 use std::fmt;
 
-#[derive(Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq)]
 pub enum Type {
     Void,
     Int1,
@@ -20,19 +20,19 @@ pub trait TypeSize {
     fn size_in_bits(&self) -> usize;
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FunctionType {
     pub ret_ty: Type,
     pub params_ty: Vec<Type>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ArrayType {
     pub elem_ty: Type,
     pub len: usize,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StructType {
     pub fields_ty: Vec<Type>,
 }
