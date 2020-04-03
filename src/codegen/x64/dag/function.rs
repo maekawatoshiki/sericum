@@ -50,15 +50,18 @@ impl DAGFunction {
             vreg_gen,
         }
     }
-}
 
-impl fmt::Debug for DAGFunction {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "DAGFunc(name: {}, ty: {:?}):", self.name, self.ty)?;
+    pub fn debug(&self, f: &mut fmt::Formatter, tys: &Types) -> fmt::Result {
+        writeln!(
+            f,
+            "DAGFunc(name: {}, ty: {}):",
+            self.name,
+            tys.to_string(self.ty)
+        )?;
 
         for bb_id in &self.dag_basic_blocks {
             let bb = &self.dag_basic_block_arena[*bb_id];
-            bb.debug(f, bb_id.index())?;
+            bb.debug(f, tys, bb_id.index())?;
         }
 
         fmt::Result::Ok(())

@@ -1,5 +1,5 @@
 use super::node::DAGNode;
-use crate::util::allocator::*;
+use crate::{ir::types::Types, util::allocator::*};
 use id_arena::*;
 use rustc_hash::FxHashMap;
 use std::fmt;
@@ -31,7 +31,7 @@ impl DAGBasicBlock {
         self.entry = Some(entry);
     }
 
-    pub fn debug(&self, f: &mut fmt::Formatter<'_>, bb_idx: usize) -> fmt::Result {
+    pub fn debug(&self, f: &mut fmt::Formatter<'_>, tys: &Types, bb_idx: usize) -> fmt::Result {
         writeln!(
             f,
             "BB({}); pred: {{{}}}, succ: {{{}}});",
@@ -47,19 +47,9 @@ impl DAGBasicBlock {
         )?;
 
         if let Some(entry) = self.entry {
-            entry.debug(f, &mut FxHashMap::default(), 0, 2)?;
+            entry.debug(f, tys, &mut FxHashMap::default(), 0, 2)?;
         }
 
         fmt::Result::Ok(())
-    }
-}
-
-impl fmt::Debug for DAGBasicBlock {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "BB: pred: {:?}, succ: {:?}", self.pred, self.succ)?;
-        if let Some(entry) = self.entry {
-            write!(f, "{:?}", *entry)?;
-        }
-        Result::Ok(())
     }
 }

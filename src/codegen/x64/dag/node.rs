@@ -8,7 +8,7 @@ use std::fmt;
 
 pub type DAGNodeId = Id<DAGNode>;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct DAGNode {
     pub kind: NodeKind,
     pub operand: Vec<Raw<DAGNode>>,
@@ -210,6 +210,7 @@ impl DAGNode {
     pub fn debug(
         &self,
         f: &mut fmt::Formatter<'_>,
+        tys: &Types,
         s: &mut FxHashMap<Raw<DAGNode>, usize>,
         self_id: usize, // 0 is entry
         indent: usize,
@@ -219,7 +220,7 @@ impl DAGNode {
             let l=s.len()+1; s.entry($op).or_insert(l)
         }}}
         write!(f, "{}", " ".repeat(indent))?;
-        write!(f, "id{}({:?}) = ", self_id, self.ty)?;
+        write!(f, "id{}({}) = ", self_id, tys.to_string(self.ty))?;
         write!(f, "{:?}", self.kind)?;
         for (i, op) in self.operand.iter().enumerate() {
             if i > 0 {
@@ -231,9 +232,10 @@ impl DAGNode {
             if op.is_operation() {
                 write!(f, " id{}", id4op!(*op))?;
             } else {
-                write!(f, " {:?}", op.kind.as_operand())?;
+                write!(f, " ")?;
+                op.kind.as_operand().debug(f, tys)?;
             }
-            write!(f, ".{:?}", op.ty)?;
+            write!(f, ".{}", tys.to_string(op.ty))?;
         }
         write!(f, "\n")?;
         for op in &self.operand {
@@ -241,13 +243,26 @@ impl DAGNode {
                 continue;
             }
             let id = *id4op!(*op);
-            op.debug(f, s, id, indent + 2)?;
+            op.debug(f, tys, s, id, indent + 2)?;
         }
         if let Some(next) = self.next {
             let id = *id4op!(next);
-            next.debug(f, s, id, indent)?;
+            next.debug(f, tys, s, id, indent)?;
         }
         fmt::Result::Ok(())
+    }
+}
+
+impl OperandNodeKind {
+    pub fn debug(&self, f: &mut fmt::Formatter<'_>, tys: &Types) -> fmt::Result {
+        match self {
+            Self::Address(a) => write!(f, "Addr({:?})", a),
+            Self::BasicBlock(b) => write!(f, "BB#{}", b.index()),
+            Self::CondKind(c) => write!(f, "Cond({:?})", c),
+            Self::Constant(c) => write!(f, "{:?}", c),
+            Self::FrameIndex(fi) => write!(f, "FI<{}, {:?}>", tys.to_string(fi.ty), fi.idx),
+            Self::Register(r) => write!(f, "Reg({:?})", r),
+        }
     }
 }
 

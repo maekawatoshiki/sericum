@@ -31,12 +31,12 @@ pub struct MachineFunction {
     pub vreg_gen: VirtRegGen,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct InstructionArena {
     pub arena: Arena<MachineInst>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct MachineFunctionBody {
     pub inst_arena: InstructionArena,
     pub basic_blocks: MachineBasicBlocks,
@@ -131,6 +131,28 @@ impl MachineFunction {
     pub fn get_entry_bb(&self) -> Option<&MachineBasicBlockId> {
         self.body.basic_blocks.order.get(0)
     }
+
+    pub fn debug(&self, tys: &Types, f: &mut fmt::Formatter) -> fmt::Result {
+        writeln!(
+            f,
+            "MachineFunction(name: {}, ty: {}):",
+            self.name,
+            tys.to_string(self.ty)
+        )?;
+
+        let mut idx = 0;
+        for (id, bb, iiter) in self.body.mbb_iter() {
+            writeln!(f, "MachineBasicBlock #{} ({:?})", id.index(), bb)?;
+            for (_, inst) in iiter {
+                write!(f, "{: ^4}: ", idx)?;
+                inst.debug(tys, f)?;
+                writeln!(f)?;
+                idx += 1;
+            }
+        }
+
+        fmt::Result::Ok(())
+    }
 }
 
 impl InstructionArena {
@@ -160,26 +182,5 @@ impl Index<MachineInstId> for InstructionArena {
 impl IndexMut<MachineInstId> for InstructionArena {
     fn index_mut(&mut self, idx: MachineInstId) -> &mut Self::Output {
         &mut self.arena[idx]
-    }
-}
-
-impl fmt::Debug for MachineFunction {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        writeln!(
-            f,
-            "MachineFunction(name: {}, ty: {:?}):",
-            self.name, self.ty
-        )?;
-
-        let mut idx = 0;
-        for (id, bb, iiter) in self.body.mbb_iter() {
-            writeln!(f, "MachineBasicBlock #{} ({:?})", id.index(), bb)?;
-            for (_, inst) in iiter {
-                writeln!(f, "{: ^4}: {:?}", idx, inst)?;
-                idx += 1;
-            }
-        }
-
-        fmt::Result::Ok(())
     }
 }

@@ -140,7 +140,11 @@ impl Value {
             }
             Value::Instruction(InstructionValue { func_id, id }) => {
                 let f = parent.function_ref(*func_id);
-                format!("{} %{}", f.inst_table[*id].ty.to_string(), id.index())
+                format!(
+                    "{} %{}",
+                    parent.types.to_string(f.inst_table[*id].ty),
+                    id.index()
+                )
             }
             Value::Function(FunctionValue { func_id }) if inst => {
                 let f = parent.function_ref(*func_id);
@@ -149,7 +153,7 @@ impl Value {
             Value::Function(FunctionValue { func_id }) => {
                 let f = parent.function_ref(*func_id);
                 let fty = parent.types.as_function_ty(f.ty).unwrap();
-                format!("{} {}", fty.ret_ty.to_string(), f.name)
+                format!("{} {}", parent.types.to_string(fty.ret_ty), f.name)
             }
             Value::None => "".to_string(),
         }

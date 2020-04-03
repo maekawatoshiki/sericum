@@ -36,7 +36,7 @@ impl fmt::Debug for DAGModule {
         writeln!(f, "DAGModule: {}", self.name)?;
 
         for (_, func) in &self.functions {
-            writeln!(f, "{:?}", func)?;
+            func.debug(f, &self.types)?;
         }
 
         fmt::Result::Ok(())

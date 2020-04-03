@@ -9,6 +9,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use std::{
     cell::{Ref, RefCell, RefMut},
     fmt,
+    fmt::Debug,
     rc::Rc,
 };
 
@@ -583,8 +584,8 @@ impl fmt::Debug for MachineConstant {
     }
 }
 
-impl fmt::Debug for MachineInst {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl MachineInst {
+    pub fn debug(&self, tys: &Types, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for (i, def) in self.def.iter().enumerate() {
             def.fmt(f)?;
             if i < self.def.len() - 1 {
@@ -597,7 +598,7 @@ impl fmt::Debug for MachineInst {
         write!(f, "{:?} ", self.opcode)?;
 
         for (i, op) in self.operand.iter().enumerate() {
-            op.fmt(f)?;
+            op.debug(tys, f)?;
             if i < self.operand.len() - 1 {
                 write!(f, ", ")?;
             }
@@ -636,12 +637,14 @@ impl fmt::Debug for MachineInst {
     }
 }
 
-impl fmt::Debug for MachineOperand {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+impl MachineOperand {
+    pub fn debug(&self, tys: &Types, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             MachineOperand::Register(r) => r.fmt(f),
             MachineOperand::Constant(c) => c.fmt(f),
-            MachineOperand::FrameIndex(fi) => fi.fmt(f),
+            MachineOperand::FrameIndex(fi) => {
+                write!(f, "FI<{}, {:?}>", tys.to_string(fi.ty), fi.idx)
+            }
             MachineOperand::Address(g) => g.fmt(f),
             MachineOperand::Branch(id) => write!(f, "BB#{}", id.index()),
             MachineOperand::None => write!(f, "!"),
