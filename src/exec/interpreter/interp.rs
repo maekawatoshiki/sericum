@@ -111,6 +111,7 @@ impl<'a> Interpreter<'a> {
                                         vec.set_len(a.len);
                                         Box::into_raw(vec.into_boxed_slice()) as *mut u8
                                     },
+                                    Type::Struct(_) => unimplemented!(),
                                 },
                                 ty.get_pointer_ty(),
                             ),
@@ -171,7 +172,7 @@ impl<'a> Interpreter<'a> {
                             ConcreteValue::Mem(ptr, _) => ptr,
                             _ => unreachable!(),
                         };
-                        let val = match v.get_type(self.module).get_element_ty().unwrap() {
+                        let val = match v.get_type(self.module).get_element_ty(None).unwrap() {
                             Type::Int1 => {
                                 ConcreteValue::Int1(if unsafe { *(ptr as *mut u8) } == 0 {
                                     false

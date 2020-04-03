@@ -152,6 +152,13 @@ impl Value {
             Value::None => "".to_string(),
         }
     }
+
+    pub fn as_imm(&self) -> &ImmediateValue {
+        match self {
+            Value::Immediate(imm) => imm,
+            _ => panic!(),
+        }
+    }
 }
 
 impl ImmediateValue {

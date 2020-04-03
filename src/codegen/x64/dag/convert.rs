@@ -393,7 +393,7 @@ impl<'a> ConvertToDAG<'a> {
         let mut ty = ptr.get_type(self.module);
 
         for idx in indices {
-            ty = ty.get_element_ty().unwrap();
+            ty = ty.get_element_ty(Some(idx)).unwrap();
 
             let idx = self.get_dag_id_from_value(idx, true);
             let heap = &mut self.cur_conv_info_mut().dag_heap;

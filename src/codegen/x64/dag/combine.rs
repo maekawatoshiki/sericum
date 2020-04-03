@@ -75,8 +75,9 @@ impl Combine {
             node.operand.swap(0, 1);
         }
 
-        // println!(">>>> {:?}", node_op!(1));
+        // (N + 0) -> N
         if node.operand[1].is_constant() && node.operand[1].as_constant().is_null() {
+            node.operand[0].ty = node.ty.clone();
             return node.operand[0];
         }
 

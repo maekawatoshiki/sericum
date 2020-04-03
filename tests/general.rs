@@ -850,3 +850,36 @@ fn floating_point() {
     println!("return: {:?}", res);
     assert_eq!(res, exec::jit::GenericValue::F64(3.14));
 }
+
+#[test]
+fn struct1() {
+    let mut m = module::Module::new("cilk");
+
+    let f = m.create_function("f", types::Type::Int32, vec![]);
+
+    let mut builder = builder::Builder::new(&mut m, f);
+
+    let entry = builder.append_basic_block();
+    builder.set_insert_point(entry);
+
+    let new_struct_ty = types::Type::Struct(Box::new(types::StructType::new(vec![
+        types::Type::Int32,
+        types::Type::Int32,
+        types::Type::Int32,
+    ])));
+    let var = builder.build_alloca(new_struct_ty);
+
+    cilk_ir!((builder) {
+        x = gep (%var), [(i32 0), (i32 0)];
+        store (i32 1), (%x);
+        load_x = load (%x);
+        ret (%load_x);
+    });
+
+    println!("{}", m.dump(f));
+
+    let mut jit = exec::jit::JITExecutor::new(&m);
+    let func = jit.find_function_by_name("f").unwrap();
+    let res = jit.run(func, vec![]);
+    println!("return: {:?}", res);
+}

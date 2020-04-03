@@ -230,6 +230,7 @@ impl DAGNode {
             } else {
                 write!(f, " {:?}", op.kind.as_operand())?;
             }
+            write!(f, ".{:?}", op.ty);
         }
         write!(f, "\n")?;
         for op in &self.operand {

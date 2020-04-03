@@ -64,7 +64,10 @@ impl<'a> Builder<'a> {
     pub fn build_load(&mut self, v: Value) -> Value {
         let inst = self.create_inst_value(
             Opcode::Load(v),
-            v.get_type(self.module).get_element_ty().unwrap().clone(),
+            v.get_type(self.module)
+                .get_element_ty(None)
+                .unwrap()
+                .clone(),
         );
         self.append_inst_to_cur_bb(inst);
         inst
