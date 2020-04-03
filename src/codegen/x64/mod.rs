@@ -20,7 +20,7 @@ impl TypeSize for Type {
                 ary.size_in_byte(tys)
             }
             Type::Struct(id) => {
-                let s = tys.non_primitive_types[*id].as_array();
+                let s = tys.non_primitive_types[*id].as_struct();
                 s.size_in_byte(tys)
             }
             Type::Pointer(_) => 8,

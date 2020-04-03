@@ -19,7 +19,6 @@ pub struct ConvertToDAG<'a> {
 
 pub struct ConversionInfo {
     pub dag_heap: RawAllocator<DAGNode>,
-    // pub dag_arena: Arena<DAGNode>,
     pub local_mgr: LocalVariables,
     pub bb_to_dag_bb: FxHashMap<BasicBlockId, DAGBasicBlockId>,
     pub last_chain_node: Option<Raw<DAGNode>>,
@@ -39,13 +38,18 @@ impl<'a> ConvertToDAG<'a> {
         }
     }
 
-    pub fn convert_module(&mut self) -> DAGModule {
-        let mut dag_module = DAGModule::new(self.module.name.as_str());
+    pub fn convert_module(mut self) -> DAGModule {
+        let mut functions = Arena::new();
+
         for (f_id, _) in &self.module.functions {
-            dag_module.add_function(self.construct_dag(f_id));
+            functions.alloc(self.construct_dag(f_id));
         }
-        dag_module.types = self.types.clone();
-        dag_module
+
+        DAGModule {
+            name: self.module.name.clone(),
+            functions,
+            types: self.types,
+        }
     }
 
     pub fn construct_dag(&mut self, func_id: FunctionId) -> DAGFunction {
@@ -111,7 +115,7 @@ impl<'a> ConvertToDAG<'a> {
                 let ty = self
                     .module
                     .function_ref(av.func_id)
-                    .get_param_type(&self.module.types, av.index)
+                    .get_param_type(&self.types, av.index)
                     .unwrap();
                 let fi = self.cur_conv_info_mut().dag_heap.alloc(DAGNode::new(
                     NodeKind::Operand(OperandNodeKind::FrameIndex(FrameIndexInfo::new(
@@ -406,7 +410,7 @@ impl<'a> ConvertToDAG<'a> {
                 NodeKind::Operand(OperandNodeKind::Constant(ConstantKind::Int32(i))) => {
                     heap.alloc(DAGNode::new(
                         NodeKind::Operand(OperandNodeKind::Constant(ConstantKind::Int32(
-                            i * ty.size_in_byte(&self.module.types) as i32,
+                            i * ty.size_in_byte(&self.types) as i32,
                         ))),
                         vec![],
                         Type::Int32,
@@ -419,12 +423,12 @@ impl<'a> ConvertToDAG<'a> {
                 _ => {
                     let tysz = heap.alloc(DAGNode::new(
                         NodeKind::Operand(OperandNodeKind::Constant(ConstantKind::Int32(
-                            ty.size_in_byte(&self.module.types) as i32,
+                            ty.size_in_byte(&self.types) as i32,
                         ))),
                         vec![],
                         Type::Int32,
                     ));
-                    let cast = sext_if_necessary(&self.module.types, heap, idx, Type::Int64);
+                    let cast = sext_if_necessary(&self.types, heap, idx, Type::Int64);
                     heap.alloc(DAGNode::new(
                         NodeKind::IR(IRNodeKind::Mul),
                         vec![cast, tysz],

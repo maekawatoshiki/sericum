@@ -85,6 +85,11 @@ impl Types {
         Type::Function(id)
     }
 
+    pub fn new_struct_ty(&mut self, fields_ty: Vec<Type>) -> Type {
+        let id = self.new_non_primitive_ty(NonPrimitiveType::Struct(StructType::new(fields_ty)));
+        Type::Struct(id)
+    }
+
     pub fn as_function_ty(&self, ty: Type) -> Option<&FunctionType> {
         match ty {
             Type::Function(id) => Some(self.non_primitive_types[id].as_function()),
