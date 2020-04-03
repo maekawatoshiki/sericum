@@ -12,21 +12,26 @@ impl PrologueEpilogueInserter {
 
     pub fn run_on_module(&mut self, module: &mut MachineModule) {
         for (_, func) in &mut module.functions {
-            self.run_on_function(func);
+            self.run_on_function(&module.types, func);
         }
     }
 
-    pub fn run_on_function(&mut self, cur_func: &mut MachineFunction) {
+    pub fn run_on_function(&mut self, tys: &Types, cur_func: &mut MachineFunction) {
         if cur_func.internal {
             return;
         }
 
-        let frame_info = FrameObjectsInfo::new(cur_func);
-        self.insert_prologue(cur_func, &frame_info);
+        let frame_info = FrameObjectsInfo::new(tys, cur_func);
+        self.insert_prologue(tys, cur_func, &frame_info);
         self.insert_epilogue(cur_func);
     }
 
-    fn insert_prologue(&mut self, cur_func: &mut MachineFunction, finfo: &FrameObjectsInfo) {
+    fn insert_prologue(
+        &mut self,
+        tys: &Types,
+        cur_func: &mut MachineFunction,
+        finfo: &FrameObjectsInfo,
+    ) {
         let mut builder = Builder::new(cur_func);
         builder.set_insert_point_at_entry_bb();
 
@@ -73,14 +78,12 @@ impl PrologueEpilogueInserter {
         let mov_rsp_i = builder.function.body.inst_arena.alloc(mov_rsp_i);
         builder.insert(mov_rsp_i);
 
-        self.insert_arg_copy(&mut builder)
+        self.insert_arg_copy(tys, &mut builder)
     }
 
-    fn insert_arg_copy<'a>(&mut self, builder: &mut Builder<'a>) {
-        for (i, ty) in builder
-            .function
-            .ty
-            .get_function_ty()
+    fn insert_arg_copy<'a>(&mut self, tys: &Types, builder: &mut Builder<'a>) {
+        for (i, ty) in tys
+            .as_function_ty(builder.function.ty)
             .unwrap()
             .params_ty
             .clone()

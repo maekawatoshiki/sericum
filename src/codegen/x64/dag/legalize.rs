@@ -18,19 +18,20 @@ impl Legalize {
 
     pub fn run_on_module(&mut self, module: &mut DAGModule) {
         for (_, func) in &mut module.functions {
-            self.run_on_function(func)
+            self.run_on_function(&module.types, func)
         }
     }
 
-    fn run_on_function(&mut self, func: &mut DAGFunction) {
+    fn run_on_function(&mut self, tys: &Types, func: &mut DAGFunction) {
         for bb_id in &func.dag_basic_blocks {
             let bb = &func.dag_basic_block_arena[*bb_id];
-            self.run_on_node(&mut func.dag_heap, bb.entry.unwrap());
+            self.run_on_node(tys, &mut func.dag_heap, bb.entry.unwrap());
         }
     }
 
     fn run_on_node(
         &mut self,
+        tys: &Types,
         heap: &mut RawAllocator<DAGNode>,
         node: Raw<DAGNode>,
     ) -> Raw<DAGNode> {
@@ -44,12 +45,12 @@ impl Legalize {
 
         // TODO: auto-generate the following code by macro
         let mut selected = match node.kind {
-            NodeKind::IR(IRNodeKind::Load) => self.run_on_node_load(heap, node),
-            NodeKind::IR(IRNodeKind::Store) => self.run_on_node_store(heap, node),
-            NodeKind::IR(IRNodeKind::Add) => self.run_on_node_add(heap, node),
-            NodeKind::IR(IRNodeKind::Sext) => self.run_on_node_sext(heap, node),
+            NodeKind::IR(IRNodeKind::Load) => self.run_on_node_load(tys, heap, node),
+            NodeKind::IR(IRNodeKind::Store) => self.run_on_node_store(tys, heap, node),
+            NodeKind::IR(IRNodeKind::Add) => self.run_on_node_add(tys, heap, node),
+            NodeKind::IR(IRNodeKind::Sext) => self.run_on_node_sext(tys, heap, node),
             _ => {
-                self.run_on_node_operand(heap, node);
+                self.run_on_node_operand(tys, heap, node);
                 node
             }
         };
@@ -57,7 +58,7 @@ impl Legalize {
         self.selected.insert(node, selected);
 
         if let Some(next) = node.next {
-            selected.next = Some(self.run_on_node(heap, next));
+            selected.next = Some(self.run_on_node(tys, heap, next));
         }
 
         selected
@@ -65,13 +66,14 @@ impl Legalize {
 
     fn run_on_node_load(
         &mut self,
+        tys: &Types,
         heap: &mut RawAllocator<DAGNode>,
         node: Raw<DAGNode>,
     ) -> Raw<DAGNode> {
         if node.operand[0].kind == NodeKind::IR(IRNodeKind::Add) {
             let add = node.operand[0];
-            let op0 = self.run_on_node(heap, add.operand[0]);
-            let op1 = self.run_on_node(heap, add.operand[1]);
+            let op0 = self.run_on_node(tys, heap, add.operand[0]);
+            let op1 = self.run_on_node(tys, heap, add.operand[1]);
             let none = heap.alloc(DAGNode::new_none());
             let rbp = heap.alloc(DAGNode::new_phys_reg(GR64::RSP));
 
@@ -87,7 +89,7 @@ impl Legalize {
                 && op1.kind == NodeKind::IR(IRNodeKind::Mul)
                 && op1.operand[1].is_constant()
             {
-                let op1_op0 = self.run_on_node(heap, op1.operand[0]);
+                let op1_op0 = self.run_on_node(tys, heap, op1.operand[0]);
                 let op1_op1 = op1.operand[1];
                 return heap.alloc(DAGNode::new(
                     NodeKind::MI(MINodeKind::MOVrm32),
@@ -100,7 +102,7 @@ impl Legalize {
                 && op1.kind == NodeKind::IR(IRNodeKind::Mul)
                 && op1.operand[1].is_constant()
             {
-                let op1_op0 = self.run_on_node(heap, op1.operand[0]);
+                let op1_op0 = self.run_on_node(tys, heap, op1.operand[0]);
                 let op1_op1 = op1.operand[1];
                 return heap.alloc(DAGNode::new(
                     NodeKind::MI(MINodeKind::MOVrm32),
@@ -110,12 +112,13 @@ impl Legalize {
             }
         }
 
-        self.run_on_node_operand(heap, node);
+        self.run_on_node_operand(tys, heap, node);
         node
     }
 
     fn run_on_node_store(
         &mut self,
+        tys: &Types,
         heap: &mut RawAllocator<DAGNode>,
         mut node: Raw<DAGNode>,
     ) -> Raw<DAGNode> {
@@ -139,6 +142,7 @@ impl Legalize {
 
     fn run_on_node_add(
         &mut self,
+        tys: &Types,
         heap: &mut RawAllocator<DAGNode>,
         node: Raw<DAGNode>,
     ) -> Raw<DAGNode> {
@@ -153,7 +157,7 @@ impl Legalize {
             ));
 
             if node.operand[1].is_maybe_register() {
-                let op1 = self.run_on_node(heap, node.operand[1]);
+                let op1 = self.run_on_node(tys, heap, node.operand[1]);
                 return heap.alloc(DAGNode::new(
                     NodeKind::MI(MINodeKind::LEAr64m),
                     vec![rbp, op0, one, op1],
@@ -169,12 +173,13 @@ impl Legalize {
             }
         }
 
-        self.run_on_node_operand(heap, node);
+        self.run_on_node_operand(tys, heap, node);
         node
     }
 
     fn run_on_node_sext(
         &mut self,
+        tys: &Types,
         heap: &mut RawAllocator<DAGNode>,
         node: Raw<DAGNode>,
     ) -> Raw<DAGNode> {
@@ -189,15 +194,20 @@ impl Legalize {
             ));
         }
 
-        self.run_on_node_operand(heap, node);
+        self.run_on_node_operand(tys, heap, node);
         node
     }
 
-    fn run_on_node_operand(&mut self, heap: &mut RawAllocator<DAGNode>, mut node: Raw<DAGNode>) {
+    fn run_on_node_operand(
+        &mut self,
+        tys: &Types,
+        heap: &mut RawAllocator<DAGNode>,
+        mut node: Raw<DAGNode>,
+    ) {
         node.operand = node
             .operand
             .iter()
-            .map(|op| self.run_on_node(heap, *op))
+            .map(|op| self.run_on_node(tys, heap, *op))
             .collect()
     }
 }

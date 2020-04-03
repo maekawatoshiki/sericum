@@ -144,7 +144,12 @@ impl JITCompiler {
         let buf = executor.lock();
         let f: extern "C" fn() -> u64 = unsafe { ::std::mem::transmute(buf.ptr(entry)) };
 
-        match &module.function_ref(id).ty.get_function_ty().unwrap().ret_ty {
+        match module
+            .types
+            .as_function_ty(module.function_ref(id).ty)
+            .unwrap()
+            .ret_ty
+        {
             Type::Int32 => GenericValue::Int32(f() as i32),
             Type::F64 => {
                 let f: extern "C" fn() -> f64 = unsafe { ::std::mem::transmute(buf.ptr(entry)) };
@@ -182,7 +187,7 @@ impl JITCompiler {
 
         let f_entry = self.get_label(id);
 
-        let frame_objects = FrameObjectsInfo::new(f);
+        let frame_objects = FrameObjectsInfo::new(&module.types, f);
 
         dynasm!(self.asm
             ; =>f_entry

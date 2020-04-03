@@ -11,6 +11,7 @@ use rustc_hash::FxHashMap;
 
 pub struct ConvertToDAG<'a> {
     pub module: &'a Module,
+    pub types: Types, // copied from module
     pub inst_id_node_id: FxHashMap<InstructionId, Raw<DAGNode>>,
     pub inst_id_to_copy_node: FxHashMap<InstructionId, Raw<DAGNode>>,
     pub cur_conversion_info: Option<ConversionInfo>,
@@ -31,6 +32,7 @@ impl<'a> ConvertToDAG<'a> {
 
         Self {
             module,
+            types: module.types.clone(),
             inst_id_node_id: FxHashMap::default(),
             inst_id_to_copy_node: FxHashMap::default(),
             cur_conversion_info: None,
@@ -42,6 +44,7 @@ impl<'a> ConvertToDAG<'a> {
         for (f_id, _) in &self.module.functions {
             dag_module.add_function(self.construct_dag(f_id));
         }
+        dag_module.types = self.types.clone();
         dag_module
     }
 
@@ -108,7 +111,7 @@ impl<'a> ConvertToDAG<'a> {
                 let ty = self
                     .module
                     .function_ref(av.func_id)
-                    .get_param_type(av.index)
+                    .get_param_type(&self.module.types, av.index)
                     .unwrap();
                 let fi = self.cur_conv_info_mut().dag_heap.alloc(DAGNode::new(
                     NodeKind::Operand(OperandNodeKind::FrameIndex(FrameIndexInfo::new(
@@ -394,15 +397,16 @@ impl<'a> ConvertToDAG<'a> {
         let mut ty = ptr.get_type(self.module);
 
         for idx in indices {
-            ty = ty.get_element_ty(Some(idx)).unwrap();
+            ty = self.types.get_element_ty(ty, Some(idx)).unwrap();
+            // ty = ty.get_element_ty(Some(idx)).unwrap();
 
             let idx = self.get_dag_id_from_value(idx, true);
-            let heap = &mut self.cur_conv_info_mut().dag_heap;
+            let heap = &mut self.cur_conversion_info.as_mut().unwrap().dag_heap;
             let idx = match idx.kind {
                 NodeKind::Operand(OperandNodeKind::Constant(ConstantKind::Int32(i))) => {
                     heap.alloc(DAGNode::new(
                         NodeKind::Operand(OperandNodeKind::Constant(ConstantKind::Int32(
-                            i * ty.size_in_byte() as i32,
+                            i * ty.size_in_byte(&self.module.types) as i32,
                         ))),
                         vec![],
                         Type::Int32,
@@ -415,12 +419,12 @@ impl<'a> ConvertToDAG<'a> {
                 _ => {
                     let tysz = heap.alloc(DAGNode::new(
                         NodeKind::Operand(OperandNodeKind::Constant(ConstantKind::Int32(
-                            ty.size_in_byte() as i32,
+                            ty.size_in_byte(&self.module.types) as i32,
                         ))),
                         vec![],
                         Type::Int32,
                     ));
-                    let cast = sext_if_necessary(heap, idx, Type::Int64);
+                    let cast = sext_if_necessary(&self.module.types, heap, idx, Type::Int64);
                     heap.alloc(DAGNode::new(
                         NodeKind::IR(IRNodeKind::Mul),
                         vec![cast, tysz],
@@ -429,10 +433,11 @@ impl<'a> ConvertToDAG<'a> {
                 }
             };
 
+            let ptr_ty = self.types.new_pointer_ty(ty);
             gep = self.cur_conv_info_mut().dag_heap.alloc(DAGNode::new(
                 NodeKind::IR(IRNodeKind::Add),
                 vec![gep, idx],
-                Type::Pointer(Box::new(ty.clone())),
+                ptr_ty, // Type::Pointer(Box::new(ty.clone())),
             ));
         }
 
@@ -496,11 +501,12 @@ impl<'a> ConvertToDAG<'a> {
 }
 
 fn sext_if_necessary(
+    tys: &Types,
     heap: &mut RawAllocator<DAGNode>,
     node: Raw<DAGNode>,
     to: Type,
 ) -> Raw<DAGNode> {
-    if node.ty == to || node.ty.size_in_bits() >= to.size_in_bits() {
+    if node.ty == to || node.ty.size_in_bits(tys) >= to.size_in_bits(tys) {
         return node;
     }
 

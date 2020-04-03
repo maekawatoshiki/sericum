@@ -1,5 +1,6 @@
 use super::const_data::ConstDataArena;
 use super::function::*;
+use crate::ir::types::*;
 use id_arena::*;
 use std::fmt;
 
@@ -7,6 +8,7 @@ pub struct MachineModule {
     pub name: String,
     pub functions: Arena<MachineFunction>,
     pub const_data: ConstDataArena,
+    pub types: Types,
 }
 
 impl MachineModule {
@@ -15,6 +17,7 @@ impl MachineModule {
             name: name.to_string(),
             functions: Arena::new(),
             const_data: ConstDataArena::new(),
+            types: Types::new(),
         }
     }
 

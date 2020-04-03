@@ -1,23 +1,38 @@
 use super::value::Value;
+use id_arena::*;
 use std::fmt;
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone)]
+pub struct Types {
+    pub non_primitive_types: Arena<NonPrimitiveType>,
+}
+
+pub type NonPrimitiveTypeId = Id<NonPrimitiveType>;
+
+#[derive(Clone, Eq, PartialEq)]
+pub enum NonPrimitiveType {
+    Pointer(Type),
+    Array(ArrayType),
+    Function(FunctionType),
+    Struct(StructType),
+}
+
+#[derive(Clone, PartialEq, Eq, Copy)]
 pub enum Type {
     Void,
     Int1,
     Int32,
     Int64,
     F64,
-    // TODO: Box -> Rc<RefCell<_>> (for circular structure)
-    Pointer(Box<Type>),
-    Array(Box<ArrayType>),
-    Function(Box<FunctionType>),
-    Struct(Box<StructType>),
+    Pointer(NonPrimitiveTypeId),
+    Array(NonPrimitiveTypeId),
+    Function(NonPrimitiveTypeId),
+    Struct(NonPrimitiveTypeId),
 }
 
 pub trait TypeSize {
-    fn size_in_byte(&self) -> usize;
-    fn size_in_bits(&self) -> usize;
+    fn size_in_byte(&self, tys: &Types) -> usize;
+    fn size_in_bits(&self, tys: &Types) -> usize;
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -37,58 +52,129 @@ pub struct StructType {
     pub fields_ty: Vec<Type>,
 }
 
-impl Type {
-    pub fn func_ty(ret_ty: Type, params_ty: Vec<Type>) -> Self {
-        Type::Function(Box::new(FunctionType::new(ret_ty, params_ty)))
+impl Types {
+    pub fn new() -> Self {
+        Self {
+            non_primitive_types: Arena::new(),
+        }
     }
 
-    pub fn get_function_ty(&self) -> Option<&FunctionType> {
-        match self {
-            Type::Function(f) => Some(&*f),
+    fn new_non_primitive_ty(&mut self, t: NonPrimitiveType) -> NonPrimitiveTypeId {
+        for (id, t_) in &self.non_primitive_types {
+            if &t == t_ {
+                return id;
+            }
+        }
+        self.non_primitive_types.alloc(t)
+    }
+
+    pub fn new_pointer_ty(&mut self, elem_ty: Type) -> Type {
+        let id = self.new_non_primitive_ty(NonPrimitiveType::Pointer(elem_ty));
+        Type::Pointer(id)
+    }
+
+    pub fn new_array_ty(&mut self, elem_ty: Type, len: usize) -> Type {
+        let id = self.new_non_primitive_ty(NonPrimitiveType::Array(ArrayType::new(elem_ty, len)));
+        Type::Array(id)
+    }
+
+    pub fn new_function_ty(&mut self, ret_ty: Type, params_ty: Vec<Type>) -> Type {
+        let id = self.new_non_primitive_ty(NonPrimitiveType::Function(FunctionType::new(
+            ret_ty, params_ty,
+        )));
+        Type::Function(id)
+    }
+
+    pub fn as_function_ty(&self, ty: Type) -> Option<&FunctionType> {
+        match ty {
+            Type::Function(id) => Some(self.non_primitive_types[id].as_function()),
             _ => None,
         }
     }
 
-    pub fn get_pointer_ty(&self) -> Type {
-        Type::Pointer(Box::new(self.clone()))
-    }
-
-    pub fn get_element_ty(&self, index: Option<&Value>) -> Option<&Type> {
-        match self {
-            Type::Pointer(e) => Some(&**e),
-            Type::Array(a) => Some(&a.elem_ty),
-            Type::Struct(s) => Some(&s.fields_ty[index.unwrap().as_imm().as_int32() as usize]),
+    pub fn get_element_ty(&self, ty: Type, index: Option<&Value>) -> Option<Type> {
+        match ty {
+            Type::Pointer(id) => Some(*self.non_primitive_types[id].as_pointer()),
+            Type::Array(id) => Some(self.non_primitive_types[id].as_array().elem_ty),
+            Type::Struct(id) => Some(
+                self.non_primitive_types[id].as_struct().fields_ty
+                    [index.unwrap().as_imm().as_int32() as usize],
+            ),
             Type::Void | Type::Int1 | Type::Int32 | Type::Int64 | Type::F64 | Type::Function(_) => {
-                Some(self)
+                Some(ty)
             }
         }
     }
 
-    pub fn get_element_ty_with_indices(&self, indices: &[Value]) -> Option<&Type> {
+    pub fn get_element_ty_with_indices(&self, ty: Type, indices: &[Value]) -> Option<Type> {
         if indices.len() == 0 {
-            return Some(self);
+            return Some(ty);
         }
 
-        match self {
+        match ty {
             Type::Void | Type::Int1 | Type::Int32 | Type::Int64 | Type::F64 | Type::Function(_) => {
-                Some(self)
+                None
             }
-            Type::Pointer(p) => match indices.len() {
-                1 => Some(&**p),
-                _ => p.get_element_ty_with_indices(&indices[1..]),
+            Type::Pointer(id) => match indices.len() {
+                1 => Some(*self.non_primitive_types[id].as_pointer()),
+                _ => {
+                    let elem_ty = self.non_primitive_types[id].as_pointer();
+                    self.get_element_ty_with_indices(*elem_ty, &indices[1..])
+                }
             },
-            Type::Array(a) => match indices.len() {
-                1 => Some(&a.elem_ty),
-                _ => a.elem_ty.get_element_ty_with_indices(&indices[1..]),
+            Type::Array(id) => match indices.len() {
+                1 => Some(self.non_primitive_types[id].as_array().elem_ty),
+                _ => {
+                    let elem_ty = self.non_primitive_types[id].as_array().elem_ty;
+                    self.get_element_ty_with_indices(elem_ty, &indices[1..])
+                }
             },
-            Type::Struct(s) => match indices.len() {
-                1 => Some(&s.fields_ty[indices[0].as_imm().as_int32() as usize]),
-                _ => s.fields_ty[indices[0].as_imm().as_int32() as usize]
-                    .get_element_ty_with_indices(&indices[1..]),
+            Type::Struct(id) => match indices.len() {
+                1 => Some(
+                    self.non_primitive_types[id].as_struct().fields_ty
+                        [indices[0].as_imm().as_int32() as usize],
+                ),
+                _ => self.get_element_ty_with_indices(
+                    self.non_primitive_types[id].as_struct().fields_ty
+                        [indices[0].as_imm().as_int32() as usize],
+                    &indices[1..],
+                ),
             },
         }
     }
 
+    pub fn to_string(&self, ty: Type) -> String {
+        match ty {
+            Type::Void => "void".to_string(),
+            Type::Int1 => "i1".to_string(),
+            Type::Int32 => "i32".to_string(),
+            Type::Int64 => "i64".to_string(),
+            Type::F64 => "f64".to_string(),
+            Type::Pointer(id) => {
+                let elem_ty = self.non_primitive_types[id].as_pointer();
+                format!("{}*", self.to_string(*elem_ty))
+            }
+            Type::Array(id) => {
+                let arr = self.non_primitive_types[id].as_array();
+                arr.to_string(self)
+            }
+            Type::Function(id) => {
+                let f = self.non_primitive_types[id].as_function();
+                f.to_string(self)
+            }
+            Type::Struct(id) => {
+                let s = self.non_primitive_types[id].as_struct();
+                s.to_string(self)
+            }
+        }
+    }
+
+    // pub fn get_pointer_ty(&self) -> Type {
+    //     Type::Pointer(Box::new(self.clone()))
+    // }
+}
+
+impl Type {
     pub fn to_string(&self) -> String {
         match self {
             Type::Void => "void".to_string(),
@@ -96,10 +182,10 @@ impl Type {
             Type::Int32 => "i32".to_string(),
             Type::Int64 => "i64".to_string(),
             Type::F64 => "f64".to_string(),
-            Type::Pointer(e) => format!("{}*", e.to_string()),
-            Type::Array(a) => a.to_string(),
-            Type::Function(f) => f.to_string(),
-            Type::Struct(s) => s.to_string(),
+            Type::Pointer(id) => format!("(ty:{})*", id.index()),
+            Type::Array(id) => format!("arrty:{}", id.index()),
+            Type::Function(id) => format!("functy:{}", id.index()),
+            Type::Struct(id) => format!("structty:{}", id.index()),
         }
     }
 }
@@ -109,12 +195,12 @@ impl FunctionType {
         Self { ret_ty, params_ty }
     }
 
-    pub fn to_string(&self) -> String {
+    pub fn to_string(&self, tys: &Types) -> String {
         format!(
             "{} ({})",
-            self.ret_ty.to_string(),
+            tys.to_string(self.ret_ty),
             self.params_ty.iter().fold("".to_string(), |mut s, p| {
-                s += &(p.to_string() + ", ");
+                s += &(tys.to_string(*p) + ", ");
                 s
             }),
         )
@@ -126,8 +212,8 @@ impl ArrayType {
         Self { elem_ty, len }
     }
 
-    pub fn to_string(&self) -> String {
-        format!("[{} x {}]", self.len, self.elem_ty.to_string(),)
+    pub fn to_string(&self, tys: &Types) -> String {
+        format!("[{} x {}]", self.len, tys.to_string(self.elem_ty))
     }
 }
 
@@ -136,13 +222,13 @@ impl StructType {
         Self { fields_ty }
     }
 
-    pub fn to_string(&self) -> String {
+    pub fn to_string(&self, tys: &Types) -> String {
         format!(
             "struct {{{}}}",
             self.fields_ty
                 .iter()
                 .fold("".to_string(), |mut s, t| {
-                    s += &(t.to_string() + ", ");
+                    s += &(tys.to_string(*t) + ", ");
                     s
                 })
                 .trim_matches(&[',', ' '][0..])
@@ -150,8 +236,44 @@ impl StructType {
     }
 }
 
+impl NonPrimitiveType {
+    pub fn as_pointer(&self) -> &Type {
+        match self {
+            NonPrimitiveType::Pointer(p) => p,
+            _ => panic!(),
+        }
+    }
+
+    pub fn as_array(&self) -> &ArrayType {
+        match self {
+            NonPrimitiveType::Array(a) => a,
+            _ => panic!(),
+        }
+    }
+
+    pub fn as_function(&self) -> &FunctionType {
+        match self {
+            NonPrimitiveType::Function(f) => f,
+            _ => panic!(),
+        }
+    }
+
+    pub fn as_struct(&self) -> &StructType {
+        match self {
+            NonPrimitiveType::Struct(s) => s,
+            _ => panic!(),
+        }
+    }
+}
+
 impl fmt::Debug for Type {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.to_string())
+    }
+}
+
+impl fmt::Debug for Types {
+    fn fmt(&self, _: &mut fmt::Formatter) -> fmt::Result {
+        fmt::Result::Ok(())
     }
 }

@@ -69,7 +69,7 @@ impl<'a> ISelPatParser<'a> {
                 #root.operand = #root
                     .operand
                     .iter()
-                    .map(|op| self.run_on_node(heap, *op))
+                    .map(|op| self.run_on_node(tys, heap, *op))
                     .collect();
                 #root
             }
@@ -116,7 +116,7 @@ impl<'a> ISelPatParser<'a> {
                 };
                 quote! {
                     // #node.ty is pointer type
-                    if #node.is_frame_index() && #node.ty.get_element_ty(None).unwrap().size_in_bits() == #bits {
+                    if #node.is_frame_index() && tys.get_element_ty(#node.ty, None).unwrap().size_in_bits(tys) == #bits {
                         #body
                     }
                 }
@@ -179,7 +179,7 @@ impl<'a> ISelPatParser<'a> {
                 } else {
                     def_operands = quote! {
                         #def_operands
-                        let #op = self.run_on_node(heap, #op);
+                        let #op = self.run_on_node(tys, heap, #op);
                     };
                     operands = quote! { #operands #op, };
                 }

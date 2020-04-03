@@ -5,7 +5,7 @@ use super::super::machine::{
     inst::*,
     module::MachineModule,
 };
-use crate::ir::types::TypeSize;
+use crate::ir::types::{TypeSize, Types};
 
 pub struct MachineAsmPrinter {
     pub output: String,
@@ -25,41 +25,46 @@ impl MachineAsmPrinter {
         self.output.push_str("  .intel_syntax noprefix\n");
 
         for (_, func) in &m.functions {
-            self.run_on_function(&func)
+            self.run_on_function(&m.types, &func)
         }
     }
 
-    fn run_on_function(&mut self, f: &MachineFunction) {
+    fn run_on_function(&mut self, tys: &Types, f: &MachineFunction) {
         if f.internal {
             return;
         }
 
-        let fo = FrameObjectsInfo::new(f);
+        let fo = FrameObjectsInfo::new(tys, f);
 
         self.output
             .push_str(format!("  .globl {}\n", f.name).as_str()); // TODO
 
         self.output.push_str(format!("{}:\n", f.name).as_str());
 
-        self.run_on_basic_blocks(f, &fo);
+        self.run_on_basic_blocks(tys, f, &fo);
     }
 
-    fn run_on_basic_blocks(&mut self, f: &MachineFunction, fo: &FrameObjectsInfo) {
+    fn run_on_basic_blocks(&mut self, tys: &Types, f: &MachineFunction, fo: &FrameObjectsInfo) {
         for (id, _, inst_iter) in f.body.mbb_iter() {
             self.output
                 .push_str(format!("{}:\n", self.bb_id_to_label_id(&id)).as_str());
-            self.run_on_basic_block(inst_iter, fo);
+            self.run_on_basic_block(tys, inst_iter, fo);
         }
         self.cur_bb_id_base += f.body.basic_blocks.order.len();
     }
 
-    fn run_on_basic_block<'a>(&mut self, inst_iter: InstIter<'a>, fo: &FrameObjectsInfo) {
+    fn run_on_basic_block<'a>(
+        &mut self,
+        tys: &Types,
+        inst_iter: InstIter<'a>,
+        fo: &FrameObjectsInfo,
+    ) {
         for (_, inst) in inst_iter {
-            self.run_on_inst(inst, fo);
+            self.run_on_inst(tys, inst, fo);
         }
     }
 
-    fn run_on_inst(&mut self, inst: &MachineInst, fo: &FrameObjectsInfo) {
+    fn run_on_inst(&mut self, tys: &Types, inst: &MachineInst, fo: &FrameObjectsInfo) {
         self.output.push_str("  ");
 
         match inst.opcode {
@@ -70,7 +75,9 @@ impl MachineAsmPrinter {
             | MachineOpcode::MOVrr64
             | MachineOpcode::MOVri64 => self.run_on_inst_mov_rx(inst),
             MachineOpcode::MOVrm32 | MachineOpcode::MOVrm64 => self.run_on_inst_mov_rm(inst, fo),
-            MachineOpcode::MOVmr32 | MachineOpcode::MOVmi32 => self.run_on_inst_mov_mx(inst, fo),
+            MachineOpcode::MOVmr32 | MachineOpcode::MOVmi32 => {
+                self.run_on_inst_mov_mx(tys, inst, fo)
+            }
             MachineOpcode::LEAr64m => self.run_on_inst_lea_rm(inst, fo),
             MachineOpcode::ADDrr32 | MachineOpcode::ADDri32 | MachineOpcode::ADDr64i32 => {
                 self.run_on_inst_add(inst)
@@ -179,8 +186,8 @@ impl MachineAsmPrinter {
         }
     }
 
-    fn run_on_inst_mov_mx(&mut self, i: &MachineInst, fo: &FrameObjectsInfo) {
-        let word = byte2word(i.operand[4].get_type().unwrap().size_in_byte());
+    fn run_on_inst_mov_mx(&mut self, tys: &Types, i: &MachineInst, fo: &FrameObjectsInfo) {
+        let word = byte2word(i.operand[4].get_type().unwrap().size_in_byte(tys));
 
         self.output.push_str("mov ");
 

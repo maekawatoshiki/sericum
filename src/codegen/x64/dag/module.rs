@@ -1,10 +1,12 @@
 use super::function::*;
+use crate::ir::types::Types;
 use id_arena::*;
 use std::fmt;
 
 pub struct DAGModule {
     pub name: String,
     pub functions: Arena<DAGFunction>,
+    pub types: Types,
 }
 
 impl DAGModule {
@@ -12,6 +14,7 @@ impl DAGModule {
         Self {
             name: name.to_string(),
             functions: Arena::new(),
+            types: Types::new(),
         }
     }
 

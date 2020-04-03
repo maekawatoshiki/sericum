@@ -32,17 +32,23 @@ impl LocalVariables {
 }
 
 impl FrameObjectsInfo {
-    pub fn new(f: &MachineFunction) -> Self {
+    pub fn new(tys: &Types, f: &MachineFunction) -> Self {
         let mut offset_map = FxHashMap::default();
         let mut offset = 0;
 
-        for (i, param_ty) in f.ty.get_function_ty().unwrap().params_ty.iter().enumerate() {
-            offset += param_ty.size_in_byte();
+        for (i, param_ty) in tys
+            .as_function_ty(f.ty)
+            .unwrap()
+            .params_ty
+            .iter()
+            .enumerate()
+        {
+            offset += param_ty.size_in_byte(tys);
             offset_map.insert(FrameIndexKind::Arg(i), offset);
         }
 
         for FrameIndexInfo { idx, ty } in &f.local_mgr.locals {
-            offset += ty.size_in_byte();
+            offset += ty.size_in_byte(tys);
             offset_map.insert(*idx, offset);
         }
 

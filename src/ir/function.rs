@@ -38,9 +38,10 @@ pub struct Function {
 
 impl Function {
     pub fn new(module: &mut Module, name: &str, ret_ty: Type, params_ty: Vec<Type>) -> FunctionId {
+        let ty = module.types.new_function_ty(ret_ty, params_ty);
         module.add_function(Self {
             name: name.to_string(),
-            ty: Type::func_ty(ret_ty, params_ty),
+            ty,
             basic_block_arena: Arena::new(),
             basic_blocks: vec![],
             inst_table: Arena::new(),
@@ -71,8 +72,8 @@ impl Function {
         &mut self.basic_block_arena[id]
     }
 
-    pub fn get_param_value(&self, func_id: FunctionId, idx: usize) -> Option<Value> {
-        if idx >= self.ty.get_function_ty().unwrap().params_ty.len() {
+    pub fn get_param_value(&self, tys: &Types, func_id: FunctionId, idx: usize) -> Option<Value> {
+        if idx >= tys.as_function_ty(self.ty).unwrap().params_ty.len() {
             return None;
         }
         Some(Value::Argument(ArgumentValue {
@@ -81,12 +82,12 @@ impl Function {
         }))
     }
 
-    pub fn get_param_type(&self, idx: usize) -> Option<&Type> {
-        let params_ty = &self.ty.get_function_ty().unwrap().params_ty;
+    pub fn get_param_type(&self, tys: &Types, idx: usize) -> Option<Type> {
+        let params_ty = &tys.as_function_ty(self.ty).unwrap().params_ty;
         if idx >= params_ty.len() {
             return None;
         }
-        Some(&params_ty[idx])
+        Some(params_ty[idx])
     }
 
     pub fn inst_id(&mut self, inst: Instruction) -> InstructionId {
@@ -96,15 +97,15 @@ impl Function {
 
 impl DumpToString for &Function {
     fn dump(&self, module: &Module) -> String {
-        let ty = self.ty.get_function_ty().unwrap();
+        let ty = module.types.as_function_ty(self.ty).unwrap();
         format!(
             "define {} {}({}) {{\n{}}}",
-            ty.ret_ty.to_string(),
+            module.types.to_string(ty.ret_ty),
             self.name,
             ty.params_ty
                 .iter()
                 .fold("".to_string(), |mut s, p| {
-                    s += &(p.to_string() + ", ");
+                    s += &(module.types.to_string(*p) + ", ");
                     s
                 })
                 .trim_matches(&[',', ' '][0..]),

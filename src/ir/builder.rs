@@ -19,9 +19,11 @@ impl<'a> Builder<'a> {
     }
 
     pub fn get_param(&self, idx: usize) -> Option<Value> {
-        self.module
-            .function_ref(self.func_id)
-            .get_param_value(self.func_id, idx)
+        self.module.function_ref(self.func_id).get_param_value(
+            &self.module.types,
+            self.func_id,
+            idx,
+        )
     }
 
     pub fn append_basic_block(&mut self) -> BasicBlockId {
@@ -44,18 +46,19 @@ impl<'a> Builder<'a> {
     }
 
     pub fn build_alloca(&mut self, ty: Type) -> Value {
-        let ptr_ty = ty.get_pointer_ty();
+        let ptr_ty = self.module.types.new_pointer_ty(ty);
         let inst = self.create_inst_value(Opcode::Alloca(ty), ptr_ty);
         self.append_inst_to_cur_bb(inst);
         inst
     }
 
     pub fn build_gep(&mut self, v: Value, indices: Vec<Value>) -> Value {
-        let ty = v
-            .get_type(self.module)
-            .get_element_ty_with_indices(&indices)
-            .unwrap()
-            .get_pointer_ty();
+        let ty = self.module.types.new_pointer_ty(
+            self.module
+                .types
+                .get_element_ty_with_indices(v.get_type(self.module), &indices)
+                .unwrap(),
+        );
         let inst = self.create_inst_value(Opcode::GetElementPtr(v, indices), ty);
         self.append_inst_to_cur_bb(inst);
         inst
@@ -64,8 +67,9 @@ impl<'a> Builder<'a> {
     pub fn build_load(&mut self, v: Value) -> Value {
         let inst = self.create_inst_value(
             Opcode::Load(v),
-            v.get_type(self.module)
-                .get_element_ty(None)
+            self.module
+                .types
+                .get_element_ty(v.get_type(self.module), None)
                 .unwrap()
                 .clone(),
         );
@@ -163,12 +167,12 @@ impl<'a> Builder<'a> {
     }
 
     pub fn build_call(&mut self, f: Value, args: Vec<Value>) -> Value {
-        let ret_ty = f
-            .get_type(self.module)
-            .get_function_ty()
+        let ret_ty = self
+            .module
+            .types
+            .as_function_ty(f.get_type(self.module))
             .unwrap()
-            .ret_ty
-            .clone();
+            .ret_ty;
         let inst = self.create_inst_value(Opcode::Call(f, args), ret_ty);
         self.append_inst_to_cur_bb(inst);
         inst

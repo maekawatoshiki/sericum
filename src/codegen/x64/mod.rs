@@ -9,37 +9,43 @@ pub mod register;
 use crate::ir::types::*;
 
 impl TypeSize for Type {
-    fn size_in_byte(&self) -> usize {
+    fn size_in_byte(&self, tys: &Types) -> usize {
         match self {
             Type::Int1 => 1,
             Type::Int32 => 4,
             Type::Int64 => 8,
             Type::F64 => 8,
-            Type::Array(arrty) => arrty.size_in_byte(),
-            Type::Struct(s) => s.size_in_byte(),
+            Type::Array(id) => {
+                let ary = tys.non_primitive_types[*id].as_array();
+                ary.size_in_byte(tys)
+            }
+            Type::Struct(id) => {
+                let s = tys.non_primitive_types[*id].as_array();
+                s.size_in_byte(tys)
+            }
             Type::Pointer(_) => 8,
             Type::Function(_) => unimplemented!(),
             Type::Void => 0,
         }
     }
 
-    fn size_in_bits(&self) -> usize {
-        self.size_in_byte() * 8
+    fn size_in_bits(&self, tys: &Types) -> usize {
+        self.size_in_byte(tys) * 8
     }
 }
 
 impl TypeSize for ArrayType {
-    fn size_in_byte(&self) -> usize {
-        self.elem_ty.size_in_byte() * self.len
+    fn size_in_byte(&self, tys: &Types) -> usize {
+        self.elem_ty.size_in_byte(tys) * self.len
     }
 
-    fn size_in_bits(&self) -> usize {
-        self.size_in_byte() * 8
+    fn size_in_bits(&self, tys: &Types) -> usize {
+        self.size_in_byte(tys) * 8
     }
 }
 
 impl TypeSize for StructType {
-    fn size_in_byte(&self) -> usize {
+    fn size_in_byte(&self, tys: &Types) -> usize {
         let mut size_total = 0;
         let calc_padding = |off, align| -> usize {
             if off % align == 0 {
@@ -50,14 +56,14 @@ impl TypeSize for StructType {
         };
         for ty in &self.fields_ty {
             size_total += {
-                let size = ty.size_in_byte();
+                let size = ty.size_in_byte(tys);
                 size + calc_padding(size_total, size)
             };
         }
         size_total
     }
 
-    fn size_in_bits(&self) -> usize {
-        self.size_in_byte() * 8
+    fn size_in_bits(&self, tys: &Types) -> usize {
+        self.size_in_byte(tys) * 8
     }
 }

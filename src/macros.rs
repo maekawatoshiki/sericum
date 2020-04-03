@@ -37,39 +37,30 @@ macro_rules! matches {
 
 #[macro_export]
 macro_rules! cilk_parse_ty {
-    (i32) => {
+    ($_:expr, i32) => {
         types::Type::Int32
     };
-    (i64) => {
+    ($_:expr, i64) => {
         types::Type::Int64
     };
-    (f64) => {
+    ($_:expr, f64) => {
         types::Type::F64
     };
-    (void) => {
+    ($_:expr, void) => {
         types::Type::Void
     };
-    (ptr $($elem:tt)*) => {
-        types::Type::Pointer(
-            Box::new(
-                cilk_parse_ty!($($elem)*)
-            )
-        )
-    };
-    ([$n:expr; $ty:ident]) => {
-        types::Type::Array(
-            Box::new(
-                types::ArrayType::new(cilk_parse_ty!($ty), $n)
-            )
-        )
-    };
-    ([$n:expr; $($elem:tt)*]) => {
-        types::Type::Array(
-            Box::new(
-            types::ArrayType::new(cilk_parse_ty!($($elem)*), $n)
-        )
-    )
-};
+    ($tys:expr, ptr $($elem:tt)*) => {{
+        let e = cilk_parse_ty!($tys, $($elem)*);
+        $tys.new_pointer_ty(e)
+    }};
+    ($tys:expr, [$n:expr; $ty:ident]) => {{
+        let e = { cilk_parse_ty!($tys, $ty)};
+        $tys.new_array_ty(e, $n)
+    }};
+    ($tys:expr, [$n:expr; $($elem:tt)*]) => {{
+        let e = {cilk_parse_ty!($tys, $($elem)*)};
+        $tys.new_array_ty(e, $n)
+    }};
 }
 
 #[macro_export]
@@ -115,11 +106,14 @@ macro_rules! cilk_expr {
     cilk_expr!($builder; $bb_map; $( $remain )*);
 };
 ($builder:expr; $bb_map:expr; $x:ident = alloca $ty:ident; $($remain:tt)*) => {
-    let $x = $builder.build_alloca(cilk_parse_ty!($ty));
+    let $x = $builder.build_alloca(cilk_parse_ty!($builder.module.types, $ty));
     cilk_expr!($builder; $bb_map; $( $remain )*);
 };
 ($builder:expr; $bb_map:expr; $x:ident = alloca_ ($($ty:tt)*); $($remain:tt)*) => {
-    let $x = $builder.build_alloca(cilk_parse_ty!($( $ty )*));
+    let $x = {
+        let ty = cilk_parse_ty!($builder.module.types, $( $ty )*);
+        $builder.build_alloca(ty)
+    };
     cilk_expr!($builder; $bb_map; $( $remain )*);
 };
 ($builder:expr; $bb_map:expr; $x:ident = load ($($val:tt)*); $($remain:tt)*) => {
@@ -216,8 +210,8 @@ macro_rules! cilk_ir {
     ($m:expr; define [$($ret_ty:tt)*] $name:ident [$(($($arg:tt)*)),*] { $($exp:tt)* }) => {{
         let f_id = $m.create_function(
                 stringify!($name),
-                cilk_parse_ty!($($ret_ty)*),
-                vec![$( cilk_parse_ty!($($arg)*) ),*],
+                cilk_parse_ty!(m.types, $($ret_ty)*),
+                vec![$( cilk_parse_ty!(m.types, $($arg)*) ),*],
             );
         let mut builder = builder::Builder::new(&mut $m, f_id);
         let mut bb_map: FxHashMap<&str, basic_block::BasicBlockId> = FxHashMap::default();

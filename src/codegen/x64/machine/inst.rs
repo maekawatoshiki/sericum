@@ -536,8 +536,8 @@ impl AddressInfo {
     }
 }
 
-impl TypeSize for MachineConstant {
-    fn size_in_byte(&self) -> usize {
+impl MachineConstant {
+    pub fn size_in_byte(&self) -> usize {
         match self {
             MachineConstant::Int32(_) => 4,
             MachineConstant::Int64(_) => 8,
@@ -545,7 +545,7 @@ impl TypeSize for MachineConstant {
         }
     }
 
-    fn size_in_bits(&self) -> usize {
+    pub fn size_in_bits(&self) -> usize {
         self.size_in_byte() * 8
     }
 }

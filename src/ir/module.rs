@@ -5,6 +5,7 @@ use id_arena::*;
 pub struct Module {
     pub name: String,
     pub functions: Arena<Function>,
+    pub types: Types,
 }
 
 impl Module {
@@ -12,6 +13,7 @@ impl Module {
         Self {
             name: name.to_string(),
             functions: Arena::new(),
+            types: Types::new(),
         }
     }
 

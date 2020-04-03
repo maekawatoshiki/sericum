@@ -4,6 +4,7 @@ use super::super::{
     register::*,
 };
 use super::{builder::*, function::*, inst::*, liveness::*, module::*, spiller::Spiller};
+use crate::ir::types::Types;
 use rustc_hash::FxHashSet;
 use std::collections::VecDeque;
 
@@ -24,14 +25,14 @@ impl RegisterAllocator {
 
     pub fn run_on_module(&mut self, module: &mut MachineModule) {
         for (_, func) in &mut module.functions {
-            self.run_on_function(func);
+            self.run_on_function(&module.types, func);
         }
     }
 
-    pub fn run_on_function(&mut self, cur_func: &mut MachineFunction) {
+    pub fn run_on_function(&mut self, tys: &Types, cur_func: &mut MachineFunction) {
         let mut matrix = LivenessAnalysis::new().analyze_function(cur_func);
 
-        self.preserve_vreg_uses_across_call(cur_func, &mut matrix);
+        self.preserve_vreg_uses_across_call(tys, cur_func, &mut matrix);
 
         fn sort_queue(mut queue: Vec<VirtReg>, matrix: &LiveRegMatrix) -> Vec<VirtReg> {
             queue.sort_by(|x, y| {
@@ -74,7 +75,7 @@ impl RegisterAllocator {
             let phy_reg = matrix.unassign_reg(reg_to_spill).unwrap();
             matrix.assign_reg(vreg, phy_reg);
 
-            let new_regs = Spiller::new(cur_func, &mut matrix).spill(reg_to_spill);
+            let new_regs = Spiller::new(cur_func, &mut matrix).spill(tys, reg_to_spill);
             self.queue.push_back(reg_to_spill);
             for new_reg in new_regs {
                 self.queue.push_back(new_reg);
@@ -112,6 +113,7 @@ impl RegisterAllocator {
 
     fn insert_inst_to_save_reg(
         &mut self,
+        tys: &Types,
         cur_func: &mut MachineFunction,
         matrix: &mut LiveRegMatrix,
         occupied: &mut FxHashSet<FrameIndexKind>,
@@ -191,7 +193,7 @@ impl RegisterAllocator {
 
             let load_inst_id = cur_func.body.inst_arena.alloc(
                 MachineInst::new_simple(
-                    mov_rx(&src).unwrap(),
+                    mov_rx(tys, &src).unwrap(),
                     vec![rbp, src, MachineOperand::None, MachineOperand::None],
                     call_inst_parent,
                 )
@@ -211,6 +213,7 @@ impl RegisterAllocator {
 
     fn preserve_vreg_uses_across_call(
         &mut self,
+        tys: &Types,
         cur_func: &mut MachineFunction,
         matrix: &mut LiveRegMatrix,
     ) {
@@ -233,7 +236,7 @@ impl RegisterAllocator {
             .collect::<FxHashSet<_>>();
 
         for inst_id in call_inst_id {
-            self.insert_inst_to_save_reg(cur_func, matrix, &mut occupied.clone(), inst_id);
+            self.insert_inst_to_save_reg(tys, cur_func, matrix, &mut occupied.clone(), inst_id);
         }
     }
 }

@@ -9,6 +9,7 @@ use super::{
     inst::{MachineInst, MachineOperand, MachineRegister, RegisterInfo},
     liveness::LiveRegMatrix,
 };
+use crate::ir::types::Types;
 
 pub struct Spiller<'a> {
     func: &'a mut MachineFunction,
@@ -52,7 +53,12 @@ impl<'a> Spiller<'a> {
         builder.insert(store);
     }
 
-    pub fn insert_reload(&mut self, r: MachineRegister, slot: &FrameIndexInfo) -> Vec<VirtReg> {
+    pub fn insert_reload(
+        &mut self,
+        tys: &Types,
+        r: MachineRegister,
+        slot: &FrameIndexInfo,
+    ) -> Vec<VirtReg> {
         let mut new_regs = vec![];
         let rc = r.info_ref().reg_class;
 
@@ -71,7 +77,7 @@ impl<'a> Spiller<'a> {
                 RegisterInfo::new_phy_reg(GR64::RBP).into_machine_register(),
             );
             let load = MachineInst::new_simple(
-                mov_rx(&src).unwrap(),
+                mov_rx(tys, &src).unwrap(),
                 vec![rbp, src, MachineOperand::None, MachineOperand::None],
                 use_inst.parent,
             )
@@ -87,7 +93,7 @@ impl<'a> Spiller<'a> {
         new_regs
     }
 
-    pub fn spill(&mut self, vreg: VirtReg) -> Vec<VirtReg> {
+    pub fn spill(&mut self, tys: &Types, vreg: VirtReg) -> Vec<VirtReg> {
         let r = self.matrix.get_entity_by_vreg(vreg).unwrap().clone();
         let slot = self.func.local_mgr.alloc(&rc2ty(r.info_ref().reg_class)); // TODO
 
@@ -97,7 +103,7 @@ impl<'a> Spiller<'a> {
             .range
             .adjust_end_to_start();
 
-        let new_regs = self.insert_reload(r.clone(), &slot);
+        let new_regs = self.insert_reload(tys, r.clone(), &slot);
         self.insert_evict(r, &slot);
 
         new_regs

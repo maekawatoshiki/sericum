@@ -109,7 +109,7 @@ impl Opcode {
 
     pub fn to_string(&self, parent: &Module) -> String {
         match self {
-            Opcode::Alloca(ty) => format!("alloca {}", ty.to_string()),
+            Opcode::Alloca(ty) => format!("alloca {}", parent.types.to_string(*ty)),
             Opcode::Load(v) => format!("load {}", v.to_string(parent, false)),
             Opcode::Store(src, dst) => format!(
                 "store {}, {}",

@@ -37,7 +37,14 @@ impl<'a> IRLivenessAnalyzer<'a> {
                         def.insert(inst_id);
                     }
                     Opcode::Call(f, _) => {
-                        if f.get_type(self.module).get_function_ty().unwrap().ret_ty != Type::Void {
+                        if self
+                            .module
+                            .types
+                            .as_function_ty(f.get_type(self.module))
+                            .unwrap()
+                            .ret_ty
+                            != Type::Void
+                        {
                             def.insert(inst_id);
                         }
                     }

@@ -18,19 +18,20 @@ impl MISelector {
 
     pub fn run_on_module(&mut self, module: &mut DAGModule) {
         for (_, func) in &mut module.functions {
-            self.run_on_function(func)
+            self.run_on_function(&module.types, func)
         }
     }
 
-    fn run_on_function(&mut self, func: &mut DAGFunction) {
+    fn run_on_function(&mut self, tys: &Types, func: &mut DAGFunction) {
         for bb_id in &func.dag_basic_blocks {
             let bb = &func.dag_basic_block_arena[*bb_id];
-            self.run_on_node(&mut func.dag_heap, bb.entry.unwrap());
+            self.run_on_node(tys, &mut func.dag_heap, bb.entry.unwrap());
         }
     }
 
     fn run_on_node(
         &mut self,
+        tys: &Types,
         heap: &mut RawAllocator<DAGNode>,
         mut node: Raw<DAGNode>,
     ) -> Raw<DAGNode> {
@@ -80,7 +81,7 @@ impl MISelector {
         self.selected.insert(node, selected);
 
         if let Some(next) = node.next {
-            selected.next = Some(self.run_on_node(heap, next));
+            selected.next = Some(self.run_on_node(tys, heap, next));
         }
 
         selected

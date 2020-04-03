@@ -69,7 +69,7 @@ impl Value {
         Self::Function(f)
     }
 
-    pub fn get_type<'a>(&'a self, parent: &'a Module) -> &'a Type {
+    pub fn get_type(&self, parent: &Module) -> Type {
         match self {
             Value::Argument(ArgumentValue {
                 func_id,
@@ -77,7 +77,7 @@ impl Value {
                 // parent,
             }) => {
                 let f = parent.function_ref(*func_id);
-                f.get_param_type(*index).unwrap()
+                f.get_param_type(&parent.types, *index).unwrap()
             }
             Value::Instruction(InstructionValue {
                 func_id,
@@ -85,11 +85,11 @@ impl Value {
                 // parent,
             }) => {
                 let f = parent.function_ref(*func_id);
-                &f.inst_table[*id].ty
+                f.inst_table[*id].ty
             }
-            Value::Function(FunctionValue { func_id }) => &parent.function_ref(*func_id).ty,
-            Value::Immediate(ref im) => im.get_type(),
-            Value::None => &Type::Void,
+            Value::Function(FunctionValue { func_id }) => parent.function_ref(*func_id).ty,
+            Value::Immediate(ref im) => *im.get_type(),
+            Value::None => Type::Void,
         }
     }
 
@@ -117,7 +117,7 @@ impl Value {
                 // parent,
             }) => {
                 let f = parent.function_ref(*func_id);
-                let ty = f.get_param_type(*index).unwrap();
+                let ty = f.get_param_type(&parent.types, *index).unwrap();
                 format!("{} %arg.{}", ty.to_string(), index)
             }
             Value::Immediate(iv) => match iv {
@@ -148,7 +148,7 @@ impl Value {
             }
             Value::Function(FunctionValue { func_id }) => {
                 let f = parent.function_ref(*func_id);
-                let fty = f.ty.get_function_ty().unwrap();
+                let fty = parent.types.as_function_ty(f.ty).unwrap();
                 format!("{} {}", fty.ret_ty.to_string(), f.name)
             }
             Value::None => "".to_string(),
