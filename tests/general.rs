@@ -862,16 +862,16 @@ fn struct1() {
     let entry = builder.append_basic_block();
     builder.set_insert_point(entry);
 
+    let ary_ty = types::Type::Array(Box::new(types::ArrayType::new(types::Type::Int32, 16)));
     let new_struct_ty = types::Type::Struct(Box::new(types::StructType::new(vec![
-        types::Type::Int32,
-        types::Type::Int32,
+        ary_ty,
         types::Type::Int32,
     ])));
     let var = builder.build_alloca(new_struct_ty);
 
     cilk_ir!((builder) {
-        x = gep (%var), [(i32 0), (i32 0)];
-        store (i32 1), (%x);
+        x = gep (%var), [(i32 0), (i32 1)];
+        store (i32 3), (%x);
         load_x = load (%x);
         ret (%load_x);
     });
@@ -881,5 +881,5 @@ fn struct1() {
     let mut jit = exec::jit::JITExecutor::new(&m);
     let func = jit.find_function_by_name("f").unwrap();
     let res = jit.run(func, vec![]);
-    println!("return: {:?}", res);
+    assert_eq!(res, exec::jit::GenericValue::Int32(3));
 }

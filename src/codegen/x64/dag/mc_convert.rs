@@ -430,6 +430,7 @@ impl MIConverter {
         match node.kind {
             NodeKind::Operand(OperandNodeKind::Constant(c)) => match c {
                 ConstantKind::Int32(i) => MachineOperand::Constant(MachineConstant::Int32(i)),
+                ConstantKind::Int64(i) => MachineOperand::Constant(MachineConstant::Int64(i)),
                 ConstantKind::F64(f) => MachineOperand::Constant(MachineConstant::F64(f)),
             },
             NodeKind::Operand(OperandNodeKind::FrameIndex(ref kind)) => {

@@ -70,6 +70,7 @@ pub enum IRNodeKind {
 #[derive(Debug, Clone, PartialEq, Copy)]
 pub enum ConstantKind {
     Int32(i32),
+    Int64(i64),
     F64(f64),
 }
 
@@ -99,6 +100,7 @@ impl ConstantKind {
     pub fn add(self, n: ConstantKind) -> ConstantKind {
         match (self, n) {
             (ConstantKind::Int32(x), ConstantKind::Int32(y)) => ConstantKind::Int32(x + y),
+            (ConstantKind::Int64(x), ConstantKind::Int64(y)) => ConstantKind::Int64(x + y),
             (ConstantKind::F64(x), ConstantKind::F64(y)) => ConstantKind::F64(x + y),
             _ => unimplemented!(),
         }
@@ -107,13 +109,14 @@ impl ConstantKind {
     pub fn get_type(&self) -> Type {
         match self {
             ConstantKind::Int32(_) => Type::Int32,
+            ConstantKind::Int64(_) => Type::Int64,
             ConstantKind::F64(_) => Type::F64,
         }
     }
 
     pub fn is_null(&self) -> bool {
         match self {
-            ConstantKind::Int32(0) => true,
+            ConstantKind::Int32(0) | ConstantKind::Int64(0) => true,
             ConstantKind::F64(f) if *f == 0.0 => true,
             _ => false,
         }

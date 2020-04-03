@@ -40,6 +40,9 @@ macro_rules! cilk_parse_ty {
     (i32) => {
         types::Type::Int32
     };
+    (i64) => {
+        types::Type::Int64
+    };
     (f64) => {
         types::Type::F64
     };
@@ -79,6 +82,9 @@ macro_rules! cilk_value {
     }};
     ($builder:expr; i32 $n:expr) => {{
         value::Value::Immediate(value::ImmediateValue::Int32($n))
+    }};
+    ($builder:expr; i64 $n:expr) => {{
+        value::Value::Immediate(value::ImmediateValue::Int64($n))
     }};
     ($builder:expr; f64 $n:expr) => {{
         value::Value::Immediate(value::ImmediateValue::F64($n))

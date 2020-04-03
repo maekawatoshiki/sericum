@@ -95,6 +95,7 @@ impl<'a> ConvertToDAG<'a> {
             Value::Immediate(imm) => {
                 let imm = match imm {
                     ImmediateValue::Int32(i) => ConstantKind::Int32(*i),
+                    ImmediateValue::Int64(i) => ConstantKind::Int64(*i),
                     ImmediateValue::F64(f) => ConstantKind::F64(*f),
                 };
                 self.cur_conv_info_mut().dag_heap.alloc(DAGNode::new(

@@ -52,6 +52,7 @@ pub struct FunctionValue {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ImmediateValue {
     Int32(i32),
+    Int64(i64),
     F64(f64),
 }
 
@@ -121,6 +122,7 @@ impl Value {
             }
             Value::Immediate(iv) => match iv {
                 ImmediateValue::Int32(i) => format!("i32 {}", i),
+                ImmediateValue::Int64(i) => format!("i64 {}", i),
                 ImmediateValue::F64(f) => format!("f64 {}", f),
             },
             Value::Instruction(InstructionValue {
@@ -165,6 +167,7 @@ impl ImmediateValue {
     pub fn get_type(&self) -> &Type {
         match self {
             ImmediateValue::Int32(_) => &Type::Int32,
+            ImmediateValue::Int64(_) => &Type::Int64,
             ImmediateValue::F64(_) => &Type::F64,
         }
     }
