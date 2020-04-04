@@ -132,7 +132,7 @@ impl MachineFunction {
         self.body.basic_blocks.order.get(0)
     }
 
-    pub fn debug(&self, tys: &Types, f: &mut fmt::Formatter) -> fmt::Result {
+    pub fn debug(&self, f: &mut fmt::Formatter, tys: &Types) -> fmt::Result {
         writeln!(
             f,
             "MachineFunction(name: {}, ty: {}):",

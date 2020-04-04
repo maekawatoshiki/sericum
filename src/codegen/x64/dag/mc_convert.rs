@@ -20,6 +20,7 @@ pub struct ConversionInfo<'a> {
     dag_to_reg: FxHashMap<Raw<DAGNode>, Option<MachineRegister>>,
     cur_bb: MachineBasicBlockId,
     iseq: &'a mut Vec<MachineInstId>,
+    stack_adjust: &'a mut usize,
 }
 
 impl MIConverter {
@@ -39,7 +40,7 @@ impl MIConverter {
         machine_module
     }
 
-    pub fn convert_function(&mut self, tys: &Types, dag_func: DAGFunction) -> MachineFunction {
+    pub fn convert_function(&mut self, tys: &Types, mut dag_func: DAGFunction) -> MachineFunction {
         self.dag_bb_to_machine_bb.clear();
 
         let mut mbbs = MachineBasicBlocks::new();
@@ -65,6 +66,7 @@ impl MIConverter {
 
         let mut machine_inst_arena = InstructionArena::new();
 
+        let mut stack_adjust = 0;
         for dag_bb_id in &dag_func.dag_basic_blocks {
             let node = &dag_func.dag_basic_block_arena[*dag_bb_id];
             let bb_id = self.get_machine_bb(*dag_bb_id);
@@ -78,12 +80,15 @@ impl MIConverter {
                     dag_to_reg: FxHashMap::default(),
                     cur_bb: bb_id,
                     iseq: &mut iseq,
+                    stack_adjust: &mut stack_adjust,
                 },
                 node.entry.unwrap(),
             );
 
             mbbs.arena[bb_id].iseq = RefCell::new(iseq);
         }
+
+        dag_func.local_mgr.adjust_byte = stack_adjust;
 
         MachineFunction::new(dag_func, mbbs, machine_inst_arena)
     }
@@ -361,7 +366,8 @@ impl MIConverter {
             match op {
                 MachineOperand::Branch(_) => unimplemented!(),
                 MachineOperand::Constant(_) | MachineOperand::Register(_) => {
-                    MachineInst::new_with_def_reg(mov_rx(tys, &op).unwrap(), vec![op], vec![r], bb)
+                    MachineInst::new_simple(mov_rx(tys, &op).unwrap(), vec![op], bb)
+                        .with_def(vec![r])
                 }
                 MachineOperand::FrameIndex(_) => {
                     let rbp = MachineOperand::Register(
@@ -380,21 +386,44 @@ impl MIConverter {
 
         let mut arg_regs = vec![];
         // TODO: We have to push remaining arguments on stack
+        let mut off = 0;
         for (i, operand) in node.operand[1..].iter().enumerate() {
             let arg = self.normal_operand(tys, conv_info, *operand);
             let ty = arg.get_type().unwrap();
 
             // TODO: not simple
             let r = RegisterInfo::new(ty2rc(&ty).unwrap()); //.with_vreg(conv_info.cur_func.vreg_gen.next_vreg()); IS THIS REQUIRED?
-            let r = {
-                let a = r.reg_class.get_nth_arg_reg(i).unwrap();
-                r.with_reg(a).into_machine_register()
+            let inst = match r.reg_class.get_nth_arg_reg(i) {
+                Some(arg_reg) => {
+                    let r = r.with_reg(arg_reg).into_machine_register();
+                    arg_regs.push(r.clone());
+                    move_operand_to_reg(tys, arg, r, conv_info.cur_bb)
+                }
+                None => {
+                    // conv_info.cur_func.local_mgr.alloc(&Type::Int32);
+                    let rsp = MachineOperand::Register(
+                        RegisterInfo::new_phy_reg(GR64::RSP).into_machine_register(),
+                    );
+                    let inst = MachineInst::new_simple(
+                        mov_mx(&arg).unwrap(),
+                        vec![
+                            rsp,
+                            MachineOperand::None,
+                            MachineOperand::None,
+                            MachineOperand::Constant(MachineConstant::Int32(off)),
+                            arg,
+                        ],
+                        conv_info.cur_bb,
+                    );
+                    off += 8;
+                    inst
+                }
             };
 
-            arg_regs.push(r.clone());
-            let inst = move_operand_to_reg(tys, arg, r, conv_info.cur_bb);
             conv_info.push_inst(inst);
         }
+
+        *conv_info.stack_adjust = ::std::cmp::max(*conv_info.stack_adjust, off as usize);
 
         let callee = self.normal_operand(tys, conv_info, node.operand[0]);
 

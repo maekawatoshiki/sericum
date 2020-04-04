@@ -7,12 +7,13 @@ use std::fmt;
 pub struct LocalVariables {
     pub locals: Vec<FrameIndexInfo>,
     pub cur_idx: usize,
+    pub adjust_byte: usize,
 }
 
 #[derive(Debug)]
 pub struct FrameObjectsInfo {
     offset_map: FxHashMap<FrameIndexKind, usize>, // frame index -> offset
-    total_size: usize,
+    pub total_size: usize,
 }
 
 impl LocalVariables {
@@ -20,6 +21,7 @@ impl LocalVariables {
         Self {
             locals: vec![],
             cur_idx: 0,
+            adjust_byte: 0,
         }
     }
 
@@ -54,7 +56,7 @@ impl FrameObjectsInfo {
 
         Self {
             offset_map,
-            total_size: offset,
+            total_size: offset + f.local_mgr.adjust_byte,
         }
     }
 

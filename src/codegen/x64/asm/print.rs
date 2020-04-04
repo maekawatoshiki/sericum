@@ -174,6 +174,18 @@ impl MachineAsmPrinter {
             );
         }
 
+        // out = mov base, none, none, const.off
+        if i.operand[0].is_register()
+            && i.operand[1].is_none()
+            && i.operand[2].is_none()
+            && i.operand[3].is_const_i32()
+        {
+            let base = i.operand[0].as_register().get_reg().unwrap();
+            let off = i.operand[3].as_constant().as_i32();
+            self.output
+                .push_str(format!("{} ptr [{} + {}]", word, base.name(), off).as_str());
+        }
+
         // out = mov base, none, none, none
         if i.operand[0].is_register()
             && i.operand[1].is_none()
@@ -256,6 +268,18 @@ impl MachineAsmPrinter {
                 )
                 .as_str(),
             );
+        }
+
+        // mov base, none, none, const.off, r
+        if i.operand[0].is_register()
+            && i.operand[1].is_none()
+            && i.operand[2].is_none()
+            && i.operand[3].is_const_i32()
+        {
+            let base = i.operand[0].as_register().get_reg().unwrap();
+            let off = i.operand[3].as_constant().as_i32();
+            self.output
+                .push_str(format!("{} ptr [{} + {}], ", word, base.name(), off).as_str());
         }
 
         // mov base, none, none, none, r

@@ -48,7 +48,7 @@ impl fmt::Debug for MachineModule {
         writeln!(f, "MachineModule (name: {})", self.name)?;
 
         for (_, func) in &self.functions {
-            func.debug(&self.types, f)?;
+            func.debug(f, &self.types)?;
         }
 
         fmt::Result::Ok(())

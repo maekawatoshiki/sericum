@@ -300,6 +300,18 @@ impl JITCompiler {
             }
         }
 
+        // out = mov base, none, none, const.off
+        if inst.operand[0].is_register()
+            && inst.operand[1].is_none()
+            && inst.operand[2].is_none()
+            && inst.operand[3].is_const_i32()
+        {
+            let r0 = phys_reg_to_dynasm_reg(inst.def[0].get_reg().unwrap());
+            let r1 = phys_reg_to_dynasm_reg(inst.operand[0].as_register().get_reg().unwrap());
+            let i2 = inst.operand[3].as_constant().as_i32();
+            dynasm!(self.asm; mov Rd(r0), DWORD [Rq(r1) + i2]);
+        }
+
         // out = mov base, none, none, none
         if inst.operand[0].is_register()
             && inst.operand[1].is_none()
@@ -395,7 +407,7 @@ impl JITCompiler {
             dynasm!(self.asm; mov DWORD [rbp - m0], Rd(r1));
         }
 
-        // out = mov rbp, fi, none, const.off, r
+        // mov rbp, fi, none, const.off, r
         if inst.operand[0].is_register() // must be rbp
             && inst.operand[1].is_frame_index()
             && inst.operand[2].is_none()
@@ -408,7 +420,7 @@ impl JITCompiler {
             dynasm!(self.asm; mov DWORD [rbp - m0 + i1], Rd(r2));
         }
 
-        // out = mov rbp, fi, align, off, r
+        // mov rbp, fi, align, off, r
         if inst.operand[0].is_register() // must be rbp
             && inst.operand[1].is_frame_index()
             && inst.operand[2].is_const_i32()
@@ -425,7 +437,7 @@ impl JITCompiler {
             }
         }
 
-        // out = mov base, none, align, off, r
+        // mov base, none, align, off, r
         if inst.operand[0].is_register()
             && inst.operand[1].is_none()
             && inst.operand[2].is_const_i32()
@@ -442,7 +454,20 @@ impl JITCompiler {
             }
         }
 
-        // out = mov base, none, none, none, r
+        // mov base, none, none, const.off, r
+        if inst.operand[0].is_register()
+            && inst.operand[1].is_none()
+            && inst.operand[2].is_none()
+            && inst.operand[3].is_const_i32()
+            && inst.operand[4].is_register()
+        {
+            let r0 = phys_reg_to_dynasm_reg(inst.operand[0].as_register().get_reg().unwrap());
+            let i1 = inst.operand[3].as_constant().as_i32();
+            let r2 = phys_reg_to_dynasm_reg(inst.operand[4].as_register().get_reg().unwrap());
+            dynasm!(self.asm; mov DWORD [Rq(r0) + i1], Rd(r2))
+        }
+
+        // mov base, none, none, none, r
         if inst.operand[0].is_register()
             && inst.operand[1].is_none()
             && inst.operand[2].is_none()
@@ -513,6 +538,19 @@ impl JITCompiler {
                 4 => dynasm!(self.asm; mov DWORD [Rq(r0) + 4*Rq(r2)], i3),
                 _ => unimplemented!(),
             }
+        }
+
+        // mov base, none, none, const.off, r
+        if inst.operand[0].is_register()
+            && inst.operand[1].is_none()
+            && inst.operand[2].is_none()
+            && inst.operand[3].is_const_i32()
+            && inst.operand[4].is_const_i32()
+        {
+            let r0 = phys_reg_to_dynasm_reg(inst.operand[0].as_register().get_reg().unwrap());
+            let i1 = inst.operand[3].as_constant().as_i32();
+            let i2 = inst.operand[4].as_constant().as_i32();
+            dynasm!(self.asm; mov DWORD [Rq(r0) + i1], i2);
         }
 
         // out = mov base, none, none, none, r
