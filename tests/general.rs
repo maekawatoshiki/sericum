@@ -878,3 +878,36 @@ fn struct1() {
     let res = jit.run(func, vec![]);
     assert_eq!(res, exec::jit::GenericValue::Int32(3));
 }
+
+#[test]
+fn many_arguments() {
+    let mut m = module::Module::new("cilk");
+
+    let _ = cilk_ir!(m; define [i32] func [
+            (i32), (i32), (i32), (i32), (i32), (i32), (i32), (i32), (i32) ] {
+        entry:
+            x = add (%arg.0), (%arg.1);//1
+            x = add (%x), (%arg.2);//3
+            x = add (%x), (%arg.3);//6
+            x = add (%x), (%arg.4);//10
+            x = add (%x), (%arg.5);//15
+            x = add (%x), (%arg.6);//21
+            x = add (%x), (%arg.7);//28
+            x = add (%x), (%arg.8);//36
+            ret (%x);
+    });
+
+    let _ = cilk_ir!(m; define [i32] main [] {
+        entry:
+            x = call func [(i32 0),(i32 1),(i32 2),(i32 3),(i32 4),(i32 5),(i32 6),(i32 7),(i32 8)];
+            ret (%x);
+    });
+
+    println!("{:?}", m);
+
+    let mut jit = exec::jit::JITExecutor::new(&m);
+    let func = jit.find_function_by_name("main").unwrap();
+    let res = jit.run(func, vec![]);
+    println!("{:?}", res);
+    assert_eq!(res, exec::jit::GenericValue::Int32(36));
+}
