@@ -17,7 +17,6 @@ pub struct ConversionInfo<'a> {
     dag_to_reg: FxHashMap<Raw<DAGNode>, Option<MachineRegister>>,
     cur_bb: MachineBasicBlockId,
     iseq: &'a mut Vec<MachineInstId>,
-    stack_adjust: &'a mut usize,
     bb_map: &'a FxHashMap<DAGBasicBlockId, MachineBasicBlockId>,
     node2minst: &'a mut FxHashMap<Raw<DAGNode>, MachineInstId>,
 }
@@ -30,7 +29,7 @@ pub fn convert_module(module: DAGModule) -> MachineModule {
     MachineModule::new(module.name, functions, module.types)
 }
 
-pub fn convert_function(types: &Types, mut dag_func: DAGFunction) -> MachineFunction {
+pub fn convert_function(types: &Types, dag_func: DAGFunction) -> MachineFunction {
     let mut bb_map = FxHashMap::default();
     let mut mbbs = MachineBasicBlocks::new();
 
@@ -55,7 +54,6 @@ pub fn convert_function(types: &Types, mut dag_func: DAGFunction) -> MachineFunc
 
     let mut machine_inst_arena = InstructionArena::new();
     let mut node2minst = FxHashMap::default();
-    let mut stack_adjust = 0;
 
     for dag_bb_id in &dag_func.dag_basic_blocks {
         let node = &dag_func.dag_basic_block_arena[*dag_bb_id];
@@ -69,7 +67,6 @@ pub fn convert_function(types: &Types, mut dag_func: DAGFunction) -> MachineFunc
             dag_to_reg: FxHashMap::default(),
             cur_bb: bb_id,
             iseq: &mut iseq,
-            stack_adjust: &mut stack_adjust,
             bb_map: &bb_map,
             node2minst: &mut node2minst,
         }
@@ -77,8 +74,6 @@ pub fn convert_function(types: &Types, mut dag_func: DAGFunction) -> MachineFunc
 
         mbbs.arena[bb_id].iseq = RefCell::new(iseq);
     }
-
-    dag_func.local_mgr.adjust_byte = stack_adjust;
 
     MachineFunction::new(dag_func, mbbs, machine_inst_arena)
 }
@@ -340,28 +335,35 @@ impl<'a> ConversionInfo<'a> {
 
     fn convert_call_dag(&mut self, node: &DAGNode) -> MachineInstId {
         let mut arg_regs = vec![];
-        // TODO: We have to push remaining arguments on stack
         let mut off = 0;
+
         for (i, operand) in node.operand[1..].iter().enumerate() {
             let arg = self.normal_operand(*operand);
             let ty = arg.get_type().unwrap();
 
-            // TODO: not simple
-            let r = RegisterInfo::new(ty2rc(&ty).unwrap()); //.with_vreg(conv_info.cur_func.vreg_gen.next_vreg()); IS THIS REQUIRED?
-            let inst = match r.reg_class.get_nth_arg_reg(i) {
+            if !matches!(
+                ty,
+                Type::Int32 | Type::Int64 | Type::F64 | Type::Pointer(_) | Type::Array(_)
+            ) {
+                unimplemented!()
+            };
+
+            let reg_class = ty2rc(&ty).unwrap();
+            let inst = match reg_class.get_nth_arg_reg(i) {
                 Some(arg_reg) => {
-                    let r = r.with_reg(arg_reg).into_machine_register();
+                    let r = RegisterInfo::phys_reg(arg_reg).into_machine_register();
                     arg_regs.push(r.clone());
                     self.move2reg(r, arg)
                 }
                 None => {
+                    // Put the exceeded value onto the stack
                     let inst = MachineInst::new_simple(
                         mov_mx(&arg).unwrap(),
                         vec![
                             MachineOperand::phys_reg(GR64::RSP),
                             MachineOperand::None,
                             MachineOperand::None,
-                            MachineOperand::Constant(MachineConstant::Int32(off)),
+                            MachineOperand::imm_i32(off),
                             arg,
                         ],
                         self.cur_bb,
@@ -374,40 +376,49 @@ impl<'a> ConversionInfo<'a> {
             self.push_inst(inst);
         }
 
-        *self.stack_adjust = ::std::cmp::max(*self.stack_adjust, off as usize);
-
-        let callee = self.normal_operand(node.operand[0]);
-
-        let ret_reg = RegisterInfo::phys_reg(GR32::EAX).into_machine_register(); // TODO: support types other than int.
-                                                                                 //       what about struct or union? they won't be assigned to register.
-        let call_inst = self.push_inst(
-            MachineInst::new_with_imp_def_use(
-                MachineOpcode::CALL,
-                vec![callee],
-                if node.ty == Type::Void {
-                    vec![]
-                } else {
-                    vec![ret_reg.clone()]
-                },
-                vec![], // TODO: imp-use
+        self.push_inst(
+            MachineInst::new_simple(
+                MachineOpcode::AdjStackDown,
+                vec![MachineOperand::imm_i32(off)],
                 self.cur_bb,
             )
-            .with_imp_uses(arg_regs),
+            .with_imp_def(MachineRegister::phys_reg(GR64::RSP))
+            .with_imp_use(MachineRegister::phys_reg(GR64::RSP)),
+        );
+
+        let callee = self.normal_operand(node.operand[0]);
+        let ret_reg = RegisterInfo::phys_reg(GR32::EAX).into_machine_register(); // TODO: Support other types than i32
+        let call_inst = self.push_inst(
+            MachineInst::new_simple(MachineOpcode::CALL, vec![callee], self.cur_bb)
+                .with_imp_uses(arg_regs)
+                .with_def(match node.ty {
+                    Type::Void => vec![],
+                    _ => vec![ret_reg.clone()],
+                }),
+        );
+
+        self.push_inst(
+            MachineInst::new_simple(
+                MachineOpcode::AdjStackUp,
+                vec![MachineOperand::imm_i32(off)],
+                self.cur_bb,
+            )
+            .with_imp_def(MachineRegister::phys_reg(GR64::RSP))
+            .with_imp_use(MachineRegister::phys_reg(GR64::RSP)),
         );
 
         if node.ty == Type::Void {
-            call_inst
-        } else {
-            let reg_class = ret_reg.info_ref().reg_class;
-
-            self.push_inst(MachineInst::new(
-                &self.cur_func.vreg_gen,
-                MachineOpcode::Copy,
-                vec![MachineOperand::Register(ret_reg.clone())],
-                Some(reg_class),
-                self.cur_bb,
-            ))
+            return call_inst;
         }
+
+        let reg_class = ret_reg.info_ref().reg_class;
+        self.push_inst(MachineInst::new(
+            &self.cur_func.vreg_gen,
+            MachineOpcode::Copy,
+            vec![MachineOperand::Register(ret_reg)],
+            Some(reg_class),
+            self.cur_bb,
+        ))
     }
 
     fn normal_operand(&mut self, node: Raw<DAGNode>) -> MachineOperand {

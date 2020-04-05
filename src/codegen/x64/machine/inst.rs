@@ -313,6 +313,10 @@ impl MachineRegister {
         Self { info }
     }
 
+    pub fn phys_reg<T: TargetRegisterTrait>(r: T) -> Self {
+        RegisterInfo::phys_reg(r).into_machine_register()
+    }
+
     pub fn add_use(&self, use_id: MachineInstId) {
         self.info_ref_mut().use_list.insert(use_id);
     }
@@ -455,6 +459,10 @@ impl RegisterInfo {
 impl MachineOperand {
     pub fn phys_reg<T: TargetRegisterTrait>(r: T) -> Self {
         Self::Register(RegisterInfo::phys_reg(r).into_machine_register())
+    }
+
+    pub fn imm_i32(i: i32) -> Self {
+        MachineOperand::Constant(MachineConstant::Int32(i))
     }
 
     pub fn as_frame_index(&self) -> &FrameIndexInfo {

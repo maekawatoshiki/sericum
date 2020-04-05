@@ -7,7 +7,6 @@ use std::fmt;
 pub struct LocalVariables {
     pub locals: Vec<FrameIndexInfo>,
     pub cur_idx: usize,
-    pub adjust_byte: usize,
 }
 
 #[derive(Debug)]
@@ -21,7 +20,6 @@ impl LocalVariables {
         Self {
             locals: vec![],
             cur_idx: 0,
-            adjust_byte: 0,
         }
     }
 
@@ -56,7 +54,7 @@ impl FrameObjectsInfo {
 
         Self {
             offset_map,
-            total_size: offset + f.local_mgr.adjust_byte,
+            total_size: offset,
         }
     }
 

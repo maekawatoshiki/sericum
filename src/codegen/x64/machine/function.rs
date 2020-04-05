@@ -102,8 +102,6 @@ impl MachineFunction {
             internal: is_internal_function(&f.name),
             name: f.name,
             ty: f.ty,
-            // inst_arena,
-            // basic_blocks,
             body: MachineFunctionBody {
                 inst_arena,
                 basic_blocks,
@@ -115,10 +113,9 @@ impl MachineFunction {
 
     pub fn find_inst_pos(&self, inst_id: MachineInstId) -> Option<(MachineBasicBlockId, usize)> {
         let parent = self.body.inst_arena[inst_id].parent;
-        match self.body.basic_blocks.arena[parent].find_inst_pos(inst_id) {
-            Some(pos) => Some((parent, pos)),
-            None => None,
-        }
+        self.body.basic_blocks.arena[parent]
+            .find_inst_pos(inst_id)
+            .map(|pos| (parent, pos))
     }
 
     pub fn remove_inst(&self, inst_id: MachineInstId) {

@@ -2,6 +2,7 @@ use super::super::{dag::mc_convert::mov_mx, frame_object::*, register::*};
 use super::{builder::*, function::MachineFunction, inst::*, module::MachineModule};
 use crate::codegen::x64::exec::roundup;
 use crate::ir::types::*;
+use std::cmp;
 
 pub struct PrologueEpilogueInserter {}
 
@@ -22,8 +23,34 @@ impl PrologueEpilogueInserter {
         }
 
         let frame_info = FrameObjectsInfo::new(tys, cur_func);
-        self.insert_prologue(tys, cur_func, &frame_info);
+        let down = self.calc_max_adjust_stack_down(cur_func);
+        self.insert_prologue(tys, cur_func, &frame_info, down);
         self.insert_epilogue(cur_func);
+    }
+
+    fn calc_max_adjust_stack_down(&mut self, cur_func: &mut MachineFunction) -> i32 {
+        let mut down = 0;
+        let mut removal_list = vec![];
+
+        for (_, _, iiter) in cur_func.body.mbb_iter() {
+            for (id, inst) in iiter {
+                match inst.opcode {
+                    MachineOpcode::AdjStackDown => {
+                        let d = inst.operand[0].as_constant().as_i32();
+                        down = cmp::max(d, down);
+                        removal_list.push(id)
+                    }
+                    MachineOpcode::AdjStackUp => removal_list.push(id),
+                    _ => continue,
+                }
+            }
+        }
+
+        for id in removal_list {
+            cur_func.remove_inst(id)
+        }
+
+        down
     }
 
     fn insert_prologue(
@@ -31,6 +58,7 @@ impl PrologueEpilogueInserter {
         tys: &Types,
         cur_func: &mut MachineFunction,
         finfo: &FrameObjectsInfo,
+        down: i32,
     ) {
         let mut builder = Builder::new(cur_func);
         builder.set_insert_point_at_entry_bb();
@@ -57,7 +85,7 @@ impl PrologueEpilogueInserter {
         builder.insert(mov_rbp_rsp);
 
         // sub rsp, adjust
-        let adjust = roundup(finfo.total_size() + /*push rbp=*/8, 16) - /*push rbp=*/8;
+        let adjust = roundup(finfo.total_size() + /*push rbp=*/8 + down, 16) - /*push rbp=*/8;
         let sub_rsp = MachineInst::new_simple(
             MachineOpcode::SUBr64i32,
             vec![
