@@ -78,9 +78,7 @@ impl PrologueEpilogueInserter {
             vec![MachineOperand::phys_reg(GR64::RSP)],
             builder.get_cur_bb().unwrap(),
         )
-        .with_def(vec![
-            RegisterInfo::phys_reg(GR64::RBP).into_machine_register()
-        ]);
+        .with_def(vec![MachineRegister::phys_reg(GR64::RBP)]);
         let mov_rbp_rsp = builder.function.body.inst_arena.alloc(mov_rbp_rsp);
         builder.insert(mov_rbp_rsp);
 
@@ -90,13 +88,11 @@ impl PrologueEpilogueInserter {
             MachineOpcode::SUBr64i32,
             vec![
                 MachineOperand::phys_reg(GR64::RSP),
-                MachineOperand::Constant(MachineConstant::Int32(adjust)),
+                MachineOperand::imm_i32(adjust),
             ],
             builder.get_cur_bb().unwrap(),
         )
-        .with_def(vec![
-            RegisterInfo::phys_reg(GR64::RSP).into_machine_register()
-        ]);
+        .with_def(vec![MachineRegister::phys_reg(GR64::RSP)]);
         let sub_rsp = builder.function.body.inst_arena.alloc(sub_rsp);
         builder.insert(sub_rsp);
 

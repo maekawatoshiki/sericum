@@ -1,7 +1,8 @@
 use super::{function::*, types::*, DumpToString};
 use id_arena::*;
+use std::fmt;
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Module {
     pub name: String,
     pub functions: Arena<Function>,
@@ -52,5 +53,15 @@ impl Module {
 
     pub fn dump<T: DumpToString>(&self, obj: T) -> String {
         obj.dump(self)
+    }
+}
+
+impl fmt::Debug for Module {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        writeln!(f, "Module (name: {})", self.name)?;
+        for (_, func) in &self.functions {
+            writeln!(f, "{}", self.dump(func))?;
+        }
+        fmt::Result::Ok(())
     }
 }
