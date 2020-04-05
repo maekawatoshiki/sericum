@@ -12,12 +12,12 @@ pub struct MachineModule {
 }
 
 impl MachineModule {
-    pub fn new(name: &str) -> Self {
+    pub fn new(name: String, functions: Arena<MachineFunction>, types: Types) -> Self {
         Self {
-            name: name.to_string(),
-            functions: Arena::new(),
+            name,
+            functions,
             const_data: ConstDataArena::new(),
-            types: Types::new(),
+            types,
         }
     }
 

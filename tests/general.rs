@@ -718,7 +718,7 @@ fn fibo() {
     dag::legalize::Legalize::new().run_on_module(&mut dag_module);
     dag::isel::MISelector::new().run_on_module(&mut dag_module);
 
-    let mut machine_module = dag::mc_convert::MIConverter::new().convert_module(dag_module);
+    let mut machine_module = dag::mc_convert::convert_module(dag_module);
     machine::phi_elimination::PhiElimination::new().run_on_module(&mut machine_module);
     machine::two_addr::TwoAddressConverter::new().run_on_module(&mut machine_module);
     machine::regalloc::RegisterAllocator::new().run_on_module(&mut machine_module);

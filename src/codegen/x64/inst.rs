@@ -299,7 +299,6 @@ pub enum TargetOpcode {
     Setle,
     Setlt,
 
-    // Branch
     // BrccEq,
     // BrccLe,
     // BrccLt,
@@ -308,13 +307,14 @@ pub enum TargetOpcode {
     JE,
     JLE,
     JL,
-
     JMP,
 
     Phi,
     Ret,
     Copy,
     BrCond,
+    AdjStackDown,
+    AdjStackUp,
 }
 
 impl TargetOpcode {

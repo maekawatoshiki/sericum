@@ -45,16 +45,16 @@ impl JITExecutor {
 
         let mut dag_module = dag::convert::ConvertToDAG::new(module).convert_module();
 
-        debug!(println!("dag: before: {:?}", dag_module));
+        // debug!(println!("dag: before: {:?}", dag_module));
 
         dag::combine::Combine::new().combine_module(&mut dag_module);
-        debug!(println!("dag: comibine: {:?}", dag_module));
+        // debug!(println!("dag: comibine: {:?}", dag_module));
         dag::legalize::Legalize::new().run_on_module(&mut dag_module);
-        debug!(println!("dag: legalize: {:?}", dag_module));
+        // debug!(println!("dag: legalize: {:?}", dag_module));
         dag::isel::MISelector::new().run_on_module(&mut dag_module);
-        debug!(println!("dag: isel: {:?}", dag_module));
+        // debug!(println!("dag: isel: {:?}", dag_module));
 
-        let mut machine_module = dag::mc_convert::MIConverter::new().convert_module(dag_module);
+        let mut machine_module = dag::mc_convert::convert_module(dag_module);
 
         // debug!(println!("{:?}", machine_module));
 
