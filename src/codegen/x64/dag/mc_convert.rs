@@ -19,7 +19,7 @@ pub struct ConversionInfo<'a> {
     iseq: &'a mut Vec<MachineInstId>,
     stack_adjust: &'a mut usize,
     bb_map: &'a FxHashMap<DAGBasicBlockId, MachineBasicBlockId>,
-    node2minst: FxHashMap<Raw<DAGNode>, MachineInstId>,
+    node2minst: &'a mut FxHashMap<Raw<DAGNode>, MachineInstId>,
 }
 
 pub fn convert_module(module: DAGModule) -> MachineModule {
@@ -54,6 +54,7 @@ pub fn convert_function(types: &Types, mut dag_func: DAGFunction) -> MachineFunc
     }
 
     let mut machine_inst_arena = InstructionArena::new();
+    let mut node2minst = FxHashMap::default();
     let mut stack_adjust = 0;
 
     for dag_bb_id in &dag_func.dag_basic_blocks {
@@ -70,7 +71,7 @@ pub fn convert_function(types: &Types, mut dag_func: DAGFunction) -> MachineFunc
             iseq: &mut iseq,
             stack_adjust: &mut stack_adjust,
             bb_map: &bb_map,
-            node2minst: FxHashMap::default(),
+            node2minst: &mut node2minst,
         }
         .convert_dag(node.entry.unwrap());
 
