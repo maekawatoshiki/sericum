@@ -1,6 +1,6 @@
 pub use super::super::inst::{TargetImmediate, TargetOpcode};
 use super::super::register::{
-    rc2ty, PhysReg, RegisterClassKind, TargetRegisterTrait, VirtReg, VirtRegGen,
+    rc2ty, PhysReg, RegisterClassKind, TargetRegisterTrait, VirtReg, VirtRegGen, GR32, GR64, XMM,
 };
 use super::{basic_block::*, const_data::DataId, frame_object::*};
 use crate::ir::types::*;
@@ -388,6 +388,11 @@ impl RegisterInfo {
         }
     }
 
+    pub fn phys_reg<T: TargetRegisterTrait>(reg: T) -> Self {
+        PHYS_REGS.with(|r| r[reg.as_phys_reg().retrieve()].clone())
+    }
+
+    // not recommended
     pub fn new_phy_reg<T: TargetRegisterTrait>(reg: T) -> Self {
         Self {
             reg_class: reg.as_phys_reg().reg_class(),
@@ -448,6 +453,10 @@ impl RegisterInfo {
 }
 
 impl MachineOperand {
+    pub fn phys_reg<T: TargetRegisterTrait>(r: T) -> Self {
+        Self::Register(RegisterInfo::phys_reg(r).into_machine_register())
+    }
+
     pub fn as_frame_index(&self) -> &FrameIndexInfo {
         match self {
             MachineOperand::FrameIndex(fi) => fi,
@@ -574,14 +583,59 @@ impl MachineConstant {
     }
 }
 
-impl fmt::Debug for MachineConstant {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Int32(x) => write!(f, "i32 {}", x),
-            Self::Int64(x) => write!(f, "i64 {}", x),
-            Self::F64(x) => write!(f, "f64 {}", x),
-        }
-    }
+thread_local! {
+    pub static PHYS_REGS: [RegisterInfo; 48] = {
+        [
+            RegisterInfo::new_phy_reg(GR32::EAX ),
+            RegisterInfo::new_phy_reg(GR32::ECX ),
+            RegisterInfo::new_phy_reg(GR32::EDX ),
+            RegisterInfo::new_phy_reg(GR32::EBX ),
+            RegisterInfo::new_phy_reg(GR32::ESP ),
+            RegisterInfo::new_phy_reg(GR32::EBP ),
+            RegisterInfo::new_phy_reg(GR32::ESI ),
+            RegisterInfo::new_phy_reg(GR32::EDI ),
+            RegisterInfo::new_phy_reg(GR32::R8D ),
+            RegisterInfo::new_phy_reg(GR32::R9D ),
+            RegisterInfo::new_phy_reg(GR32::R10D),
+            RegisterInfo::new_phy_reg(GR32::R11D),
+            RegisterInfo::new_phy_reg(GR32::R12D),
+            RegisterInfo::new_phy_reg(GR32::R13D),
+            RegisterInfo::new_phy_reg(GR32::R14D),
+            RegisterInfo::new_phy_reg(GR32::R15D),
+            RegisterInfo::new_phy_reg(GR64::RAX ),
+            RegisterInfo::new_phy_reg(GR64::RCX ),
+            RegisterInfo::new_phy_reg(GR64::RDX ),
+            RegisterInfo::new_phy_reg(GR64::RBX ),
+            RegisterInfo::new_phy_reg(GR64::RSP ),
+            RegisterInfo::new_phy_reg(GR64::RBP ),
+            RegisterInfo::new_phy_reg(GR64::RSI ),
+            RegisterInfo::new_phy_reg(GR64::RDI ),
+            RegisterInfo::new_phy_reg(GR64::R8  ),
+            RegisterInfo::new_phy_reg(GR64::R9  ),
+            RegisterInfo::new_phy_reg(GR64::R10 ),
+            RegisterInfo::new_phy_reg(GR64::R11 ),
+            RegisterInfo::new_phy_reg(GR64::R12 ),
+            RegisterInfo::new_phy_reg(GR64::R13 ),
+            RegisterInfo::new_phy_reg(GR64::R14 ),
+            RegisterInfo::new_phy_reg(GR64::R15 ),
+            RegisterInfo::new_phy_reg(XMM::XMM0 ),
+            RegisterInfo::new_phy_reg(XMM::XMM1 ),
+            RegisterInfo::new_phy_reg(XMM::XMM2 ),
+            RegisterInfo::new_phy_reg(XMM::XMM3 ),
+            RegisterInfo::new_phy_reg(XMM::XMM4 ),
+            RegisterInfo::new_phy_reg(XMM::XMM5 ),
+            RegisterInfo::new_phy_reg(XMM::XMM6 ),
+            RegisterInfo::new_phy_reg(XMM::XMM7 ),
+            RegisterInfo::new_phy_reg(XMM::XMM8 ),
+            RegisterInfo::new_phy_reg(XMM::XMM9 ),
+            RegisterInfo::new_phy_reg(XMM::XMM10),
+            RegisterInfo::new_phy_reg(XMM::XMM11),
+            RegisterInfo::new_phy_reg(XMM::XMM12),
+            RegisterInfo::new_phy_reg(XMM::XMM13),
+            RegisterInfo::new_phy_reg(XMM::XMM14),
+            RegisterInfo::new_phy_reg(XMM::XMM15),
+        ]
+    };
 }
 
 impl MachineInst {
@@ -648,6 +702,16 @@ impl MachineOperand {
             MachineOperand::Address(g) => g.fmt(f),
             MachineOperand::Branch(id) => write!(f, "BB#{}", id.index()),
             MachineOperand::None => write!(f, "!"),
+        }
+    }
+}
+
+impl fmt::Debug for MachineConstant {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Int32(x) => write!(f, "i32 {}", x),
+            Self::Int64(x) => write!(f, "i64 {}", x),
+            Self::F64(x) => write!(f, "f64 {}", x),
         }
     }
 }

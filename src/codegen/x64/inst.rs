@@ -292,9 +292,7 @@ pub enum TargetOpcode {
     POP64,
     RET,
 
-    Copy,
-
-    Call,
+    CALL,
 
     // Comparison
     Seteq,
@@ -302,7 +300,6 @@ pub enum TargetOpcode {
     Setlt,
 
     // Branch
-    BrCond,
     // BrccEq,
     // BrccLe,
     // BrccLt,
@@ -315,8 +312,9 @@ pub enum TargetOpcode {
     JMP,
 
     Phi,
-
     Ret,
+    Copy,
+    BrCond,
 }
 
 impl TargetOpcode {

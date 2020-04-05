@@ -94,7 +94,7 @@ impl MachineAsmPrinter {
             MachineOpcode::PUSH64 => self.run_on_inst_push(inst),
             MachineOpcode::POP64 => self.run_on_inst_pop(inst),
             MachineOpcode::RET => self.run_on_inst_ret(),
-            MachineOpcode::Call => self.run_on_inst_call(inst),
+            MachineOpcode::CALL => self.run_on_inst_call(inst),
             MachineOpcode::Seteq | MachineOpcode::Setle | MachineOpcode::Setlt => {}
             MachineOpcode::JMP => self.run_on_inst_jmp(inst),
             MachineOpcode::BrCond => {}

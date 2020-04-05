@@ -198,12 +198,8 @@ impl MIConverter {
                 )))
             }
             NodeKind::IR(IRNodeKind::Rem) => {
-                let eax = RegisterInfo::new_phy_reg(GR32::EAX)
-                    .with_vreg(conv_info.cur_func.vreg_gen.next_vreg())
-                    .into_machine_register();
-                let edx = RegisterInfo::new_phy_reg(GR32::EDX)
-                    .with_vreg(conv_info.cur_func.vreg_gen.next_vreg())
-                    .into_machine_register();
+                let eax = RegisterInfo::phys_reg(GR32::EAX).into_machine_register();
+                let edx = RegisterInfo::phys_reg(GR32::EDX).into_machine_register();
 
                 let op1 = self.normal_operand(tys, conv_info, node.operand[0]);
                 let op2 = self.normal_operand(tys, conv_info, node.operand[1]);
@@ -339,9 +335,7 @@ impl MIConverter {
             let ret_reg = ty2rc(&ty).unwrap().return_value_register();
             let set_ret_val =
                 MachineInst::new_simple(mov_rx(tys, &val).unwrap(), vec![val], conv_info.cur_bb)
-                    .with_def(vec![
-                        RegisterInfo::new_phy_reg(ret_reg).into_machine_register()
-                    ]);
+                    .with_def(vec![RegisterInfo::phys_reg(ret_reg).into_machine_register()]);
             conv_info.push_inst(set_ret_val);
         }
         conv_info.push_inst(MachineInst::new_simple(
@@ -359,27 +353,27 @@ impl MIConverter {
     ) -> MachineInstId {
         fn move_operand_to_reg(
             tys: &Types,
-            op: MachineOperand,
+            src: MachineOperand,
             r: MachineRegister,
             bb: MachineBasicBlockId,
         ) -> MachineInst {
-            match op {
+            match src {
                 MachineOperand::Branch(_) => unimplemented!(),
                 MachineOperand::Constant(_) | MachineOperand::Register(_) => {
-                    MachineInst::new_simple(mov_rx(tys, &op).unwrap(), vec![op], bb)
+                    MachineInst::new_simple(mov_rx(tys, &src).unwrap(), vec![src], bb)
                         .with_def(vec![r])
                 }
-                MachineOperand::FrameIndex(_) => {
-                    let rbp = MachineOperand::Register(
-                        RegisterInfo::new_phy_reg(GR64::RBP).into_machine_register(),
-                    );
-                    MachineInst::new_with_def_reg(
-                        MachineOpcode::LEAr64m,
-                        vec![rbp, op, MachineOperand::None, MachineOperand::None],
-                        vec![r],
-                        bb,
-                    )
-                }
+                MachineOperand::FrameIndex(_) => MachineInst::new_with_def_reg(
+                    MachineOpcode::LEAr64m,
+                    vec![
+                        MachineOperand::phys_reg(GR64::RBP),
+                        src,
+                        MachineOperand::None,
+                        MachineOperand::None,
+                    ],
+                    vec![r],
+                    bb,
+                ),
                 _ => unimplemented!(),
             }
         }
@@ -400,14 +394,10 @@ impl MIConverter {
                     move_operand_to_reg(tys, arg, r, conv_info.cur_bb)
                 }
                 None => {
-                    // conv_info.cur_func.local_mgr.alloc(&Type::Int32);
-                    let rsp = MachineOperand::Register(
-                        RegisterInfo::new_phy_reg(GR64::RSP).into_machine_register(),
-                    );
                     let inst = MachineInst::new_simple(
                         mov_mx(&arg).unwrap(),
                         vec![
-                            rsp,
+                            MachineOperand::phys_reg(GR64::RSP),
                             MachineOperand::None,
                             MachineOperand::None,
                             MachineOperand::Constant(MachineConstant::Int32(off)),
@@ -427,14 +417,11 @@ impl MIConverter {
 
         let callee = self.normal_operand(tys, conv_info, node.operand[0]);
 
-        let ret_reg = RegisterInfo::new_phy_reg(GR32::EAX)
-            .with_vreg(conv_info.cur_func.vreg_gen.next_vreg())
-            .into_machine_register(); // TODO: support types other than int.
-                                      //       what about struct or union? they won't be assigned to register.
-
+        let ret_reg = RegisterInfo::phys_reg(GR32::EAX).into_machine_register(); // TODO: support types other than int.
+                                                                                 //       what about struct or union? they won't be assigned to register.
         let call_inst = conv_info.push_inst(
             MachineInst::new_with_imp_def_use(
-                MachineOpcode::Call,
+                MachineOpcode::CALL,
                 vec![callee],
                 if node.ty == Type::Void {
                     vec![]

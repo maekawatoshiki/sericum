@@ -173,13 +173,17 @@ impl RegisterAllocator {
         for (frinfo, reg) in slots_to_save_regs.into_iter().zip(regs_to_save.iter()) {
             let dst = MachineOperand::FrameIndex(frinfo.clone());
             let src = MachineOperand::Register(reg.clone());
-            let rbp = MachineOperand::Register(
-                RegisterInfo::new_phy_reg(GR64::RBP).into_machine_register(),
-            );
+            let rbp = MachineOperand::phys_reg(GR64::RBP);
             let store_inst_id = cur_func.body.inst_arena.alloc(MachineInst::new(
                 &cur_func.vreg_gen,
                 mov_mx(&src).unwrap(),
-                vec![rbp, dst, MachineOperand::None, MachineOperand::None, src],
+                vec![
+                    rbp.clone(),
+                    dst,
+                    MachineOperand::None,
+                    MachineOperand::None,
+                    src,
+                ],
                 None,
                 call_inst_parent,
             ));
@@ -187,9 +191,6 @@ impl RegisterAllocator {
             cur_func.body.inst_arena[store_inst_id].add_def(store_inst_id);
 
             let src = MachineOperand::FrameIndex(frinfo);
-            let rbp = MachineOperand::Register(
-                RegisterInfo::new_phy_reg(GR64::RBP).into_machine_register(),
-            );
 
             let load_inst_id = cur_func.body.inst_arena.alloc(
                 MachineInst::new_simple(
@@ -222,7 +223,7 @@ impl RegisterAllocator {
         for (_, bb) in cur_func.body.basic_blocks.id_and_block() {
             for inst_id in bb.iseq_ref().iter() {
                 let inst = &cur_func.body.inst_arena[*inst_id];
-                if inst.opcode == MachineOpcode::Call {
+                if inst.opcode == MachineOpcode::CALL {
                     call_inst_id.push(*inst_id)
                 }
             }

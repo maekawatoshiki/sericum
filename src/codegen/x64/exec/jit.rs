@@ -227,7 +227,7 @@ impl JITCompiler {
                     MachineOpcode::IMULrr64i32 => self.compile_imul_rr64i32(inst),
                     MachineOpcode::IDIV => self.compile_idiv(&frame_objects, inst),
                     MachineOpcode::CDQ => self.compile_cdq(&frame_objects, inst),
-                    MachineOpcode::Call => self.compile_call(module, &frame_objects, inst),
+                    MachineOpcode::CALL => self.compile_call(module, &frame_objects, inst),
                     MachineOpcode::Copy => self.compile_copy(inst),
                     MachineOpcode::CMPri => self.compile_cmp_ri(inst),
                     MachineOpcode::CMPrr => self.compile_cmp_rr(inst),
