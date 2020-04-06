@@ -6,6 +6,12 @@ use std::cmp;
 
 pub struct PrologueEpilogueInserter {}
 
+struct CopyArgs<'a> {
+    off: i32,
+    builder: &'a mut Builder<'a>,
+    params_ty: &'a Vec<Type>,
+}
+
 impl PrologueEpilogueInserter {
     pub fn new() -> Self {
         Self {}
@@ -99,62 +105,12 @@ impl PrologueEpilogueInserter {
         self.insert_arg_copy(tys, &mut builder);
     }
 
-    fn insert_arg_copy<'a>(&mut self, tys: &Types, builder: &mut Builder<'a>) {
-        let mut off = 16; // call + push rbp. TODO: this may vary if there're more pushes
-        for (i, &ty) in tys
-            .as_function_ty(builder.function.ty)
-            .unwrap()
-            .params_ty
-            .iter()
-            .enumerate()
-        {
-            match ty {
-                Type::Int32 => {
-                    let dst =
-                        MachineOperand::FrameIndex(FrameIndexInfo::new(ty, FrameIndexKind::Arg(i)));
-                    let src = match RegisterClassKind::GR32.get_nth_arg_reg(i) {
-                        Some(arg_reg) => MachineOperand::Register(
-                            RegisterInfo::phys_reg(arg_reg).into_machine_register(),
-                        ),
-                        None => {
-                            let eax = RegisterInfo::phys_reg(GR32::EAX).into_machine_register();
-                            let inst = MachineInst::new_simple(
-                                MachineOpcode::MOVrm32,
-                                vec![
-                                    MachineOperand::phys_reg(GR64::RBP),
-                                    MachineOperand::None,
-                                    MachineOperand::None,
-                                    MachineOperand::Constant(MachineConstant::Int32(off)),
-                                ],
-                                builder.get_cur_bb().unwrap(),
-                            )
-                            .with_def(vec![eax.clone()]);
-                            builder.insert(inst);
-                            off += 8;
-                            MachineOperand::Register(eax)
-                        }
-                    };
-                    let inst = MachineInst::new_simple(
-                        mov_mx(&src).unwrap(),
-                        vec![
-                            MachineOperand::phys_reg(GR64::RBP),
-                            dst,
-                            MachineOperand::None,
-                            MachineOperand::None,
-                            src,
-                        ],
-                        builder.get_cur_bb().unwrap(),
-                    );
-                    builder.insert(inst)
-                }
-                Type::Pointer(_) => {
-                    unimplemented!()
-                    // let off = finfo.offset(-(i as i32 + 1)).unwrap();
-                    // dynasm!(self.asm; mov [rbp - off], Ra(reg4arg(i).unwrap()));
-                }
-                _ => unimplemented!(),
-            }
-        }
+    fn insert_arg_copy<'a>(&mut self, tys: &'a Types, builder: &'a mut Builder<'a>) {
+        CopyArgs::new(
+            builder,
+            &tys.as_function_ty(builder.function.ty).unwrap().params_ty,
+        )
+        .copy();
     }
 
     fn insert_epilogue(&mut self, cur_func: &mut MachineFunction) {
@@ -199,5 +155,76 @@ impl PrologueEpilogueInserter {
                 builder.insert(inst)
             }
         }
+    }
+}
+
+impl<'a> CopyArgs<'a> {
+    pub fn new(builder: &'a mut Builder<'a>, params_ty: &'a Vec<Type>) -> Self {
+        Self {
+            builder,
+            params_ty,
+            off: 16, // call + push rbp. TODO: this may vary if there're more pushes
+        }
+    }
+
+    pub fn copy(mut self) {
+        for (i, &ty) in self.params_ty.iter().enumerate() {
+            match ty {
+                Type::Int32 => self.copy_int(ty, i, 32),
+                Type::Int64 | Type::Pointer(_) => self.copy_int(ty, i, 64),
+                _ => unimplemented!(),
+            }
+        }
+    }
+
+    fn copy_int(&mut self, ty: Type, i: usize, bit: usize) {
+        let (ax, rc, movrm) = match bit {
+            32 => (
+                GR32::EAX.as_phys_reg(),
+                RegisterClassKind::GR32,
+                MachineOpcode::MOVrm32,
+            ),
+            64 => (
+                GR64::RAX.as_phys_reg(),
+                RegisterClassKind::GR64,
+                MachineOpcode::MOVrm64,
+            ),
+            _ => unimplemented!(),
+        };
+        let dst = MachineOperand::FrameIndex(FrameIndexInfo::new(ty, FrameIndexKind::Arg(i)));
+        let src = match rc.get_nth_arg_reg(i) {
+            Some(arg_reg) => {
+                MachineOperand::Register(RegisterInfo::phys_reg(arg_reg).into_machine_register())
+            }
+            None => {
+                let ax = MachineRegister::phys_reg(ax);
+                let inst = MachineInst::new_simple(
+                    movrm,
+                    vec![
+                        MachineOperand::phys_reg(GR64::RBP),
+                        MachineOperand::None,
+                        MachineOperand::None,
+                        MachineOperand::imm_i32(self.off),
+                    ],
+                    self.builder.get_cur_bb().unwrap(),
+                )
+                .with_def(vec![ax.clone()]);
+                self.builder.insert(inst);
+                self.off += 8;
+                MachineOperand::Register(ax)
+            }
+        };
+        let inst = MachineInst::new_simple(
+            mov_mx(&src).unwrap(),
+            vec![
+                MachineOperand::phys_reg(GR64::RBP),
+                dst,
+                MachineOperand::None,
+                MachineOperand::None,
+                src,
+            ],
+            self.builder.get_cur_bb().unwrap(),
+        );
+        self.builder.insert(inst)
     }
 }
