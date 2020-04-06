@@ -117,7 +117,7 @@ macro_rules! cilk_expr {
     cilk_expr!($builder; $bb_map; $( $remain )*);
 };
 ($builder:expr; $bb_map:expr; $x:ident = load ($($val:tt)*); $($remain:tt)*) => {
-    let val= cilk_value!($builder; $( $val )*);
+    let val = cilk_value!($builder; $( $val )*);
     let $x = $builder.build_load(val);
     cilk_expr!($builder; $bb_map; $( $remain )*);
 };

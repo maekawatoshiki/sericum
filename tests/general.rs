@@ -929,6 +929,50 @@ fn struct1() {
 }
 
 #[test]
+fn struct2() {
+    let mut m = module::Module::new("cilk");
+
+    let struct_ty = m
+        .types
+        .new_struct_ty(vec![types::Type::Int32, types::Type::Int32]);
+    let ptr_struct_ty = m.types.new_pointer_ty(struct_ty);
+
+    let f = m.create_function("f", types::Type::Void, vec![ptr_struct_ty]);
+
+    let mut builder = builder::Builder::new(&mut m, f);
+
+    let entry = builder.append_basic_block();
+    builder.set_insert_point(entry);
+
+    cilk_ir!((builder) {
+        x = gep (%arg.0), [(i32 0), (i32 1)];
+        store (i32 123), (%x);
+        ret (void);
+    });
+
+    let main = m.create_function("main", types::Type::Int32, vec![]);
+
+    let mut builder = builder::Builder::new(&mut m, main);
+
+    let entry = builder.append_basic_block();
+    builder.set_insert_point(entry);
+
+    let var = builder.build_alloca(struct_ty);
+
+    cilk_ir!((builder) {
+        __ = call f [(%var)];
+        x = gep (%var), [(i32 0), (i32 1)];
+        r = load (%x);
+        ret (%r);
+    });
+
+    let mut jit = exec::jit::JITExecutor::new(&m);
+    let func = jit.find_function_by_name("main").unwrap();
+    let res = jit.run(func, vec![]);
+    assert_eq!(res, exec::jit::GenericValue::Int32(123));
+}
+
+#[test]
 fn many_arguments() {
     let mut m = module::Module::new("cilk");
 

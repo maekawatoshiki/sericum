@@ -150,7 +150,7 @@ impl Legalize {
         if node.operand[0].kind == NodeKind::IR(IRNodeKind::FIAddr) {
             let op0 = node.operand[0].operand[0];
             let none = heap.alloc(DAGNode::new_none());
-            let rbp = heap.alloc(DAGNode::new_phys_reg(GR64::RSP));
+            let rbp = heap.alloc(DAGNode::new_phys_reg(GR64::RBP));
             let one = heap.alloc(DAGNode::new(
                 NodeKind::Operand(OperandNodeKind::Constant(ConstantKind::Int32(1))),
                 vec![],
