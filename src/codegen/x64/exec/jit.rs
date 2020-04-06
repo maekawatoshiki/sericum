@@ -209,6 +209,7 @@ impl JITCompiler {
                     MachineOpcode::MOVrm32 => self.compile_mov_rm32(&frame_objects, inst),
                     MachineOpcode::MOVrm64 => self.compile_mov_rm64(&frame_objects, inst),
                     MachineOpcode::MOVmr32 => self.compile_mov_mr32(&frame_objects, inst),
+                    MachineOpcode::MOVmr64 => self.compile_mov_mr64(&frame_objects, inst),
                     MachineOpcode::MOVmi32 => self.compile_mov_mi32(&frame_objects, inst),
                     MachineOpcode::MOVSXDr64m32 => self.compile_movsxd_r64m32(&frame_objects, inst),
                     MachineOpcode::MOVSDrm64 => self.compile_movsd_rm64(inst),
@@ -596,6 +597,92 @@ impl JITCompiler {
         // let r = inst.def[0].get_reg().unwrap().get() as u8;
         // let i = inst.operand[0].as_constant().as_i64();
         // dynasm!(self.asm; mov Ra(r), i);
+    }
+
+    fn compile_mov_mr64(&mut self, fo: &FrameObjectsInfo, inst: &MachineInst) {
+        // mov rbp, fi, none, none, r
+        if inst.operand[0].is_register() // must be rbp
+            && inst.operand[1].is_frame_index()
+            && inst.operand[2].is_none()
+            && inst.operand[3].is_none()
+            && inst.operand[4].is_register()
+        {
+            let m0 = fo.offset(inst.operand[1].as_frame_index().idx).unwrap();
+            let r1 = phys_reg_to_dynasm_reg(inst.operand[4].as_register().get_reg().unwrap());
+            dynasm!(self.asm; mov QWORD [rbp - m0], Rq(r1));
+        }
+
+        // mov rbp, fi, none, const.off, r
+        if inst.operand[0].is_register() // must be rbp
+            && inst.operand[1].is_frame_index()
+            && inst.operand[2].is_none()
+            && inst.operand[3].is_const_i32()
+            && inst.operand[4].is_register()
+        {
+            let m0 = fo.offset(inst.operand[1].as_frame_index().idx).unwrap();
+            let i1 = inst.operand[3].as_constant().as_i32();
+            let r2 = phys_reg_to_dynasm_reg(inst.operand[4].as_register().get_reg().unwrap());
+            dynasm!(self.asm; mov QWORD [rbp - m0 + i1], Rq(r2));
+        }
+
+        // mov rbp, fi, align, off, r
+        if inst.operand[0].is_register() // must be rbp
+            && inst.operand[1].is_frame_index()
+            && inst.operand[2].is_const_i32()
+            && inst.operand[3].is_register()
+            && inst.operand[4].is_register()
+        {
+            let m0 = fo.offset(inst.operand[1].as_frame_index().idx).unwrap();
+            let i1 = inst.operand[2].as_constant().as_i32();
+            let r2 = phys_reg_to_dynasm_reg(inst.operand[3].as_register().get_reg().unwrap());
+            let r3 = phys_reg_to_dynasm_reg(inst.operand[4].as_register().get_reg().unwrap());
+            match i1 {
+                4 => dynasm!(self.asm; mov QWORD [rbp - m0 + 4*Rq(r2)], Rq(r3)),
+                _ => unimplemented!(),
+            }
+        }
+
+        // mov base, none, align, off, r
+        if inst.operand[0].is_register()
+            && inst.operand[1].is_none()
+            && inst.operand[2].is_const_i32()
+            && inst.operand[3].is_register()
+            && inst.operand[4].is_register()
+        {
+            let r0 = phys_reg_to_dynasm_reg(inst.operand[0].as_register().get_reg().unwrap());
+            let i1 = inst.operand[2].as_constant().as_i32();
+            let r2 = phys_reg_to_dynasm_reg(inst.operand[3].as_register().get_reg().unwrap());
+            let r3 = phys_reg_to_dynasm_reg(inst.operand[4].as_register().get_reg().unwrap());
+            match i1 {
+                4 => dynasm!(self.asm; mov QWORD [Rq(r0) + 4*Rq(r2)], Rq(r3)),
+                _ => unimplemented!(),
+            }
+        }
+
+        // mov base, none, none, const.off, r
+        if inst.operand[0].is_register()
+            && inst.operand[1].is_none()
+            && inst.operand[2].is_none()
+            && inst.operand[3].is_const_i32()
+            && inst.operand[4].is_register()
+        {
+            let r0 = phys_reg_to_dynasm_reg(inst.operand[0].as_register().get_reg().unwrap());
+            let i1 = inst.operand[3].as_constant().as_i32();
+            let r2 = phys_reg_to_dynasm_reg(inst.operand[4].as_register().get_reg().unwrap());
+            dynasm!(self.asm; mov QWORD [Rq(r0) + i1], Rq(r2))
+        }
+
+        // mov base, none, none, none, r
+        if inst.operand[0].is_register()
+            && inst.operand[1].is_none()
+            && inst.operand[2].is_none()
+            && inst.operand[3].is_none()
+            && inst.operand[4].is_register()
+        {
+            let r0 = phys_reg_to_dynasm_reg(inst.operand[0].as_register().get_reg().unwrap());
+            let r1 = phys_reg_to_dynasm_reg(inst.operand[4].as_register().get_reg().unwrap());
+            dynasm!(self.asm; mov QWORD [Rq(r0)], Rq(r1));
+        }
     }
 
     fn compile_mov_rr64(&mut self, inst: &MachineInst) {

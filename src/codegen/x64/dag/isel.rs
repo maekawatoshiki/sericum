@@ -70,13 +70,14 @@ impl MISelector {
                 GR64  a => (mi.MOVrm32 a, none, none, none)
             }
             (ir.Store a, b) {
+                GR64   a {
+                    imm32 b => (mi.MOVmi32 a, none, none, none, b)
+                    GR32  b => (mi.MOVmr32 a, none, none, none, b)
+                    GR64  b => (mi.MOVmr64 a, none, none, none, b) }
                 (ir.FIAddr c) a {
                     mem32 c {
                         GR32  b => (mi.MOVmr32 %rbp, c, none, none, b)
                         imm32 b => (mi.MOVmi32 %rbp, c, none, none, b) } }
-                GR64   a {
-                    imm32 b => (mi.MOVmi32 a, none, none, none, b)
-                    GR32  b => (mi.MOVmr32 a, none, none, none, b) }
             }
             (ir.FIAddr a) {
                 mem a => (mi.LEAr64m %rbp, a, none, none)
