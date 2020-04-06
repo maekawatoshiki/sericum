@@ -208,10 +208,10 @@ macro_rules! cilk_expr {
 #[macro_export]
 macro_rules! cilk_ir {
     ($m:expr; define [$($ret_ty:tt)*] $name:ident [$(($($arg:tt)*)),*] { $($exp:tt)* }) => {{
+        let ret_ty = cilk_parse_ty!($m.types, $($ret_ty)*);
+        let args_ty = vec![$( cilk_parse_ty!($m.types, $($arg)*) ),*];
         let f_id = $m.create_function(
-                stringify!($name),
-                cilk_parse_ty!(m.types, $($ret_ty)*),
-                vec![$( cilk_parse_ty!(m.types, $($arg)*) ),*],
+                stringify!($name), ret_ty, args_ty
             );
         let mut builder = builder::Builder::new(&mut $m, f_id);
         let mut bb_map: FxHashMap<&str, basic_block::BasicBlockId> = FxHashMap::default();

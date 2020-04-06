@@ -71,7 +71,9 @@ impl Combine {
         }
 
         // (~fi + fi) -> (fi + ~fi)
-        if !node.operand[0].is_frame_index() && node.operand[1].is_frame_index() {
+        if node.operand[0].kind != NodeKind::IR(IRNodeKind::FIAddr)
+            && node.operand[1].kind == NodeKind::IR(IRNodeKind::FIAddr)
+        {
             node.operand.swap(0, 1);
         }
 

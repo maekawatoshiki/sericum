@@ -322,6 +322,37 @@ fn pointer() {
     assert_eq!(jit.run(func, vec![]), exec::jit::GenericValue::Int32(0));
 }
 
+// #[test]
+// fn pointer2() {
+//     let mut m = module::Module::new("cilk");
+//
+//     let ptr_i32_ty = m.types.new_pointer_ty(types::Type::Int32);
+//
+//     // cilk_ir!(m; define [void] func [(ptr i32)] {
+//     // entry:
+//     //     store (i32 123), (%arg.0);
+//     //     ret (void);
+//     // });
+//
+//     cilk_ir!(m; define [i32] main [] {
+//     entry:
+//         a = alloca i32;
+//         pa = alloca_ (ptr i32);
+//         store (%a), (%pa);
+//         lpa = load (%pa);
+//         store (i32 123), (%lpa);
+//         // __ = call func [(%a)];
+//         la = load (%a);
+//         ret (%la);
+//     });
+//
+//     println!("{:?}", m);
+//
+//     let mut jit = exec::jit::JITExecutor::new(&m);
+//     let func = jit.find_function_by_name("main").unwrap();
+//     println!("{:?}", jit.run(func, vec![]));
+// }
+
 #[test]
 fn phi() {
     let mut m = module::Module::new("cilk");

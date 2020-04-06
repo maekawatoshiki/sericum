@@ -77,15 +77,15 @@ impl Legalize {
             let none = heap.alloc(DAGNode::new_none());
             let rbp = heap.alloc(DAGNode::new_phys_reg(GR64::RSP));
 
-            if op0.is_frame_index() && op1.is_constant() {
+            if op0.kind == NodeKind::IR(IRNodeKind::FIAddr) && op1.is_constant() {
                 return heap.alloc(DAGNode::new(
                     NodeKind::MI(MINodeKind::MOVrm32),
-                    vec![rbp, op0, none, op1],
+                    vec![rbp, op0.operand[0], none, op1],
                     node.ty.clone(),
                 ));
             }
 
-            if op0.is_frame_index()
+            if op0.kind == NodeKind::IR(IRNodeKind::FIAddr)
                 && op1.kind == NodeKind::IR(IRNodeKind::Mul)
                 && op1.operand[1].is_constant()
             {
@@ -93,7 +93,7 @@ impl Legalize {
                 let op1_op1 = op1.operand[1];
                 return heap.alloc(DAGNode::new(
                     NodeKind::MI(MINodeKind::MOVrm32),
-                    vec![rbp, op0, op1_op1, op1_op0],
+                    vec![rbp, op0.operand[0], op1_op1, op1_op0],
                     node.ty.clone(),
                 ));
             }
@@ -125,14 +125,15 @@ impl Legalize {
         isel_pat! {
         (ir.Store dst, src) {
             (ir.Add a1, a2) dst {
-                mem32 a1 {
-                    imm32 a2 {
-                        GR32  src => (mi.MOVmr32 %rbp, a1, none, a2, src)
-                        imm32 src => (mi.MOVmi32 %rbp, a1, none, a2, src) }
-                    (ir.Mul m1, m2) a2 {
-                        imm32 m2 {
-                            GR32  src => (mi.MOVmr32 %rbp, a1, m2, m1, src)
-                            imm32 src => (mi.MOVmi32 %rbp, a1, m2, m1, src) } } }
+                (ir.FIAddr fi) a1 {
+                    mem32 fi {
+                        imm32 a2 {
+                            GR32  src => (mi.MOVmr32 %rbp, fi, none, a2, src)
+                            imm32 src => (mi.MOVmi32 %rbp, fi, none, a2, src) }
+                        (ir.Mul m1, m2) a2 {
+                            imm32 m2 {
+                                GR32  src => (mi.MOVmr32 %rbp, fi, m2, m1, src)
+                                imm32 src => (mi.MOVmi32 %rbp, fi, m2, m1, src) } } } }
                 GR64 a1 {
                     (ir.Mul m1, m2) a2 {
                         imm32 m2 {
@@ -146,8 +147,8 @@ impl Legalize {
         heap: &mut RawAllocator<DAGNode>,
         node: Raw<DAGNode>,
     ) -> Raw<DAGNode> {
-        if node.operand[0].is_frame_index() {
-            let op0 = node.operand[0];
+        if node.operand[0].kind == NodeKind::IR(IRNodeKind::FIAddr) {
+            let op0 = node.operand[0].operand[0];
             let none = heap.alloc(DAGNode::new_none());
             let rbp = heap.alloc(DAGNode::new_phys_reg(GR64::RSP));
             let one = heap.alloc(DAGNode::new(
@@ -185,11 +186,11 @@ impl Legalize {
     ) -> Raw<DAGNode> {
         if node.ty == Type::Int64
             && node.operand[0].kind == NodeKind::IR(IRNodeKind::Load)
-            && node.operand[0].operand[0].is_frame_index()
+            && node.operand[0].operand[0].kind == NodeKind::IR(IRNodeKind::FIAddr)
         {
             return heap.alloc(DAGNode::new(
                 NodeKind::MI(MINodeKind::MOVSXDr64m32),
-                vec![node.operand[0].operand[0]],
+                vec![node.operand[0].operand[0].operand[0]],
                 node.ty.clone(),
             ));
         }

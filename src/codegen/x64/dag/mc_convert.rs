@@ -503,6 +503,7 @@ pub fn mov_rx(tys: &Types, x: &MachineOperand) -> Option<MachineOpcode> {
 
 pub fn mov_mx(x: &MachineOperand) -> Option<MachineOpcode> {
     let mov32mx = [MachineOpcode::MOVmr32, MachineOpcode::MOVmi32];
+    let mov64mx = [MachineOpcode::MOVmr64, MachineOpcode::MOVmi64];
     // let mov64rx = [
     //     MachineOpcode::MOVrr64,
     //     MachineOpcode::MOVri64,
@@ -515,7 +516,7 @@ pub fn mov_mx(x: &MachineOperand) -> Option<MachineOpcode> {
     };
     match bit {
         32 => Some(mov32mx[n]),
-        // 64 => Some(mov64rx[xidx]),
+        64 => Some(mov64mx[n]),
         _ => None,
     }
 }

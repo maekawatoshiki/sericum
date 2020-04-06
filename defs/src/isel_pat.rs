@@ -116,7 +116,7 @@ impl<'a> ISelPatParser<'a> {
                 };
                 quote! {
                     // #node.ty is pointer type
-                    if #node.is_frame_index() && tys.get_element_ty(#node.ty, None).unwrap().size_in_bits(tys) == #bits {
+                    if #node.is_frame_index() && #node.ty.size_in_bits(tys) == #bits {
                         #body
                     }
                 }

@@ -45,14 +45,14 @@ impl JITExecutor {
 
         let mut dag_module = dag::convert::ConvertToDAG::new(module).convert_module();
 
-        // debug!(println!("dag: before: {:?}", dag_module));
+        debug!(println!("dag: before: {:?}", dag_module));
 
         dag::combine::Combine::new().combine_module(&mut dag_module);
         // debug!(println!("dag: comibine: {:?}", dag_module));
         dag::legalize::Legalize::new().run_on_module(&mut dag_module);
         // debug!(println!("dag: legalize: {:?}", dag_module));
         dag::isel::MISelector::new().run_on_module(&mut dag_module);
-        // debug!(println!("dag: isel: {:?}", dag_module));
+        debug!(println!("dag: isel: {:?}", dag_module));
 
         let mut machine_module = dag::mc_convert::convert_module(dag_module);
 
@@ -217,6 +217,7 @@ impl JITCompiler {
                     MachineOpcode::PUSH64 => self.compile_push64(inst),
                     MachineOpcode::POP64 => self.compile_pop64(inst),
                     MachineOpcode::ADDrr32 => self.compile_add_rr32(inst),
+                    MachineOpcode::ADDrr64 => self.compile_add_rr64(inst),
                     MachineOpcode::ADDri32 => self.compile_add_ri32(inst),
                     MachineOpcode::ADDr64i32 => self.compile_add_r64i32(inst),
                     MachineOpcode::SUBrr32 => self.compile_sub_rr32(inst),
@@ -803,6 +804,13 @@ impl JITCompiler {
         let r0 = phys_reg_to_dynasm_reg(inst.def[0].get_reg().unwrap());
         let r1 = phys_reg_to_dynasm_reg(inst.operand[1].as_register().get_reg().unwrap());
         dynasm!(self.asm; add Rd(r0), Rd(r1));
+    }
+
+    fn compile_add_rr64(&mut self, inst: &MachineInst) {
+        // inst.operand[0] must be the same as inst.def[0] (they're tied)
+        let r0 = phys_reg_to_dynasm_reg(inst.def[0].get_reg().unwrap());
+        let r1 = phys_reg_to_dynasm_reg(inst.operand[1].as_register().get_reg().unwrap());
+        dynasm!(self.asm; add Rq(r0), Rq(r1));
     }
 
     fn compile_add_ri32(&mut self, inst: &MachineInst) {

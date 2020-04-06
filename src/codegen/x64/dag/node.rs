@@ -58,6 +58,8 @@ pub enum IRNodeKind {
     Ret,
     Sext,
 
+    FIAddr,
+
     CopyToReg,
     CopyFromReg,
     StoreFiConstOff,

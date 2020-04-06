@@ -117,24 +117,31 @@ impl<'a> ConvertToDAG<'a> {
                     .function_ref(av.func_id)
                     .get_param_type(&self.types, av.index)
                     .unwrap();
+                let fi_ty = self.types.new_pointer_ty(ty);
                 let fi = self.cur_conv_info_mut().dag_heap.alloc(DAGNode::new(
                     NodeKind::Operand(OperandNodeKind::FrameIndex(FrameIndexInfo::new(
                         ty.clone(),
                         FrameIndexKind::Arg(av.index),
                     ))),
                     vec![],
-                    ty.clone(),
+                    ty,
                 ));
+                let fiaddr = self.cur_conv_info_mut_with(|c| {
+                    c.dag_heap.alloc(DAGNode::new(
+                        NodeKind::IR(IRNodeKind::FIAddr),
+                        vec![fi],
+                        fi_ty,
+                    ))
+                });
                 if arg_load {
                     let load_id = self.cur_conv_info_mut().dag_heap.alloc(DAGNode::new(
                         NodeKind::IR(IRNodeKind::Load),
-                        vec![fi],
-                        ty.clone(),
+                        vec![fiaddr],
+                        ty,
                     ));
-                    // self.make_chain(load_id);
                     load_id
                 } else {
-                    fi
+                    fiaddr
                 }
             }
             Value::Function(FunctionValue { func_id }) => {
@@ -155,11 +162,7 @@ impl<'a> ConvertToDAG<'a> {
         }
     }
 
-    pub fn construct_dag_from_basic_block(
-        &mut self,
-        func: &Function,
-        bb: &BasicBlock,
-    ) -> Raw<DAGNode> {
+    fn construct_dag_from_basic_block(&mut self, func: &Function, bb: &BasicBlock) -> Raw<DAGNode> {
         let entry_node = self.cur_conv_info_mut().dag_heap.alloc(DAGNode::new(
             NodeKind::IR(IRNodeKind::Entry),
             vec![],
@@ -184,15 +187,23 @@ impl<'a> ConvertToDAG<'a> {
 
             match inst.opcode {
                 Opcode::Alloca(ref ty) => {
+                    let fi_ty = self.types.new_pointer_ty(*ty);
                     let fi = self.cur_conv_info_mut_with(|c| {
                         let frinfo = c.local_mgr.alloc(ty);
                         c.dag_heap.alloc(DAGNode::new(
                             NodeKind::Operand(OperandNodeKind::FrameIndex(frinfo.clone())), // TODO
                             vec![],
-                            ty.clone(),
+                            *ty,
                         ))
                     });
-                    self.inst_id_node_id.insert(inst_id, fi);
+                    let fiaddr = self.cur_conv_info_mut_with(|c| {
+                        c.dag_heap.alloc(DAGNode::new(
+                            NodeKind::IR(IRNodeKind::FIAddr),
+                            vec![fi],
+                            fi_ty,
+                        ))
+                    });
+                    self.inst_id_node_id.insert(inst_id, fiaddr);
                 }
                 Opcode::Load(ref v) => {
                     let v = self.get_dag_id_from_value(v, true);
@@ -416,8 +427,9 @@ impl<'a> ConvertToDAG<'a> {
                         Type::Int32,
                     ))
                 }
+                NodeKind::IR(IRNodeKind::FIAddr) => idx.operand[0], // retrieve frame index
+                NodeKind::Operand(OperandNodeKind::FrameIndex(_)) => unreachable!(),
                 NodeKind::Operand(OperandNodeKind::CondKind(_))
-                | NodeKind::Operand(OperandNodeKind::FrameIndex(_))
                 | NodeKind::Operand(OperandNodeKind::Address(_))
                 | NodeKind::Operand(OperandNodeKind::BasicBlock(_)) => idx,
                 _ => {
