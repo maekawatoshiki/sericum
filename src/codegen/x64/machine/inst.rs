@@ -457,8 +457,8 @@ impl RegisterInfo {
 }
 
 impl MachineOperand {
-    pub fn phys_reg<T: TargetRegisterTrait>(r: T) -> Self {
-        Self::Register(RegisterInfo::phys_reg(r).into_machine_register())
+    pub fn phys_reg<T: TargetRegisterTrait>(r: T) -> MachineOperand {
+        MachineOperand::Register(RegisterInfo::phys_reg(r).into_machine_register())
     }
 
     pub fn imm_i32(i: i32) -> Self {

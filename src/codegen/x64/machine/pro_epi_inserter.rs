@@ -7,7 +7,7 @@ use std::cmp;
 pub struct PrologueEpilogueInserter {}
 
 struct CopyArgs<'a> {
-    off: i32,
+    offset: i32,
     builder: &'a mut Builder<'a>,
     params_ty: &'a Vec<Type>,
 }
@@ -132,9 +132,7 @@ impl PrologueEpilogueInserter {
                 vec![MachineOperand::phys_reg(GR64::RBP)],
                 bb_id,
             )
-            .with_def(vec![
-                RegisterInfo::phys_reg(GR64::RSP).into_machine_register()
-            ]);
+            .with_def(vec![MachineRegister::phys_reg(GR64::RSP)]);
             iseq.push(cur_func.body.inst_arena.alloc(i));
 
             // pop rbp
@@ -163,7 +161,7 @@ impl<'a> CopyArgs<'a> {
         Self {
             builder,
             params_ty,
-            off: 16, // call + push rbp. TODO: this may vary if there're more pushes
+            offset: 16, // call + push rbp. TODO: this may vary if there're more pushes
         }
     }
 
@@ -193,9 +191,7 @@ impl<'a> CopyArgs<'a> {
         };
         let dst = MachineOperand::FrameIndex(FrameIndexInfo::new(ty, FrameIndexKind::Arg(i)));
         let src = match rc.get_nth_arg_reg(i) {
-            Some(arg_reg) => {
-                MachineOperand::Register(RegisterInfo::phys_reg(arg_reg).into_machine_register())
-            }
+            Some(arg_reg) => MachineRegister::phys_reg(arg_reg),
             None => {
                 let ax = MachineRegister::phys_reg(ax);
                 let inst = MachineInst::new_simple(
@@ -204,13 +200,13 @@ impl<'a> CopyArgs<'a> {
                         MachineOperand::phys_reg(GR64::RBP),
                         MachineOperand::None,
                         MachineOperand::None,
-                        MachineOperand::imm_i32(self.off),
+                        MachineOperand::imm_i32(self.offset),
                     ],
                     self.builder.get_cur_bb().unwrap(),
                 )
                 .with_def(vec![ax.clone()]);
                 self.builder.insert(inst);
-                self.off += 8;
+                self.offset += 8;
                 MachineOperand::Register(ax)
             }
         };

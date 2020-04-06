@@ -174,8 +174,8 @@ impl<'a> ConversionInfo<'a> {
                 )))
             }
             NodeKind::IR(IRNodeKind::Rem) => {
-                let eax = RegisterInfo::phys_reg(GR32::EAX).into_machine_register();
-                let edx = RegisterInfo::phys_reg(GR32::EDX).into_machine_register();
+                let eax = MachineRegister::phys_reg(GR32::EAX);
+                let edx = MachineRegister::phys_reg(GR32::EDX);
 
                 let op1 = self.normal_operand(node.operand[0]);
                 let op2 = self.normal_operand(node.operand[1]);
@@ -301,7 +301,7 @@ impl<'a> ConversionInfo<'a> {
             let ret_reg = ty2rc(&ty).unwrap().return_value_register();
             let set_ret_val =
                 MachineInst::new_simple(mov_rx(self.types, &val).unwrap(), vec![val], self.cur_bb)
-                    .with_def(vec![RegisterInfo::phys_reg(ret_reg).into_machine_register()]);
+                    .with_def(vec![MachineRegister::phys_reg(ret_reg)]);
             self.push_inst(set_ret_val);
         }
         self.push_inst(MachineInst::new_simple(
@@ -351,7 +351,7 @@ impl<'a> ConversionInfo<'a> {
             let reg_class = ty2rc(&ty).unwrap();
             let inst = match reg_class.get_nth_arg_reg(i) {
                 Some(arg_reg) => {
-                    let r = RegisterInfo::phys_reg(arg_reg).into_machine_register();
+                    let r = MachineRegister::phys_reg(arg_reg);
                     arg_regs.push(r.clone());
                     self.move2reg(r, arg)
                 }
@@ -387,7 +387,7 @@ impl<'a> ConversionInfo<'a> {
         );
 
         let callee = self.normal_operand(node.operand[0]);
-        let ret_reg = RegisterInfo::phys_reg(GR32::EAX).into_machine_register(); // TODO: Support other types than i32
+        let ret_reg = MachineRegister::phys_reg(GR32::EAX); // TODO: Support other types than i32
         let call_inst = self.push_inst(
             MachineInst::new_simple(MachineOpcode::CALL, vec![callee], self.cur_bb)
                 .with_imp_uses(arg_regs)

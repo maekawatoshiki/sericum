@@ -6,7 +6,7 @@ use super::super::{
 use super::{
     builder::{BuilderTrait, BuilderWithLiveInfoEdit},
     function::MachineFunction,
-    inst::{MachineInst, MachineOperand, MachineRegister, RegisterInfo},
+    inst::{MachineInst, MachineOperand, MachineRegister},
     liveness::LiveRegMatrix,
 };
 use crate::ir::types::Types;
@@ -23,8 +23,7 @@ impl<'a> Spiller<'a> {
 
     pub fn insert_evict(&mut self, r: MachineRegister, slot: &FrameIndexInfo) {
         let r_def_list = r.info_ref().def_list.clone();
-        // If r is defined more than once (no longer SSA) and r_def_list.len() > 1,
-        // choose the later defined one.
+        // If r is defined more than once, choose the later defined one.
         // e.g.
         //   %v1 = COPY %v2
         //   %v1 = ADD %v1, 2 <- def_id
@@ -72,8 +71,7 @@ impl<'a> Spiller<'a> {
             new_r.add_use(use_id);
 
             let src = MachineOperand::FrameIndex(slot.clone());
-            let rbp =
-                MachineOperand::Register(RegisterInfo::phys_reg(GR64::RBP).into_machine_register());
+            let rbp = MachineOperand::phys_reg(GR64::RBP);
             let load = MachineInst::new_simple(
                 mov_rx(tys, &src).unwrap(),
                 vec![rbp, src, MachineOperand::None, MachineOperand::None],
