@@ -191,7 +191,7 @@ impl<'a> CopyArgs<'a> {
         };
         let dst = MachineOperand::FrameIndex(FrameIndexInfo::new(ty, FrameIndexKind::Arg(i)));
         let src = match rc.get_nth_arg_reg(i) {
-            Some(arg_reg) => MachineRegister::phys_reg(arg_reg),
+            Some(arg_reg) => MachineOperand::phys_reg(arg_reg),
             None => {
                 let ax = MachineRegister::phys_reg(ax);
                 let inst = MachineInst::new_simple(
