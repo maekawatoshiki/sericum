@@ -1,4 +1,5 @@
 // use super::{module::*, opcode::*, value::*};
+use super::super::register::VirtReg;
 use super::inst::*;
 use id_arena::*;
 use rustc_hash::FxHashSet;
@@ -39,9 +40,9 @@ pub struct MachineBasicBlock {
 
 #[derive(Clone, Debug)]
 pub struct LivenessInfo {
-    pub def: FxHashSet<MachineRegister>,
-    pub live_in: FxHashSet<MachineRegister>,
-    pub live_out: FxHashSet<MachineRegister>,
+    pub def: FxHashSet<VirtReg>,
+    pub live_in: FxHashSet<VirtReg>,
+    pub live_out: FxHashSet<VirtReg>,
 }
 
 impl MachineBasicBlocks {

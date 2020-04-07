@@ -94,7 +94,8 @@ impl<'a> Spiller<'a> {
         let slot = self.func.local_mgr.alloc(&rc2ty(r.info_ref().reg_class)); // TODO
 
         self.matrix
-            .get_vreg_interval_mut(vreg)
+            .virt_reg_interval
+            .get_mut(&vreg)
             .unwrap()
             .range
             .adjust_end_to_start();

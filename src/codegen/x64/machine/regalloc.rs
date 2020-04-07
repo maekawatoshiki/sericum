@@ -36,15 +36,25 @@ impl RegisterAllocator {
 
         fn sort_queue(mut queue: Vec<VirtReg>, matrix: &LiveRegMatrix) -> Vec<VirtReg> {
             queue.sort_by(|x, y| {
-                let x = matrix.get_vreg_interval(*x).unwrap().start_point().unwrap();
-                let y = matrix.get_vreg_interval(*y).unwrap().start_point().unwrap();
+                let x = matrix
+                    .virt_reg_interval
+                    .get(x)
+                    .unwrap()
+                    .start_point()
+                    .unwrap();
+                let y = matrix
+                    .virt_reg_interval
+                    .get(y)
+                    .unwrap()
+                    .start_point()
+                    .unwrap();
                 x.cmp(&y)
             });
             queue
         }
 
-        // TODO: Is this correct?
-        self.queue = sort_queue(matrix.collect_vregs(), &matrix)
+        // TODO: not efficient
+        self.queue = sort_queue(matrix.collect_virt_regs(), &matrix)
             .into_iter()
             .collect();
 
@@ -67,7 +77,6 @@ impl RegisterAllocator {
             }
 
             let interfering = matrix.collect_interfering_vregs(vreg);
-            // let reg_to_spill = *interfering.last().unwrap();
             let reg_to_spill = matrix
                 // TODO: spill weight is coming soon
                 .pick_assigned_and_longest_lived_vreg(&interfering)
@@ -81,11 +90,8 @@ impl RegisterAllocator {
                 self.queue.push_back(new_reg);
             }
 
-            debug!(
-                println!("interfering({:?}): {:?}", vreg, interfering);
-                println!(
-                    "spill target: {:?}",reg_to_spill
-            ));
+            debug!(println!("interfering({:?}): {:?}", vreg, interfering);
+                   println!("spill target: {:?}", reg_to_spill));
         }
 
         self.rewrite_vregs(cur_func, &matrix);
@@ -101,7 +107,8 @@ impl RegisterAllocator {
                     }
 
                     let reg = matrix
-                        .get_vreg_interval(def.get_vreg())
+                        .virt_reg_interval
+                        .get(&def.get_vreg())
                         .unwrap()
                         .reg
                         .unwrap();
@@ -151,10 +158,11 @@ impl RegisterAllocator {
             let regs_that_may_interfere = &liveness.def | &liveness.live_in;
             for r in &regs_that_may_interfere {
                 if matrix.interferes_with_range(
-                    r.get_vreg(),
+                    *r,
                     LiveRange::new(vec![LiveSegment::new(call_inst_pp, call_inst_pp)]),
                 ) {
-                    regs_to_save.insert(r.clone());
+                    let r = matrix.get_entity_by_vreg(*r).unwrap().clone();
+                    regs_to_save.insert(r);
                 }
             }
         }
@@ -170,7 +178,7 @@ impl RegisterAllocator {
 
         let call_inst_parent = cur_func.body.inst_arena[call_inst_id].parent;
 
-        for (frinfo, reg) in slots_to_save_regs.into_iter().zip(regs_to_save.iter()) {
+        for (frinfo, reg) in slots_to_save_regs.into_iter().zip(regs_to_save.into_iter()) {
             let dst = MachineOperand::FrameIndex(frinfo.clone());
             let src = MachineOperand::Register(reg.clone());
             let rbp = MachineOperand::phys_reg(GR64::RBP);
@@ -198,7 +206,7 @@ impl RegisterAllocator {
                     vec![rbp, src, MachineOperand::None, MachineOperand::None],
                     call_inst_parent,
                 )
-                .with_def(vec![reg.clone()]),
+                .with_def(vec![reg]),
             );
             cur_func.body.inst_arena[load_inst_id].add_def(load_inst_id); // TODO: is this needed?
 

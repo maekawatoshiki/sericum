@@ -115,7 +115,8 @@ impl<'a> BuilderTrait for BuilderWithLiveInfoEdit<'a> {
             for use_ in inst.collect_used_regs() {
                 let end_point = self
                     .matrix
-                    .get_vreg_interval_mut(use_.get_vreg())
+                    .virt_reg_interval
+                    .get_mut(&use_.get_vreg())
                     .unwrap()
                     .end_point_mut()
                     .unwrap();

@@ -9,13 +9,16 @@ const IDX_STEP: usize = 16;
 pub struct LiveRegMatrix {
     pub vreg2entity: FxHashMap<VirtReg, MachineRegister>,
     pub id2pp: FxHashMap<MachineInstId, ProgramPoint>,
-    pub vreg_interval: FxHashMap<VirtReg, LiveInterval>,
-    pub reg_range: FxHashMap<RegKey, LiveRange>,
+    pub virt_reg_interval: VirtRegInterval,
+    pub phys_reg_range: PhysRegRange,
     pub program_points: ProgramPoints,
 }
 
+pub struct PhysRegRange(FxHashMap<RegKey, LiveRange>);
+pub struct VirtRegInterval(FxHashMap<VirtReg, LiveInterval>);
+
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
-pub struct RegKey(pub usize);
+pub struct RegKey(usize);
 
 #[derive(Debug, Clone)]
 pub struct LiveInterval {
@@ -57,15 +60,15 @@ impl LiveRegMatrix {
     pub fn new(
         vreg2entity: FxHashMap<VirtReg, MachineRegister>,
         id2pp: FxHashMap<MachineInstId, ProgramPoint>,
-        vreg_interval: FxHashMap<VirtReg, LiveInterval>,
-        reg_range: FxHashMap<RegKey, LiveRange>,
+        virt_reg_interval: VirtRegInterval,
+        phys_reg_range: PhysRegRange,
         program_points: ProgramPoints,
     ) -> Self {
         Self {
             vreg2entity,
             id2pp,
-            vreg_interval,
-            reg_range,
+            virt_reg_interval,
+            phys_reg_range,
             program_points,
         }
     }
@@ -79,11 +82,7 @@ impl LiveRegMatrix {
     }
 
     pub fn add_live_interval(&mut self, vreg: VirtReg, range: LiveRange) {
-        self.vreg_interval.entry(vreg).or_insert(LiveInterval {
-            vreg,
-            range,
-            reg: None,
-        });
+        self.virt_reg_interval.add(vreg, range)
     }
 
     pub fn get_program_point(&self, id: MachineInstId) -> Option<ProgramPoint> {
@@ -92,17 +91,17 @@ impl LiveRegMatrix {
 
     /// Return false if it's legal to allocate reg for vreg
     pub fn interferes(&self, vreg: VirtReg, reg: PhysReg) -> bool {
-        let r1 = match self.get_reg_live_range(reg) {
+        let r1 = match self.phys_reg_range.get(reg) {
             Some(r1) => r1,
             None => return false,
         };
-        let r2 = &self.vreg_interval.get(&vreg).unwrap().range;
+        let r2 = &self.virt_reg_interval.get(&vreg).unwrap().range;
 
         r1.interferes(r2)
     }
 
     pub fn interferes_with_range(&self, vreg: VirtReg, range: LiveRange) -> bool {
-        match self.vreg_interval.get(&vreg) {
+        match self.virt_reg_interval.get(&vreg) {
             Some(interval) => range.interferes(&interval.range),
             None => false,
         }
@@ -110,14 +109,14 @@ impl LiveRegMatrix {
 
     pub fn collect_interfering_vregs(&self, vreg: VirtReg) -> Vec<VirtReg> {
         let mut interferings = vec![];
-        let vreg_interval = &self.vreg_interval.get(&vreg).unwrap();
+        let i = self.virt_reg_interval.get(&vreg).unwrap();
 
-        for (cur_vreg, interval) in &self.vreg_interval {
+        for (cur_vreg, interval) in self.virt_reg_interval.inner() {
             if vreg == *cur_vreg {
                 continue;
             }
 
-            if interval.interferes(vreg_interval) {
+            if interval.interferes(i) {
                 interferings.push(*cur_vreg);
             }
         }
@@ -131,7 +130,7 @@ impl LiveRegMatrix {
         for vreg in vregs {
             match longest {
                 Some((ref mut endpp1, ref mut vreg1)) => {
-                    let interval2 = self.vreg_interval.get(vreg).unwrap();
+                    let interval2 = self.virt_reg_interval.get(vreg).unwrap();
                     if interval2.reg.is_none() {
                         continue;
                     }
@@ -142,7 +141,7 @@ impl LiveRegMatrix {
                     }
                 }
                 None => {
-                    let interval = self.vreg_interval.get(vreg).unwrap();
+                    let interval = self.virt_reg_interval.get(vreg).unwrap();
                     if interval.reg.is_none() {
                         continue;
                     }
@@ -156,15 +155,14 @@ impl LiveRegMatrix {
 
     pub fn assign_reg(&mut self, vreg: VirtReg, reg: PhysReg) {
         // assign reg to vreg
-        self.vreg_interval.get_mut(&vreg).unwrap().reg = Some(reg);
+        self.virt_reg_interval.get_mut(&vreg).unwrap().reg = Some(reg);
 
-        let vreg_range = self.get_vreg_interval(vreg).unwrap().range.clone();
-        self.get_or_create_reg_live_range(reg)
-            .unite_range(vreg_range);
+        let range = self.virt_reg_interval.get(&vreg).unwrap().range.clone();
+        self.phys_reg_range.get_or_create(reg).unite_range(range);
     }
 
     pub fn unassign_reg(&mut self, vreg: VirtReg) -> Option<PhysReg> {
-        let maybe_reg = &mut self.vreg_interval.get_mut(&vreg).unwrap().reg;
+        let maybe_reg = &mut self.virt_reg_interval.get_mut(&vreg).unwrap().reg;
 
         if maybe_reg.is_none() {
             return None;
@@ -174,15 +172,15 @@ impl LiveRegMatrix {
         // unassign physical register
         *maybe_reg = None;
 
-        let vreg_range = self.get_vreg_interval(vreg).unwrap().range.clone();
-        self.get_or_create_reg_live_range(reg)
-            .remove_range(vreg_range);
+        let range = &self.virt_reg_interval.get(&vreg).unwrap().range;
+        self.phys_reg_range.get_or_create(reg).remove_range(range);
 
         Some(reg)
     }
 
-    pub fn collect_vregs(&self) -> Vec<VirtReg> {
-        self.vreg_interval
+    pub fn collect_virt_regs(&self) -> Vec<VirtReg> {
+        self.virt_reg_interval
+            .inner()
             .iter()
             .map(|(vreg, _)| *vreg)
             .collect::<Vec<_>>()
@@ -191,23 +189,41 @@ impl LiveRegMatrix {
     pub fn get_entity_by_vreg(&self, vreg: VirtReg) -> Option<&MachineRegister> {
         self.vreg2entity.get(&vreg)
     }
+}
 
-    pub fn get_vreg_interval(&self, vreg: VirtReg) -> Option<&LiveInterval> {
-        self.vreg_interval.get(&vreg)
+impl PhysRegRange {
+    pub fn get_or_create(&mut self, reg: PhysReg) -> &mut LiveRange {
+        self.0.entry(reg.into()).or_insert(LiveRange::new_empty())
     }
 
-    pub fn get_vreg_interval_mut(&mut self, vreg: VirtReg) -> Option<&mut LiveInterval> {
-        self.vreg_interval.get_mut(&vreg)
+    pub fn get(&self, reg: PhysReg) -> Option<&LiveRange> {
+        self.0.get(&reg.into())
+    }
+}
+
+impl VirtRegInterval {
+    pub fn inner(&self) -> &FxHashMap<VirtReg, LiveInterval> {
+        &self.0
     }
 
-    pub fn get_or_create_reg_live_range(&mut self, reg: PhysReg) -> &mut LiveRange {
-        self.reg_range
-            .entry(reg.into())
-            .or_insert(LiveRange::new_empty())
+    pub fn get(&self, vreg: &VirtReg) -> Option<&LiveInterval> {
+        self.0.get(vreg)
     }
 
-    pub fn get_reg_live_range(&self, reg: PhysReg) -> Option<&LiveRange> {
-        self.reg_range.get(&reg.into())
+    pub fn get_mut(&mut self, vreg: &VirtReg) -> Option<&mut LiveInterval> {
+        self.0.get_mut(vreg)
+    }
+
+    pub fn add(&mut self, vreg: VirtReg, range: LiveRange) {
+        self.0.entry(vreg).or_insert(LiveInterval {
+            vreg,
+            range,
+            reg: None,
+        });
+    }
+
+    pub fn collect_virt_regs(&self) -> Vec<VirtReg> {
+        self.0.iter().map(|(vreg, _)| *vreg).collect()
     }
 }
 
@@ -281,7 +297,7 @@ impl LiveRange {
         self.segments.retain(|seg_| seg_.start != seg.start);
     }
 
-    pub fn remove_range(&mut self, range: LiveRange) {
+    pub fn remove_range(&mut self, range: &LiveRange) {
         for seg in &range.segments {
             self.remove_segment(seg)
         }
@@ -485,13 +501,13 @@ impl LivenessAnalysis {
     }
 
     pub fn analyze_function(&mut self, cur_func: &MachineFunction) -> LiveRegMatrix {
-        self.clear_bb_liveness_info(cur_func);
+        self.clear_liveness_info(cur_func);
         self.set_def(cur_func);
         self.visit(cur_func);
         self.construct_live_reg_matrix(cur_func)
     }
 
-    fn clear_bb_liveness_info(&mut self, cur_func: &MachineFunction) {
+    fn clear_liveness_info(&mut self, cur_func: &MachineFunction) {
         for (_, bb) in &cur_func.body.basic_blocks.arena {
             bb.liveness_ref_mut().clear();
         }
@@ -506,8 +522,11 @@ impl LivenessAnalysis {
     }
 
     fn set_def_on_inst(&mut self, bb: &MachineBasicBlock, inst: &MachineInst) {
-        if inst.def.len() > 0 {
-            bb.liveness.borrow_mut().def.insert(inst.def[0].clone());
+        for vreg in inst.def.iter().filter_map(|d| match d.get_reg() {
+            Some(_) => None,
+            _ => Some(d.get_vreg()),
+        }) {
+            bb.liveness.borrow_mut().def.insert(vreg);
         }
     }
 
@@ -527,32 +546,27 @@ impl LivenessAnalysis {
     ) {
         for operand in &inst.operand {
             if let MachineOperand::Register(reg) = operand {
-                // live_in and live_out should contain no assigned registers
+                // live_in and live_out should contain no assigned(physical) registers
                 if reg.is_phys_reg() {
                     continue;
                 }
 
-                self.propagate(cur_func, bb, reg)
+                self.propagate(cur_func, bb, reg.get_vreg())
             }
         }
     }
 
-    fn propagate(
-        &self,
-        cur_func: &MachineFunction,
-        bb: MachineBasicBlockId,
-        reg: &MachineRegister,
-    ) {
+    fn propagate(&self, cur_func: &MachineFunction, bb: MachineBasicBlockId, reg: VirtReg) {
         let bb = &cur_func.body.basic_blocks.arena[bb];
 
         {
             let mut bb_liveness = bb.liveness.borrow_mut();
 
-            if bb_liveness.def.contains(reg) {
+            if bb_liveness.def.contains(&reg) {
                 return;
             }
 
-            if !bb_liveness.live_in.insert(reg.clone()) {
+            if !bb_liveness.live_in.insert(reg) {
                 // live_in already had the reg
                 return;
             }
@@ -560,7 +574,7 @@ impl LivenessAnalysis {
 
         for pred_id in &bb.pred {
             let pred = &cur_func.body.basic_blocks.arena[*pred_id];
-            if pred.liveness.borrow_mut().live_out.insert(reg.clone()) {
+            if pred.liveness.borrow_mut().live_out.insert(reg) {
                 // live_out didn't have the reg
                 self.propagate(cur_func, *pred_id, reg);
             }
@@ -592,12 +606,8 @@ impl LivenessAnalysis {
             }};}
 
             for livein in &liveness.live_in {
-                if livein.get_reg().is_some() {
-                    continue;
-                }
-
                 vreg2range
-                    .entry(livein.get_vreg())
+                    .entry(*livein)
                     .or_insert_with(|| LiveRange::new_empty())
                     .add_segment(LiveSegment::new(cur_pp!(), cur_pp!()))
             }
@@ -609,36 +619,36 @@ impl LivenessAnalysis {
                     vreg2entity.insert(def_reg.get_vreg(), def_reg);
                 }
 
-                for operand in &inst.operand {
-                    if let MachineOperand::Register(reg) = operand {
-                        if let Some(phy_reg) = reg.get_reg() {
-                            if let Some(range) = reg2range.get_mut(&phy_reg.into()) {
-                                range.segments.last_mut().unwrap().end = cur_pp!();
-                            }
+                for reg in inst.operand.iter().filter_map(|o| match o {
+                    MachineOperand::Register(r) => Some(r),
+                    _ => None,
+                }) {
+                    if let Some(phy_reg) = reg.get_reg() {
+                        if let Some(range) = reg2range.get_mut(&phy_reg.into()) {
+                            range.segments.last_mut().unwrap().end = cur_pp!();
                         }
+                    }
 
-                        if reg.get_reg().is_none() {
-                            vreg2range
-                                .get_mut(&reg.get_vreg())
-                                .unwrap()
-                                .segments
-                                .last_mut()
-                                .unwrap()
-                                .end = cur_pp!();
-                        }
+                    if reg.get_reg().is_none() {
+                        vreg2range
+                            .get_mut(&reg.get_vreg())
+                            .unwrap()
+                            .segments
+                            .last_mut()
+                            .unwrap()
+                            .end = cur_pp!();
                     }
                 }
 
-                // TODO: def.len() > 0 is no easy to understand
-                if inst.def.len() > 0 {
-                    if inst.def[0].get_reg().is_some() {
+                for def in &inst.def {
+                    if def.get_reg().is_some() {
                         reg2range
-                            .entry(inst.def[0].get_reg().unwrap().into())
+                            .entry(def.get_reg().unwrap().into())
                             .or_insert_with(|| LiveRange::new_empty())
                             .add_segment(LiveSegment::new(cur_pp!(), cur_pp!()));
                     } else {
                         vreg2range
-                            .entry(inst.def[0].get_vreg())
+                            .entry(def.get_vreg())
                             .or_insert_with(|| LiveRange::new_empty())
                             .add_segment(LiveSegment::new(cur_pp!(), cur_pp!()));
                     }
@@ -661,12 +671,8 @@ impl LivenessAnalysis {
             }
 
             for liveout in &liveness.live_out {
-                if liveout.get_reg().is_some() {
-                    continue;
-                }
-
                 vreg2range
-                    .get_mut(&liveout.get_vreg())
+                    .get_mut(&liveout)
                     .unwrap()
                     .segments
                     .last_mut()
@@ -677,18 +683,16 @@ impl LivenessAnalysis {
             bb_idx += 1;
         }
 
-        // debug!(for (vreg, range) in &vreg2range {
-        //     println!("{:?}: {:?}", vreg, range)
-        // });
-
         LiveRegMatrix::new(
             vreg2entity,
             id2pp,
-            vreg2range
-                .into_iter()
-                .map(|(vreg, range)| (vreg, LiveInterval::new(vreg, range)))
-                .collect(),
-            reg2range,
+            VirtRegInterval(
+                vreg2range
+                    .into_iter()
+                    .map(|(vreg, range)| (vreg, LiveInterval::new(vreg, range)))
+                    .collect(),
+            ),
+            PhysRegRange(reg2range),
             program_points,
         )
     }
