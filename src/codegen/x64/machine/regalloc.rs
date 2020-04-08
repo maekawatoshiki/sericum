@@ -14,6 +14,7 @@ pub struct RegisterAllocator {
 
 pub struct AllocationOrder<'a> {
     matrix: &'a LiveRegMatrix,
+    func: &'a MachineFunction,
 }
 
 impl RegisterAllocator {
@@ -60,7 +61,9 @@ impl RegisterAllocator {
 
         while let Some(vreg) = self.queue.pop_front() {
             let mut allocated = false;
-            let order = AllocationOrder::new(&matrix).get_order(vreg).unwrap();
+            let order = AllocationOrder::new(&matrix, cur_func)
+                .get_order(vreg)
+                .unwrap();
             for reg in order {
                 if matrix.interferes(vreg, reg) {
                     continue;
@@ -149,8 +152,7 @@ impl RegisterAllocator {
         let call_inst_pp = matrix.get_program_point(call_inst_id).unwrap();
         let mut regs_to_save = FxHashSet::default();
 
-        // TODO: It's expensive to check all the elements in ``inst_arena``
-        // IMPROVED A LITTLE: any better ideas?
+        // IMPROVED EFFICIENCY A LITTLE: any better ideas?
         {
             let bb_including_call =
                 &cur_func.body.basic_blocks.arena[cur_func.body.inst_arena[call_inst_id].parent];
@@ -250,18 +252,36 @@ impl RegisterAllocator {
     }
 }
 
-// TODO: Take into consideration the use list of register
 impl<'a> AllocationOrder<'a> {
-    pub fn new(matrix: &'a LiveRegMatrix) -> Self {
-        Self { matrix }
+    pub fn new(matrix: &'a LiveRegMatrix, func: &'a MachineFunction) -> Self {
+        Self { matrix, func }
     }
 
     pub fn get_order(&self, vreg: VirtReg) -> Option<RegisterOrder> {
-        Some(
-            self.matrix
-                .get_entity_by_vreg(vreg)?
-                .get_reg_class()
-                .get_reg_order(),
-        )
+        let reg = self
+            .matrix
+            .get_entity_by_vreg(vreg)
+            .unwrap()
+            .info_ref()
+            .use_list
+            .iter()
+            .find_map(|&use_| {
+                let inst = &self.func.body.inst_arena[use_];
+                if inst.opcode.is_copy() {
+                    return inst.def[0].get_reg();
+                }
+                None
+            });
+        let mut order = self
+            .matrix
+            .get_entity_by_vreg(vreg)?
+            .get_reg_class()
+            .get_reg_order();
+
+        if let Some(phys) = reg {
+            order.add_preferred_reg(phys);
+        }
+
+        Some(order)
     }
 }

@@ -801,15 +801,15 @@ fibo:
   ret
 .L2:
   mov eax, dword ptr [rbp - 4]
-  mov eax, eax
-  sub eax, 1
   mov edi, eax
+  sub edi, 1
+  mov edi, edi
   call fibo
   mov ecx, eax
   mov eax, dword ptr [rbp - 4]
-  mov eax, eax
-  sub eax, 2
   mov edi, eax
+  sub edi, 2
+  mov edi, edi
   mov dword ptr [rbp - 8], ecx
   call fibo
   mov ecx, dword ptr [rbp - 8]
@@ -1003,4 +1003,34 @@ fn many_arguments() {
     let res = jit.run(func, vec![]);
     println!("{:?}", res);
     assert_eq!(res, exec::jit::GenericValue::Int32(36));
+}
+
+#[test]
+fn fact() {
+    let mut m = module::Module::new("cilk");
+
+    /*
+     * int fact(int x) {
+     *   if (x == 1) return 1;
+     *   return x * fact(x - 1);
+     * }
+     */
+    let _ = cilk_ir!(m; define [i32] fact [(i32)] {
+        entry:
+            cond = icmp eq (%arg.0), (i32 1);
+            br (%cond) l1, l2;
+        l1:
+            ret (i32 1);
+        l2:
+            a = sub (%arg.0), (i32 1);
+            y = call fact [(%a)];
+            z = mul (%y), (%arg.0);
+            ret (%z);
+    });
+
+    let mut jit = exec::jit::JITExecutor::new(&m);
+    let func = jit.find_function_by_name("fact").unwrap();
+    let res = jit.run(func, vec![exec::jit::GenericValue::Int32(10)]);
+    println!("{:?}", res);
+    assert_eq!(res, exec::jit::GenericValue::Int32(3628800));
 }

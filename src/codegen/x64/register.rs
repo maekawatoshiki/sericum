@@ -359,6 +359,10 @@ impl RegisterOrder {
             nth: 0,
         }
     }
+
+    pub fn add_preferred_reg(&mut self, r: PhysReg) {
+        self.order.insert(0, r);
+    }
 }
 
 impl Iterator for RegisterOrder {
