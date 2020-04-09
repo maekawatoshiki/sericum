@@ -800,21 +800,15 @@ fibo:
   pop rbp
   ret
 .L2:
-  mov eax, dword ptr [rbp - 4]
-  mov edi, eax
+  mov edi, dword ptr [rbp - 4]
   sub edi, 1
-  mov edi, edi
   call fibo
   mov ecx, eax
-  mov eax, dword ptr [rbp - 4]
-  mov edi, eax
+  mov edi, dword ptr [rbp - 4]
   sub edi, 2
-  mov edi, edi
   mov dword ptr [rbp - 8], ecx
   call fibo
   mov ecx, dword ptr [rbp - 8]
-  mov eax, eax
-  mov ecx, ecx
   add ecx, eax
   mov eax, ecx
   mov rsp, rbp
@@ -828,8 +822,6 @@ main:
   sub rsp, 8
   mov edi, 10
   call fibo
-  mov eax, eax
-  mov eax, eax
   mov rsp, rbp
   pop rbp
   ret
