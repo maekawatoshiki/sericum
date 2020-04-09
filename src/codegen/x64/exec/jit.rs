@@ -60,6 +60,9 @@ impl JITExecutor {
 
         machine::phi_elimination::PhiElimination::new().run_on_module(&mut machine_module); //
         machine::two_addr::TwoAddressConverter::new().run_on_module(&mut machine_module);
+        debug!(println!("bcoalesce {:?}", machine_module));
+        machine::reg_coalescer::RegisterCoalescer::new().run_on_module(&mut machine_module); //
+        debug!(println!("coalesce {:?}", machine_module));
         machine::regalloc::RegisterAllocator::new().run_on_module(&mut machine_module); //
         machine::pro_epi_inserter::PrologueEpilogueInserter::new()
             .run_on_module(&mut machine_module);
@@ -87,7 +90,13 @@ impl JITExecutor {
     }
 
     pub fn run(&mut self, id: MachineFunctionId, args: Vec<GenericValue>) -> GenericValue {
-        self.jit.run(&self.machine_module, id, args)
+        let now = ::std::time::Instant::now();
+        let a = self.jit.run(&self.machine_module, id, args);
+        println!(
+            "duration: {:?}",
+            ::std::time::Instant::now().duration_since(now)
+        );
+        a
     }
 }
 

@@ -287,7 +287,7 @@ impl MachineInst {
 }
 
 impl MachineOpcode {
-    pub fn is_copy(&self) -> bool {
+    pub fn is_copy_like(&self) -> bool {
         matches!(
             self,
             MachineOpcode::MOVrr32 | MachineOpcode::MOVrr64 | MachineOpcode::Copy

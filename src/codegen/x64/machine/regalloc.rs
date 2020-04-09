@@ -267,7 +267,7 @@ impl<'a> AllocationOrder<'a> {
             .iter()
             .find_map(|&use_| {
                 let inst = &self.func.body.inst_arena[use_];
-                if inst.opcode.is_copy() {
+                if inst.opcode.is_copy_like() {
                     return inst.def[0].get_reg();
                 }
                 None

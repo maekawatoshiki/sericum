@@ -616,6 +616,9 @@ impl LivenessAnalysis {
                 id2pp.insert(inst_id, cur_pp!());
 
                 for def_reg in inst.collect_defined_regs() {
+                    if def_reg.is_phys_reg() {
+                        continue;
+                    }
                     vreg2entity.insert(def_reg.get_vreg(), def_reg);
                 }
 
