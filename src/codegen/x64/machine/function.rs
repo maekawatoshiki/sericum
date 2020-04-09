@@ -140,8 +140,8 @@ impl MachineFunction {
         let mut idx = 0;
         for (id, bb, iiter) in self.body.mbb_iter() {
             writeln!(f, "MachineBasicBlock #{} ({:?})", id.index(), bb)?;
-            for (_, inst) in iiter {
-                write!(f, "{: ^4}: ", idx)?;
+            for (id, inst) in iiter {
+                write!(f, "{: ^4}({: ^4}): ", idx, id.index())?;
                 inst.debug(tys, f)?;
                 writeln!(f)?;
                 idx += 1;
@@ -162,8 +162,7 @@ impl InstructionArena {
     pub fn alloc(&mut self, mi: MachineInst) -> Id<MachineInst> {
         let mi_id = self.arena.alloc(mi);
         let mi = &mut self.arena[mi_id];
-        mi.add_use(mi_id);
-        mi.add_def(mi_id);
+        mi.set_id(mi_id);
         mi_id
     }
 }

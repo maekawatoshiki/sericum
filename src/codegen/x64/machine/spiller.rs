@@ -67,14 +67,13 @@ impl<'a> Spiller<'a> {
             self.matrix.add_vreg_entity(new_r.clone());
 
             let use_inst = &mut self.func.body.inst_arena[use_id];
-            use_inst.replace_operand_reg(&r, &new_r);
-            new_r.add_use(use_id);
+            use_inst.replace_operand_register(&r, &new_r);
 
-            let src = MachineOperand::FrameIndex(slot.clone());
+            let fi = MachineOperand::FrameIndex(slot.clone());
             let rbp = MachineOperand::phys_reg(GR64::RBP);
             let load = MachineInst::new_simple(
-                mov_rx(tys, &src).unwrap(),
-                vec![rbp, src, MachineOperand::None, MachineOperand::None],
+                mov_rx(tys, &fi).unwrap(),
+                vec![rbp, fi, MachineOperand::None, MachineOperand::None],
                 use_inst.parent,
             )
             .with_def(vec![new_r.clone()]);

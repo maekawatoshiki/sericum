@@ -197,8 +197,6 @@ impl RegisterAllocator {
                 None,
                 call_inst_parent,
             ));
-            cur_func.body.inst_arena[store_inst_id].add_use(store_inst_id);
-            cur_func.body.inst_arena[store_inst_id].add_def(store_inst_id);
 
             let src = MachineOperand::FrameIndex(frinfo);
 
@@ -210,7 +208,6 @@ impl RegisterAllocator {
                 )
                 .with_def(vec![reg]),
             );
-            cur_func.body.inst_arena[load_inst_id].add_def(load_inst_id); // TODO: is this needed?
 
             let mut builder = BuilderWithLiveInfoEdit::new(matrix, cur_func);
 

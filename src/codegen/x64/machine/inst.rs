@@ -19,6 +19,7 @@ pub type MachineInstId = Id<MachineInst>;
 
 #[derive(Clone)]
 pub struct MachineInst {
+    pub id: Option<MachineInstId>,
     pub opcode: MachineOpcode,
     pub operand: Vec<MachineOperand>,
     pub def: Vec<MachineRegister>,
@@ -97,6 +98,7 @@ impl MachineInst {
         parent: MachineBasicBlockId,
     ) -> Self {
         Self {
+            id: None,
             opcode,
             operand,
             def: match rc {
@@ -116,6 +118,7 @@ impl MachineInst {
         parent: MachineBasicBlockId,
     ) -> Self {
         Self {
+            id: None,
             opcode,
             operand,
             def: vec![],
@@ -133,6 +136,7 @@ impl MachineInst {
         parent: MachineBasicBlockId,
     ) -> Self {
         Self {
+            id: None,
             opcode,
             operand,
             def,
@@ -151,6 +155,7 @@ impl MachineInst {
         parent: MachineBasicBlockId,
     ) -> Self {
         Self {
+            id: None,
             opcode,
             operand,
             def: vec![],
@@ -186,38 +191,47 @@ impl MachineInst {
         self
     }
 
-    pub fn add_use(&self, id: MachineInstId) {
-        for operand in &self.operand {
-            let reg = match operand {
-                MachineOperand::Register(reg) => reg,
-                _ => continue,
-            };
-            reg.info_ref_mut().use_list.insert(id);
+    pub fn set_id(&mut self, id: MachineInstId) {
+        self.id = Some(id);
+        self.set_uses();
+        self.set_defs();
+    }
+
+    pub fn set_uses(&self) {
+        let id = self.id.unwrap();
+
+        for reg in self.operand.iter().filter_map(|o| match o {
+            MachineOperand::Register(r) => Some(r),
+            _ => None,
+        }) {
+            reg.add_use(id);
         }
 
         for reg in &self.imp_use {
-            reg.info_ref_mut().use_list.insert(id);
+            reg.add_use(id);
         }
     }
 
-    pub fn add_def(&self, id: MachineInstId) {
+    pub fn set_defs(&self) {
+        let id = self.id.unwrap();
+
         for reg in &self.def {
-            reg.info_ref_mut().def_list.insert(id);
+            reg.add_def(id);
         }
 
         for reg in &self.imp_def {
-            reg.info_ref_mut().def_list.insert(id);
+            reg.add_def(id);
         }
     }
 
-    pub fn replace_operand_reg(&mut self, from: &MachineRegister, to: &MachineRegister) {
-        for operand in self.operand.iter_mut() {
-            match operand {
-                MachineOperand::Register(ref mut r) if r.get_vreg() == from.get_vreg() => {
-                    *r = to.clone();
-                }
-                _ => {}
-            }
+    pub fn replace_operand_register(&mut self, from: &MachineRegister, to: &MachineRegister) {
+        // TODO: This loop may run once at most
+        for r in self.operand.iter_mut().filter_map(|o| match o {
+            MachineOperand::Register(r) if r.get_vreg() == from.get_vreg() => Some(r),
+            _ => None,
+        }) {
+            r.remove_use(self.id.unwrap());
+            *r = to.clone();
         }
     }
 
@@ -321,8 +335,16 @@ impl MachineRegister {
         self.info_ref_mut().use_list.insert(use_id);
     }
 
+    pub fn remove_use(&self, id: MachineInstId) {
+        self.info_ref_mut().use_list.remove(&id);
+    }
+
     pub fn add_def(&self, def_id: MachineInstId) {
         self.info_ref_mut().def_list.insert(def_id);
+    }
+
+    pub fn remove_def(&self, id: MachineInstId) {
+        self.info_ref_mut().def_list.remove(&id);
     }
 
     pub fn copy_with_new_vreg(&self, vreg_gen: &VirtRegGen) -> Self {

@@ -199,7 +199,7 @@ fn brainfuxk() {
 
     fn count_continuous_char(c: char, code_bytes: &[u8], code_pos: &mut usize) -> usize {
         let mut count = 0;
-        while code_bytes[*code_pos] as char == c {
+        while *code_pos < code_bytes.len() && code_bytes[*code_pos] as char == c {
             *code_pos += 1;
             count += 1
         }
