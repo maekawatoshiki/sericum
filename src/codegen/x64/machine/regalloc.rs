@@ -33,6 +33,9 @@ impl RegisterAllocator {
     pub fn run_on_function(&mut self, tys: &Types, cur_func: &mut MachineFunction) {
         let mut matrix = LivenessAnalysis::new().analyze_function(cur_func);
 
+        use super::reg_coalescer::coalesce_function;
+        coalesce_function(&mut matrix, cur_func);
+
         self.preserve_vreg_uses_across_call(tys, cur_func, &mut matrix);
 
         fn sort_queue(mut queue: Vec<VirtReg>, matrix: &LiveRegMatrix) -> Vec<VirtReg> {
@@ -158,6 +161,7 @@ impl RegisterAllocator {
                 &cur_func.body.basic_blocks.arena[cur_func.body.inst_arena[call_inst_id].parent];
             let liveness = bb_including_call.liveness_ref();
             let regs_that_may_interfere = &liveness.def | &liveness.live_in;
+            println!("{:?}", regs_that_may_interfere);
             for r in &regs_that_may_interfere {
                 if matrix.interferes_with_range(
                     *r,

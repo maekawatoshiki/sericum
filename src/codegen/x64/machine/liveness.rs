@@ -3,6 +3,7 @@ use super::{basic_block::*, function::*, inst::*, module::*};
 use crate::util::allocator::{Raw, RawAllocator};
 use rustc_hash::FxHashMap;
 use std::cmp::Ordering;
+use std::fmt;
 
 const IDX_STEP: usize = 16;
 
@@ -39,7 +40,7 @@ pub struct LiveSegment {
     end: ProgramPoint,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 pub struct ProgramPoint {
     base: Raw<ProgramPointBase>,
 }
@@ -100,9 +101,19 @@ impl LiveRegMatrix {
         r1.interferes(r2)
     }
 
+    /// Return false if it's legal to allocate reg for vreg
+    pub fn interferes_virt_regs(&self, vreg1: VirtReg, vreg2: VirtReg) -> bool {
+        let r1 = &self.virt_reg_interval.get(&vreg1).unwrap().range;
+        let r2 = &self.virt_reg_interval.get(&vreg2).unwrap().range;
+        r1.interferes(r2)
+    }
+
     pub fn interferes_with_range(&self, vreg: VirtReg, range: LiveRange) -> bool {
         match self.virt_reg_interval.get(&vreg) {
-            Some(interval) => range.interferes(&interval.range),
+            Some(interval) => {
+                println!("check: {:?} - {:?}:{:?}", range, vreg, interval.range);
+                range.interferes(&interval.range)
+            }
             None => false,
         }
     }
@@ -178,6 +189,27 @@ impl LiveRegMatrix {
         Some(reg)
     }
 
+    /// v2 merges into v1 and remove v2 from matrix
+    pub fn merge_virt_regs(&mut self, v1: VirtReg, v2: VirtReg) {
+        let v2_e = self.vreg2entity.remove(&v2).unwrap();
+        let v1_e = self.vreg2entity.get(&v1).unwrap();
+        for &use_ in &v2_e.info_ref().use_list {
+            v1_e.add_use(use_)
+        }
+        let v2_i = self.virt_reg_interval.remove(&v2).unwrap();
+        let v1_i = self.virt_reg_interval.get_mut(&v1).unwrap();
+        v1_i.range.unite_range(v2_i.range);
+        println!("range of {:?}: {:?}", v1, v1_i.range);
+    }
+
+    /// r2 merges into r1 and remove r2 from matrix
+    pub fn merge_regs(&mut self, r1: PhysReg, r2: VirtReg) {
+        self.vreg2entity.remove(&r2);
+        let r2_i = self.virt_reg_interval.remove(&r2).unwrap();
+        let r1_i = self.phys_reg_range.get_mut(r1).unwrap();
+        r1_i.unite_range(r2_i.range);
+    }
+
     pub fn collect_virt_regs(&self) -> Vec<VirtReg> {
         self.virt_reg_interval
             .inner()
@@ -199,6 +231,10 @@ impl PhysRegRange {
     pub fn get(&self, reg: PhysReg) -> Option<&LiveRange> {
         self.0.get(&reg.into())
     }
+
+    pub fn get_mut(&mut self, reg: PhysReg) -> Option<&mut LiveRange> {
+        self.0.get_mut(&reg.into())
+    }
 }
 
 impl VirtRegInterval {
@@ -212,6 +248,10 @@ impl VirtRegInterval {
 
     pub fn get_mut(&mut self, vreg: &VirtReg) -> Option<&mut LiveInterval> {
         self.0.get_mut(vreg)
+    }
+
+    pub fn remove(&mut self, vreg: &VirtReg) -> Option<LiveInterval> {
+        self.0.remove(vreg)
     }
 
     pub fn add(&mut self, vreg: VirtReg, range: LiveRange) {
@@ -474,6 +514,12 @@ impl Ord for ProgramPoint {
 }
 
 impl Eq for ProgramPoint {}
+
+impl fmt::Debug for ProgramPoint {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}:{}", self.bb(), self.idx())
+    }
+}
 
 impl PartialOrd for ProgramPoint {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {

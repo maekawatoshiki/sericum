@@ -68,6 +68,7 @@ impl TwoAddressConverter {
             );
 
             let inst = f.body.inst_arena.alloc(old_inst);
+            f.body.inst_arena[inst_id].set_id(inst_id);
 
             let mut builder = Builder::new(f);
             builder.set_insert_point_after_inst(inst_id).unwrap();

@@ -191,35 +191,46 @@ impl MachineInst {
         self
     }
 
-    pub fn set_id(&mut self, id: MachineInstId) {
-        self.id = Some(id);
-        self.set_uses();
-        self.set_defs();
+    pub fn set_def(&mut self, r: MachineRegister) {
+        self.def[0].remove_def(self.id.unwrap());
+        self.def[0] = r;
+        self.def[0].add_def(self.id.unwrap());
     }
 
-    pub fn set_uses(&self) {
+    pub fn set_id(&mut self, id: MachineInstId) {
+        let old_id = self.id;
+        self.id = Some(id);
+        self.set_use_to_regs(old_id);
+        self.set_def_to_regs(old_id);
+    }
+
+    pub fn set_use_to_regs(&self, old_id: Option<MachineInstId>) {
         let id = self.id.unwrap();
 
         for reg in self.operand.iter().filter_map(|o| match o {
             MachineOperand::Register(r) => Some(r),
             _ => None,
         }) {
+            some_then!(id, old_id, reg.remove_use(id));
             reg.add_use(id);
         }
 
         for reg in &self.imp_use {
+            some_then!(id, old_id, reg.remove_use(id));
             reg.add_use(id);
         }
     }
 
-    pub fn set_defs(&self) {
+    pub fn set_def_to_regs(&self, old_id: Option<MachineInstId>) {
         let id = self.id.unwrap();
 
         for reg in &self.def {
+            some_then!(id, old_id, reg.remove_def(id));
             reg.add_def(id);
         }
 
         for reg in &self.imp_def {
+            some_then!(id, old_id, reg.remove_def(id));
             reg.add_def(id);
         }
     }
@@ -232,6 +243,7 @@ impl MachineInst {
         }) {
             r.remove_use(self.id.unwrap());
             *r = to.clone();
+            r.add_use(self.id.unwrap());
         }
     }
 
