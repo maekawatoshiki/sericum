@@ -3,6 +3,7 @@ use super::super::{
     frame_object::*,
     register::*,
 };
+use super::reg_coalescer::coalesce_function;
 use super::{builder::*, function::*, inst::*, liveness::*, module::*, spiller::Spiller};
 use crate::ir::types::Types;
 use rustc_hash::FxHashSet;
@@ -33,8 +34,11 @@ impl RegisterAllocator {
     pub fn run_on_function(&mut self, tys: &Types, cur_func: &mut MachineFunction) {
         let mut matrix = LivenessAnalysis::new().analyze_function(cur_func);
 
-        use super::reg_coalescer::coalesce_function;
+        // debug!(println!("before coalesing {:?}", cur_func));
+
         coalesce_function(&mut matrix, cur_func);
+
+        debug!(println!("after coalesing {:?}", cur_func));
 
         self.preserve_vreg_uses_across_call(tys, cur_func, &mut matrix);
 

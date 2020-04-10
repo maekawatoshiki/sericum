@@ -31,12 +31,12 @@ pub struct MachineFunction {
     pub vreg_gen: VirtRegGen,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct InstructionArena {
     pub arena: Arena<MachineInst>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct MachineFunctionBody {
     pub inst_arena: InstructionArena,
     pub basic_blocks: MachineBasicBlocks,
@@ -129,6 +129,7 @@ impl MachineFunction {
         self.body.basic_blocks.order.get(0)
     }
 
+    // for more precise information (of type) than Debug trait
     pub fn debug(&self, f: &mut fmt::Formatter, tys: &Types) -> fmt::Result {
         writeln!(
             f,
@@ -144,6 +145,27 @@ impl MachineFunction {
                 write!(f, "{: ^4}({: ^4}): ", idx, id.index())?;
                 inst.debug(tys, f)?;
                 writeln!(f)?;
+                idx += 1;
+            }
+        }
+
+        fmt::Result::Ok(())
+    }
+}
+
+impl fmt::Debug for MachineFunction {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        writeln!(
+            f,
+            "MachineFunction(name: {}, ty: {:?}):",
+            self.name, self.ty
+        )?;
+
+        let mut idx = 0;
+        for (id, bb, iiter) in self.body.mbb_iter() {
+            writeln!(f, "MachineBasicBlock #{} ({:?})", id.index(), bb)?;
+            for (id, inst) in iiter {
+                writeln!(f, "{: ^4}({: ^4}): {:?}", idx, id.index(), inst)?;
                 idx += 1;
             }
         }

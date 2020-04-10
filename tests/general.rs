@@ -661,15 +661,10 @@ fn jit_executor1() {
 
     let mut jit = exec::jit::JITExecutor::new(&m);
     let main = jit.find_function_by_name("main").unwrap();
-    let now = ::std::time::Instant::now();
     println!(
         "main: return: {:?}",
         jit.run(main, vec![exec::jit::GenericValue::Int32(40)])
     );
-    println!(
-        "duration: {:?}",
-        ::std::time::Instant::now().duration_since(now)
-    )
 }
 
 #[test]
@@ -724,15 +719,10 @@ fn jit_executor2() {
 
     let mut jit = exec::jit::JITExecutor::new(&m);
     let main = jit.find_function_by_name("main").unwrap();
-    let now = ::std::time::Instant::now();
     println!(
         "main: return: {:?}",
-        jit.run(main, vec![exec::jit::GenericValue::Int32(35)])
+        jit.run(main, vec![exec::jit::GenericValue::Int32(39)])
     );
-    println!(
-        "duration: {:?}",
-        ::std::time::Instant::now().duration_since(now)
-    )
 }
 
 #[test]

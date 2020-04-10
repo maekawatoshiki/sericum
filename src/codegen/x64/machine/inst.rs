@@ -50,7 +50,7 @@ pub struct MachineInstDef {
     pub parent: MachineBasicBlockId,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub enum MachineOperand {
     Register(MachineRegister),
     Constant(MachineConstant),
@@ -745,6 +745,59 @@ impl MachineOperand {
             MachineOperand::Branch(id) => write!(f, "BB#{}", id.index()),
             MachineOperand::None => write!(f, "!"),
         }
+    }
+}
+
+impl fmt::Debug for MachineInst {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for (i, def) in self.def.iter().enumerate() {
+            def.fmt(f)?;
+            if i < self.def.len() - 1 {
+                write!(f, ", ")?;
+            } else {
+                write!(f, " = ")?;
+            }
+        }
+
+        write!(f, "{:?} ", self.opcode)?;
+
+        for (i, op) in self.operand.iter().enumerate() {
+            write!(f, "{:?}", op)?;
+            if i < self.operand.len() - 1 {
+                write!(f, ", ")?;
+            }
+        }
+
+        if self.tie.len() > 0 || self.imp_def.len() > 0 || self.imp_use.len() > 0 {
+            write!(f, " (")?;
+        }
+
+        if self.tie.len() != 0 {
+            write!(f, "tie:")?;
+            for (def, use_) in &self.tie {
+                write!(f, "{:?}->{:?},", def, use_)?;
+            }
+        }
+
+        if self.imp_def.len() != 0 {
+            write!(f, "imp-def:")?;
+            for reg in &self.imp_def {
+                write!(f, "{:?},", reg)?;
+            }
+        }
+
+        if self.imp_use.len() != 0 {
+            write!(f, "imp-use:")?;
+            for reg in &self.imp_use {
+                write!(f, "{:?},", reg)?;
+            }
+        }
+
+        if self.tie.len() > 0 || self.imp_def.len() > 0 || self.imp_use.len() > 0 {
+            write!(f, ")")?;
+        }
+
+        fmt::Result::Ok(())
     }
 }
 

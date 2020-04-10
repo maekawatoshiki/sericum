@@ -57,6 +57,7 @@ impl TwoAddressConverter {
             // after:  v1 = copy v2
             //         v1 = add v1, 1
 
+            // TODO: hard to understand what's going on
             let old_inst = mem::replace(
                 &mut f.body.inst_arena[inst_id],
                 MachineInst::new_simple(
