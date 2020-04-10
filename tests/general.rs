@@ -862,22 +862,6 @@ fn spill() {
 }
 
 #[test]
-fn floating_point() {
-    let mut m = module::Module::new("cilk");
-
-    let _ = cilk_ir!(m; define [f64] func [] {
-        entry:
-            ret (f64 3.14);
-    });
-
-    let mut jit = exec::jit::JITExecutor::new(&m);
-    let func = jit.find_function_by_name("func").unwrap();
-    let res = jit.run(func, vec![]);
-    println!("return: {:?}", res);
-    assert_eq!(res, exec::jit::GenericValue::F64(3.14));
-}
-
-#[test]
 fn struct1() {
     let mut m = module::Module::new("cilk");
 
@@ -1015,4 +999,23 @@ fn fact() {
     let res = jit.run(func, vec![exec::jit::GenericValue::Int32(10)]);
     println!("{:?}", res);
     assert_eq!(res, exec::jit::GenericValue::Int32(3628800));
+}
+
+#[test]
+fn float2() {
+    let mut m = module::Module::new("cilk");
+
+    let _ = cilk_ir!(m; define [f64] func [] {
+        entry:
+            a = alloca f64;
+            // store (f64 1.23), (%a);
+            la = load (%a);
+            ret (%la);
+    });
+
+    let mut jit = exec::jit::JITExecutor::new(&m);
+    let func = jit.find_function_by_name("func").unwrap();
+    let res = jit.run(func, vec![]);
+    println!("return: {:?}", res);
+    // assert_eq!(res, exec::jit::GenericValue::F64(3.14));
 }

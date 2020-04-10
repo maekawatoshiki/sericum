@@ -475,7 +475,11 @@ pub fn mov_n_rx(bit: usize, x: &MachineOperand) -> Option<MachineOpcode> {
 pub fn mov_rx(tys: &Types, x: &MachineOperand) -> Option<MachineOpcode> {
     // TODO: special handling for float
     if x.get_type().unwrap() == Type::F64 {
-        return Some(MachineOpcode::MOVSDrm64);
+        return match x {
+            MachineOperand::Address(_) => Some(MachineOpcode::MOVSDrm64),
+            MachineOperand::Register(_) => Some(MachineOpcode::MOVSDrr),
+            _ => None,
+        };
     }
 
     let mov32rx = [

@@ -45,14 +45,14 @@ impl JITExecutor {
 
         let mut dag_module = dag::convert::ConvertToDAG::new(module).convert_module();
 
-        // debug!(println!("dag: before: {:?}", dag_module));
+        debug!(println!("dag: before: {:?}", dag_module));
 
         dag::combine::Combine::new().combine_module(&mut dag_module);
         // debug!(println!("dag: comibine: {:?}", dag_module));
         dag::legalize::Legalize::new().run_on_module(&mut dag_module);
         // debug!(println!("dag: legalize: {:?}", dag_module));
         dag::isel::MISelector::new().run_on_module(&mut dag_module);
-        // debug!(println!("dag: isel: {:?}", dag_module));
+        debug!(println!("dag: isel: {:?}", dag_module));
 
         let mut machine_module = dag::mc_convert::convert_module(dag_module);
 
@@ -88,12 +88,12 @@ impl JITExecutor {
 
     pub fn run(&mut self, id: MachineFunctionId, args: Vec<GenericValue>) -> GenericValue {
         let now = ::std::time::Instant::now();
-        let a = self.jit.run(&self.machine_module, id, args);
-        println!(
+        let res = self.jit.run(&self.machine_module, id, args);
+        debug!(println!(
             "duration: {:?}",
             ::std::time::Instant::now().duration_since(now)
-        );
-        a
+        ));
+        res
     }
 }
 
@@ -219,6 +219,8 @@ impl JITCompiler {
                     MachineOpcode::MOVmi32 => self.compile_mov_mi32(&frame_objects, inst),
                     MachineOpcode::MOVSXDr64m32 => self.compile_movsxd_r64m32(&frame_objects, inst),
                     MachineOpcode::MOVSDrm64 => self.compile_movsd_rm64(inst),
+                    MachineOpcode::MOVSDrm => self.compile_movsd_rm(&frame_objects, inst),
+                    MachineOpcode::MOVSDrr => self.compile_movsd_rr(inst),
                     MachineOpcode::LEAr64m => self.compile_lea_r64m(&frame_objects, inst),
                     MachineOpcode::RET => self.compile_ret(),
                     MachineOpcode::PUSH64 => self.compile_push64(inst),
@@ -703,6 +705,27 @@ impl JITCompiler {
         let m1 = inst.operand[0].as_address().as_absolute();
         let l1 = self.get_label(m1);
         dynasm!(self.asm; movsd Rx(r0), [=>l1]);
+    }
+
+    fn compile_movsd_rr(&mut self, inst: &MachineInst) {
+        let r0 = phys_reg_to_dynasm_reg(inst.def[0].get_reg().unwrap());
+        let r1 = phys_reg_to_dynasm_reg(inst.operand[0].as_register().get_reg().unwrap());
+        dynasm!(self.asm; movsd Rx(r0), Rx(r1));
+    }
+
+    fn compile_movsd_rm(&mut self, fo: &FrameObjectsInfo, inst: &MachineInst) {
+        // r = movsd rbp, fi, none, none
+        if inst.operand[0].is_register() // must be rbp
+            && inst.operand[1].is_frame_index()
+            && inst.operand[2].is_none()
+            && inst.operand[3].is_none()
+        {
+            let r0 = phys_reg_to_dynasm_reg(inst.def[0].get_reg().unwrap());
+            let m1 = fo.offset(inst.operand[1].as_frame_index().idx).unwrap();
+            dynasm!(self.asm; movsd Rx(r0), [rbp - m1]);
+            return;
+        }
+        unimplemented!()
     }
 
     fn compile_lea_r64m(&mut self, fo: &FrameObjectsInfo, inst: &MachineInst) {
