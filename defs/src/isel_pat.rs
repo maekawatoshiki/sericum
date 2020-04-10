@@ -107,11 +107,22 @@ impl<'a> ISelPatParser<'a> {
             "imm32" => quote! {
                 if #node.is_constant() && matches!(#node.ty, Type::Int32) { #body }
             },
+            // TODO
             "mem" => quote! { if #node.is_frame_index() { #body } },
-            "i32mem" | "i64mem" | "f64mem" => {
+            "mem32" | "mem64" => {
+                let bits = match ty.as_str() {
+                    "mem32" => 32usize,
+                    "mem64" => 64usize,
+                    _ => unimplemented!(),
+                };
+                quote! {
+                    if #node.is_frame_index() && #node.ty.size_in_bits(tys) == #bits {
+                        #body
+                    }
+                }
+            }
+            "f64mem" => {
                 let ty = match ty.as_str() {
-                    "i32mem" => quote! { Type::Int32 },
-                    "i64mem" => quote! { Type::Int64 },
                     "f64mem" => quote! { Type::F64   },
                     _ => unimplemented!(),
                 };

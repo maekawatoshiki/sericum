@@ -126,7 +126,7 @@ impl Legalize {
         (ir.Store dst, src) {
             (ir.Add a1, a2) dst {
                 (ir.FIAddr fi) a1 {
-                    i32mem fi {
+                    mem32 fi {
                         imm32 a2 {
                             GR32  src => (mi.MOVmr32 %rbp, fi, none, a2, src)
                             imm32 src => (mi.MOVmi32 %rbp, fi, none, a2, src) }
