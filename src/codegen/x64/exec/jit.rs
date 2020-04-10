@@ -226,6 +226,7 @@ impl JITCompiler {
                     MachineOpcode::RET => self.compile_ret(),
                     MachineOpcode::PUSH64 => self.compile_push64(inst),
                     MachineOpcode::POP64 => self.compile_pop64(inst),
+                    MachineOpcode::ADDSDrr => self.compile_addsd_rr(inst),
                     MachineOpcode::ADDrr32 => self.compile_add_rr32(inst),
                     MachineOpcode::ADDrr64 => self.compile_add_rr64(inst),
                     MachineOpcode::ADDri32 => self.compile_add_ri32(inst),
@@ -930,6 +931,13 @@ impl JITCompiler {
         // for save_reg in save_regs.iter().rev() {
         //     dynasm!(self.asm; pop Ra(*save_reg));
         // }
+    }
+
+    fn compile_addsd_rr(&mut self, inst: &MachineInst) {
+        // inst.operand[0] must be the same as inst.def[0] (they're tied)
+        let r0 = phys_reg_to_dynasm_reg(inst.def[0].get_reg().unwrap());
+        let r1 = phys_reg_to_dynasm_reg(inst.operand[1].as_register().get_reg().unwrap());
+        dynasm!(self.asm; addsd Rx(r0), Rx(r1));
     }
 
     fn compile_add_rr32(&mut self, inst: &MachineInst) {
