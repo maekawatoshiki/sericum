@@ -12,7 +12,7 @@ use proc_quote::quote;
 
 pub fn run(item: TokenStream) -> TokenStream {
     let mut reader = TokenStreamReader::new(item.into_iter());
-    let output = ISelPatParser::new(&mut reader, &quote! {node}, quote! { node }).parse();
+    let output = ISelPatParser::new(&mut reader, &quote! { node }, quote! { node }).parse();
     TokenStream::from(output)
 }
 
@@ -53,7 +53,7 @@ impl<'a> ISelPatParser<'a> {
             } else {
                 output = quote! {
                     #output
-                    else #t
+                    #t
                 }
             }
             i += 1;
@@ -64,16 +64,30 @@ impl<'a> ISelPatParser<'a> {
         }
 
         let root = &self.root;
-        return quote! {
-            #output else {
-                #root.operand = #root
-                    .operand
-                    .iter()
-                    .map(|op| self.run_on_node(tys, heap, *op))
-                    .collect();
-                #root
+        if depth == 0 {
+            quote! {
+                (|| -> Raw<DAGNode> {
+                    #output
+
+                    #root.operand = #root
+                        .operand
+                        .iter()
+                        .map(|op| self.run_on_node(tys, heap, *op))
+                        .collect();
+                    #root
+                }) ()
             }
-        };
+        } else {
+            quote! {
+                #output
+                // #root.operand = #root
+                //     .operand
+                //     .iter()
+                //     .map(|op| self.run_on_node(tys, heap, *op))
+                //     .collect();
+                // #root
+            }
+        }
     }
 
     // e.g. (ir.INST a b)
@@ -96,19 +110,33 @@ impl<'a> ISelPatParser<'a> {
             parser.parse_pats(depth + 1)
         } else if self.reader.skip_punct('=') && self.reader.skip_punct('>') {
             let group = self.reader.get().unwrap();
-            let mut reader = TokenStreamReader::new(group_stream(group).into_iter());
-            let mut parser = ISelPatParser::new(&mut reader, &self.root, quote! { #node });
-            parser.parse_selected_inst_pat()
+            let one = tok_is_group(&group, '(');
+            if one {
+                let mut reader = TokenStreamReader::new(group_stream(group).into_iter());
+                let mut parser = ISelPatParser::new(&mut reader, &self.root, quote! { #node });
+                parser.parse_selected_inst_pat()
+            } else {
+                // for user own code
+                let body = proc_macro2::TokenStream::from(group_stream(group));
+                quote! {
+                    return {
+                         #body
+                    };
+                }
+            }
         } else {
             abort!(0, "expected ':' or '=>'")
         };
 
         match ty.as_str() {
-            "imm32" => quote! {
-                if #node.is_constant() && matches!(#node.ty, Type::Int32) { #body }
-            },
+            "imm32" => {
+                quote! { if #node.is_constant() && matches!(#node.ty, Type::Int32) { #body } }
+            }
+            "imm_f64" => {
+                quote! { if #node.is_constant() && matches!(#node.ty, Type::F64) {  #body } }
+            }
             // TODO
-            "mem" => quote! { if #node.is_frame_index() { #body } },
+            "mem" => quote! { if #node.is_frame_index() {  #body } },
             "mem32" | "mem64" => {
                 let bits = match ty.as_str() {
                     "mem32" => 32usize,
@@ -117,18 +145,18 @@ impl<'a> ISelPatParser<'a> {
                 };
                 quote! {
                     if #node.is_frame_index() && #node.ty.size_in_bits(tys) == #bits {
-                        #body
+                          #body
                     }
                 }
             }
             "f64mem" => {
                 let ty = match ty.as_str() {
-                    "f64mem" => quote! { Type::F64   },
+                    "f64mem" => quote! { Type::F64 },
                     _ => unimplemented!(),
                 };
                 quote! {
                     if #node.is_frame_index() && matches!(#node.ty, #ty) {
-                        #body
+                          #body
                     }
                 }
             }
@@ -138,7 +166,7 @@ impl<'a> ISelPatParser<'a> {
                 quote! {
                     if #node.is_maybe_register()
                       && matches!(ty2rc(&#node.ty), Some(RegisterClassKind::#r)) {
-                          #body
+                            #body
                     }
                 }
             }
@@ -204,7 +232,7 @@ impl<'a> ISelPatParser<'a> {
         let root = &self.root;
         quote! {
             #def_operands
-            heap.alloc(DAGNode::new(
+            return heap.alloc(DAGNode::new(
                 #inst,
                 vec![#operands],
                 #root.ty.clone()
@@ -255,9 +283,20 @@ impl<'a> ISelPatParser<'a> {
             parser.parse_pats(depth + 1)
         } else if self.reader.skip_punct('=') && self.reader.skip_punct('>') {
             let group = self.reader.get().unwrap();
-            let mut reader = TokenStreamReader::new(group_stream(group).into_iter());
-            let mut parser = ISelPatParser::new(&mut reader, &self.root, new_parent.clone());
-            parser.parse_selected_inst_pat()
+            let one = tok_is_group(&group, '(');
+            if one {
+                let mut reader = TokenStreamReader::new(group_stream(group).into_iter());
+                let mut parser = ISelPatParser::new(&mut reader, &self.root, new_parent.clone());
+                parser.parse_selected_inst_pat()
+            } else {
+                // for user own code
+                let body = proc_macro2::TokenStream::from(group_stream(group));
+                quote! {
+                    {
+                        return #body;
+                    }
+                }
+            }
         } else {
             abort!(0, "expected ':' or '=>'")
         };

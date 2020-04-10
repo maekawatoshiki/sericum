@@ -165,7 +165,6 @@ impl RegisterAllocator {
                 &cur_func.body.basic_blocks.arena[cur_func.body.inst_arena[call_inst_id].parent];
             let liveness = bb_including_call.liveness_ref();
             let regs_that_may_interfere = &liveness.def | &liveness.live_in;
-            println!("{:?}", regs_that_may_interfere);
             for r in &regs_that_may_interfere {
                 if matrix.interferes_with_range(
                     *r,

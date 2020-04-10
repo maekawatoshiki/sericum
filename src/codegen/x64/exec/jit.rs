@@ -45,14 +45,14 @@ impl JITExecutor {
 
         let mut dag_module = dag::convert::ConvertToDAG::new(module).convert_module();
 
-        debug!(println!("dag: before: {:?}", dag_module));
+        // debug!(println!("dag: before: {:?}", dag_module));
 
         dag::combine::Combine::new().combine_module(&mut dag_module);
         // debug!(println!("dag: comibine: {:?}", dag_module));
         dag::legalize::Legalize::new().run_on_module(&mut dag_module);
         // debug!(println!("dag: legalize: {:?}", dag_module));
         dag::isel::MISelector::new().run_on_module(&mut dag_module);
-        debug!(println!("dag: isel: {:?}", dag_module));
+        // debug!(println!("dag: isel: {:?}", dag_module));
 
         let mut machine_module = dag::mc_convert::convert_module(dag_module);
 
@@ -220,6 +220,7 @@ impl JITCompiler {
                     MachineOpcode::MOVSXDr64m32 => self.compile_movsxd_r64m32(&frame_objects, inst),
                     MachineOpcode::MOVSDrm64 => self.compile_movsd_rm64(inst),
                     MachineOpcode::MOVSDrm => self.compile_movsd_rm(&frame_objects, inst),
+                    MachineOpcode::MOVSDmr => self.compile_movsd_mr(&frame_objects, inst),
                     MachineOpcode::MOVSDrr => self.compile_movsd_rr(inst),
                     MachineOpcode::LEAr64m => self.compile_lea_r64m(&frame_objects, inst),
                     MachineOpcode::RET => self.compile_ret(),
@@ -723,6 +724,22 @@ impl JITCompiler {
             let r0 = phys_reg_to_dynasm_reg(inst.def[0].get_reg().unwrap());
             let m1 = fo.offset(inst.operand[1].as_frame_index().idx).unwrap();
             dynasm!(self.asm; movsd Rx(r0), [rbp - m1]);
+            return;
+        }
+        unimplemented!()
+    }
+
+    fn compile_movsd_mr(&mut self, fo: &FrameObjectsInfo, inst: &MachineInst) {
+        // movsd rbp, fi, none, none, r
+        if inst.operand[0].is_register() // must be rbp
+            && inst.operand[1].is_frame_index()
+            && inst.operand[2].is_none()
+            && inst.operand[3].is_none()
+            && inst.operand[4].is_register()
+        {
+            let m0 = fo.offset(inst.operand[1].as_frame_index().idx).unwrap();
+            let r1 = phys_reg_to_dynasm_reg(inst.operand[4].as_register().get_reg().unwrap());
+            dynasm!(self.asm; movsd [rbp - m0], Rx(r1));
             return;
         }
         unimplemented!()

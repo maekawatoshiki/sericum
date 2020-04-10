@@ -101,7 +101,7 @@ fn tok_is_punct(tok: &TokenTree, punct: char) -> bool {
     }
 }
 
-fn tok_is_group(tok: &TokenTree, d: char) -> bool {
+pub fn tok_is_group(tok: &TokenTree, d: char) -> bool {
     let d = match d {
         '(' => Delimiter::Parenthesis,
         '{' => Delimiter::Brace,

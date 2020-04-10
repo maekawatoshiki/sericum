@@ -110,10 +110,7 @@ impl LiveRegMatrix {
 
     pub fn interferes_with_range(&self, vreg: VirtReg, range: LiveRange) -> bool {
         match self.virt_reg_interval.get(&vreg) {
-            Some(interval) => {
-                println!("check: {:?} - {:?}:{:?}", range, vreg, interval.range);
-                range.interferes(&interval.range)
-            }
+            Some(interval) => range.interferes(&interval.range),
             None => false,
         }
     }
@@ -199,7 +196,6 @@ impl LiveRegMatrix {
         let v2_i = self.virt_reg_interval.remove(&v2).unwrap();
         let v1_i = self.virt_reg_interval.get_mut(&v1).unwrap();
         v1_i.range.unite_range(v2_i.range);
-        println!("range of {:?}: {:?}", v1, v1_i.range);
     }
 
     /// r2 merges into r1 and remove r2 from matrix
