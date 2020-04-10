@@ -65,8 +65,9 @@ impl MISelector {
                     imm32 b => (mi.IMULrr64i32 a, b) } }
             (ir.Load a) {
                 (ir.FIAddr b) a {
-                    mem32 b => (mi.MOVrm32 %rbp, b, none, none)
-                    mem64 b => (mi.MOVrm64 %rbp, b, none, none) }
+                    i32mem b => (mi.MOVrm32 %rbp, b, none, none)
+                    i64mem b => (mi.MOVrm64 %rbp, b, none, none)
+                    f64mem b => (mi.MOVSDrm %rbp, b, none, none) }
                 GR64  a => (mi.MOVrm32 a, none, none, none)
             }
             (ir.Store a, b) {
@@ -75,7 +76,7 @@ impl MISelector {
                     GR32  b => (mi.MOVmr32 a, none, none, none, b)
                     GR64  b => (mi.MOVmr64 a, none, none, none, b) }
                 (ir.FIAddr c) a {
-                    mem32 c {
+                    i32mem c {
                         GR32  b => (mi.MOVmr32 %rbp, c, none, none, b)
                         imm32 b => (mi.MOVmi32 %rbp, c, none, none, b) } }
             }

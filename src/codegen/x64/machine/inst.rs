@@ -500,6 +500,10 @@ impl MachineOperand {
         }
     }
 
+    pub fn is_address(&self) -> bool {
+        matches!(self, MachineOperand::Address(_))
+    }
+
     pub fn is_virtual_register(&self) -> bool {
         match self {
             MachineOperand::Register(r) => r.is_vreg(),

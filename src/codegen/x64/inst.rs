@@ -12,6 +12,32 @@ mod inst {
                 .set_uses(vec![TargetOperand::Addr])
                 .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::XMM)])
         };
+        pub static ref MOVSDrr: TargetInstDef = {
+            TargetInstDef::new(TargetOpcode::MOVSDrr)
+                .set_uses(vec![TargetOperand::Register(TargetRegister::RegClass(
+                    RegisterClassKind::XMM,
+                ))])
+                .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::XMM)])
+        };
+        pub static ref MOVSDrm: TargetInstDef = {
+            TargetInstDef::new(TargetOpcode::MOVSDrm)
+                .set_uses(vec![
+                    TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR64)),
+                    TargetOperand::Any,
+                    TargetOperand::Any,
+                    TargetOperand::Any,
+                ])
+                .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::XMM)])
+        };
+        pub static ref MOVSDmr: TargetInstDef = {
+            TargetInstDef::new(TargetOpcode::MOVSDmr).set_uses(vec![
+                TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR64)),
+                TargetOperand::Any,
+                TargetOperand::Any,
+                TargetOperand::Any,
+                TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::XMM)),
+            ])
+        };
         pub static ref MOVSXDr64m32: TargetInstDef = {
             TargetInstDef::new(TargetOpcode::MOVSXDr64m32)
                 .set_uses(vec![TargetOperand::FrameIndex])
@@ -273,7 +299,10 @@ pub enum TargetImmediate {
 // p => [register]
 #[derive(Debug, Clone, PartialEq, Copy)]
 pub enum TargetOpcode {
-    MOVSDrm64, // out(xmm) = movsd [memory64]
+    MOVSDrm64, // out(xmm) = movsd [memory64] TODO
+    MOVSDmr,   // movsd MEM, r
+    MOVSDrm,   // movsd r, MEM
+    MOVSDrr,
 
     // out = mov [rbp  - fi.off              ] | out = mov rbp,  fi,   none,  none
     // out = mov [rbp  - fi.off + const.off  ] | out = mov rbp,  fi,   none,  off
@@ -351,6 +380,9 @@ impl TargetOpcode {
     pub fn inst_def(&self) -> Option<&TargetInstDef> {
         match self {
             Self::MOVSDrm64 => Some(&*inst::MOVSDrm64),
+            Self::MOVSDmr => Some(&*inst::MOVSDmr),
+            Self::MOVSDrm => Some(&*inst::MOVSDrm),
+            Self::MOVSDrr => Some(&*inst::MOVSDrr),
             Self::MOVSXDr64m32 => Some(&*inst::MOVSXDr64m32),
             Self::LEAr64m => Some(&*inst::LEAr64m),
             Self::ADDrr32 => Some(&*inst::ADDrr32),
