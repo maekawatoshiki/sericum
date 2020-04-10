@@ -127,6 +127,6 @@ fn replace_regs(
 
     if from.info_ref().def_list.len() == 0 {
         let bb = &f.body.basic_blocks.arena[parent];
-        bb.liveness_ref_mut().def.remove(&to.get_vreg());
+        bb.liveness_ref_mut().def.remove(&from.get_vreg());
     }
 }

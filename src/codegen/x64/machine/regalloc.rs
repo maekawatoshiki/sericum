@@ -38,7 +38,7 @@ impl RegisterAllocator {
 
         coalesce_function(&mut matrix, cur_func);
 
-        debug!(println!("after coalesing {:?}", cur_func));
+        // debug!(println!("after coalesing {:?}", cur_func));
 
         self.preserve_vreg_uses_across_call(tys, cur_func, &mut matrix);
 
