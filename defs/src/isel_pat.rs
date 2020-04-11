@@ -78,15 +78,7 @@ impl<'a> ISelPatParser<'a> {
                 }) ()
             }
         } else {
-            quote! {
-                #output
-                // #root.operand = #root
-                //     .operand
-                //     .iter()
-                //     .map(|op| self.run_on_node(tys, heap, *op))
-                //     .collect();
-                // #root
-            }
+            output
         }
     }
 
@@ -187,14 +179,13 @@ impl<'a> ISelPatParser<'a> {
         let mut def_operands = quote! {};
         let mut operands = quote! {};
 
-        let mut none = false;
         loop {
             if self.reader.skip_punct('%') {
                 let reg_s = self.reader.get_ident().unwrap();
                 let reg = ident_tok(reg_s.as_str());
                 def_operands = quote! {
                     #def_operands
-                    let #reg = heap.alloc(DAGNode::new_phys_reg(str2reg(#reg_s).unwrap()));
+                    let #reg = heap.alloc_phys_reg(str2reg(#reg_s).unwrap());
                 };
                 operands = quote! {
                     #operands #reg,
@@ -202,25 +193,20 @@ impl<'a> ISelPatParser<'a> {
             } else {
                 let name = self.reader.get_ident().unwrap();
                 let op = ident_tok(name.as_str());
-                if name == "none" {
-                    if !none {
+                match name.as_str() {
+                    "none" => {
+                        operands = quote! {
+                            #operands
+                            heap.alloc_none(),
+                        }
+                    }
+                    _ => {
                         def_operands = quote! {
                             #def_operands
-                            let none__ = heap.alloc(DAGNode::new(
-                                NodeKind::None, vec![], Type::Void));
+                            let #op = self.run_on_node(tys, heap, #op);
                         };
+                        operands = quote! { #operands #op, };
                     }
-                    operands = quote! {
-                        #operands
-                        none__,
-                    };
-                    none = true;
-                } else {
-                    def_operands = quote! {
-                        #def_operands
-                        let #op = self.run_on_node(tys, heap, #op);
-                    };
-                    operands = quote! { #operands #op, };
                 }
             }
 

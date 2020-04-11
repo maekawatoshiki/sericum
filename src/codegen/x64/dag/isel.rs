@@ -1,5 +1,9 @@
 use super::super::register::*;
-use super::{function::DAGFunction, module::DAGModule, node::*};
+use super::{
+    function::{DAGFunction, DAGHeap},
+    module::DAGModule,
+    node::*,
+};
 use crate::ir::types::*;
 use crate::util::allocator::*;
 use defs::isel_pat;
@@ -32,7 +36,7 @@ impl MISelector {
     fn run_on_node(
         &mut self,
         tys: &Types,
-        heap: &mut RawAllocator<DAGNode>,
+        heap: &mut DAGHeap,
         mut node: Raw<DAGNode>,
     ) -> Raw<DAGNode> {
         if !node.is_operation() {
@@ -86,7 +90,7 @@ impl MISelector {
                         imm_f64 b => {
                             // TODO: Refactor
                             let rbp = heap.alloc(DAGNode::new_phys_reg(GR64::RBP));
-                            let none = heap.alloc(DAGNode::new_none());
+                            let none = heap.alloc_none();
                             let n1 = heap.alloc(DAGNode::new(
                                     NodeKind::MI(MINodeKind::MOVSDrm64), vec![b], Type::F64));
                             let n2 = heap.alloc(DAGNode::new(NodeKind::MI(MINodeKind::MOVSDmr),

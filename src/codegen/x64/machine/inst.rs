@@ -1,6 +1,7 @@
 pub use super::super::inst::{TargetImmediate, TargetOpcode};
 use super::super::register::{
-    rc2ty, PhysReg, RegisterClassKind, TargetRegisterTrait, VirtReg, VirtRegGen, GR32, GR64, XMM,
+    rc2ty, PhysReg, RegisterClassKind, TargetRegisterTrait, VirtReg, VirtRegGen, GR32, GR64,
+    PHYS_REGISTERS_NUM, XMM,
 };
 use super::{basic_block::*, const_data::DataId, frame_object::*};
 use crate::ir::types::*;
@@ -630,7 +631,7 @@ impl MachineConstant {
 }
 
 thread_local! {
-    pub static PHYS_REGS: [RegisterInfo; 48] = {
+    pub static PHYS_REGS: [RegisterInfo; PHYS_REGISTERS_NUM] = {
         [
             RegisterInfo::new_phy_reg(GR32::EAX ),
             RegisterInfo::new_phy_reg(GR32::ECX ),

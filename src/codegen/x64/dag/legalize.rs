@@ -1,5 +1,9 @@
 use super::super::register::*;
-use super::{function::DAGFunction, module::DAGModule, node::*};
+use super::{
+    function::{DAGFunction, DAGHeap},
+    module::DAGModule,
+    node::*,
+};
 use crate::ir::types::*;
 use crate::util::allocator::*;
 use defs::isel_pat;
@@ -29,12 +33,7 @@ impl Legalize {
         }
     }
 
-    fn run_on_node(
-        &mut self,
-        tys: &Types,
-        heap: &mut RawAllocator<DAGNode>,
-        node: Raw<DAGNode>,
-    ) -> Raw<DAGNode> {
+    fn run_on_node(&mut self, tys: &Types, heap: &mut DAGHeap, node: Raw<DAGNode>) -> Raw<DAGNode> {
         if !node.is_operation() {
             return node;
         }
@@ -67,15 +66,15 @@ impl Legalize {
     fn run_on_node_load(
         &mut self,
         tys: &Types,
-        heap: &mut RawAllocator<DAGNode>,
+        heap: &mut DAGHeap,
         node: Raw<DAGNode>,
     ) -> Raw<DAGNode> {
         if node.operand[0].kind == NodeKind::IR(IRNodeKind::Add) {
             let add = node.operand[0];
             let op0 = self.run_on_node(tys, heap, add.operand[0]);
             let op1 = self.run_on_node(tys, heap, add.operand[1]);
-            let none = heap.alloc(DAGNode::new_none());
-            let rbp = heap.alloc(DAGNode::new_phys_reg(GR64::RBP));
+            let none = heap.alloc_none();
+            let rbp = heap.alloc_phys_reg(GR64::RBP);
 
             if op0.kind == NodeKind::IR(IRNodeKind::FIAddr) && op1.is_constant() {
                 return heap.alloc(DAGNode::new(
@@ -119,7 +118,7 @@ impl Legalize {
     fn run_on_node_store(
         &mut self,
         tys: &Types,
-        heap: &mut RawAllocator<DAGNode>,
+        heap: &mut DAGHeap,
         mut node: Raw<DAGNode>,
     ) -> Raw<DAGNode> {
         isel_pat! {
@@ -144,13 +143,13 @@ impl Legalize {
     fn run_on_node_add(
         &mut self,
         tys: &Types,
-        heap: &mut RawAllocator<DAGNode>,
+        heap: &mut DAGHeap,
         node: Raw<DAGNode>,
     ) -> Raw<DAGNode> {
         if node.operand[0].kind == NodeKind::IR(IRNodeKind::FIAddr) {
             let op0 = node.operand[0].operand[0];
-            let none = heap.alloc(DAGNode::new_none());
-            let rbp = heap.alloc(DAGNode::new_phys_reg(GR64::RBP));
+            let none = heap.alloc_none();
+            let rbp = heap.alloc_phys_reg(GR64::RBP);
             let one = heap.alloc(DAGNode::new(
                 NodeKind::Operand(OperandNodeKind::Constant(ConstantKind::Int32(1))),
                 vec![],
@@ -181,7 +180,7 @@ impl Legalize {
     fn run_on_node_sext(
         &mut self,
         tys: &Types,
-        heap: &mut RawAllocator<DAGNode>,
+        heap: &mut DAGHeap,
         node: Raw<DAGNode>,
     ) -> Raw<DAGNode> {
         if node.ty == Type::Int64
@@ -199,12 +198,7 @@ impl Legalize {
         node
     }
 
-    fn run_on_node_operand(
-        &mut self,
-        tys: &Types,
-        heap: &mut RawAllocator<DAGNode>,
-        mut node: Raw<DAGNode>,
-    ) {
+    fn run_on_node_operand(&mut self, tys: &Types, heap: &mut DAGHeap, mut node: Raw<DAGNode>) {
         node.operand = node
             .operand
             .iter()

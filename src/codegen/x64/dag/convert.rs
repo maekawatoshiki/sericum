@@ -5,7 +5,7 @@ use super::{basic_block::*, function::*, module::*, node::*};
 use crate::ir::{
     basic_block::*, function::*, liveness::*, module::*, opcode::*, types::*, value::*,
 };
-use crate::util::allocator::{Raw, RawAllocator};
+use crate::util::allocator::Raw;
 use id_arena::*;
 use rustc_hash::FxHashMap;
 
@@ -18,7 +18,7 @@ pub struct ConvertToDAG<'a> {
 }
 
 pub struct ConversionInfo {
-    pub dag_heap: RawAllocator<DAGNode>,
+    pub dag_heap: DAGHeap,
     pub local_mgr: LocalVariables,
     pub bb_to_dag_bb: FxHashMap<BasicBlockId, DAGBasicBlockId>,
     pub last_chain_node: Option<Raw<DAGNode>>,
@@ -511,7 +511,7 @@ impl<'a> ConvertToDAG<'a> {
 
 fn sext_if_necessary(
     tys: &Types,
-    heap: &mut RawAllocator<DAGNode>,
+    heap: &mut DAGHeap,
     node: Raw<DAGNode>,
     to: Type,
 ) -> Raw<DAGNode> {
@@ -525,7 +525,7 @@ fn sext_if_necessary(
 impl ConversionInfo {
     pub fn new() -> Self {
         ConversionInfo {
-            dag_heap: RawAllocator::new(),
+            dag_heap: DAGHeap::new(),
             // dag_heap: Arena::new(),
             local_mgr: LocalVariables::new(),
             bb_to_dag_bb: FxHashMap::default(),

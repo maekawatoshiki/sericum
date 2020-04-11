@@ -30,7 +30,7 @@ impl Combine {
     fn combine_node(
         &mut self,
         replace: &mut FxHashMap<Raw<DAGNode>, Raw<DAGNode>>,
-        heap: &mut RawAllocator<DAGNode>,
+        heap: &mut DAGHeap,
         mut node: Raw<DAGNode>,
     ) -> Raw<DAGNode> {
         if !node.is_operation() {
@@ -62,7 +62,7 @@ impl Combine {
     fn combine_node_add(
         &mut self,
         replace: &mut FxHashMap<Raw<DAGNode>, Raw<DAGNode>>,
-        heap: &mut RawAllocator<DAGNode>,
+        heap: &mut DAGHeap,
         mut node: Raw<DAGNode>,
     ) -> Raw<DAGNode> {
         // (C + any) -> (any + C)
@@ -109,11 +109,7 @@ impl Combine {
         node
     }
 
-    fn combine_node_brcond(
-        &mut self,
-        heap: &mut RawAllocator<DAGNode>,
-        node: Raw<DAGNode>,
-    ) -> Raw<DAGNode> {
+    fn combine_node_brcond(&mut self, heap: &mut DAGHeap, node: Raw<DAGNode>) -> Raw<DAGNode> {
         let cond = node.operand[0];
         let br = node.operand[1];
         match cond.kind {
@@ -129,7 +125,7 @@ impl Combine {
     fn combine_operands(
         &mut self,
         replace: &mut FxHashMap<Raw<DAGNode>, Raw<DAGNode>>,
-        heap: &mut RawAllocator<DAGNode>,
+        heap: &mut DAGHeap,
         operands: Vec<Raw<DAGNode>>,
     ) -> Vec<Raw<DAGNode>> {
         operands

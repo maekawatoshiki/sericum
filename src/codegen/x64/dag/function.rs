@@ -21,7 +21,7 @@ pub struct DAGFunction {
     pub dag_basic_blocks: Vec<DAGBasicBlockId>,
 
     /// DAG node arena
-    pub dag_heap: RawAllocator<DAGNode>,
+    pub dag_heap: DAGHeap,
 
     // /// True if internal function
     // pub internal: bool,
@@ -31,10 +31,16 @@ pub struct DAGFunction {
     pub vreg_gen: VirtRegGen,
 }
 
+pub struct DAGHeap {
+    heap: RawAllocator<DAGNode>,
+    node_none: Raw<DAGNode>,
+    node_regs: [Option<Raw<DAGNode>>; PHYS_REGISTERS_NUM],
+}
+
 impl DAGFunction {
     pub fn new(
         func: &Function,
-        dag_heap: RawAllocator<DAGNode>,
+        dag_heap: DAGHeap,
         dag_basic_block_arena: Arena<DAGBasicBlock>,
         dag_basic_blocks: Vec<DAGBasicBlockId>,
         local_mgr: LocalVariables,
@@ -65,5 +71,36 @@ impl DAGFunction {
         }
 
         fmt::Result::Ok(())
+    }
+}
+
+impl DAGHeap {
+    pub fn new() -> Self {
+        let mut heap = RawAllocator::new();
+        Self {
+            node_none: heap.alloc(DAGNode::new_none()),
+            node_regs: [None; PHYS_REGISTERS_NUM],
+            heap,
+        }
+    }
+
+    pub fn alloc(&mut self, node: DAGNode) -> Raw<DAGNode> {
+        self.heap.alloc(node)
+    }
+
+    pub fn alloc_none(&self) -> Raw<DAGNode> {
+        self.node_none
+    }
+
+    pub fn alloc_phys_reg<T: TargetRegisterTrait>(&mut self, r: T) -> Raw<DAGNode> {
+        let rn = r.as_phys_reg().retrieve();
+        match self.node_regs[rn] {
+            Some(node) => node,
+            None => {
+                let r = self.alloc(DAGNode::new_phys_reg(r));
+                self.node_regs[rn] = Some(r);
+                r
+            }
+        }
     }
 }
