@@ -64,6 +64,7 @@ impl MISelector {
                                 vec![a, n1], Type::F64));
                         n2
                     }
+                    XMM    b => (mi.ADDSDrr a, b)
                 }
             }
             (ir.Sub a, b) {
@@ -71,7 +72,7 @@ impl MISelector {
                     GR32  b => (mi.SUBrr32   a, b)
                     imm32 b => (mi.SUBri32   a, b) }
                 GR64 a {
-                    imm32 b => (mi.SUBr64i32 a, b) } 
+                    imm32 b => (mi.SUBr64i32 a, b) }
                 XMM  a {
                     imm_f64 b => {
                         let n1 = heap.alloc(DAGNode::new(
@@ -81,6 +82,7 @@ impl MISelector {
                                 vec![a, n1], Type::F64));
                         n2
                     }
+                    XMM    b => (mi.SUBSDrr a, b)
                 }
             }
             (ir.Mul a, b) {

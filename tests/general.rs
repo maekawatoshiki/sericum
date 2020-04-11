@@ -743,11 +743,13 @@ fn float3() {
             la = load (%a);
             b = add (%la), (f64 2.34);
             c = sub (%b), (f64 0.34);
-            ret (%c);
+            d = add (%b), (%c);
+            e = sub (%d), (%la);
+            ret (%e);
     });
 
     let mut jit = exec::jit::JITExecutor::new(&m);
     let func = jit.find_function_by_name("func").unwrap();
     let res = jit.run(func, vec![]);
-    assert_eq!(res, exec::jit::GenericValue::F64(3.23));
+    assert_eq!(res, exec::jit::GenericValue::F64(5.57));
 }
