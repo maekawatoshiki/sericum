@@ -226,14 +226,15 @@ impl JITCompiler {
                     MachineOpcode::RET => self.compile_ret(),
                     MachineOpcode::PUSH64 => self.compile_push64(inst),
                     MachineOpcode::POP64 => self.compile_pop64(inst),
-                    MachineOpcode::ADDSDrr => self.compile_addsd_rr(inst),
                     MachineOpcode::ADDrr32 => self.compile_add_rr32(inst),
                     MachineOpcode::ADDrr64 => self.compile_add_rr64(inst),
                     MachineOpcode::ADDri32 => self.compile_add_ri32(inst),
                     MachineOpcode::ADDr64i32 => self.compile_add_r64i32(inst),
+                    MachineOpcode::ADDSDrr => self.compile_addsd_rr(inst),
                     MachineOpcode::SUBrr32 => self.compile_sub_rr32(inst),
                     MachineOpcode::SUBri32 => self.compile_sub_ri32(inst),
                     MachineOpcode::SUBr64i32 => self.compile_sub_r64i32(inst),
+                    MachineOpcode::SUBSDrr => self.compile_subsd_rr(inst),
                     MachineOpcode::IMULrr32 => self.compile_imul_rr32(inst),
                     MachineOpcode::IMULrri32 => self.compile_imul_rri32(inst),
                     MachineOpcode::IMULrr64i32 => self.compile_imul_rr64i32(inst),
@@ -933,13 +934,6 @@ impl JITCompiler {
         // }
     }
 
-    fn compile_addsd_rr(&mut self, inst: &MachineInst) {
-        // inst.operand[0] must be the same as inst.def[0] (they're tied)
-        let r0 = phys_reg_to_dynasm_reg(inst.def[0].get_reg().unwrap());
-        let r1 = phys_reg_to_dynasm_reg(inst.operand[1].as_register().get_reg().unwrap());
-        dynasm!(self.asm; addsd Rx(r0), Rx(r1));
-    }
-
     fn compile_add_rr32(&mut self, inst: &MachineInst) {
         // inst.operand[0] must be the same as inst.def[0] (they're tied)
         let r0 = phys_reg_to_dynasm_reg(inst.def[0].get_reg().unwrap());
@@ -968,6 +962,13 @@ impl JITCompiler {
         dynasm!(self.asm; add Rq(r0), i1);
     }
 
+    fn compile_addsd_rr(&mut self, inst: &MachineInst) {
+        // inst.operand[0] must be the same as inst.def[0] (they're tied)
+        let r0 = phys_reg_to_dynasm_reg(inst.def[0].get_reg().unwrap());
+        let r1 = phys_reg_to_dynasm_reg(inst.operand[1].as_register().get_reg().unwrap());
+        dynasm!(self.asm; addsd Rx(r0), Rx(r1));
+    }
+
     fn compile_sub_rr32(&mut self, inst: &MachineInst) {
         // inst.operand[0] must be the same as inst.def[0] (they're tied)
         let r0 = phys_reg_to_dynasm_reg(inst.def[0].get_reg().unwrap());
@@ -987,6 +988,13 @@ impl JITCompiler {
         let r0 = phys_reg_to_dynasm_reg(inst.def[0].get_reg().unwrap());
         let i1 = inst.operand[1].as_constant().as_i32();
         dynasm!(self.asm; sub Rq(r0), i1);
+    }
+
+    fn compile_subsd_rr(&mut self, inst: &MachineInst) {
+        // inst.operand[0] must be the same as inst.def[0] (they're tied)
+        let r0 = phys_reg_to_dynasm_reg(inst.def[0].get_reg().unwrap());
+        let r1 = phys_reg_to_dynasm_reg(inst.operand[1].as_register().get_reg().unwrap());
+        dynasm!(self.asm; subsd Rx(r0), Rx(r1));
     }
 
     fn compile_imul_rr32(&mut self, inst: &MachineInst) {
