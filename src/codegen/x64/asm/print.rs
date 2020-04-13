@@ -121,69 +121,7 @@ impl MachineAsmPrinter {
         self.output
             .push_str(format!("{}, ", i.def[0].get_reg().unwrap().name()).as_str());
 
-        match &i.operand[0] {
-            MachineOperand::Mem(MachineMemOperand::BaseFi(base, fi)) => {
-                let offset = fo.offset(fi.idx).unwrap();
-                self.output.push_str(
-                    format!(
-                        "{} ptr [{} - {}]",
-                        word,
-                        base.get_reg().unwrap().name(),
-                        offset
-                    )
-                    .as_str(),
-                );
-            }
-            MachineOperand::Mem(MachineMemOperand::BaseAlignOff(base, align, off)) => {
-                let base = base.get_reg().unwrap();
-                let reg = off.get_reg().unwrap();
-                self.output.push_str(
-                    format!("{} ptr [{} + {}*{}]", word, base.name(), align, reg.name()).as_str(),
-                );
-            }
-            MachineOperand::Mem(MachineMemOperand::BaseFiAlignOff(base, fi, align, off)) => {
-                let offset = fo.offset(fi.idx).unwrap();
-                let base = base.get_reg().unwrap();
-                let reg = off.get_reg().unwrap();
-                self.output.push_str(
-                    format!(
-                        "{} ptr [{} + {}*{} - {}]",
-                        word,
-                        base.name(),
-                        align,
-                        reg.name(),
-                        offset
-                    )
-                    .as_str(),
-                );
-            }
-            MachineOperand::Mem(MachineMemOperand::BaseFiOff(base, fi, off)) => {
-                let off1 = fo.offset(fi.idx).unwrap();
-                let off2 = *off;
-                assert!(off1 >= off2);
-                let offset = off1 - off2;
-                self.output.push_str(
-                    format!(
-                        "{} ptr [{} - {}]",
-                        word,
-                        base.get_reg().unwrap().name(),
-                        offset
-                    )
-                    .as_str(),
-                );
-            }
-            MachineOperand::Mem(MachineMemOperand::Base(base)) => {
-                let base = base.get_reg().unwrap();
-                self.output
-                    .push_str(format!("{} ptr [{}]", word, base.name()).as_str());
-            }
-            MachineOperand::Mem(MachineMemOperand::BaseOff(base, off)) => {
-                let base = base.get_reg().unwrap();
-                self.output
-                    .push_str(format!("{} ptr [{} + {}]", word, base.name(), off).as_str());
-            }
-            e => panic!("{:?}", e),
-        }
+        self.run_on_mem_operand(&i.operand[0], fo, word);
     }
 
     fn run_on_inst_mov_mx(&mut self, tys: &Types, i: &MachineInst, fo: &FrameObjectsInfo) {
@@ -346,6 +284,60 @@ impl MachineAsmPrinter {
         {
             let base = i.operand[0].as_register().get_reg().unwrap();
             self.output.push_str(format!("[{}]", base.name()).as_str());
+        }
+    }
+
+    fn run_on_mem_operand(&mut self, op: &MachineOperand, fo: &FrameObjectsInfo, word: &str) {
+        match op {
+            MachineOperand::Mem(MachineMemOperand::BaseFi(base, fi)) => {
+                let base = base.get_reg().unwrap();
+                let offset = fo.offset(fi.idx).unwrap();
+                self.output
+                    .push_str(format!("{} ptr [{} - {}]", word, base.name(), offset).as_str());
+            }
+            MachineOperand::Mem(MachineMemOperand::BaseAlignOff(base, align, off)) => {
+                let base = base.get_reg().unwrap();
+                let reg = off.get_reg().unwrap();
+                self.output.push_str(
+                    format!("{} ptr [{} + {}*{}]", word, base.name(), align, reg.name()).as_str(),
+                );
+            }
+            MachineOperand::Mem(MachineMemOperand::BaseFiAlignOff(base, fi, align, off)) => {
+                let offset = fo.offset(fi.idx).unwrap();
+                let base = base.get_reg().unwrap();
+                let reg = off.get_reg().unwrap();
+                self.output.push_str(
+                    format!(
+                        "{} ptr [{} + {}*{} - {}]",
+                        word,
+                        base.name(),
+                        align,
+                        reg.name(),
+                        offset
+                    )
+                    .as_str(),
+                );
+            }
+            MachineOperand::Mem(MachineMemOperand::BaseFiOff(base, fi, off)) => {
+                let base = base.get_reg().unwrap();
+                let off1 = fo.offset(fi.idx).unwrap();
+                let off2 = *off;
+                assert!(off1 >= off2);
+                let offset = off1 - off2;
+                self.output
+                    .push_str(format!("{} ptr [{} - {}]", word, base.name(), offset).as_str());
+            }
+            MachineOperand::Mem(MachineMemOperand::Base(base)) => {
+                let base = base.get_reg().unwrap();
+                self.output
+                    .push_str(format!("{} ptr [{}]", word, base.name()).as_str());
+            }
+            MachineOperand::Mem(MachineMemOperand::BaseOff(base, off)) => {
+                let base = base.get_reg().unwrap();
+                self.output
+                    .push_str(format!("{} ptr [{} + {}]", word, base.name(), off).as_str());
+            }
+            e => panic!("{:?}", e),
         }
     }
 
