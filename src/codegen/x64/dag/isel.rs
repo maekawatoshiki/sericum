@@ -94,9 +94,9 @@ impl MISelector {
             (ir.Load a) {
                 (ir.FIAddr b) a {
                     f64mem b => (mi.MOVSDrm %rbp, b, none, none)
-                    mem32  b => (mi.MOVrm32 %rbp, b, none, none)
-                    mem64  b => (mi.MOVrm64 %rbp, b, none, none) }
-                GR64  a => (mi.MOVrm32 a, none, none, none)
+                    mem32  b => (mi.MOVrm32 [BaseFi %rbp, b]) //%rbp, b, none, none)
+                    mem64  b => (mi.MOVrm64 [BaseFi %rbp, b]) } //, none, none) }
+                GR64  a => (mi.MOVrm32 [Base a]) // a, none, none, none)
             }
             (ir.Store a, b) {
                 (ir.FIAddr c) a {

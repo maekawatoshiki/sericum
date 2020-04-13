@@ -58,7 +58,19 @@ pub enum MachineOperand {
     FrameIndex(FrameIndexInfo),
     Address(AddressInfo),
     Branch(MachineBasicBlockId),
+    Mem(MachineMemOperand),
     None,
+}
+
+// TODO: target dependent
+#[derive(Debug, Clone)]
+pub enum MachineMemOperand {
+    BaseFi(MachineRegister, FrameIndexInfo),
+    BaseFiOff(MachineRegister, FrameIndexInfo, i32), // base, fi, off
+    BaseFiAlignOff(MachineRegister, FrameIndexInfo, i32, MachineRegister), // base, fi, align, off
+    BaseAlignOff(MachineRegister, i32, MachineRegister), // base, align, off
+    BaseOff(MachineRegister, i32),
+    Base(MachineRegister),
 }
 
 #[derive(Clone)]
@@ -208,10 +220,15 @@ impl MachineInst {
     pub fn set_use_to_regs(&self, old_id: Option<MachineInstId>) {
         let id = self.id.unwrap();
 
-        for reg in self.operand.iter().filter_map(|o| match o {
-            MachineOperand::Register(r) => Some(r),
-            _ => None,
-        }) {
+        for reg in self
+            .operand
+            .iter()
+            .filter_map(|o| match o {
+                MachineOperand::Register(_) | MachineOperand::Mem(_) => Some(o),
+                _ => None,
+            })
+            .flat_map(|o| o.registers())
+        {
             some_then!(id, old_id, reg.remove_use(id));
             reg.add_use(id);
         }
@@ -238,10 +255,21 @@ impl MachineInst {
 
     pub fn replace_operand_register(&mut self, from: &MachineRegister, to: &MachineRegister) {
         // TODO: This loop may run once at most
-        for r in self.operand.iter_mut().filter_map(|o| match o {
-            MachineOperand::Register(r) if r.get_vreg() == from.get_vreg() => Some(r),
-            _ => None,
-        }) {
+        for r in self
+            .operand
+            .iter_mut()
+            .filter_map(|o| match o {
+                MachineOperand::Register(_) | MachineOperand::Mem(_) => Some(o),
+                _ => None,
+            })
+            .flat_map(|o| o.registers_mut())
+            .filter_map(|r| {
+                if r.get_vreg() == from.get_vreg() {
+                    return Some(r);
+                }
+                None
+            })
+        {
             r.remove_use(self.id.unwrap());
             *r = to.clone();
             r.add_use(self.id.unwrap());
@@ -302,7 +330,7 @@ impl MachineInst {
         for operand in &self.operand {
             match operand {
                 MachineOperand::Register(r) => {
-                    if r.get_reg().is_none() {
+                    if r.is_vreg() {
                         regs.push(r.clone()) // TODO
                     }
                 }
@@ -500,6 +528,22 @@ impl MachineOperand {
         MachineOperand::Constant(MachineConstant::Int32(i))
     }
 
+    pub fn registers(&self) -> Vec<&MachineRegister> {
+        match self {
+            Self::Register(r) => vec![r],
+            Self::Mem(mem) => mem.registers(),
+            _ => vec![],
+        }
+    }
+
+    pub fn registers_mut(&mut self) -> Vec<&mut MachineRegister> {
+        match self {
+            Self::Register(r) => vec![r],
+            Self::Mem(mem) => mem.registers_mut(),
+            _ => vec![],
+        }
+    }
+
     pub fn as_frame_index(&self) -> &FrameIndexInfo {
         match self {
             MachineOperand::FrameIndex(fi) => fi,
@@ -577,9 +621,33 @@ impl MachineOperand {
             MachineOperand::Constant(MachineConstant::F64(_)) => Some(Type::F64),
             MachineOperand::FrameIndex(fi) => Some(fi.ty.clone()),
             MachineOperand::Address(_) => None, // TODO
-            MachineOperand::None => None,
-            // TODO
-            MachineOperand::Register(r) => Some(rc2ty(r.info_ref().reg_class)),
+            MachineOperand::Mem(_) => None,
+            MachineOperand::None => None, // TODO
+            MachineOperand::Register(r) => Some(rc2ty(r.info_ref().reg_class)), // TODO
+        }
+    }
+}
+
+impl MachineMemOperand {
+    pub fn registers(&self) -> Vec<&MachineRegister> {
+        match self {
+            MachineMemOperand::BaseFi(r, _)
+            | MachineMemOperand::BaseFiOff(r, _, _)
+            | MachineMemOperand::BaseOff(r, _)
+            | MachineMemOperand::Base(r) => vec![r],
+            MachineMemOperand::BaseAlignOff(r, _, r2)
+            | MachineMemOperand::BaseFiAlignOff(r, _, _, r2) => vec![r, r2],
+        }
+    }
+
+    pub fn registers_mut(&mut self) -> Vec<&mut MachineRegister> {
+        match self {
+            MachineMemOperand::BaseFi(r, _)
+            | MachineMemOperand::BaseFiOff(r, _, _)
+            | MachineMemOperand::BaseOff(r, _)
+            | MachineMemOperand::Base(r) => vec![r],
+            MachineMemOperand::BaseAlignOff(r, _, r2)
+            | MachineMemOperand::BaseFiAlignOff(r, _, _, r2) => vec![r, r2],
         }
     }
 }
@@ -748,6 +816,7 @@ impl MachineOperand {
             }
             MachineOperand::Address(g) => g.fmt(f),
             MachineOperand::Branch(id) => write!(f, "BB#{}", id.index()),
+            MachineOperand::Mem(mem) => write!(f, "{:?}", mem),
             MachineOperand::None => write!(f, "!"),
         }
     }

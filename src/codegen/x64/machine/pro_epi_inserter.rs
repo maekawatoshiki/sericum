@@ -196,12 +196,10 @@ impl<'a> CopyArgs<'a> {
                 let ax = MachineRegister::phys_reg(ax);
                 let inst = MachineInst::new_simple(
                     movrm,
-                    vec![
-                        MachineOperand::phys_reg(GR64::RBP),
-                        MachineOperand::None,
-                        MachineOperand::None,
-                        MachineOperand::imm_i32(self.offset),
-                    ],
+                    vec![MachineOperand::Mem(MachineMemOperand::BaseOff(
+                        MachineRegister::phys_reg(GR64::RBP),
+                        self.offset,
+                    ))],
                     self.builder.get_cur_bb().unwrap(),
                 )
                 .with_def(vec![ax.clone()]);

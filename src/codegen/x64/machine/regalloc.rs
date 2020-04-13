@@ -210,7 +210,10 @@ impl RegisterAllocator {
             let load_inst_id = cur_func.body.inst_arena.alloc(
                 MachineInst::new_simple(
                     mov_rx(tys, &src).unwrap(),
-                    vec![rbp, src, MachineOperand::None, MachineOperand::None],
+                    vec![MachineOperand::Mem(MachineMemOperand::BaseFi(
+                        rbp.as_register().clone(),
+                        *src.as_frame_index(),
+                    ))],
                     call_inst_parent,
                 )
                 .with_def(vec![reg]),

@@ -8,7 +8,7 @@ use std::fmt;
 
 pub type DAGNodeId = Id<DAGNode>;
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct DAGNode {
     pub kind: NodeKind,
     pub operand: Vec<Raw<DAGNode>>,
@@ -37,6 +37,7 @@ pub enum OperandNodeKind {
     Address(AddressKind),
     BasicBlock(DAGBasicBlockId),
     Register(RegisterInfoRef),
+    Mem(MemNodeKind),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -88,6 +89,16 @@ pub enum AddressKind {
     FunctionName(String),
 }
 
+// TODO: target dependent
+#[derive(Debug, Clone, PartialEq)]
+pub enum MemNodeKind {
+    BaseFi(Raw<DAGNode>, Raw<DAGNode>),
+    BaseFiOff(Raw<DAGNode>, Raw<DAGNode>, Raw<DAGNode>), // base, fi, off
+    BaseFiAlignOff(Raw<DAGNode>, Raw<DAGNode>, Raw<DAGNode>, Raw<DAGNode>), // base, fi, align, off
+    BaseAlignOff(Raw<DAGNode>, Raw<DAGNode>, Raw<DAGNode>), // base, align, off
+    Base(Raw<DAGNode>),
+}
+
 impl Into<CondKind> for ICmpKind {
     fn into(self) -> CondKind {
         match self {
@@ -123,6 +134,13 @@ impl ConstantKind {
             _ => false,
         }
     }
+
+    pub fn as_i32(&self) -> i32 {
+        match self {
+            Self::Int32(i) => *i,
+            _ => panic!(),
+        }
+    }
 }
 
 impl DAGNode {
@@ -155,6 +173,14 @@ impl DAGNode {
         }
     }
 
+    pub fn new_mem(mem: MemNodeKind) -> Self {
+        Self::new(
+            NodeKind::Operand(OperandNodeKind::Mem(mem)),
+            vec![],
+            Type::Void,
+        )
+    }
+
     pub fn set_next(mut self, next: Raw<DAGNode>) -> Self {
         self.next = Some(next);
         self
@@ -177,6 +203,13 @@ impl DAGNode {
     pub fn as_constant(&self) -> ConstantKind {
         match self.kind {
             NodeKind::Operand(OperandNodeKind::Constant(c)) => c,
+            _ => panic!(),
+        }
+    }
+
+    pub fn as_frame_index(&self) -> FrameIndexInfo {
+        match self.kind {
+            NodeKind::Operand(OperandNodeKind::FrameIndex(fi)) => fi,
             _ => panic!(),
         }
     }
@@ -264,6 +297,7 @@ impl OperandNodeKind {
             Self::Constant(c) => write!(f, "{:?}", c),
             Self::FrameIndex(fi) => write!(f, "FI<{}, {:?}>", tys.to_string(fi.ty), fi.idx),
             Self::Register(r) => write!(f, "Reg({:?})", r),
+            Self::Mem(mem) => write!(f, "{:?}", mem),
         }
     }
 }

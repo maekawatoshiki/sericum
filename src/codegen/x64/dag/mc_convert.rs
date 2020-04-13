@@ -440,6 +440,37 @@ impl<'a> ConversionInfo<'a> {
             NodeKind::Operand(OperandNodeKind::Register(ref r)) => {
                 MachineOperand::Register(MachineRegister::new(r.clone()))
             }
+            NodeKind::Operand(OperandNodeKind::Mem(ref mem)) => match mem {
+                MemNodeKind::Base(r) => MachineOperand::Mem(MachineMemOperand::Base(
+                    self.normal_operand(*r).as_register().clone(),
+                )),
+                MemNodeKind::BaseAlignOff(r, align, off) => {
+                    MachineOperand::Mem(MachineMemOperand::BaseAlignOff(
+                        self.normal_operand(*r).as_register().clone(),
+                        self.normal_operand(*align).as_constant().as_i32(),
+                        self.normal_operand(*off).as_register().clone(),
+                    ))
+                }
+                MemNodeKind::BaseFi(r, fi) => MachineOperand::Mem(MachineMemOperand::BaseFi(
+                    self.normal_operand(*r).as_register().clone(),
+                    *self.normal_operand(*fi).as_frame_index(),
+                )),
+                MemNodeKind::BaseFiAlignOff(r, fi, align, off) => {
+                    MachineOperand::Mem(MachineMemOperand::BaseFiAlignOff(
+                        self.normal_operand(*r).as_register().clone(),
+                        *self.normal_operand(*fi).as_frame_index(),
+                        self.normal_operand(*align).as_constant().as_i32(),
+                        self.normal_operand(*off).as_register().clone(),
+                    ))
+                }
+                MemNodeKind::BaseFiOff(r, fi, off) => {
+                    MachineOperand::Mem(MachineMemOperand::BaseFiOff(
+                        self.normal_operand(*r).as_register().clone(),
+                        *self.normal_operand(*fi).as_frame_index(),
+                        self.normal_operand(*off).as_constant().as_i32(),
+                    ))
+                }
+            },
             NodeKind::None => MachineOperand::None,
             _ => MachineOperand::Register(self.convert_dag(node).unwrap()),
         }
@@ -485,7 +516,7 @@ pub fn mov_rx(tys: &Types, x: &MachineOperand) -> Option<MachineOpcode> {
     let mov32rx = [
         MachineOpcode::MOVrr32,
         MachineOpcode::MOVri32,
-        MachineOpcode::MOVrm64,
+        MachineOpcode::MOVrm32,
     ];
     let mov64rx = [
         MachineOpcode::MOVrr64,

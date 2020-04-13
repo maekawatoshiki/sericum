@@ -67,7 +67,7 @@ impl FrameObjectsInfo {
     }
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Copy)]
 pub struct FrameIndexInfo {
     pub ty: Type,
     pub idx: FrameIndexKind,

@@ -73,13 +73,17 @@ impl Legalize {
             let add = node.operand[0];
             let op0 = self.run_on_node(tys, heap, add.operand[0]);
             let op1 = self.run_on_node(tys, heap, add.operand[1]);
-            let none = heap.alloc_none();
             let rbp = heap.alloc_phys_reg(GR64::RBP);
 
             if op0.kind == NodeKind::IR(IRNodeKind::FIAddr) && op1.is_constant() {
+                let mem = heap.alloc(DAGNode::new_mem(MemNodeKind::BaseFiOff(
+                    rbp,
+                    op0.operand[0],
+                    op1,
+                )));
                 return heap.alloc(DAGNode::new(
                     NodeKind::MI(MINodeKind::MOVrm32),
-                    vec![rbp, op0.operand[0], none, op1],
+                    vec![mem],
                     node.ty.clone(),
                 ));
             }
@@ -90,9 +94,15 @@ impl Legalize {
             {
                 let op1_op0 = self.run_on_node(tys, heap, op1.operand[0]);
                 let op1_op1 = op1.operand[1];
+                let mem = heap.alloc(DAGNode::new_mem(MemNodeKind::BaseFiAlignOff(
+                    rbp,
+                    op0.operand[0],
+                    op1_op1,
+                    op1_op0,
+                )));
                 return heap.alloc(DAGNode::new(
                     NodeKind::MI(MINodeKind::MOVrm32),
-                    vec![rbp, op0.operand[0], op1_op1, op1_op0],
+                    vec![mem],
                     node.ty.clone(),
                 ));
             }
@@ -103,9 +113,12 @@ impl Legalize {
             {
                 let op1_op0 = self.run_on_node(tys, heap, op1.operand[0]);
                 let op1_op1 = op1.operand[1];
+                let mem = heap.alloc(DAGNode::new_mem(MemNodeKind::BaseAlignOff(
+                    op0, op1_op1, op1_op0,
+                )));
                 return heap.alloc(DAGNode::new(
                     NodeKind::MI(MINodeKind::MOVrm32),
-                    vec![op0, none, op1_op1, op1_op0],
+                    vec![mem],
                     node.ty.clone(),
                 ));
             }

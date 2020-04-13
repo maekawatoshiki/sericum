@@ -587,13 +587,27 @@ impl LivenessAnalysis {
         inst: &MachineInst,
     ) {
         for operand in &inst.operand {
-            if let MachineOperand::Register(reg) = operand {
-                // live_in and live_out should contain no assigned(physical) registers
-                if reg.is_phys_reg() {
-                    continue;
+            // live_in and live_out should contain no assigned(physical) registers
+            match operand {
+                MachineOperand::Register(reg)
+                | MachineOperand::Mem(MachineMemOperand::BaseFi(reg, _))
+                | MachineOperand::Mem(MachineMemOperand::BaseFiOff(reg, _, _))
+                | MachineOperand::Mem(MachineMemOperand::BaseOff(reg, _))
+                | MachineOperand::Mem(MachineMemOperand::Base(reg)) => {
+                    if reg.is_vreg() {
+                        self.propagate(cur_func, bb, reg.get_vreg())
+                    }
                 }
-
-                self.propagate(cur_func, bb, reg.get_vreg())
+                MachineOperand::Mem(MachineMemOperand::BaseAlignOff(reg, _, reg2))
+                | MachineOperand::Mem(MachineMemOperand::BaseFiAlignOff(reg, _, _, reg2)) => {
+                    if reg.is_vreg() {
+                        self.propagate(cur_func, bb, reg.get_vreg());
+                    }
+                    if reg2.is_vreg() {
+                        self.propagate(cur_func, bb, reg2.get_vreg());
+                    }
+                }
+                _ => {}
             }
         }
     }
@@ -664,24 +678,29 @@ impl LivenessAnalysis {
                     vreg2entity.insert(def_reg.get_vreg(), def_reg);
                 }
 
-                for reg in inst.operand.iter().filter_map(|o| match o {
-                    MachineOperand::Register(r) => Some(r),
-                    _ => None,
-                }) {
-                    if let Some(phy_reg) = reg.get_reg() {
-                        if let Some(range) = reg2range.get_mut(&phy_reg.into()) {
-                            range.segments.last_mut().unwrap().end = cur_pp!();
-                        }
-                    }
+                for operand in &inst.operand {
+                    let regs = match operand {
+                        MachineOperand::Register(r) => vec![r],
+                        MachineOperand::Mem(mem) => mem.registers(),
+                        _ => continue,
+                    };
 
-                    if reg.get_reg().is_none() {
-                        vreg2range
-                            .get_mut(&reg.get_vreg())
-                            .unwrap()
-                            .segments
-                            .last_mut()
-                            .unwrap()
-                            .end = cur_pp!();
+                    for reg in regs {
+                        if let Some(phy_reg) = reg.get_reg() {
+                            if let Some(range) = reg2range.get_mut(&phy_reg.into()) {
+                                range.segments.last_mut().unwrap().end = cur_pp!();
+                            }
+                        }
+
+                        if reg.get_reg().is_none() {
+                            vreg2range
+                                .get_mut(&reg.get_vreg())
+                                .unwrap()
+                                .segments
+                                .last_mut()
+                                .unwrap()
+                                .end = cur_pp!();
+                        }
                     }
                 }
 

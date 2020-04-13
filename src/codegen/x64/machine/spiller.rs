@@ -6,7 +6,7 @@ use super::super::{
 use super::{
     builder::{BuilderTrait, BuilderWithLiveInfoEdit},
     function::MachineFunction,
-    inst::{MachineInst, MachineOperand, MachineRegister},
+    inst::{MachineInst, MachineMemOperand, MachineOperand, MachineRegister},
     liveness::LiveRegMatrix,
 };
 use crate::ir::types::Types;
@@ -73,7 +73,10 @@ impl<'a> Spiller<'a> {
             let rbp = MachineOperand::phys_reg(GR64::RBP);
             let load = MachineInst::new_simple(
                 mov_rx(tys, &fi).unwrap(),
-                vec![rbp, fi, MachineOperand::None, MachineOperand::None],
+                vec![MachineOperand::Mem(MachineMemOperand::BaseFi(
+                    rbp.as_register().clone(),
+                    *fi.as_frame_index(),
+                ))],
                 use_inst.parent,
             )
             .with_def(vec![new_r.clone()]);

@@ -17,7 +17,7 @@ pub fn run(item: TokenStream) -> TokenStream {
 }
 
 struct ISelPatParser<'a> {
-    reader: &'a mut TokenStreamReader,
+    pub reader: &'a mut TokenStreamReader,
     root: &'a proc_macro2::TokenStream,
     parent: proc_macro2::TokenStream,
 }
@@ -165,17 +165,9 @@ impl<'a> ISelPatParser<'a> {
         }
     }
 
-    // TODO: refine code asap
-    pub fn parse_selected_inst_pat(&mut self) -> proc_macro2::TokenStream {
-        let ir_or_mi = self.reader.get_ident().unwrap();
-        assert!(self.reader.skip_punct('.'));
-        let name = ident_tok(self.reader.get_ident().unwrap().as_str());
-        let inst = match ir_or_mi.as_str() {
-            "ir" => quote! { NodeKind::IR(IRNodeKind::#name) },
-            "mi" => quote! { NodeKind::MI(MINodeKind::#name) },
-            _ => abort!(0, "expected 'ir' or 'mi'"),
-        };
-
+    pub fn parse_selected_inst_arguments_pat(
+        &mut self,
+    ) -> (proc_macro2::TokenStream, proc_macro2::TokenStream) {
         let mut def_operands = quote! {};
         let mut operands = quote! {};
 
@@ -189,6 +181,20 @@ impl<'a> ISelPatParser<'a> {
                 };
                 operands = quote! {
                     #operands #reg,
+                };
+            } else if self.reader.cur_is_group('[') {
+                let group = self.reader.get().unwrap();
+                let mut reader = TokenStreamReader::new(group_stream(group).into_iter());
+                let mut parser = ISelPatParser::new(&mut reader, &self.root, self.parent.clone());
+                let addressing_name = ident_tok(parser.reader.get_ident().unwrap().as_str());
+                let (defo, o) = parser.parse_selected_inst_arguments_pat();
+                def_operands = quote! {
+                    #def_operands
+                    #defo
+                    let mem__ = heap.alloc(DAGNode::new_mem( MemNodeKind::#addressing_name(#o) ));
+                };
+                operands = quote! {
+                    #operands mem__,
                 };
             } else {
                 let name = self.reader.get_ident().unwrap();
@@ -214,6 +220,22 @@ impl<'a> ISelPatParser<'a> {
                 break;
             }
         }
+
+        (def_operands, operands)
+    }
+
+    // TODO: refine code asap
+    pub fn parse_selected_inst_pat(&mut self) -> proc_macro2::TokenStream {
+        let ir_or_mi = self.reader.get_ident().unwrap();
+        assert!(self.reader.skip_punct('.'));
+        let name = ident_tok(self.reader.get_ident().unwrap().as_str());
+        let inst = match ir_or_mi.as_str() {
+            "ir" => quote! { NodeKind::IR(IRNodeKind::#name) },
+            "mi" => quote! { NodeKind::MI(MINodeKind::#name) },
+            _ => abort!(0, "expected 'ir' or 'mi'"),
+        };
+
+        let (def_operands, operands) = self.parse_selected_inst_arguments_pat();
 
         let root = &self.root;
         quote! {
@@ -278,9 +300,7 @@ impl<'a> ISelPatParser<'a> {
                 // for user own code
                 let body = proc_macro2::TokenStream::from(group_stream(group));
                 quote! {
-                    {
-                        return #body;
-                    }
+                    { return { #body }; }
                 }
             }
         } else {

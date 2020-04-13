@@ -256,154 +256,94 @@ impl JITCompiler {
     }
 
     fn compile_mov_rm32(&mut self, fo: &FrameObjectsInfo, inst: &MachineInst) {
-        // mov rbp, fi, none, none
-        if inst.operand[0].is_register() // must be rbp
-            && inst.operand[1].is_frame_index()
-            && inst.operand[2].is_none()
-            && inst.operand[3].is_none()
-        {
-            let r0 = phys_reg_to_dynasm_reg(inst.def[0].get_reg().unwrap());
-            let m1 = inst.operand[1].as_frame_index();
-            dynasm!(self.asm; mov Rd(r0), [rbp - fo.offset(m1.idx).unwrap()]);
-        }
-
-        // out = mov rbp, fi, none, const.off
-        if inst.operand[0].is_register() // must be rbp
-            && inst.operand[1].is_frame_index()
-            && inst.operand[2].is_none()
-            && inst.operand[3].is_const_i32()
-        {
-            let r0 = phys_reg_to_dynasm_reg(inst.def[0].get_reg().unwrap());
-            let m1 = fo.offset(inst.operand[1].as_frame_index().idx).unwrap();
-            let i2 = inst.operand[3].as_constant().as_i32();
-            dynasm!(self.asm; mov Rd(r0), [rbp - m1 + i2]);
-        }
-
-        // out = mov rbp, fi, align, off
-        if inst.operand[0].is_register() // must be rbp
-            && inst.operand[1].is_frame_index()
-            && inst.operand[2].is_const_i32()
-            && inst.operand[3].is_register()
-        {
-            let r0 = phys_reg_to_dynasm_reg(inst.def[0].get_reg().unwrap());
-            let m1 = fo.offset(inst.operand[1].as_frame_index().idx).unwrap();
-            let i2 = inst.operand[2].as_constant().as_i32();
-            let r3 = phys_reg_to_dynasm_reg(inst.operand[3].as_register().get_reg().unwrap());
-
-            match i2 {
-                4 => dynasm!(self.asm; mov Rd(r0), DWORD [rbp - m1 + 4*Rq(r3)]),
-                _ => unimplemented!(),
+        let r0 = phys_reg_to_dynasm_reg(inst.def[0].get_reg().unwrap());
+        match &inst.operand[0] {
+            MachineOperand::Mem(MachineMemOperand::BaseFi(base, fi)) => {
+                let r1 = phys_reg_to_dynasm_reg(base.get_reg().unwrap());
+                let m2 = fi.idx;
+                dynasm!(self.asm; mov Rd(r0), DWORD [Rq(r1) - fo.offset(m2).unwrap()]);
             }
-        }
-
-        // out = mov base, none, align, off
-        if inst.operand[0].is_register()
-            && inst.operand[1].is_none()
-            && inst.operand[2].is_const_i32()
-            && inst.operand[3].is_register()
-        {
-            let r0 = phys_reg_to_dynasm_reg(inst.def[0].get_reg().unwrap());
-            let r1 = phys_reg_to_dynasm_reg(inst.operand[0].as_register().get_reg().unwrap());
-            let i2 = inst.operand[2].as_constant().as_i32();
-            let r3 = phys_reg_to_dynasm_reg(inst.operand[3].as_register().get_reg().unwrap());
-
-            match i2 {
-                4 => dynasm!(self.asm; mov Rd(r0), DWORD [Rq(r1) + 4*Rq(r3)]),
-                _ => unimplemented!(),
+            MachineOperand::Mem(MachineMemOperand::BaseAlignOff(base, align, off)) => {
+                let r1 = phys_reg_to_dynasm_reg(base.get_reg().unwrap());
+                let i2 = align;
+                let r3 = phys_reg_to_dynasm_reg(off.get_reg().unwrap());
+                match i2 {
+                    4 => dynasm!(self.asm; mov Rd(r0), DWORD [Rq(r1) + 4*Rq(r3)]),
+                    _ => unimplemented!(),
+                }
             }
-        }
-
-        // out = mov base, none, none, const.off
-        if inst.operand[0].is_register()
-            && inst.operand[1].is_none()
-            && inst.operand[2].is_none()
-            && inst.operand[3].is_const_i32()
-        {
-            let r0 = phys_reg_to_dynasm_reg(inst.def[0].get_reg().unwrap());
-            let r1 = phys_reg_to_dynasm_reg(inst.operand[0].as_register().get_reg().unwrap());
-            let i2 = inst.operand[3].as_constant().as_i32();
-            dynasm!(self.asm; mov Rd(r0), DWORD [Rq(r1) + i2]);
-        }
-
-        // out = mov base, none, none, none
-        if inst.operand[0].is_register()
-            && inst.operand[1].is_none()
-            && inst.operand[2].is_none()
-            && inst.operand[3].is_none()
-        {
-            let r0 = phys_reg_to_dynasm_reg(inst.def[0].get_reg().unwrap());
-            let r1 = phys_reg_to_dynasm_reg(inst.operand[0].as_register().get_reg().unwrap());
-            dynasm!(self.asm; mov Rd(r0), [Rq(r1)]);
+            MachineOperand::Mem(MachineMemOperand::BaseFiAlignOff(base, fi, align, off)) => {
+                let r1 = phys_reg_to_dynasm_reg(base.get_reg().unwrap());
+                let m2 = fo.offset(fi.idx).unwrap();
+                let i3 = align;
+                let r4 = phys_reg_to_dynasm_reg(off.get_reg().unwrap());
+                match i3 {
+                    4 => dynasm!(self.asm; mov Rd(r0), DWORD [Rq(r1) - m2 + 4*Rq(r4)]),
+                    _ => unimplemented!(),
+                }
+            }
+            MachineOperand::Mem(MachineMemOperand::BaseFiOff(base, fi, off)) => {
+                let r1 = phys_reg_to_dynasm_reg(base.get_reg().unwrap());
+                let m2 = fo.offset(fi.idx).unwrap();
+                let i3 = off;
+                dynasm!(self.asm; mov Rd(r0), DWORD [Rq(r1) - m2 + i3]);
+            }
+            MachineOperand::Mem(MachineMemOperand::Base(base)) => {
+                let r1 = phys_reg_to_dynasm_reg(base.get_reg().unwrap());
+                dynasm!(self.asm; mov Rd(r0), DWORD [Rq(r1)]);
+            }
+            MachineOperand::Mem(MachineMemOperand::BaseOff(base, off)) => {
+                let r1 = phys_reg_to_dynasm_reg(base.get_reg().unwrap());
+                let i2 = *off;
+                dynasm!(self.asm; mov Rd(r0), DWORD [Rq(r1) + i2]);
+            }
+            e => panic!("{:?}", e),
         }
     }
 
     fn compile_mov_rm64(&mut self, fo: &FrameObjectsInfo, inst: &MachineInst) {
-        // mov rbp, fi, none, none
-        if inst.operand[0].is_register() // must be rbp
-            && inst.operand[1].is_frame_index()
-            && inst.operand[2].is_none()
-            && inst.operand[3].is_none()
-        {
-            let r0 = phys_reg_to_dynasm_reg(inst.def[0].get_reg().unwrap());
-            let m1 = inst.operand[1].as_frame_index();
-            dynasm!(self.asm; mov Rq(r0), QWORD [rbp - fo.offset(m1.idx).unwrap()]);
-        }
-
-        // out = mov rbp, fi, none, const.off
-        if inst.operand[0].is_register() // must be rbp
-            && inst.operand[1].is_frame_index()
-            && inst.operand[2].is_none()
-            && inst.operand[3].is_const_i32()
-        {
-            let r0 = phys_reg_to_dynasm_reg(inst.def[0].get_reg().unwrap());
-            let m1 = fo.offset(inst.operand[1].as_frame_index().idx).unwrap();
-            let i2 = inst.operand[3].as_constant().as_i32();
-            dynasm!(self.asm; mov Rq(r0), QWORD [rbp - m1 + i2]);
-        }
-
-        // out = mov rbp, fi, align, off
-        if inst.operand[0].is_register() // must be rbp
-            && inst.operand[1].is_frame_index()
-            && inst.operand[2].is_const_i32()
-            && inst.operand[3].is_register()
-        {
-            let r0 = phys_reg_to_dynasm_reg(inst.def[0].get_reg().unwrap());
-            let m1 = fo.offset(inst.operand[1].as_frame_index().idx).unwrap();
-            let i2 = inst.operand[2].as_constant().as_i32();
-            let r3 = phys_reg_to_dynasm_reg(inst.operand[3].as_register().get_reg().unwrap());
-
-            match i2 {
-                4 => dynasm!(self.asm; mov Rq(r0), QWORD [rbp - m1 + 4*Rq(r3)]),
-                _ => unimplemented!(),
+        let r0 = phys_reg_to_dynasm_reg(inst.def[0].get_reg().unwrap());
+        match &inst.operand[0] {
+            MachineOperand::Mem(MachineMemOperand::BaseFi(base, fi)) => {
+                let r1 = phys_reg_to_dynasm_reg(base.get_reg().unwrap());
+                let m2 = fi.idx;
+                dynasm!(self.asm; mov Rq(r0), QWORD [Rq(r1) - fo.offset(m2).unwrap()]);
             }
-        }
-
-        // out = mov base, none, align, off
-        if inst.operand[0].is_register()
-            && inst.operand[1].is_none()
-            && inst.operand[2].is_const_i32()
-            && inst.operand[3].is_register()
-        {
-            let r0 = phys_reg_to_dynasm_reg(inst.def[0].get_reg().unwrap());
-            let r1 = phys_reg_to_dynasm_reg(inst.operand[0].as_register().get_reg().unwrap());
-            let i2 = inst.operand[2].as_constant().as_i32();
-            let r3 = phys_reg_to_dynasm_reg(inst.operand[3].as_register().get_reg().unwrap());
-
-            match i2 {
-                4 => dynasm!(self.asm; mov Rq(r0), QWORD [Rq(r1) + 4*Rq(r3)]),
-                _ => unimplemented!(),
+            MachineOperand::Mem(MachineMemOperand::BaseAlignOff(base, align, off)) => {
+                let r1 = phys_reg_to_dynasm_reg(base.get_reg().unwrap());
+                let i2 = align;
+                let r3 = phys_reg_to_dynasm_reg(off.get_reg().unwrap());
+                match i2 {
+                    4 => dynasm!(self.asm; mov Rq(r0), QWORD [Rq(r1) + 4*Rq(r3)]),
+                    _ => unimplemented!(),
+                }
             }
-        }
-
-        // out = mov base, none, none, none
-        if inst.operand[0].is_register()
-            && inst.operand[1].is_none()
-            && inst.operand[2].is_none()
-            && inst.operand[3].is_none()
-        {
-            let r0 = phys_reg_to_dynasm_reg(inst.def[0].get_reg().unwrap());
-            let r1 = phys_reg_to_dynasm_reg(inst.operand[0].as_register().get_reg().unwrap());
-            dynasm!(self.asm; mov Rq(r0), QWORD [Rq(r1)]);
+            MachineOperand::Mem(MachineMemOperand::BaseFiAlignOff(base, fi, align, off)) => {
+                let r1 = phys_reg_to_dynasm_reg(base.get_reg().unwrap());
+                let m2 = fo.offset(fi.idx).unwrap();
+                let i3 = align;
+                let r4 = phys_reg_to_dynasm_reg(off.get_reg().unwrap());
+                match i3 {
+                    4 => dynasm!(self.asm; mov Rq(r0), QWORD [Rq(r1) - m2 + 4*Rq(r4)]),
+                    _ => unimplemented!(),
+                }
+            }
+            MachineOperand::Mem(MachineMemOperand::BaseFiOff(base, fi, off)) => {
+                let r1 = phys_reg_to_dynasm_reg(base.get_reg().unwrap());
+                let m2 = fo.offset(fi.idx).unwrap();
+                let i3 = off;
+                dynasm!(self.asm; mov Rq(r0), QWORD [Rq(r1) - m2 + i3]);
+            }
+            MachineOperand::Mem(MachineMemOperand::Base(base)) => {
+                let r1 = phys_reg_to_dynasm_reg(base.get_reg().unwrap());
+                dynasm!(self.asm; mov Rq(r0), QWORD [Rq(r1)]);
+            }
+            MachineOperand::Mem(MachineMemOperand::BaseOff(base, off)) => {
+                let r1 = phys_reg_to_dynasm_reg(base.get_reg().unwrap());
+                let i2 = *off;
+                dynasm!(self.asm; mov Rq(r0), QWORD [Rq(r1) + i2]);
+            }
+            _ => panic!(),
         }
     }
 

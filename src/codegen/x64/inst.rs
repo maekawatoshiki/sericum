@@ -179,12 +179,7 @@ mod inst {
         };
         pub static ref MOVrm32: TargetInstDef = {
             TargetInstDef::new(TargetOpcode::MOVrm32)
-                .set_uses(vec![
-                    TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR64)),
-                    TargetOperand::Any,
-                    TargetOperand::Any,
-                    TargetOperand::Any,
-                ])
+                .set_uses(vec![TargetOperand::Mem])
                 .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR32)])
         };
         pub static ref MOVmr32: TargetInstDef = {
@@ -237,12 +232,7 @@ mod inst {
         };
         pub static ref MOVrm64: TargetInstDef = {
             TargetInstDef::new(TargetOpcode::MOVrm64)
-                .set_uses(vec![
-                    TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR64)),
-                    TargetOperand::Any,
-                    TargetOperand::Any,
-                    TargetOperand::Any,
-                ])
+                .set_uses(vec![TargetOperand::Mem])
                 .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR64)])
         };
         pub static ref IDIV: TargetInstDef = {
@@ -296,6 +286,7 @@ pub enum TargetOperand {
     Addr,
     FrameIndex,
     Any,
+    Mem,
 }
 
 #[derive(Clone)]
