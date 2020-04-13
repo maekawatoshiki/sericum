@@ -190,15 +190,15 @@ impl RegisterAllocator {
         for (frinfo, reg) in slots_to_save_regs.into_iter().zip(regs_to_save.into_iter()) {
             let dst = MachineOperand::FrameIndex(frinfo.clone());
             let src = MachineOperand::Register(reg.clone());
-            let rbp = MachineOperand::phys_reg(GR64::RBP);
+            let rbp = MachineRegister::phys_reg(GR64::RBP);
             let store_inst_id = cur_func.body.inst_arena.alloc(MachineInst::new(
                 &cur_func.vreg_gen,
                 mov_mx(&src).unwrap(),
                 vec![
-                    rbp.clone(),
-                    dst,
-                    MachineOperand::None,
-                    MachineOperand::None,
+                    MachineOperand::Mem(MachineMemOperand::BaseFi(
+                        rbp.clone(),
+                        *dst.as_frame_index(),
+                    )),
                     src,
                 ],
                 None,
@@ -211,7 +211,7 @@ impl RegisterAllocator {
                 MachineInst::new_simple(
                     mov_rx(tys, &src).unwrap(),
                     vec![MachineOperand::Mem(MachineMemOperand::BaseFi(
-                        rbp.as_register().clone(),
+                        rbp,
                         *src.as_frame_index(),
                     ))],
                     call_inst_parent,

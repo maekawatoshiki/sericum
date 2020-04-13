@@ -184,37 +184,25 @@ mod inst {
         };
         pub static ref MOVmr32: TargetInstDef = {
             TargetInstDef::new(TargetOpcode::MOVmr32).set_uses(vec![
-                TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR64)),
-                TargetOperand::Any,
-                TargetOperand::Any,
-                TargetOperand::Any,
+                TargetOperand::Mem,
                 TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR32)),
             ])
         };
         pub static ref MOVmi32: TargetInstDef = {
             TargetInstDef::new(TargetOpcode::MOVmi32).set_uses(vec![
-                TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR64)),
-                TargetOperand::Any,
-                TargetOperand::Any,
-                TargetOperand::Any,
+                TargetOperand::Mem,
                 TargetOperand::Immediate(TargetImmediate::I32),
             ])
         };
         pub static ref MOVmr64: TargetInstDef = {
             TargetInstDef::new(TargetOpcode::MOVmr64).set_uses(vec![
-                TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR64)),
-                TargetOperand::Any,
-                TargetOperand::Any,
-                TargetOperand::Any,
+                TargetOperand::Mem,
                 TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR64)),
             ])
         };
         pub static ref MOVmi64: TargetInstDef = {
             TargetInstDef::new(TargetOpcode::MOVmi64).set_uses(vec![
-                TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR64)),
-                TargetOperand::Any,
-                TargetOperand::Any,
-                TargetOperand::Any,
+                TargetOperand::Mem,
                 TargetOperand::Immediate(TargetImmediate::I64),
             ])
         };
@@ -313,6 +301,7 @@ pub enum TargetOpcode {
     MOVSDrm,   // movsd r, MEM
     MOVSDrr,
 
+    // TODO: MachineMemOperand is introduced, this is no longer correct info
     // out = mov [rbp  - fi.off              ] | out = mov rbp,  fi,   none,  none
     // out = mov [rbp  - fi.off + const.off  ] | out = mov rbp,  fi,   none,  off
     // out = mov [rbp  - fi.off + align * off] | out = mov rbp,  fi,   align, off

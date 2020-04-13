@@ -39,7 +39,9 @@ impl MISelector {
         heap: &mut DAGHeap,
         mut node: Raw<DAGNode>,
     ) -> Raw<DAGNode> {
-        if !node.is_operation() {
+        // Mem contains register node, which must be processed
+        if !matches!(node.kind, NodeKind::Operand(OperandNodeKind::Mem(_))) && !node.is_operation()
+        {
             return node;
         }
 
@@ -113,12 +115,12 @@ impl MISelector {
                         }
                     }
                     mem32  c {
-                        GR32  b => (mi.MOVmr32 %rbp, c, none, none, b)
-                        imm32 b => (mi.MOVmi32 %rbp, c, none, none, b) } }
+                        GR32  b => (mi.MOVmr32 [BaseFi %rbp, c], b)
+                        imm32 b => (mi.MOVmi32 [BaseFi %rbp, c], b) } }
                 GR64   a {
-                    imm32 b => (mi.MOVmi32 a, none, none, none, b)
-                    GR32  b => (mi.MOVmr32 a, none, none, none, b)
-                    GR64  b => (mi.MOVmr64 a, none, none, none, b) }
+                    imm32 b => (mi.MOVmi32 [Base a], b)
+                    GR32  b => (mi.MOVmr32 [Base a], b)
+                    GR64  b => (mi.MOVmr64 [Base a], b) }
             }
             (ir.FIAddr a) {
                 mem a => (mi.LEAr64m %rbp, a, none, none)

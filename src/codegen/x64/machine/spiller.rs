@@ -39,10 +39,13 @@ impl<'a> Spiller<'a> {
         let bb = self.func.body.inst_arena[def_id].parent;
         let dst = MachineOperand::FrameIndex(slot.clone());
         let src = MachineOperand::Register(r.clone());
-        let rbp = MachineOperand::phys_reg(GR64::RBP);
+        let rbp = MachineRegister::phys_reg(GR64::RBP);
         let store = MachineInst::new_simple(
             mov_mx(&src).unwrap(),
-            vec![rbp, dst, MachineOperand::None, MachineOperand::None, src],
+            vec![
+                MachineOperand::Mem(MachineMemOperand::BaseFi(rbp, *dst.as_frame_index())),
+                src,
+            ],
             bb,
         );
 
@@ -70,11 +73,11 @@ impl<'a> Spiller<'a> {
             use_inst.replace_operand_register(&r, &new_r);
 
             let fi = MachineOperand::FrameIndex(slot.clone());
-            let rbp = MachineOperand::phys_reg(GR64::RBP);
+            let rbp = MachineRegister::phys_reg(GR64::RBP);
             let load = MachineInst::new_simple(
                 mov_rx(tys, &fi).unwrap(),
                 vec![MachineOperand::Mem(MachineMemOperand::BaseFi(
-                    rbp.as_register().clone(),
+                    rbp,
                     *fi.as_frame_index(),
                 ))],
                 use_inst.parent,

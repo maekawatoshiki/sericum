@@ -120,106 +120,15 @@ impl MachineAsmPrinter {
         self.output.push_str("mov ");
         self.output
             .push_str(format!("{}, ", i.def[0].get_reg().unwrap().name()).as_str());
-
         self.run_on_mem_operand(&i.operand[0], fo, word);
     }
 
     fn run_on_inst_mov_mx(&mut self, tys: &Types, i: &MachineInst, fo: &FrameObjectsInfo) {
-        let word = byte2word(i.operand[4].get_type().unwrap().size_in_byte(tys));
-
+        let word = byte2word(i.operand[1].get_type().unwrap().size_in_byte(tys));
         self.output.push_str("mov ");
-
-        // mov rbp, fi, none, none, r
-        if i.operand[0].is_register() // must be rbp
-            && i.operand[1].is_frame_index()
-            && i.operand[2].is_none()
-            && i.operand[3].is_none()
-        {
-            let offset = fo.offset(i.operand[1].as_frame_index().idx).unwrap();
-            self.output
-                .push_str(format!("{} ptr [rbp - {}], ", word, offset).as_str());
-        }
-
-        // mov rbp, fi, none, const.off, r
-        if i.operand[0].is_register() // must be rbp
-            && i.operand[1].is_frame_index()
-            && i.operand[2].is_none()
-            && i.operand[3].is_const_i32()
-        {
-            let off1 = fo.offset(i.operand[1].as_frame_index().idx).unwrap();
-            let off2 = i.operand[3].as_constant().as_i32();
-            assert!(off1 >= off2);
-            let offset = off1 - off2;
-            self.output
-                .push_str(format!("{} ptr [rbp - {}], ", word, offset).as_str());
-        }
-
-        // mov rbp, fi, align, off, r
-        if i.operand[0].is_register() // must be rbp
-            && i.operand[1].is_frame_index()
-            && i.operand[2].is_const_i32()
-            && i.operand[3].is_register()
-        {
-            let offset = fo.offset(i.operand[1].as_frame_index().idx).unwrap();
-            let align = i.operand[2].as_constant().as_i32();
-            let reg = i.operand[3].as_register().get_reg().unwrap();
-            self.output.push_str(
-                format!(
-                    "{} ptr [rbp + {}*{} - {}], ",
-                    word,
-                    align,
-                    reg.name(),
-                    offset
-                )
-                .as_str(),
-            );
-        }
-
-        // mov base, none, align, off, r
-        if i.operand[0].is_register()
-            && i.operand[1].is_none()
-            && i.operand[2].is_const_i32()
-            && i.operand[3].is_register()
-        {
-            let base = i.operand[0].as_register().get_reg().unwrap();
-            let align = i.operand[2].as_constant().as_i32();
-            let reg = i.operand[3].as_register().get_reg().unwrap();
-            self.output.push_str(
-                format!(
-                    "{} ptr [{} + {}*{}], ",
-                    word,
-                    base.name(),
-                    align,
-                    reg.name()
-                )
-                .as_str(),
-            );
-        }
-
-        // mov base, none, none, const.off, r
-        if i.operand[0].is_register()
-            && i.operand[1].is_none()
-            && i.operand[2].is_none()
-            && i.operand[3].is_const_i32()
-        {
-            let base = i.operand[0].as_register().get_reg().unwrap();
-            let off = i.operand[3].as_constant().as_i32();
-            self.output
-                .push_str(format!("{} ptr [{} + {}], ", word, base.name(), off).as_str());
-        }
-
-        // mov base, none, none, none, r
-        if i.operand[0].is_register()
-            && i.operand[1].is_none()
-            && i.operand[2].is_none()
-            && i.operand[3].is_none()
-        {
-            let base = i.operand[0].as_register().get_reg().unwrap();
-            self.output
-                .push_str(format!("{} ptr [{}], ", word, base.name()).as_str());
-        }
-
-        self.run_on_operand(&i.operand[4]);
+        self.run_on_mem_operand(&i.operand[0], fo, word);
+        self.output.push_str(", ");
+        self.run_on_operand(&i.operand[1]);
     }
 
     fn run_on_inst_lea_rm(&mut self, i: &MachineInst, fo: &FrameObjectsInfo) {

@@ -33,7 +33,9 @@ impl Combine {
         heap: &mut DAGHeap,
         mut node: Raw<DAGNode>,
     ) -> Raw<DAGNode> {
-        if !node.is_operation() {
+        // Mem contains register node, which must be combined
+        if !matches!(node.kind, NodeKind::Operand(OperandNodeKind::Mem(_))) && !node.is_operation()
+        {
             return node;
         }
 

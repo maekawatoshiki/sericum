@@ -34,7 +34,9 @@ impl Legalize {
     }
 
     fn run_on_node(&mut self, tys: &Types, heap: &mut DAGHeap, node: Raw<DAGNode>) -> Raw<DAGNode> {
-        if !node.is_operation() {
+        // Mem contains register node, which must be processed
+        if !matches!(node.kind, NodeKind::Operand(OperandNodeKind::Mem(_))) && !node.is_operation()
+        {
             return node;
         }
 
@@ -76,11 +78,10 @@ impl Legalize {
             let rbp = heap.alloc_phys_reg(GR64::RBP);
 
             if op0.kind == NodeKind::IR(IRNodeKind::FIAddr) && op1.is_constant() {
-                let mem = heap.alloc(DAGNode::new_mem(MemNodeKind::BaseFiOff(
-                    rbp,
-                    op0.operand[0],
-                    op1,
-                )));
+                let mem = heap.alloc(DAGNode::new_mem(
+                    MemNodeKind::BaseFiOff,
+                    vec![rbp, op0.operand[0], op1],
+                ));
                 return heap.alloc(DAGNode::new(
                     NodeKind::MI(MINodeKind::MOVrm32),
                     vec![mem],
@@ -94,12 +95,10 @@ impl Legalize {
             {
                 let op1_op0 = self.run_on_node(tys, heap, op1.operand[0]);
                 let op1_op1 = op1.operand[1];
-                let mem = heap.alloc(DAGNode::new_mem(MemNodeKind::BaseFiAlignOff(
-                    rbp,
-                    op0.operand[0],
-                    op1_op1,
-                    op1_op0,
-                )));
+                let mem = heap.alloc(DAGNode::new_mem(
+                    MemNodeKind::BaseFiAlignOff,
+                    vec![rbp, op0.operand[0], op1_op1, op1_op0],
+                ));
                 return heap.alloc(DAGNode::new(
                     NodeKind::MI(MINodeKind::MOVrm32),
                     vec![mem],
@@ -113,9 +112,10 @@ impl Legalize {
             {
                 let op1_op0 = self.run_on_node(tys, heap, op1.operand[0]);
                 let op1_op1 = op1.operand[1];
-                let mem = heap.alloc(DAGNode::new_mem(MemNodeKind::BaseAlignOff(
-                    op0, op1_op1, op1_op0,
-                )));
+                let mem = heap.alloc(DAGNode::new_mem(
+                    MemNodeKind::BaseAlignOff,
+                    vec![op0, op1_op1, op1_op0],
+                ));
                 return heap.alloc(DAGNode::new(
                     NodeKind::MI(MINodeKind::MOVrm32),
                     vec![mem],
@@ -140,17 +140,17 @@ impl Legalize {
                 (ir.FIAddr fi) a1 {
                     mem32 fi {
                         imm32 a2 {
-                            GR32  src => (mi.MOVmr32 %rbp, fi, none, a2, src)
-                            imm32 src => (mi.MOVmi32 %rbp, fi, none, a2, src) }
+                            GR32  src => (mi.MOVmr32 [BaseFiOff %rbp, fi, a2], src)
+                            imm32 src => (mi.MOVmi32 [BaseFiOff %rbp, fi, a2], src) }
                         (ir.Mul m1, m2) a2 {
                             imm32 m2 {
-                                GR32  src => (mi.MOVmr32 %rbp, fi, m2, m1, src)
-                                imm32 src => (mi.MOVmi32 %rbp, fi, m2, m1, src) } } } }
+                                GR32  src => (mi.MOVmr32 [BaseFiAlignOff %rbp, fi, m2, m1], src)
+                                imm32 src => (mi.MOVmi32 [BaseFiAlignOff %rbp, fi, m2, m1], src) } } } }
                 GR64 a1 {
                     (ir.Mul m1, m2) a2 {
                         imm32 m2 {
-                            GR32  src => (mi.MOVmr32 a1, none, m2, m1, src)
-                            imm32 src => (mi.MOVmi32 a1, none, m2, m1, src) } } } } } }
+                            GR32  src => (mi.MOVmr32 [BaseAlignOff a1, m2, m1], src)
+                            imm32 src => (mi.MOVmi32 [BaseAlignOff a1, m2, m1], src) } } } } } }
     }
 
     fn run_on_node_add(

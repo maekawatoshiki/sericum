@@ -191,7 +191,7 @@ impl<'a> ISelPatParser<'a> {
                 def_operands = quote! {
                     #def_operands
                     #defo
-                    let mem__ = heap.alloc(DAGNode::new_mem( MemNodeKind::#addressing_name(#o) ));
+                    let mem__ = heap.alloc(DAGNode::new_mem( MemNodeKind::#addressing_name, vec![#o])); // TODO: Uniquify mem__
                 };
                 operands = quote! {
                     #operands mem__,

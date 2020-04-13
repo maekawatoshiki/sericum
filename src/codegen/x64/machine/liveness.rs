@@ -680,8 +680,7 @@ impl LivenessAnalysis {
 
                 for operand in &inst.operand {
                     let regs = match operand {
-                        MachineOperand::Register(r) => vec![r],
-                        MachineOperand::Mem(mem) => mem.registers(),
+                        MachineOperand::Register(_) | MachineOperand::Mem(_) => operand.registers(),
                         _ => continue,
                     };
 

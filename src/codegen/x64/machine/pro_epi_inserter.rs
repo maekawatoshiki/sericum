@@ -189,7 +189,7 @@ impl<'a> CopyArgs<'a> {
             ),
             _ => unimplemented!(),
         };
-        let dst = MachineOperand::FrameIndex(FrameIndexInfo::new(ty, FrameIndexKind::Arg(i)));
+        let dst = FrameIndexInfo::new(ty, FrameIndexKind::Arg(i));
         let src = match rc.get_nth_arg_reg(i) {
             Some(arg_reg) => MachineOperand::phys_reg(arg_reg),
             None => {
@@ -211,10 +211,10 @@ impl<'a> CopyArgs<'a> {
         let inst = MachineInst::new_simple(
             mov_mx(&src).unwrap(),
             vec![
-                MachineOperand::phys_reg(GR64::RBP),
-                dst,
-                MachineOperand::None,
-                MachineOperand::None,
+                MachineOperand::Mem(MachineMemOperand::BaseFi(
+                    MachineRegister::phys_reg(GR64::RBP),
+                    dst,
+                )),
                 src,
             ],
             self.builder.get_cur_bb().unwrap(),

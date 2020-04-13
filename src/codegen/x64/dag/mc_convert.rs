@@ -285,7 +285,12 @@ impl<'a> ConversionInfo<'a> {
             NodeKind::IR(IRNodeKind::CopyToLiveOut) => {
                 self.convert_dag_to_machine_inst(node.operand[0])
             }
-            _ => None,
+            e => {
+                println!("{:?}", e);
+                println!("{:?}", *node.operand[0]);
+                println!("{:?}", *node.operand[1]);
+                None
+            }
         };
 
         if machine_inst_id.is_some() {
@@ -360,10 +365,10 @@ impl<'a> ConversionInfo<'a> {
                     let inst = MachineInst::new_simple(
                         mov_mx(&arg).unwrap(),
                         vec![
-                            MachineOperand::phys_reg(GR64::RSP),
-                            MachineOperand::None,
-                            MachineOperand::None,
-                            MachineOperand::imm_i32(off),
+                            MachineOperand::Mem(MachineMemOperand::BaseOff(
+                                MachineRegister::phys_reg(GR64::RSP),
+                                off,
+                            )),
                             arg,
                         ],
                         self.cur_bb,
@@ -441,35 +446,31 @@ impl<'a> ConversionInfo<'a> {
                 MachineOperand::Register(MachineRegister::new(r.clone()))
             }
             NodeKind::Operand(OperandNodeKind::Mem(ref mem)) => match mem {
-                MemNodeKind::Base(r) => MachineOperand::Mem(MachineMemOperand::Base(
-                    self.normal_operand(*r).as_register().clone(),
+                MemNodeKind::Base => MachineOperand::Mem(MachineMemOperand::Base(
+                    self.normal_operand(node.operand[0]).as_register().clone(),
                 )),
-                MemNodeKind::BaseAlignOff(r, align, off) => {
-                    MachineOperand::Mem(MachineMemOperand::BaseAlignOff(
-                        self.normal_operand(*r).as_register().clone(),
-                        self.normal_operand(*align).as_constant().as_i32(),
-                        self.normal_operand(*off).as_register().clone(),
-                    ))
-                }
-                MemNodeKind::BaseFi(r, fi) => MachineOperand::Mem(MachineMemOperand::BaseFi(
-                    self.normal_operand(*r).as_register().clone(),
-                    *self.normal_operand(*fi).as_frame_index(),
+                MemNodeKind::BaseAlignOff => MachineOperand::Mem(MachineMemOperand::BaseAlignOff(
+                    self.normal_operand(node.operand[0]).as_register().clone(),
+                    self.normal_operand(node.operand[1]).as_constant().as_i32(),
+                    self.normal_operand(node.operand[2]).as_register().clone(),
                 )),
-                MemNodeKind::BaseFiAlignOff(r, fi, align, off) => {
+                MemNodeKind::BaseFi => MachineOperand::Mem(MachineMemOperand::BaseFi(
+                    self.normal_operand(node.operand[0]).as_register().clone(),
+                    *self.normal_operand(node.operand[1]).as_frame_index(),
+                )),
+                MemNodeKind::BaseFiAlignOff => {
                     MachineOperand::Mem(MachineMemOperand::BaseFiAlignOff(
-                        self.normal_operand(*r).as_register().clone(),
-                        *self.normal_operand(*fi).as_frame_index(),
-                        self.normal_operand(*align).as_constant().as_i32(),
-                        self.normal_operand(*off).as_register().clone(),
+                        self.normal_operand(node.operand[0]).as_register().clone(),
+                        *self.normal_operand(node.operand[1]).as_frame_index(),
+                        self.normal_operand(node.operand[2]).as_constant().as_i32(),
+                        self.normal_operand(node.operand[3]).as_register().clone(),
                     ))
                 }
-                MemNodeKind::BaseFiOff(r, fi, off) => {
-                    MachineOperand::Mem(MachineMemOperand::BaseFiOff(
-                        self.normal_operand(*r).as_register().clone(),
-                        *self.normal_operand(*fi).as_frame_index(),
-                        self.normal_operand(*off).as_constant().as_i32(),
-                    ))
-                }
+                MemNodeKind::BaseFiOff => MachineOperand::Mem(MachineMemOperand::BaseFiOff(
+                    self.normal_operand(node.operand[0]).as_register().clone(),
+                    *self.normal_operand(node.operand[1]).as_frame_index(),
+                    self.normal_operand(node.operand[2]).as_constant().as_i32(),
+                )),
             },
             NodeKind::None => MachineOperand::None,
             _ => MachineOperand::Register(self.convert_dag(node).unwrap()),

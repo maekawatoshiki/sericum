@@ -92,11 +92,11 @@ pub enum AddressKind {
 // TODO: target dependent
 #[derive(Debug, Clone, PartialEq)]
 pub enum MemNodeKind {
-    BaseFi(Raw<DAGNode>, Raw<DAGNode>),
-    BaseFiOff(Raw<DAGNode>, Raw<DAGNode>, Raw<DAGNode>), // base, fi, off
-    BaseFiAlignOff(Raw<DAGNode>, Raw<DAGNode>, Raw<DAGNode>, Raw<DAGNode>), // base, fi, align, off
-    BaseAlignOff(Raw<DAGNode>, Raw<DAGNode>, Raw<DAGNode>), // base, align, off
-    Base(Raw<DAGNode>),
+    BaseFi,
+    BaseFiOff,
+    BaseFiAlignOff,
+    BaseAlignOff,
+    Base,
 }
 
 impl Into<CondKind> for ICmpKind {
@@ -173,10 +173,10 @@ impl DAGNode {
         }
     }
 
-    pub fn new_mem(mem: MemNodeKind) -> Self {
+    pub fn new_mem(mem: MemNodeKind, operands: Vec<Raw<DAGNode>>) -> Self {
         Self::new(
             NodeKind::Operand(OperandNodeKind::Mem(mem)),
-            vec![],
+            operands,
             Type::Void,
         )
     }
@@ -237,6 +237,7 @@ impl DAGNode {
             | NodeKind::Operand(OperandNodeKind::Address(_))
             | NodeKind::Operand(OperandNodeKind::BasicBlock(_))
             | NodeKind::Operand(OperandNodeKind::Register(_))
+            | NodeKind::Operand(OperandNodeKind::Mem(_))
             | NodeKind::None => false,
             _ => true,
         }
