@@ -323,14 +323,12 @@ impl<'a> ConversionInfo<'a> {
                 MachineInst::new_simple(mov_rx(self.types, &src).unwrap(), vec![src], self.cur_bb)
                     .with_def(vec![r])
             }
-            MachineOperand::FrameIndex(_) => MachineInst::new_with_def_reg(
+            MachineOperand::FrameIndex(fi) => MachineInst::new_with_def_reg(
                 MachineOpcode::LEAr64m,
-                vec![
-                    MachineOperand::phys_reg(GR64::RBP),
-                    src,
-                    MachineOperand::None,
-                    MachineOperand::None,
-                ],
+                vec![MachineOperand::Mem(MachineMemOperand::BaseFi(
+                    MachineRegister::phys_reg(GR64::RBP),
+                    fi,
+                ))],
                 vec![r],
                 self.cur_bb,
             ),

@@ -48,11 +48,11 @@ impl JITExecutor {
         // debug!(println!("dag: before: {:?}", dag_module));
 
         dag::combine::Combine::new().combine_module(&mut dag_module);
-        debug!(println!("dag: comibine: {:?}", dag_module));
+        // debug!(println!("dag: comibine: {:?}", dag_module));
         dag::legalize::Legalize::new().run_on_module(&mut dag_module);
-        debug!(println!("dag: legalize: {:?}", dag_module));
+        // debug!(println!("dag: legalize: {:?}", dag_module));
         dag::isel::MISelector::new().run_on_module(&mut dag_module);
-        debug!(println!("dag: isel: {:?}", dag_module));
+        // debug!(println!("dag: isel: {:?}", dag_module));
 
         let mut machine_module = dag::mc_convert::convert_module(dag_module);
 
@@ -583,72 +583,50 @@ impl JITCompiler {
     }
 
     fn compile_lea_r64m(&mut self, fo: &FrameObjectsInfo, inst: &MachineInst) {
-        // out = lea rbp, fi, none, none
-        if inst.operand[0].is_register() // must be rbp
-            && inst.operand[1].is_frame_index()
-            && inst.operand[2].is_none()
-            && inst.operand[3].is_none()
-        {
-            let r0 = phys_reg_to_dynasm_reg(inst.def[0].get_reg().unwrap());
-            let m1 = inst.operand[1].as_frame_index();
-            dynasm!(self.asm; lea Rq(r0), [rbp - fo.offset(m1.idx).unwrap()]);
-        }
-
-        // out = lea rbp, fi, none, const.off
-        if inst.operand[0].is_register() // must be rbp
-            && inst.operand[1].is_frame_index()
-            && inst.operand[2].is_none()
-            && inst.operand[3].is_const_i32()
-        {
-            let r0 = phys_reg_to_dynasm_reg(inst.def[0].get_reg().unwrap());
-            let m1 = fo.offset(inst.operand[1].as_frame_index().idx).unwrap();
-            let i2 = inst.operand[3].as_constant().as_i32();
-            dynasm!(self.asm; lea Rq(r0), [rbp - m1 + i2]);
-        }
-
-        // out = lea rbp, fi, align, off
-        if inst.operand[0].is_register() // must be rbp
-            && inst.operand[1].is_frame_index()
-            && inst.operand[2].is_const_i32()
-            && inst.operand[3].is_register()
-        {
-            let r0 = phys_reg_to_dynasm_reg(inst.def[0].get_reg().unwrap());
-            let m1 = fo.offset(inst.operand[1].as_frame_index().idx).unwrap();
-            let i2 = inst.operand[2].as_constant().as_i32();
-            let r3 = phys_reg_to_dynasm_reg(inst.operand[3].as_register().get_reg().unwrap());
-
-            match i2 {
-                1 => dynasm!(self.asm; lea Rq(r0), [rbp - m1 + Rq(r3)]),
-                _ => unimplemented!(),
+        let r0 = phys_reg_to_dynasm_reg(inst.def[0].get_reg().unwrap());
+        match &inst.operand[0] {
+            MachineOperand::Mem(MachineMemOperand::BaseFi(base, fi)) => {
+                let r1 = phys_reg_to_dynasm_reg(base.get_reg().unwrap());
+                let m2 = fi.idx;
+                dynasm!(self.asm; lea Rq(r0), [Rq(r1) - fo.offset(m2).unwrap()]);
             }
-        }
-
-        // out = lea base, none, align, off
-        if inst.operand[0].is_register()
-            && inst.operand[1].is_none()
-            && inst.operand[2].is_const_i32()
-            && inst.operand[3].is_register()
-        {
-            let r0 = phys_reg_to_dynasm_reg(inst.def[0].get_reg().unwrap());
-            let r1 = phys_reg_to_dynasm_reg(inst.operand[0].as_register().get_reg().unwrap());
-            let i2 = inst.operand[2].as_constant().as_i32();
-            let r3 = phys_reg_to_dynasm_reg(inst.operand[3].as_register().get_reg().unwrap());
-
-            match i2 {
-                1 => dynasm!(self.asm; lea Rq(r0), [Rq(r1) + Rq(r3)]),
-                _ => unimplemented!(),
+            MachineOperand::Mem(MachineMemOperand::BaseAlignOff(base, align, off)) => {
+                let r1 = phys_reg_to_dynasm_reg(base.get_reg().unwrap());
+                let i2 = align;
+                let r3 = phys_reg_to_dynasm_reg(off.get_reg().unwrap());
+                match i2 {
+                    1 => dynasm!(self.asm; lea Rq(r0), [Rq(r1) + 1*Rq(r3)]),
+                    4 => dynasm!(self.asm; lea Rq(r0), [Rq(r1) + 4*Rq(r3)]),
+                    _ => unimplemented!(),
+                }
             }
-        }
-
-        // out = lea base, none, none, none
-        if inst.operand[0].is_register()
-            && inst.operand[1].is_none()
-            && inst.operand[2].is_none()
-            && inst.operand[3].is_none()
-        {
-            let r0 = phys_reg_to_dynasm_reg(inst.def[0].get_reg().unwrap());
-            let r1 = phys_reg_to_dynasm_reg(inst.operand[0].as_register().get_reg().unwrap());
-            dynasm!(self.asm; lea Rq(r0), [Rq(r1)]);
+            MachineOperand::Mem(MachineMemOperand::BaseFiAlignOff(base, fi, align, off)) => {
+                let r1 = phys_reg_to_dynasm_reg(base.get_reg().unwrap());
+                let m2 = fo.offset(fi.idx).unwrap();
+                let i3 = align;
+                let r4 = phys_reg_to_dynasm_reg(off.get_reg().unwrap());
+                match i3 {
+                    1 => dynasm!(self.asm; lea Rq(r0), [Rq(r1) - m2 + 1*Rq(r4)]),
+                    4 => dynasm!(self.asm; lea Rq(r0), [Rq(r1) - m2 + 4*Rq(r4)]),
+                    _ => unimplemented!(),
+                }
+            }
+            MachineOperand::Mem(MachineMemOperand::BaseFiOff(base, fi, off)) => {
+                let r1 = phys_reg_to_dynasm_reg(base.get_reg().unwrap());
+                let m2 = fo.offset(fi.idx).unwrap();
+                let i3 = off;
+                dynasm!(self.asm; lea Rq(r0), [Rq(r1) - m2 + i3]);
+            }
+            MachineOperand::Mem(MachineMemOperand::Base(base)) => {
+                let r1 = phys_reg_to_dynasm_reg(base.get_reg().unwrap());
+                dynasm!(self.asm; lea Rq(r0), [Rq(r1)]);
+            }
+            MachineOperand::Mem(MachineMemOperand::BaseOff(base, off)) => {
+                let r1 = phys_reg_to_dynasm_reg(base.get_reg().unwrap());
+                let i2 = *off;
+                dynasm!(self.asm; lea Rq(r0),[Rq(r1) + i2]);
+            }
+            _ => panic!(),
         }
     }
 

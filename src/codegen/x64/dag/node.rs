@@ -243,6 +243,19 @@ impl DAGNode {
         }
     }
 
+    pub fn may_contain_children(&self) -> bool {
+        match self.kind {
+            NodeKind::Operand(OperandNodeKind::CondKind(_))
+            | NodeKind::Operand(OperandNodeKind::FrameIndex(_))
+            | NodeKind::Operand(OperandNodeKind::Constant(_))
+            | NodeKind::Operand(OperandNodeKind::Address(_))
+            | NodeKind::Operand(OperandNodeKind::BasicBlock(_))
+            | NodeKind::Operand(OperandNodeKind::Register(_))
+            | NodeKind::None => false,
+            _ => true,
+        }
+    }
+
     pub fn debug(
         &self,
         f: &mut fmt::Formatter<'_>,
@@ -265,7 +278,7 @@ impl DAGNode {
             if op.kind == NodeKind::None {
                 continue;
             }
-            if op.is_operation() {
+            if op.may_contain_children() {
                 write!(f, " id{}", id4op!(*op))?;
             } else {
                 write!(f, " ")?;
@@ -275,7 +288,7 @@ impl DAGNode {
         }
         write!(f, "\n")?;
         for op in &self.operand {
-            if !op.is_operation() || op.kind == NodeKind::None {
+            if !op.may_contain_children() || op.kind == NodeKind::None {
                 continue;
             }
             let id = *id4op!(*op);

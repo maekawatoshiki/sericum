@@ -45,12 +45,7 @@ mod inst {
         };
         pub static ref LEAr64m: TargetInstDef = {
             TargetInstDef::new(TargetOpcode::LEAr64m)
-                .set_uses(vec![
-                    TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR64)),
-                    TargetOperand::Any,
-                    TargetOperand::Any,
-                    TargetOperand::Any,
-                ])
+                .set_uses(vec![TargetOperand::Mem])
                 .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR64)])
         };
         pub static ref ADDrr32: TargetInstDef = {

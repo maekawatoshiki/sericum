@@ -34,9 +34,7 @@ impl Legalize {
     }
 
     fn run_on_node(&mut self, tys: &Types, heap: &mut DAGHeap, node: Raw<DAGNode>) -> Raw<DAGNode> {
-        // Mem contains register node, which must be processed
-        if !matches!(node.kind, NodeKind::Operand(OperandNodeKind::Mem(_))) && !node.is_operation()
-        {
+        if !node.may_contain_children() {
             return node;
         }
 
@@ -161,7 +159,6 @@ impl Legalize {
     ) -> Raw<DAGNode> {
         if node.operand[0].kind == NodeKind::IR(IRNodeKind::FIAddr) {
             let op0 = node.operand[0].operand[0];
-            let none = heap.alloc_none();
             let rbp = heap.alloc_phys_reg(GR64::RBP);
             let one = heap.alloc(DAGNode::new(
                 NodeKind::Operand(OperandNodeKind::Constant(ConstantKind::Int32(1))),
@@ -171,16 +168,24 @@ impl Legalize {
 
             if node.operand[1].is_maybe_register() {
                 let op1 = self.run_on_node(tys, heap, node.operand[1]);
+                let mem = heap.alloc(DAGNode::new_mem(
+                    MemNodeKind::BaseFiAlignOff,
+                    vec![rbp, op0, one, op1],
+                ));
                 return heap.alloc(DAGNode::new(
                     NodeKind::MI(MINodeKind::LEAr64m),
-                    vec![rbp, op0, one, op1],
+                    vec![mem],
                     node.ty.clone(),
                 ));
             } else if node.operand[1].is_constant() {
                 let op1 = node.operand[1];
+                let mem = heap.alloc(DAGNode::new_mem(
+                    MemNodeKind::BaseFiOff,
+                    vec![rbp, op0, op1],
+                ));
                 return heap.alloc(DAGNode::new(
                     NodeKind::MI(MINodeKind::LEAr64m),
-                    vec![rbp, op0, none, op1],
+                    vec![mem],
                     node.ty.clone(),
                 ));
             }
