@@ -15,7 +15,7 @@ use std::{
 };
 
 pub type MachineOpcode = TargetOpcode;
-pub type RegisterInfoRef = Rc<RefCell<RegisterInfo>>;
+pub type RegisterBaseRef = Rc<RefCell<RegisterBase>>;
 pub type MachineInstId = Id<MachineInst>;
 
 #[derive(Clone)]
@@ -31,25 +31,25 @@ pub struct MachineInst {
 }
 
 #[derive(Clone, PartialEq)]
-pub struct RegisterInfo {
+pub struct RegisterBase {
     pub vreg: VirtReg,
     pub reg: Option<PhysReg>,
     pub reg_class: RegisterClassKind,
-    pub tied: Option<RegisterInfoRef>,
-    pub use_list: FxHashSet<MachineInstId>,
-    pub def_list: FxHashSet<MachineInstId>,
+    pub tied: Option<RegisterBaseRef>,
+    pub uses: FxHashSet<MachineInstId>,
+    pub defs: FxHashSet<MachineInstId>,
 }
 
-#[derive(Clone)]
-pub struct MachineInstDef {
-    pub opcode: MachineOpcode,
-    pub operand: Vec<MachineOperand>, // reg|imm|
-    pub def: Vec<MachineRegister>,
-    pub tie: FxHashMap<MachineRegister, MachineRegister>, // def -> use
-    pub imp_use: Vec<MachineRegister>,
-    pub imp_def: Vec<MachineRegister>,
-    pub parent: MachineBasicBlockId,
-}
+// #[derive(Clone)]
+// pub struct MachineInstDef {
+//     pub opcode: MachineOpcode,
+//     pub operand: Vec<MachineOperand>, // reg|imm|
+//     pub def: Vec<MachineRegister>,
+//     pub tie: FxHashMap<MachineRegister, MachineRegister>, // def -> use
+//     pub imp_use: Vec<MachineRegister>,
+//     pub imp_def: Vec<MachineRegister>,
+//     pub parent: MachineBasicBlockId,
+// }
 
 #[derive(Debug, Clone)]
 pub enum MachineOperand {
@@ -88,7 +88,7 @@ pub enum MachineConstant {
 
 #[derive(Clone, PartialEq)]
 pub struct MachineRegister {
-    pub info: RegisterInfoRef,
+    pub info: RegisterBaseRef,
 }
 
 impl ::std::cmp::Eq for MachineRegister {}
@@ -364,32 +364,32 @@ impl MachineOpcode {
 }
 
 impl MachineRegister {
-    pub fn new(info: RegisterInfoRef) -> Self {
+    pub fn new(info: RegisterBaseRef) -> Self {
         Self { info }
     }
 
     pub fn phys_reg<T: TargetRegisterTrait>(r: T) -> Self {
-        RegisterInfo::phys_reg(r).into_machine_register()
+        RegisterBase::phys_reg(r).into_machine_register()
     }
 
     pub fn add_use(&self, use_id: MachineInstId) {
-        self.info_ref_mut().use_list.insert(use_id);
+        self.info_ref_mut().uses.insert(use_id);
     }
 
     pub fn remove_use(&self, id: MachineInstId) {
-        self.info_ref_mut().use_list.remove(&id);
+        self.info_ref_mut().uses.remove(&id);
     }
 
     pub fn add_def(&self, def_id: MachineInstId) {
-        self.info_ref_mut().def_list.insert(def_id);
+        self.info_ref_mut().defs.insert(def_id);
     }
 
     pub fn remove_def(&self, id: MachineInstId) {
-        self.info_ref_mut().def_list.remove(&id);
+        self.info_ref_mut().defs.remove(&id);
     }
 
     pub fn copy_with_new_vreg(&self, vreg_gen: &VirtRegGen) -> Self {
-        let r: RegisterInfo = self.info_ref().clone();
+        let r: RegisterBase = self.info_ref().clone();
         r.copy_with_new_vreg(vreg_gen).into_machine_register()
     }
 
@@ -426,11 +426,11 @@ impl MachineRegister {
         self.info.borrow().reg_class
     }
 
-    pub fn info_ref(&self) -> Ref<RegisterInfo> {
+    pub fn info_ref(&self) -> Ref<RegisterBase> {
         self.info.borrow()
     }
 
-    pub fn info_ref_mut(&self) -> RefMut<RegisterInfo> {
+    pub fn info_ref_mut(&self) -> RefMut<RegisterBase> {
         self.info.borrow_mut()
     }
 
@@ -443,15 +443,15 @@ impl MachineRegister {
     }
 }
 
-impl RegisterInfo {
+impl RegisterBase {
     pub fn new(reg_class: RegisterClassKind) -> Self {
         Self {
             reg_class,
             vreg: VirtReg(0),
             reg: None,
             tied: None,
-            use_list: FxHashSet::default(),
-            def_list: FxHashSet::default(),
+            uses: FxHashSet::default(),
+            defs: FxHashSet::default(),
         }
     }
 
@@ -466,19 +466,19 @@ impl RegisterInfo {
             vreg: VirtReg(0),
             reg: Some(reg.as_phys_reg()),
             tied: None,
-            use_list: FxHashSet::default(),
-            def_list: FxHashSet::default(),
+            uses: FxHashSet::default(),
+            defs: FxHashSet::default(),
         }
     }
 
-    pub fn new_ref(reg_class: RegisterClassKind) -> RegisterInfoRef {
+    pub fn new_ref(reg_class: RegisterClassKind) -> RegisterBaseRef {
         Rc::new(RefCell::new(Self {
             reg_class,
             vreg: VirtReg(0),
             reg: None,
             tied: None,
-            use_list: FxHashSet::default(),
-            def_list: FxHashSet::default(),
+            uses: FxHashSet::default(),
+            defs: FxHashSet::default(),
         }))
     }
 
@@ -488,7 +488,7 @@ impl RegisterInfo {
         new
     }
 
-    pub fn into_ref(self) -> RegisterInfoRef {
+    pub fn into_ref(self) -> RegisterBaseRef {
         Rc::new(RefCell::new(self))
     }
 
@@ -496,7 +496,7 @@ impl RegisterInfo {
         MachineRegister::new(self.into_ref())
     }
 
-    pub fn tie_reg(&mut self, tied: RegisterInfoRef) {
+    pub fn tie_reg(&mut self, tied: RegisterBaseRef) {
         self.tied = Some(tied);
     }
 
@@ -521,7 +521,7 @@ impl RegisterInfo {
 
 impl MachineOperand {
     pub fn phys_reg<T: TargetRegisterTrait>(r: T) -> MachineOperand {
-        MachineOperand::Register(RegisterInfo::phys_reg(r).into_machine_register())
+        MachineOperand::Register(RegisterBase::phys_reg(r).into_machine_register())
     }
 
     pub fn imm_i32(i: i32) -> Self {
@@ -703,56 +703,56 @@ impl MachineConstant {
 }
 
 thread_local! {
-    pub static PHYS_REGS: [RegisterInfo; PHYS_REGISTERS_NUM] = {
+    pub static PHYS_REGS: [RegisterBase; PHYS_REGISTERS_NUM] = {
         [
-            RegisterInfo::new_phy_reg(GR32::EAX ),
-            RegisterInfo::new_phy_reg(GR32::ECX ),
-            RegisterInfo::new_phy_reg(GR32::EDX ),
-            RegisterInfo::new_phy_reg(GR32::EBX ),
-            RegisterInfo::new_phy_reg(GR32::ESP ),
-            RegisterInfo::new_phy_reg(GR32::EBP ),
-            RegisterInfo::new_phy_reg(GR32::ESI ),
-            RegisterInfo::new_phy_reg(GR32::EDI ),
-            RegisterInfo::new_phy_reg(GR32::R8D ),
-            RegisterInfo::new_phy_reg(GR32::R9D ),
-            RegisterInfo::new_phy_reg(GR32::R10D),
-            RegisterInfo::new_phy_reg(GR32::R11D),
-            RegisterInfo::new_phy_reg(GR32::R12D),
-            RegisterInfo::new_phy_reg(GR32::R13D),
-            RegisterInfo::new_phy_reg(GR32::R14D),
-            RegisterInfo::new_phy_reg(GR32::R15D),
-            RegisterInfo::new_phy_reg(GR64::RAX ),
-            RegisterInfo::new_phy_reg(GR64::RCX ),
-            RegisterInfo::new_phy_reg(GR64::RDX ),
-            RegisterInfo::new_phy_reg(GR64::RBX ),
-            RegisterInfo::new_phy_reg(GR64::RSP ),
-            RegisterInfo::new_phy_reg(GR64::RBP ),
-            RegisterInfo::new_phy_reg(GR64::RSI ),
-            RegisterInfo::new_phy_reg(GR64::RDI ),
-            RegisterInfo::new_phy_reg(GR64::R8  ),
-            RegisterInfo::new_phy_reg(GR64::R9  ),
-            RegisterInfo::new_phy_reg(GR64::R10 ),
-            RegisterInfo::new_phy_reg(GR64::R11 ),
-            RegisterInfo::new_phy_reg(GR64::R12 ),
-            RegisterInfo::new_phy_reg(GR64::R13 ),
-            RegisterInfo::new_phy_reg(GR64::R14 ),
-            RegisterInfo::new_phy_reg(GR64::R15 ),
-            RegisterInfo::new_phy_reg(XMM::XMM0 ),
-            RegisterInfo::new_phy_reg(XMM::XMM1 ),
-            RegisterInfo::new_phy_reg(XMM::XMM2 ),
-            RegisterInfo::new_phy_reg(XMM::XMM3 ),
-            RegisterInfo::new_phy_reg(XMM::XMM4 ),
-            RegisterInfo::new_phy_reg(XMM::XMM5 ),
-            RegisterInfo::new_phy_reg(XMM::XMM6 ),
-            RegisterInfo::new_phy_reg(XMM::XMM7 ),
-            RegisterInfo::new_phy_reg(XMM::XMM8 ),
-            RegisterInfo::new_phy_reg(XMM::XMM9 ),
-            RegisterInfo::new_phy_reg(XMM::XMM10),
-            RegisterInfo::new_phy_reg(XMM::XMM11),
-            RegisterInfo::new_phy_reg(XMM::XMM12),
-            RegisterInfo::new_phy_reg(XMM::XMM13),
-            RegisterInfo::new_phy_reg(XMM::XMM14),
-            RegisterInfo::new_phy_reg(XMM::XMM15),
+            RegisterBase::new_phy_reg(GR32::EAX ),
+            RegisterBase::new_phy_reg(GR32::ECX ),
+            RegisterBase::new_phy_reg(GR32::EDX ),
+            RegisterBase::new_phy_reg(GR32::EBX ),
+            RegisterBase::new_phy_reg(GR32::ESP ),
+            RegisterBase::new_phy_reg(GR32::EBP ),
+            RegisterBase::new_phy_reg(GR32::ESI ),
+            RegisterBase::new_phy_reg(GR32::EDI ),
+            RegisterBase::new_phy_reg(GR32::R8D ),
+            RegisterBase::new_phy_reg(GR32::R9D ),
+            RegisterBase::new_phy_reg(GR32::R10D),
+            RegisterBase::new_phy_reg(GR32::R11D),
+            RegisterBase::new_phy_reg(GR32::R12D),
+            RegisterBase::new_phy_reg(GR32::R13D),
+            RegisterBase::new_phy_reg(GR32::R14D),
+            RegisterBase::new_phy_reg(GR32::R15D),
+            RegisterBase::new_phy_reg(GR64::RAX ),
+            RegisterBase::new_phy_reg(GR64::RCX ),
+            RegisterBase::new_phy_reg(GR64::RDX ),
+            RegisterBase::new_phy_reg(GR64::RBX ),
+            RegisterBase::new_phy_reg(GR64::RSP ),
+            RegisterBase::new_phy_reg(GR64::RBP ),
+            RegisterBase::new_phy_reg(GR64::RSI ),
+            RegisterBase::new_phy_reg(GR64::RDI ),
+            RegisterBase::new_phy_reg(GR64::R8  ),
+            RegisterBase::new_phy_reg(GR64::R9  ),
+            RegisterBase::new_phy_reg(GR64::R10 ),
+            RegisterBase::new_phy_reg(GR64::R11 ),
+            RegisterBase::new_phy_reg(GR64::R12 ),
+            RegisterBase::new_phy_reg(GR64::R13 ),
+            RegisterBase::new_phy_reg(GR64::R14 ),
+            RegisterBase::new_phy_reg(GR64::R15 ),
+            RegisterBase::new_phy_reg(XMM::XMM0 ),
+            RegisterBase::new_phy_reg(XMM::XMM1 ),
+            RegisterBase::new_phy_reg(XMM::XMM2 ),
+            RegisterBase::new_phy_reg(XMM::XMM3 ),
+            RegisterBase::new_phy_reg(XMM::XMM4 ),
+            RegisterBase::new_phy_reg(XMM::XMM5 ),
+            RegisterBase::new_phy_reg(XMM::XMM6 ),
+            RegisterBase::new_phy_reg(XMM::XMM7 ),
+            RegisterBase::new_phy_reg(XMM::XMM8 ),
+            RegisterBase::new_phy_reg(XMM::XMM9 ),
+            RegisterBase::new_phy_reg(XMM::XMM10),
+            RegisterBase::new_phy_reg(XMM::XMM11),
+            RegisterBase::new_phy_reg(XMM::XMM12),
+            RegisterBase::new_phy_reg(XMM::XMM13),
+            RegisterBase::new_phy_reg(XMM::XMM14),
+            RegisterBase::new_phy_reg(XMM::XMM15),
         ]
     };
 }
@@ -894,7 +894,7 @@ impl fmt::Debug for MachineRegister {
     }
 }
 
-impl fmt::Debug for RegisterInfo {
+impl fmt::Debug for RegisterBase {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.reg {
             Some(phy_reg) => phy_reg.fmt(f),

@@ -190,7 +190,7 @@ impl LiveRegMatrix {
     pub fn merge_virt_regs(&mut self, v1: VirtReg, v2: VirtReg) {
         let v2_e = self.vreg2entity.remove(&v2).unwrap();
         let v1_e = self.vreg2entity.get(&v1).unwrap();
-        for &use_ in &v2_e.info_ref().use_list {
+        for &use_ in &v2_e.info_ref().uses {
             v1_e.add_use(use_)
         }
         let v2_i = self.virt_reg_interval.remove(&v2).unwrap();

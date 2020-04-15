@@ -115,17 +115,17 @@ fn replace_regs(
     from: &MachineRegister,
     to: &MachineRegister,
 ) {
-    let def_list = from.info_ref().def_list.clone();
-    let use_list = from.info_ref().use_list.clone();
+    let defs = from.info_ref().defs.clone();
+    let uses = from.info_ref().uses.clone();
 
-    for &def in &def_list {
+    for &def in &defs {
         f.body.inst_arena[def].set_def(to.clone());
     }
-    for use_ in use_list {
+    for use_ in uses {
         f.body.inst_arena[use_].replace_operand_register(from, to);
     }
 
-    if from.info_ref().def_list.len() == 0 {
+    if from.info_ref().defs.len() == 0 {
         let bb = &f.body.basic_blocks.arena[parent];
         bb.liveness_ref_mut().def.remove(&from.get_vreg());
     }

@@ -22,12 +22,12 @@ impl<'a> Spiller<'a> {
     }
 
     pub fn insert_evict(&mut self, r: MachineRegister, slot: &FrameIndexInfo) {
-        let r_def_list = r.info_ref().def_list.clone();
+        let r_defs = r.info_ref().defs.clone();
         // If r is defined more than once, choose the later defined one.
         // e.g.
         //   %v1 = COPY %v2
         //   %v1 = ADD %v1, 2 <- def_id
-        let def_id = *r_def_list
+        let def_id = *r_defs
             .iter()
             .max_by(|x, y| {
                 let x = &self.matrix.get_program_point(**x).unwrap();
@@ -63,7 +63,7 @@ impl<'a> Spiller<'a> {
         let mut new_regs = vec![];
         let rc = r.info_ref().reg_class;
 
-        for use_id in &r.info_ref().use_list {
+        for use_id in &r.info_ref().uses {
             let use_id = *use_id;
             let new_r = self.func.vreg_gen.gen_vreg(rc).into_machine_register();
             new_regs.push(new_r.get_vreg());
@@ -89,7 +89,7 @@ impl<'a> Spiller<'a> {
             builder.insert(load);
         }
 
-        r.info_ref_mut().use_list.clear();
+        r.info_ref_mut().uses.clear();
 
         new_regs
     }

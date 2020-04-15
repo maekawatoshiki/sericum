@@ -36,7 +36,7 @@ pub enum OperandNodeKind {
     Constant(ConstantKind),
     Address(AddressKind),
     BasicBlock(DAGBasicBlockId),
-    Register(RegisterInfoRef),
+    Register(RegisterBaseRef),
     Mem(MemNodeKind),
 }
 
@@ -165,7 +165,7 @@ impl DAGNode {
     pub fn new_phys_reg<T: TargetRegisterTrait>(reg: T) -> Self {
         Self {
             kind: NodeKind::Operand(OperandNodeKind::Register(
-                RegisterInfo::phys_reg(reg).into_ref(),
+                RegisterBase::phys_reg(reg).into_ref(),
             )),
             ty: rc2ty(reg.as_phys_reg().reg_class()),
             next: None,

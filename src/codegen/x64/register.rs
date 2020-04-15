@@ -383,8 +383,8 @@ impl VirtRegGen {
         }
     }
 
-    pub fn gen_vreg(&self, rc: RegisterClassKind) -> RegisterInfo {
-        let mut reg = RegisterInfo::new(rc);
+    pub fn gen_vreg(&self, rc: RegisterClassKind) -> RegisterBase {
+        let mut reg = RegisterBase::new(rc);
         reg.set_vreg(VirtReg(self.next_id()));
         reg
     }

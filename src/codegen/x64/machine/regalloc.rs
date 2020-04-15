@@ -270,7 +270,7 @@ impl<'a> AllocationOrder<'a> {
             .get_entity_by_vreg(vreg)
             .unwrap()
             .info_ref()
-            .use_list
+            .uses
             .iter()
             .find_map(|&use_| {
                 let inst = &self.func.body.inst_arena[use_];
