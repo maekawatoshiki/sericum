@@ -1,9 +1,9 @@
 // TODO: dirty code
 
 use super::super::inst::DefOrUseReg;
-use super::super::machine::{basic_block::*, function::*, inst::*, module::*};
+use super::super::machine::{basic_block::*, function::*, inst, inst::*, module::*};
 use super::super::register::*;
-use super::{basic_block::*, function::*, module::*, node::*};
+use super::{basic_block::*, function::*, module::*, node, node::*};
 use crate::ir::types::*;
 use crate::util::allocator::*;
 use id_arena::*;
@@ -435,9 +435,9 @@ impl<'a> ConversionInfo<'a> {
                 MachineOperand::FrameIndex(kind.clone())
             }
             NodeKind::Operand(OperandNodeKind::Address(ref g)) => match g {
-                AddressKind::FunctionName(n) => {
-                    MachineOperand::Address(AddressInfo::FunctionName(n.clone()))
-                }
+                node::AddressKind::FunctionName(n) => MachineOperand::Mem(
+                    MachineMemOperand::Address(inst::AddressKind::FunctionName(n.clone())),
+                ),
             },
             NodeKind::Operand(OperandNodeKind::BasicBlock(_)) => unimplemented!(),
             NodeKind::Operand(OperandNodeKind::Register(ref r)) => {
@@ -506,7 +506,7 @@ pub fn mov_rx(tys: &Types, x: &MachineOperand) -> Option<MachineOpcode> {
     // TODO: special handling for float
     if x.get_type().unwrap() == Type::F64 {
         return match x {
-            MachineOperand::Address(_) => Some(MachineOpcode::MOVSDrm64),
+            MachineOperand::Mem(_) => Some(MachineOpcode::MOVSDrm64),
             MachineOperand::Register(_) => Some(MachineOpcode::MOVSDrr),
             _ => None,
         };

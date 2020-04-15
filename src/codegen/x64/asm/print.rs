@@ -342,8 +342,8 @@ impl MachineAsmPrinter {
                 self.output.push_str(format!("{}", i).as_str())
             }
             MachineOperand::Register(r) => self.output.push_str(r.get_reg().unwrap().name()),
-            MachineOperand::Address(AddressInfo::FunctionName(s)) => {
-                self.output.push_str(s.as_str())
+            MachineOperand::Mem(MachineMemOperand::Address(AddressKind::FunctionName(name))) => {
+                self.output.push_str(name.as_str())
             }
             _ => unimplemented!(),
         }

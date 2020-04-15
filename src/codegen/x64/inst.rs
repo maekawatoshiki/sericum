@@ -9,7 +9,7 @@ mod inst {
     lazy_static! {
         pub static ref MOVSDrm64: TargetInstDef = {
             TargetInstDef::new(TargetOpcode::MOVSDrm64)
-                .set_uses(vec![TargetOperand::Addr])
+                .set_uses(vec![TargetOperand::Mem])
                 .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::XMM)])
         };
         pub static ref MOVSDrr: TargetInstDef = {

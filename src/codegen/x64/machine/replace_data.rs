@@ -26,7 +26,9 @@ impl ConstDataReplacer {
                     match operand {
                         MachineOperand::Constant(MachineConstant::F64(f)) => {
                             let id = data.alloc(MachineConstant::F64(*f));
-                            *operand = MachineOperand::Address(AddressInfo::Absolute(id))
+                            *operand = MachineOperand::Mem(MachineMemOperand::Address(
+                                AddressKind::Label(id),
+                            ));
                         }
                         _ => {}
                     };

@@ -540,9 +540,13 @@ impl JITCompiler {
 
     fn compile_movsd_rm64(&mut self, inst: &MachineInst) {
         let r0 = phys_reg_to_dynasm_reg(inst.def[0].get_reg().unwrap());
-        let m1 = inst.operand[0].as_address().as_absolute();
-        let l1 = self.get_label(m1);
-        dynasm!(self.asm; movsd Rx(r0), [=>l1]);
+        match &inst.operand[0] {
+            MachineOperand::Mem(MachineMemOperand::Address(AddressKind::Label(id))) => {
+                let l1 = self.get_label(*id);
+                dynasm!(self.asm; movsd Rx(r0), [=>l1]);
+            }
+            _ => unimplemented!(),
+        }
     }
 
     fn compile_movsd_rr(&mut self, inst: &MachineInst) {
@@ -711,7 +715,9 @@ impl JITCompiler {
     fn compile_call(&mut self, module: &MachineModule, _fo: &FrameObjectsInfo, inst: &MachineInst) {
         let callee_id = module
             .find_function_by_name(match &inst.operand[0] {
-                MachineOperand::Address(AddressInfo::FunctionName(n)) => n.as_str(),
+                MachineOperand::Mem(MachineMemOperand::Address(AddressKind::FunctionName(n))) => {
+                    n.as_str()
+                }
                 _ => unimplemented!(),
             })
             .unwrap();

@@ -56,7 +56,6 @@ pub enum MachineOperand {
     Register(MachineRegister),
     Constant(MachineConstant),
     FrameIndex(FrameIndexInfo),
-    Address(AddressInfo),
     Branch(MachineBasicBlockId),
     Mem(MachineMemOperand),
     None,
@@ -71,12 +70,13 @@ pub enum MachineMemOperand {
     BaseAlignOff(MachineRegister, i32, MachineRegister), // base, align, off
     BaseOff(MachineRegister, i32),
     Base(MachineRegister),
+    Address(AddressKind),
 }
 
 #[derive(Clone)]
-pub enum AddressInfo {
+pub enum AddressKind {
     FunctionName(String),
-    Absolute(DataId),
+    Label(DataId),
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -572,15 +572,11 @@ impl MachineOperand {
         }
     }
 
-    pub fn as_address(&self) -> &AddressInfo {
+    pub fn as_mem(&self) -> &MachineMemOperand {
         match self {
-            MachineOperand::Address(addr) => addr,
+            MachineOperand::Mem(mem) => mem,
             _ => panic!(),
         }
-    }
-
-    pub fn is_address(&self) -> bool {
-        matches!(self, MachineOperand::Address(_))
     }
 
     pub fn is_virtual_register(&self) -> bool {
@@ -620,7 +616,6 @@ impl MachineOperand {
             MachineOperand::Constant(MachineConstant::Int64(_)) => Some(Type::Int64),
             MachineOperand::Constant(MachineConstant::F64(_)) => Some(Type::F64),
             MachineOperand::FrameIndex(fi) => Some(fi.ty.clone()),
-            MachineOperand::Address(_) => None, // TODO
             MachineOperand::Mem(_) => None,
             MachineOperand::None => None, // TODO
             MachineOperand::Register(r) => Some(rc2ty(r.info_ref().reg_class)), // TODO
@@ -637,6 +632,7 @@ impl MachineMemOperand {
             | MachineMemOperand::Base(r) => vec![r],
             MachineMemOperand::BaseAlignOff(r, _, r2)
             | MachineMemOperand::BaseFiAlignOff(r, _, _, r2) => vec![r, r2],
+            MachineMemOperand::Address(_) => vec![],
         }
     }
 
@@ -648,14 +644,22 @@ impl MachineMemOperand {
             | MachineMemOperand::Base(r) => vec![r],
             MachineMemOperand::BaseAlignOff(r, _, r2)
             | MachineMemOperand::BaseFiAlignOff(r, _, _, r2) => vec![r, r2],
+            MachineMemOperand::Address(_) => vec![],
+        }
+    }
+
+    pub fn as_address(&self) -> &AddressKind {
+        match self {
+            Self::Address(kind) => kind,
+            _ => panic!(),
         }
     }
 }
 
-impl AddressInfo {
-    pub fn as_absolute(&self) -> DataId {
+impl AddressKind {
+    pub fn as_label(&self) -> DataId {
         match self {
-            AddressInfo::Absolute(id) => *id,
+            AddressKind::Label(id) => *id,
             _ => panic!(),
         }
     }
@@ -814,7 +818,6 @@ impl MachineOperand {
             MachineOperand::FrameIndex(fi) => {
                 write!(f, "FI<{}, {:?}>", tys.to_string(fi.ty), fi.idx)
             }
-            MachineOperand::Address(g) => g.fmt(f),
             MachineOperand::Branch(id) => write!(f, "BB#{}", id.index()),
             MachineOperand::Mem(mem) => write!(f, "{:?}", mem),
             MachineOperand::None => write!(f, "!"),
@@ -900,11 +903,11 @@ impl fmt::Debug for RegisterInfo {
     }
 }
 
-impl fmt::Debug for AddressInfo {
+impl fmt::Debug for AddressKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            AddressInfo::FunctionName(name) => write!(f, "addr<fn:{}>", name),
-            AddressInfo::Absolute(id) => write!(f, "addr<{}>", id),
+            AddressKind::FunctionName(name) => write!(f, "addr<fn:{}>", name),
+            AddressKind::Label(id) => write!(f, "label<{}>", id),
         }
     }
 }
