@@ -93,10 +93,10 @@ impl MISelector {
                     imm32 b => (mi.IMULrr64i32 a, b) } }
             (ir.Load a) {
                 (ir.FIAddr b) a {
-                    f64mem b => (mi.MOVSDrm %rbp, b, none, none)
-                    mem32  b => (mi.MOVrm32 [BaseFi %rbp, b]) //%rbp, b, none, none)
-                    mem64  b => (mi.MOVrm64 [BaseFi %rbp, b]) } //, none, none) }
-                GR64  a => (mi.MOVrm32 [Base a]) // a, none, none, none)
+                    f64mem b => (mi.MOVSDrm [BaseFi %rbp, b])
+                    mem32  b => (mi.MOVrm32 [BaseFi %rbp, b])
+                    mem64  b => (mi.MOVrm64 [BaseFi %rbp, b]) }
+                GR64  a => (mi.MOVrm32 [Base a])
             }
             (ir.Store a, b) {
                 (ir.FIAddr c) a {
@@ -104,11 +104,11 @@ impl MISelector {
                         imm_f64 b => {
                             // TODO: Refactor
                             let rbp = heap.alloc(DAGNode::new_phys_reg(GR64::RBP));
-                            let none = heap.alloc_none();
                             let n1 = heap.alloc(DAGNode::new(
                                     NodeKind::MI(MINodeKind::MOVSDrm64), vec![b], Type::F64));
+                            let mem = heap.alloc(DAGNode::new_mem(MemNodeKind::BaseFi, vec![rbp, c]));
                             let n2 = heap.alloc(DAGNode::new(NodeKind::MI(MINodeKind::MOVSDmr),
-                                    vec![rbp, c, none, none, n1], Type::Void));
+                                    vec![mem, n1], Type::Void));
                             n2
                         }
                     }

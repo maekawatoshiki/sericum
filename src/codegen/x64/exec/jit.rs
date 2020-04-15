@@ -556,34 +556,27 @@ impl JITCompiler {
     }
 
     fn compile_movsd_rm(&mut self, fo: &FrameObjectsInfo, inst: &MachineInst) {
-        // r = movsd rbp, fi, none, none
-        if inst.operand[0].is_register() // must be rbp
-            && inst.operand[1].is_frame_index()
-            && inst.operand[2].is_none()
-            && inst.operand[3].is_none()
-        {
-            let r0 = phys_reg_to_dynasm_reg(inst.def[0].get_reg().unwrap());
-            let m1 = fo.offset(inst.operand[1].as_frame_index().idx).unwrap();
-            dynasm!(self.asm; movsd Rx(r0), [rbp - m1]);
-            return;
+        let r0 = phys_reg_to_dynasm_reg(inst.def[0].get_reg().unwrap());
+        match &inst.operand[0] {
+            MachineOperand::Mem(MachineMemOperand::BaseFi(base, fi)) => {
+                let r1 = phys_reg_to_dynasm_reg(base.get_reg().unwrap());
+                let m2 = fi.idx;
+                dynasm!(self.asm; movsd Rx(r0), [Rq(r1) - fo.offset(m2).unwrap()]);
+            }
+            _ => unimplemented!(),
         }
-        unimplemented!()
     }
 
     fn compile_movsd_mr(&mut self, fo: &FrameObjectsInfo, inst: &MachineInst) {
-        // movsd rbp, fi, none, none, r
-        if inst.operand[0].is_register() // must be rbp
-            && inst.operand[1].is_frame_index()
-            && inst.operand[2].is_none()
-            && inst.operand[3].is_none()
-            && inst.operand[4].is_register()
-        {
-            let m0 = fo.offset(inst.operand[1].as_frame_index().idx).unwrap();
-            let r1 = phys_reg_to_dynasm_reg(inst.operand[4].as_register().get_reg().unwrap());
-            dynasm!(self.asm; movsd [rbp - m0], Rx(r1));
-            return;
+        match &inst.operand[0] {
+            MachineOperand::Mem(MachineMemOperand::BaseFi(base, fi)) => {
+                let r0 = phys_reg_to_dynasm_reg(base.get_reg().unwrap());
+                let m1 = fo.offset(fi.idx).unwrap();
+                let r2 = phys_reg_to_dynasm_reg(inst.operand[1].as_register().get_reg().unwrap());
+                dynasm!(self.asm; movsd [Rq(r0) - m1], Rx(r2));
+            }
+            _ => unimplemented!(),
         }
-        unimplemented!()
     }
 
     fn compile_lea_r64m(&mut self, fo: &FrameObjectsInfo, inst: &MachineInst) {

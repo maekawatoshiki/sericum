@@ -21,20 +21,12 @@ mod inst {
         };
         pub static ref MOVSDrm: TargetInstDef = {
             TargetInstDef::new(TargetOpcode::MOVSDrm)
-                .set_uses(vec![
-                    TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR64)),
-                    TargetOperand::Any,
-                    TargetOperand::Any,
-                    TargetOperand::Any,
-                ])
+                .set_uses(vec![TargetOperand::Mem])
                 .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::XMM)])
         };
         pub static ref MOVSDmr: TargetInstDef = {
             TargetInstDef::new(TargetOpcode::MOVSDmr).set_uses(vec![
-                TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR64)),
-                TargetOperand::Any,
-                TargetOperand::Any,
-                TargetOperand::Any,
+                TargetOperand::Mem,
                 TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::XMM)),
             ])
         };
