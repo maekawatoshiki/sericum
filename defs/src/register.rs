@@ -16,22 +16,22 @@ pub fn run(item: TokenStream) -> TokenStream {
 
     #[derive(Debug, Clone, Copy, Hash, PartialEq)]
     pub enum GR32 {
-        EAX,
-        EBX,
-        ECX,
-        EDX,
-        ESI,
-        EDI,
-        EBP,
-        ESP,
-        R8D,
-        R9D,
+        EAX ,
+        ECX ,
+        EDX ,
+        EBX ,
+        ESP ,
+        EBP ,
+        ESI ,
+        EDI ,
+        R8D ,
+        R9D ,
         R10D,
         R11D,
         R12D,
         R13D,
         R14D,
-        R15D,
+        R15D
     }
 
     };

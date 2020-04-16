@@ -1,5 +1,5 @@
 // use super::{module::*, opcode::*, value::*};
-use super::super::register::{PhysReg, VirtReg};
+use super::super::register::{PhysRegSet, TargetRegisterTrait, VirtReg};
 use super::inst::*;
 use id_arena::*;
 use rustc_hash::FxHashSet;
@@ -39,7 +39,7 @@ pub struct MachineBasicBlock {
 
 #[derive(Clone, Debug)]
 pub struct LivenessInfo {
-    pub phys_def: FxHashSet<PhysReg>,
+    pub phys_def: PhysRegSet,
     pub def: FxHashSet<VirtReg>,
     pub live_in: FxHashSet<VirtReg>,
     pub live_out: FxHashSet<VirtReg>,
@@ -57,10 +57,10 @@ impl MachineBasicBlocks {
         MachineBasicBlocksIter::new(self)
     }
 
-    pub fn get_def_phys_regs(&self) -> FxHashSet<PhysReg> {
-        let mut set = FxHashSet::default();
+    pub fn get_def_phys_regs(&self) -> PhysRegSet {
+        let mut set = PhysRegSet::new();
         for (_id, block) in self.id_and_block() {
-            set = &set | &block.liveness_ref().phys_def;
+            set = set | block.liveness_ref().phys_def.clone();
         }
         set
     }
@@ -123,15 +123,19 @@ impl MachineBasicBlock {
 impl LivenessInfo {
     pub fn new() -> Self {
         Self {
-            phys_def: FxHashSet::default(),
+            phys_def: PhysRegSet::new(),
             def: FxHashSet::default(),
             live_in: FxHashSet::default(),
             live_out: FxHashSet::default(),
         }
     }
 
+    pub fn add_phys_def<T: TargetRegisterTrait>(&mut self, r: T) {
+        self.phys_def |= r.regs_sharing_same_register_file();
+    }
+
     pub fn clear(&mut self) {
-        self.phys_def.clear();
+        self.phys_def = PhysRegSet::new();
         self.def.clear();
         self.live_in.clear();
         self.live_out.clear();

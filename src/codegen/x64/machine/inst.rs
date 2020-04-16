@@ -325,14 +325,12 @@ impl MachineInst {
         regs
     }
 
-    pub fn collect_used_regs(&self) -> Vec<MachineRegister> {
+    pub fn collect_used_virt_regs(&self) -> Vec<MachineRegister> {
         let mut regs = vec![];
         for operand in &self.operand {
             match operand {
-                MachineOperand::Register(r) => {
-                    if r.is_vreg() {
-                        regs.push(r.clone()) // TODO
-                    }
+                MachineOperand::Register(r) if r.is_vreg() => {
+                    regs.push(r.clone()) // TODO
                 }
                 _ => {}
             }

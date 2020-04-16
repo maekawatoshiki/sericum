@@ -112,7 +112,7 @@ impl<'a> BuilderTrait for BuilderWithLiveInfoEdit<'a> {
                     LiveRange::new(vec![LiveSegment::new(pp, pp)]),
                 );
             }
-            for use_ in inst.collect_used_regs() {
+            for use_ in inst.collect_used_virt_regs() {
                 let end_point = self
                     .matrix
                     .virt_reg_interval

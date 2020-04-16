@@ -16,11 +16,11 @@ pub fn coalesce_function(matrix: &mut LiveRegMatrix, f: &mut MachineFunction) {
     while let Some(copy_id) = worklist.pop_front() {
         let copy = f.body.inst_arena[copy_id].clone();
 
-        debug!(println!(
-            "dst:{:?}, src:{:?}",
-            copy.def[0],
-            copy.operand[0].as_register()
-        ));
+        // debug!(println!(
+        //     "dst:{:?}, src:{:?}",
+        //     copy.def[0],
+        //     copy.operand[0].as_register()
+        // ));
 
         let copy_dst = &copy.def[0];
         let copy_src = copy.operand[0].as_register();

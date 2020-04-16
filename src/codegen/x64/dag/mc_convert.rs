@@ -394,9 +394,10 @@ impl<'a> ConversionInfo<'a> {
         let call_inst = self.push_inst(
             MachineInst::new_simple(MachineOpcode::CALL, vec![callee], self.cur_bb)
                 .with_imp_uses(arg_regs)
+                .with_imp_def(MachineRegister::phys_reg(GR64::RSP))
                 .with_def(match node.ty {
                     Type::Void => vec![],
-                    _ => vec![ret_reg.clone(), MachineRegister::phys_reg(GR64::RSP)],
+                    _ => vec![ret_reg.clone()],
                 }),
         );
 
