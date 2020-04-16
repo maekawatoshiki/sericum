@@ -142,18 +142,18 @@ impl RegisterClassKind {
 
     // Returns normal order of general-purpose registers
     pub fn get_gp_reg_order_vec(&self) -> Vec<PhysReg> {
+        // commented-out registers are callee-saved registers
         match self {
             RegisterClassKind::GR32 => to_phys!(
                 GR32::EAX,
                 GR32::ECX,
                 GR32::EDX,
-                GR32::ESI,
-                GR32::EDI,
+                // GR32::ESI,
+                // GR32::EDI,
                 GR32::R8D,
                 GR32::R9D,
                 GR32::R10D,
                 GR32::R11D
-                // TODO: following 4 regs need to be saved if changed
                 // GR32::R12D,
                 // GR32::R13D,
                 // GR32::R14D,
@@ -163,13 +163,12 @@ impl RegisterClassKind {
                 GR64::RAX,
                 GR64::RCX,
                 GR64::RDX,
-                GR64::RSI,
-                GR64::RDI,
+                // GR64::RSI,
+                // GR64::RDI,
                 GR64::R8,
                 GR64::R9,
                 GR64::R10,
                 GR64::R11
-                // TODO: following 4 regs need to be saved if changed
                 // GR64::R12,
                 // GR64::R13,
                 // GR64::R14,
@@ -181,17 +180,16 @@ impl RegisterClassKind {
                 XMM::XMM2,
                 XMM::XMM3,
                 XMM::XMM4,
-                XMM::XMM5,
-                XMM::XMM6,
-                XMM::XMM7,
-                XMM::XMM8,
-                XMM::XMM9,
-                XMM::XMM10,
-                XMM::XMM11,
-                XMM::XMM12,
-                XMM::XMM13,
-                XMM::XMM14,
-                XMM::XMM15
+                XMM::XMM5 // XMM::XMM6,
+                          // XMM::XMM7,
+                          // XMM::XMM8,
+                          // XMM::XMM9,
+                          // XMM::XMM10,
+                          // XMM::XMM11,
+                          // XMM::XMM12,
+                          // XMM::XMM13,
+                          // XMM::XMM14,
+                          // XMM::XMM15
             ),
         }
     }
