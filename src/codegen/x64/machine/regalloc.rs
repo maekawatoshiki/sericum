@@ -161,9 +161,9 @@ impl RegisterAllocator {
 
         // IMPROVED EFFICIENCY A LITTLE: any better ideas?
         {
-            let bb_including_call =
+            let bb_containing_call =
                 &cur_func.body.basic_blocks.arena[cur_func.body.inst_arena[call_inst_id].parent];
-            let liveness = bb_including_call.liveness_ref();
+            let liveness = bb_containing_call.liveness_ref();
             let regs_that_may_interfere = &liveness.def | &liveness.live_in;
             for r in &regs_that_may_interfere {
                 if matrix.interferes_with_range(
