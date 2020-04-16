@@ -337,7 +337,7 @@ impl<'a> ConversionInfo<'a> {
     }
 
     fn convert_call_dag(&mut self, node: &DAGNode) -> MachineInstId {
-        let mut arg_regs = vec![];
+        let mut arg_regs = vec![MachineRegister::phys_reg(GR64::RSP)]; // call uses RSP
         let mut off = 0;
 
         for (i, operand) in node.operand[1..].iter().enumerate() {
@@ -396,7 +396,7 @@ impl<'a> ConversionInfo<'a> {
                 .with_imp_uses(arg_regs)
                 .with_def(match node.ty {
                     Type::Void => vec![],
-                    _ => vec![ret_reg.clone()],
+                    _ => vec![ret_reg.clone(), MachineRegister::phys_reg(GR64::RSP)],
                 }),
         );
 

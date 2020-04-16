@@ -108,11 +108,11 @@ impl RegisterAllocator {
     }
 
     fn rewrite_vregs(&mut self, cur_func: &mut MachineFunction, matrix: &LiveRegMatrix) {
-        for (_, bb) in cur_func.body.basic_blocks.id_and_block() {
-            for inst_id in &*bb.iseq_ref() {
-                let inst = &cur_func.body.inst_arena[*inst_id];
+        for (_, bb, iiter) in cur_func.body.mbb_iter() {
+            for (_inst_id, inst) in iiter {
                 for def in &inst.def {
-                    if def.get_reg().is_some() {
+                    if let Some(r) = def.get_reg() {
+                        bb.liveness_ref_mut().phys_def.insert(r);
                         continue;
                     }
 
@@ -122,7 +122,8 @@ impl RegisterAllocator {
                         .unwrap()
                         .reg
                         .unwrap();
-                    def.set_phy_reg(reg);
+                    def.set_phys_reg(reg);
+                    bb.liveness_ref_mut().phys_def.insert(reg);
                 }
             }
         }

@@ -66,6 +66,11 @@ impl PrologueEpilogueInserter {
         finfo: &FrameObjectsInfo,
         down: i32,
     ) {
+        // println!(
+        //     "defined physical registers: {:?}",
+        //     cur_func.body.basic_blocks.get_def_phys_regs()
+        // );
+
         let mut builder = Builder::new(cur_func);
         builder.set_insert_point_at_entry_bb();
 

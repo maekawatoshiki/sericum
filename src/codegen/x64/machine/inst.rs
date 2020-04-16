@@ -295,7 +295,7 @@ impl MachineInst {
         x.info_ref_mut().vreg = vreg;
     }
 
-    pub fn set_phy_reg(&self, reg: PhysReg) {
+    pub fn set_phys_reg(&self, reg: PhysReg) {
         let mut reg_info = self.def[0].info_ref_mut();
         reg_info.reg = Some(reg);
     }
@@ -405,7 +405,7 @@ impl MachineRegister {
         self.info.borrow_mut().set_vreg(vreg);
     }
 
-    pub fn set_phy_reg(&self, reg: PhysReg) {
+    pub fn set_phys_reg(&self, reg: PhysReg) {
         let mut info = self.info_ref_mut();
         info.reg = Some(reg);
 

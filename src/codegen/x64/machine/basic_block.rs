@@ -1,5 +1,5 @@
 // use super::{module::*, opcode::*, value::*};
-use super::super::register::VirtReg;
+use super::super::register::{PhysReg, VirtReg};
 use super::inst::*;
 use id_arena::*;
 use rustc_hash::FxHashSet;
@@ -25,7 +25,6 @@ pub struct MachineBasicBlocksIter<'a> {
 #[derive(Clone, Debug)]
 pub struct MachineBasicBlock {
     /// Information for liveness analysis
-    // TODO: Will be removed
     pub liveness: Rc<RefCell<LivenessInfo>>,
 
     /// Predecessors
@@ -40,6 +39,7 @@ pub struct MachineBasicBlock {
 
 #[derive(Clone, Debug)]
 pub struct LivenessInfo {
+    pub phys_def: FxHashSet<PhysReg>,
     pub def: FxHashSet<VirtReg>,
     pub live_in: FxHashSet<VirtReg>,
     pub live_out: FxHashSet<VirtReg>,
@@ -55,6 +55,14 @@ impl MachineBasicBlocks {
 
     pub fn id_and_block(&self) -> MachineBasicBlocksIter {
         MachineBasicBlocksIter::new(self)
+    }
+
+    pub fn get_def_phys_regs(&self) -> FxHashSet<PhysReg> {
+        let mut set = FxHashSet::default();
+        for (_id, block) in self.id_and_block() {
+            set = &set | &block.liveness_ref().phys_def;
+        }
+        set
     }
 }
 
@@ -115,6 +123,7 @@ impl MachineBasicBlock {
 impl LivenessInfo {
     pub fn new() -> Self {
         Self {
+            phys_def: FxHashSet::default(),
             def: FxHashSet::default(),
             live_in: FxHashSet::default(),
             live_out: FxHashSet::default(),
@@ -122,6 +131,7 @@ impl LivenessInfo {
     }
 
     pub fn clear(&mut self) {
+        self.phys_def.clear();
         self.def.clear();
         self.live_in.clear();
         self.live_out.clear();
