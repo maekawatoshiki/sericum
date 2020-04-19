@@ -1,11 +1,8 @@
 use super::{basic_block::*, module::Module, types::*, value::*};
 use id_arena::*;
-use std::{cell::RefCell, rc::Rc};
-// use rustc_hash::FxHashMap;
 
 pub type InstructionId = Id<Instruction>;
 pub type VirtualRegister = usize;
-pub type RegisterAllocInfoRef = Rc<RefCell<RegisterAllocInfo>>;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Register(usize);
@@ -14,15 +11,6 @@ pub struct Register(usize);
 pub struct Instruction {
     pub opcode: Opcode,
     pub ty: Type,
-    pub reg: RegisterAllocInfoRef,
-}
-
-#[derive(Debug, Clone)]
-pub struct RegisterAllocInfo {
-    pub vreg: VirtualRegister,
-    pub reg: Option<Register>,
-    pub spill: bool,
-    pub last_use: Option<InstructionId>,
 }
 
 #[derive(Clone, Debug)]
@@ -53,48 +41,11 @@ pub enum ICmpKind {
 
 impl Instruction {
     pub fn new(opcode: Opcode, ty: Type) -> Self {
-        Self {
-            opcode,
-            ty,
-            reg: Rc::new(RefCell::new(RegisterAllocInfo::new())),
-        }
+        Self { opcode, ty }
     }
 
     pub fn to_string(&self, parent: &Module) -> String {
         self.opcode.to_string(parent)
-    }
-
-    pub fn set_last_use(&self, last_use: Option<InstructionId>) {
-        self.reg.borrow_mut().last_use = last_use;
-    }
-
-    pub fn set_phy_reg(&self, reg: usize, spill: bool) {
-        let mut reg_info = self.reg.borrow_mut();
-        reg_info.reg = Some(Register(reg));
-        reg_info.spill = spill;
-    }
-
-    pub fn set_vreg(&self, vreg: usize) {
-        let mut reg_info = self.reg.borrow_mut();
-        reg_info.vreg = vreg;
-    }
-
-    pub fn can_be_eliminated(&self) -> bool {
-        let no_phy_reg = self.reg.borrow().reg.is_none();
-        let no_last_use = self.reg.borrow().last_use.is_none();
-        let unused_alloca = matches!(self.opcode, Opcode::Alloca(_)) && no_last_use;
-        unused_alloca || (self.opcode.returns_value() && no_phy_reg)
-    }
-}
-
-impl RegisterAllocInfo {
-    pub fn new() -> Self {
-        Self {
-            reg: None,
-            spill: false,
-            last_use: None,
-            vreg: 0,
-        }
     }
 }
 

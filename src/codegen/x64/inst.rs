@@ -234,7 +234,7 @@ mod inst {
                 TargetRegister::RegClass(RegisterClassKind::GR64),
             )])
         };
-        pub static ref RET: TargetInstDef = { TargetInstDef::new(TargetOpcode::RET) };
+        pub static ref RET: TargetInstDef = TargetInstDef::new(TargetOpcode::RET);
     }
 }
 
