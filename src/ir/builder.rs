@@ -47,7 +47,7 @@ impl<'a> Builder<'a> {
 
     pub fn build_alloca(&mut self, ty: Type) -> Value {
         let ptr_ty = self.module.types.new_pointer_ty(ty);
-        let inst = self.create_inst_value(Opcode::Alloca(ty), ptr_ty);
+        let inst = self.create_inst_value(Opcode::Alloca, vec![Operand::Type(ty)], ptr_ty);
         self.append_inst_to_cur_bb(inst);
         inst
     }
@@ -59,14 +59,17 @@ impl<'a> Builder<'a> {
                 .get_element_ty_with_indices(v.get_type(self.module), &indices)
                 .unwrap(),
         );
-        let inst = self.create_inst_value(Opcode::GetElementPtr(v, indices), ty);
+        let mut operands = vec![Operand::Value(v)];
+        operands.extend(indices.iter().map(|v| Operand::Value(*v)));
+        let inst = self.create_inst_value(Opcode::GetElementPtr, operands, ty);
         self.append_inst_to_cur_bb(inst);
         inst
     }
 
     pub fn build_load(&mut self, v: Value) -> Value {
         let inst = self.create_inst_value(
-            Opcode::Load(v),
+            Opcode::Load,
+            vec![Operand::Value(v)],
             self.module
                 .types
                 .get_element_ty(v.get_type(self.module), None)
@@ -78,7 +81,11 @@ impl<'a> Builder<'a> {
     }
 
     pub fn build_store(&mut self, src: Value, dst: Value) -> Value {
-        let inst = self.create_inst_value(Opcode::Store(src, dst), Type::Void);
+        let inst = self.create_inst_value(
+            Opcode::Store,
+            vec![Operand::Value(src), Operand::Value(dst)],
+            Type::Void,
+        );
         self.append_inst_to_cur_bb(inst);
         inst
     }
@@ -88,7 +95,11 @@ impl<'a> Builder<'a> {
             return konst;
         }
 
-        let inst = self.create_inst_value(Opcode::Add(v1, v2), v1.get_type(self.module).clone());
+        let inst = self.create_inst_value(
+            Opcode::Add,
+            vec![Operand::Value(v1), Operand::Value(v2)],
+            v1.get_type(self.module).clone(),
+        );
         self.append_inst_to_cur_bb(inst);
         inst
     }
@@ -98,7 +109,11 @@ impl<'a> Builder<'a> {
             return konst;
         }
 
-        let inst = self.create_inst_value(Opcode::Sub(v1, v2), v1.get_type(self.module).clone());
+        let inst = self.create_inst_value(
+            Opcode::Sub,
+            vec![Operand::Value(v1), Operand::Value(v2)],
+            v1.get_type(self.module).clone(),
+        );
         self.append_inst_to_cur_bb(inst);
         inst
     }
@@ -108,7 +123,11 @@ impl<'a> Builder<'a> {
             return konst;
         }
 
-        let inst = self.create_inst_value(Opcode::Mul(v1, v2), v1.get_type(self.module).clone());
+        let inst = self.create_inst_value(
+            Opcode::Mul,
+            vec![Operand::Value(v1), Operand::Value(v2)],
+            v1.get_type(self.module).clone(),
+        );
         self.append_inst_to_cur_bb(inst);
         inst
     }
@@ -118,19 +137,32 @@ impl<'a> Builder<'a> {
             return konst;
         }
 
-        let inst = self.create_inst_value(Opcode::Rem(v1, v2), v1.get_type(self.module).clone());
+        let inst = self.create_inst_value(
+            Opcode::Rem,
+            vec![Operand::Value(v1), Operand::Value(v2)],
+            v1.get_type(self.module).clone(),
+        );
         self.append_inst_to_cur_bb(inst);
         inst
     }
 
     pub fn build_icmp(&mut self, kind: ICmpKind, v1: Value, v2: Value) -> Value {
-        let inst = self.create_inst_value(Opcode::ICmp(kind, v1, v2), Type::Int1);
+        let inst = self.create_inst_value(
+            Opcode::ICmp,
+            vec![
+                Operand::ICmpKind(kind),
+                Operand::Value(v1),
+                Operand::Value(v2),
+            ],
+            Type::Int1,
+        );
         self.append_inst_to_cur_bb(inst);
         inst
     }
 
     pub fn build_br(&mut self, dst_id: BasicBlockId) -> Value {
-        let inst = self.create_inst_value(Opcode::Br(dst_id), Type::Void);
+        let inst =
+            self.create_inst_value(Opcode::Br, vec![Operand::BasicBlock(dst_id)], Type::Void);
         self.append_inst_to_cur_bb(inst);
 
         let cur_bb_id = self.cur_bb.unwrap();
@@ -144,7 +176,15 @@ impl<'a> Builder<'a> {
 
     pub fn build_cond_br(&mut self, cond: Value, bb1: BasicBlockId, bb2: BasicBlockId) -> Value {
         let cur_bb_id = self.cur_bb.unwrap();
-        let inst = self.create_inst_value(Opcode::CondBr(cond, bb1, bb2), Type::Void);
+        let inst = self.create_inst_value(
+            Opcode::CondBr,
+            vec![
+                Operand::Value(cond),
+                Operand::BasicBlock(bb1),
+                Operand::BasicBlock(bb2),
+            ],
+            Type::Void,
+        );
         self.append_inst_to_cur_bb(inst);
 
         self.with_function(|f| {
@@ -161,7 +201,12 @@ impl<'a> Builder<'a> {
 
     pub fn build_phi(&mut self, pairs: Vec<(Value, BasicBlockId)>) -> Value {
         let ty = pairs.get(0).unwrap().0.get_type(self.module).clone();
-        let inst = self.create_inst_value(Opcode::Phi(pairs), ty);
+        let mut operands = vec![];
+        for (v, bb) in pairs {
+            operands.push(Operand::Value(v));
+            operands.push(Operand::BasicBlock(bb));
+        }
+        let inst = self.create_inst_value(Opcode::Phi, operands, ty);
         self.append_inst_to_cur_bb(inst);
         inst
     }
@@ -173,21 +218,23 @@ impl<'a> Builder<'a> {
             .as_function_ty(f.get_type(self.module))
             .unwrap()
             .ret_ty;
-        let inst = self.create_inst_value(Opcode::Call(f, args), ret_ty);
+        let mut operands = vec![Operand::Value(f)];
+        operands.extend(args.iter().map(|&v| Operand::Value(v)));
+        let inst = self.create_inst_value(Opcode::Call, operands, ret_ty);
         self.append_inst_to_cur_bb(inst);
         inst
     }
 
     pub fn build_ret(&mut self, v: Value) -> Value {
-        let inst = self.create_inst_value(Opcode::Ret(v), Type::Void);
+        let inst = self.create_inst_value(Opcode::Ret, vec![Operand::Value(v)], Type::Void);
         self.append_inst_to_cur_bb(inst);
         inst
     }
 
     // Utils
 
-    fn create_inst_value(&mut self, opcode: Opcode, ret_ty: Type) -> Value {
-        let inst = Instruction::new(opcode, ret_ty, self.cur_bb.unwrap());
+    fn create_inst_value(&mut self, opcode: Opcode, operands: Vec<Operand>, ret_ty: Type) -> Value {
+        let inst = Instruction::new(opcode, operands, ret_ty, self.cur_bb.unwrap());
         let inst_id = self.function_ref_mut().alloc_inst(inst);
         Value::Instruction(InstructionValue {
             func_id: self.func_id,

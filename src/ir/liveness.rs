@@ -24,36 +24,23 @@ impl<'a> IRLivenessAnalyzer<'a> {
                 let inst_id = inst_val.get_inst_id().unwrap();
                 let inst = &f.inst_table[inst_id];
 
-                match inst.opcode {
-                    Opcode::Add(_, _)
-                    | Opcode::Mul(_, _)
-                    | Opcode::Rem(_, _)
-                    | Opcode::Sub(_, _)
-                    | Opcode::Alloca(_)
-                    | Opcode::ICmp(_, _, _)
-                    | Opcode::Load(_)
-                    | Opcode::Phi(_)
-                    | Opcode::GetElementPtr(_, _) => {
-                        def.insert(inst_id);
-                    }
-                    Opcode::Call(f, _) => {
-                        if self
-                            .module
-                            .types
-                            .as_function_ty(f.get_type(self.module))
-                            .unwrap()
-                            .ret_ty
-                            != Type::Void
-                        {
-                            def.insert(inst_id);
-                        }
-                    }
-                    Opcode::Store(_, _dst) => {
-                        // some_then!(id, dst.get_inst_id(), {
-                        //     // def.insert(f.inst_table[id].vreg);
-                        // });
-                    }
-                    Opcode::Br(_) | Opcode::CondBr(_, _, _) | Opcode::Ret(_) => {}
+                // inst.operands[0];
+
+                if inst.opcode == Opcode::Call
+                    && self
+                        .module
+                        .types
+                        .as_function_ty(inst.operands[0].as_value().get_type(self.module))
+                        .unwrap()
+                        .ret_ty
+                        != Type::Void
+                {
+                    def.insert(inst_id);
+                    continue;
+                }
+
+                if inst.opcode.returns_value() {
+                    def.insert(inst_id);
                 }
             }
         }
@@ -64,35 +51,49 @@ impl<'a> IRLivenessAnalyzer<'a> {
             for inst_val in &*bb.iseq.borrow() {
                 let inst = &f.inst_table[inst_val.get_inst_id().unwrap()];
 
-                match &inst.opcode {
-                    Opcode::Call(func, args) => {
-                        some_then!(id, func.get_inst_id(), self.propagate(f, bb_id, id));
-                        for arg in args {
-                            some_then!(id, arg.get_inst_id(), self.propagate(f, bb_id, id));
-                        }
-                    }
-                    Opcode::CondBr(v, _, _) | Opcode::Ret(v) | Opcode::Load(v) => {
-                        some_then!(id, v.get_inst_id(), self.propagate(f, bb_id, id));
-                    }
-                    Opcode::Phi(vals) => {
-                        for (val, _) in vals {
-                            some_then!(id, val.get_inst_id(), self.propagate(f, bb_id, id));
-                        }
-                    }
-                    Opcode::GetElementPtr(base, idx) => {
-                        some_then!(id, base.get_inst_id(), self.propagate(f, bb_id, id));
-                        for idx in idx {
-                            some_then!(id, idx.get_inst_id(), self.propagate(f, bb_id, id));
-                        }
-                    }
-                    Opcode::Store(v1, v2)
-                    | Opcode::ICmp(_, v1, v2)
-                    | Opcode::Add(v1, v2)
-                    | Opcode::Sub(v1, v2) => {
-                        some_then!(id, v1.get_inst_id(), self.propagate(f, bb_id, id));
-                        some_then!(id, v2.get_inst_id(), self.propagate(f, bb_id, id));
-                    }
-                    _ => {}
+                self.visit_operands(f, bb_id, &inst.operands);
+                // match &inst.opcode {
+                //     Opcode::Call(func, args) => {
+                //         some_then!(id, func.get_inst_id(), self.propagate(f, bb_id, id));
+                //         for arg in args {
+                //             some_then!(id, arg.get_inst_id(), self.propagate(f, bb_id, id));
+                //         }
+                //     }
+                //     Opcode::CondBr(v, _, _) | Opcode::Ret(v) | Opcode::Load(v) => {
+                //         some_then!(id, v.get_inst_id(), self.propagate(f, bb_id, id));
+                //     }
+                //     Opcode::Phi(vals) => {
+                //         for (val, _) in vals {
+                //             some_then!(id, val.get_inst_id(), self.propagate(f, bb_id, id));
+                //         }
+                //     }
+                //     Opcode::GetElementPtr(base, idx) => {
+                //         some_then!(id, base.get_inst_id(), self.propagate(f, bb_id, id));
+                //         for idx in idx {
+                //             some_then!(id, idx.get_inst_id(), self.propagate(f, bb_id, id));
+                //         }
+                //     }
+                //     Opcode::Store(v1, v2)
+                //     | Opcode::ICmp(_, v1, v2)
+                //     | Opcode::Add(v1, v2)
+                //     | Opcode::Sub(v1, v2) => {
+                //         some_then!(id, v1.get_inst_id(), self.propagate(f, bb_id, id));
+                //         some_then!(id, v2.get_inst_id(), self.propagate(f, bb_id, id));
+                //     }
+                //     _ => {}
+                // }
+            }
+        }
+    }
+
+    pub fn visit_operands(&mut self, f: &Function, cur_bb: BasicBlockId, operands: &[Operand]) {
+        for operand in operands {
+            match operand {
+                Operand::BasicBlock(_) => {}
+                Operand::Type(_) => {}
+                Operand::ICmpKind(_) => {}
+                Operand::Value(v) => {
+                    some_then!(id, v.get_inst_id(), self.propagate(f, cur_bb, id));
                 }
             }
         }

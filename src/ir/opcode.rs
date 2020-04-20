@@ -11,28 +11,37 @@ pub struct Register(usize);
 #[derive(Clone, Debug)]
 pub struct Instruction {
     pub opcode: Opcode,
+    pub operands: Vec<Operand>,
     pub ty: Type,
     pub id: Option<InstructionId>,
     pub parent: BasicBlockId,
     pub uses: RefCell<Vec<InstructionId>>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Copy, PartialEq)]
 pub enum Opcode {
-    Alloca(Type),
-    Load(Value),
-    Store(Value, Value),
-    GetElementPtr(Value, Vec<Value>), // ptr val, indices
-    Add(Value, Value),
-    Sub(Value, Value),
-    Mul(Value, Value),
-    Rem(Value, Value),
-    ICmp(ICmpKind, Value, Value),
-    Br(BasicBlockId),
-    CondBr(Value, BasicBlockId, BasicBlockId),
-    Phi(Vec<(Value, BasicBlockId)>),
-    Call(Value, Vec<Value>),
-    Ret(Value),
+    Alloca,
+    Load,
+    Store,
+    GetElementPtr, // ptr val, indices
+    Add,
+    Sub,
+    Mul,
+    Rem,
+    ICmp,
+    Br,
+    CondBr,
+    Phi,
+    Call,
+    Ret,
+}
+
+#[derive(Debug, Clone)]
+pub enum Operand {
+    Type(Type),
+    Value(Value),
+    BasicBlock(BasicBlockId),
+    ICmpKind(ICmpKind),
 }
 
 #[derive(Clone, Debug, Copy, PartialEq)]
@@ -44,9 +53,10 @@ pub enum ICmpKind {
 }
 
 impl Instruction {
-    pub fn new(opcode: Opcode, ty: Type, parent: BasicBlockId) -> Self {
+    pub fn new(opcode: Opcode, operands: Vec<Operand>, ty: Type, parent: BasicBlockId) -> Self {
         Self {
             opcode,
+            operands,
             ty,
             id: None,
             parent,
@@ -62,88 +72,81 @@ impl Instruction {
     // }
 
     pub fn to_string(&self, parent: &Module) -> String {
-        self.opcode.to_string(parent)
+        let mut output = self.opcode.to_string().to_owned();
+        for (i, operand) in self.operands.iter().enumerate() {
+            output = format!(
+                "{}{}{}",
+                output,
+                if i == 0 { " " } else { ", " },
+                operand.to_string(parent)
+            );
+        }
+        output
     }
 }
 
 impl Opcode {
     pub fn returns_value(&self) -> bool {
         match self {
-            Opcode::Br(_) | Opcode::CondBr(_, _, _) | Opcode::Ret(_) | Opcode::Store(_, _) | Opcode::Call(_, _) |
-                /* alloca doesn't return value = */ Opcode::Alloca(_) => false,
+            Opcode::Br | Opcode::CondBr | Opcode::Ret | Opcode::Store | Opcode::Call|
+                /* alloca doesn't return value = */ Opcode::Alloca => false,
             _ => true,
         }
     }
 
+    pub fn to_string(&self) -> &str {
+        match self {
+            Opcode::Alloca => "alloca",
+            Opcode::Load => "load",
+            Opcode::Store => "store",
+            Opcode::GetElementPtr => "getelementptr",
+            Opcode::Add => "add",
+            Opcode::Sub => "sub",
+            Opcode::Mul => "mul",
+            Opcode::Rem => "rem",
+            Opcode::ICmp => "icmp",
+            Opcode::Br => "br",
+            Opcode::CondBr => "br",
+            Opcode::Phi => "phi",
+            Opcode::Call => "call",
+            Opcode::Ret => "ret",
+        }
+    }
+}
+
+impl Operand {
+    // TODO: should return cow?
     pub fn to_string(&self, parent: &Module) -> String {
         match self {
-            Opcode::Alloca(ty) => format!("alloca {}", parent.types.to_string(*ty)),
-            Opcode::Load(v) => format!("load {}", v.to_string(parent, false)),
-            Opcode::Store(src, dst) => format!(
-                "store {}, {}",
-                src.to_string(parent, false),
-                dst.to_string(parent, false)
-            ),
-            Opcode::GetElementPtr(ptrval, indices) => format!(
-                "getelementptr {}{}",
-                ptrval.to_string(parent, false),
-                indices.iter().fold("".to_string(), |mut s, idx| {
-                    s += ", ";
-                    s += idx.to_string(parent, false).as_str();
-                    s
-                })
-            ),
-            Opcode::Add(v1, v2) => format!(
-                "add {}, {}",
-                v1.to_string(parent, false),
-                v2.to_string(parent, false)
-            ),
-            Opcode::Sub(v1, v2) => format!(
-                "sub {}, {}",
-                v1.to_string(parent, false),
-                v2.to_string(parent, false)
-            ),
-            Opcode::Mul(v1, v2) => format!(
-                "mul {}, {}",
-                v1.to_string(parent, false),
-                v2.to_string(parent, false)
-            ),
-            Opcode::Rem(v1, v2) => format!(
-                "rem {}, {}",
-                v1.to_string(parent, false),
-                v2.to_string(parent, false)
-            ),
-            Opcode::ICmp(kind, v1, v2) => format!(
-                "icmp {} {}, {}",
-                kind.as_str(),
-                v1.to_string(parent, false),
-                v2.to_string(parent, false)
-            ),
-            Opcode::Br(id) => format!("br %label.{}", id.index()),
-            Opcode::CondBr(v, id1, id2) => format!(
-                "br {} %label.{}, %label.{}",
-                v.to_string(parent, false),
-                id1.index(),
-                id2.index()
-            ),
-            Opcode::Phi(pairs) => pairs.iter().fold("phi".to_string(), |s, (val, bb)| {
-                format!(
-                    "{} [{}, %label.{}]",
-                    s,
-                    val.to_string(parent, false),
-                    bb.index()
-                )
-            }),
-            Opcode::Call(v, args) => format!(
-                "call {}({})",
-                v.to_string(parent, false),
-                args.iter().fold("".to_string(), |s, val| format!(
-                    "{}{}, ",
-                    s,
-                    val.to_string(parent, false)
-                ))
-            ),
-            Opcode::Ret(v) => format!("ret {}", v.to_string(parent, false)),
+            Self::BasicBlock(id) => format!("%label.{}", id.index()),
+            Self::ICmpKind(kind) => kind.as_str().to_owned(),
+            Self::Type(ty) => parent.types.to_string(*ty),
+            Self::Value(v) => v.to_string(parent, false),
+        }
+    }
+
+    pub fn as_basic_block(&self) -> &BasicBlockId {
+        match self {
+            Self::BasicBlock(id) => id,
+            _ => panic!(),
+        }
+    }
+    pub fn as_icmp_kind(&self) -> &ICmpKind {
+        match self {
+            Self::ICmpKind(kind) => kind,
+            _ => panic!(),
+        }
+    }
+    pub fn as_type(&self) -> &Type {
+        match self {
+            Self::Type(ty) => ty,
+            _ => panic!(),
+        }
+    }
+    pub fn as_value(&self) -> &Value {
+        match self {
+            Self::Value(v) => v,
+            _ => panic!(),
         }
     }
 }
