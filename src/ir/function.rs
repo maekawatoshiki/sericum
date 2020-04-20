@@ -90,6 +90,19 @@ impl Function {
         Some(params_ty[idx])
     }
 
+    pub fn find_inst_pos(&self, inst_id: InstructionId) -> Option<(BasicBlockId, usize)> {
+        let parent = self.inst_table[inst_id].parent;
+        self.basic_block_arena[parent]
+            .find_inst_pos(inst_id)
+            .map(|pos| (parent, pos))
+    }
+
+    pub fn remove_inst(&self, inst_id: InstructionId) {
+        let (bb_id, pos) = self.find_inst_pos(inst_id).unwrap();
+        self.inst_table[inst_id].remove(&self.inst_table);
+        self.basic_block_arena[bb_id].iseq_ref_mut().remove(pos);
+    }
+
     pub fn alloc_inst(&mut self, inst: Instruction) -> InstructionId {
         // TODO
         let id = self.inst_table.alloc(inst);

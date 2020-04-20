@@ -48,6 +48,17 @@ impl BasicBlock {
     pub fn iseq_ref_mut(&self) -> RefMut<Vec<Value>> {
         self.iseq.borrow_mut()
     }
+
+    pub fn find_inst_pos(&self, id2find: InstructionId) -> Option<usize> {
+        self.iseq_ref()
+            .iter()
+            .enumerate()
+            .find(|(_, val)| match val {
+                Value::Instruction(i) if i.id == id2find => true,
+                _ => false,
+            })
+            .map(|(i, _)| i)
+    }
 }
 
 impl DumpToString for BasicBlock {

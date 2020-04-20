@@ -9,18 +9,20 @@ use cilk::{
 fn test_mem2reg() {
     let mut m = module::Module::new("cilk");
 
-    let func = cilk_ir!(m; define [void] func [] {
+    let func = cilk_ir!(m; define [i32] func [] {
     entry:
         i = alloca i32;
-        store (i32 1), (%i);
+        store (i32 3), (%i);
         li = load (%i);
-        tmp = add (%li), (i32 2);
-        store (%tmp), (%i);
-        li = load (%i);
-        ret (void);
+        // tmp = add (%li), (i32 2);
+        // store (%tmp), (%i);
+        // li = load (%i);
+        ret (%li);
     });
 
     println!("{}", m.dump(func));
+
+    ir::mem2reg::Mem2Reg::new().run_on_module(&mut m);
 
     let mut jit = exec::jit::JITExecutor::new(&m);
     let func = jit.find_function_by_name("func").unwrap();

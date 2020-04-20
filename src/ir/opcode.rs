@@ -36,7 +36,7 @@ pub enum Opcode {
     Ret,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Copy)]
 pub enum Operand {
     Type(Type),
     Value(Value),
@@ -79,6 +79,28 @@ impl Instruction {
         }
     }
 
+    pub fn replace_operand(&mut self, from: &Operand, to: Operand) {
+        for operand in &mut self.operands {
+            if *operand == *from {
+                *operand = to;
+            }
+        }
+    }
+
+    pub fn remove(&self, inst_arena: &Arena<Instruction>) {
+        for operand in &self.operands {
+            match operand {
+                Operand::Value(Value::Instruction(InstructionValue { id, .. })) => {
+                    inst_arena[*id]
+                        .uses
+                        .borrow_mut()
+                        .retain(|&use_id| use_id != self.id.unwrap());
+                }
+                _ => {}
+            }
+        }
+    }
+
     pub fn to_string(&self, parent: &Module) -> String {
         let mut output = self.opcode.to_string().to_owned();
         for (i, operand) in self.operands.iter().enumerate() {
@@ -89,8 +111,9 @@ impl Instruction {
                 operand.to_string(parent)
             );
         }
+
         format!(
-            "{} ({}, {:?})",
+            "{} // (self:{}, uses:{:?})",
             output,
             self.id.unwrap().index(),
             self.uses.borrow()
