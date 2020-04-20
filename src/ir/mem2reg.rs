@@ -60,7 +60,7 @@ impl<'a> Mem2RegOnFunction<'a> {
 
     fn is_alloca_promotable(&self, alloca: &Instruction) -> bool {
         // let mut last_parent: Option<BasicBlockId> = None;
-        // alloca.uses.borrow().iter().all(|&use_id| {
+        // alloca.users.borrow().iter().all(|&use_id| {
         //     let should_be_load_or_store = &func.inst_table[use_id];
         //     let same_parent = if last_parent.is_some() {
         //         let eq = last_parent.unwrap() == should_be_load_or_store.parent;
@@ -74,14 +74,14 @@ impl<'a> Mem2RegOnFunction<'a> {
         // })
 
         let func = &self.cur_func;
-        alloca.uses.borrow().iter().all(|&use_id| {
+        alloca.users.borrow().iter().all(|&use_id| {
             let should_be_load_or_store = &func.inst_table[use_id];
             matches!(should_be_load_or_store.opcode, Opcode::Load | Opcode::Store)
         })
     }
 
     fn is_alloca_stored_only_once(&self, alloca: &Instruction) -> bool {
-        alloca.uses.borrow().iter().fold(0usize, |acc, &use_id| {
+        alloca.users.borrow().iter().fold(0usize, |acc, &use_id| {
             matches!(self.cur_func.inst_table[use_id].opcode, Opcode::Store) as usize + acc
         }) == 1
     }
@@ -92,7 +92,7 @@ impl<'a> Mem2RegOnFunction<'a> {
         let mut stores_to_remove = vec![];
         let mut loads_to_remove = vec![];
         let mut replaceable_to_src = vec![];
-        for &use_id in &*alloca.uses.borrow() {
+        for &use_id in &*alloca.users.borrow() {
             let load_or_store = &self.cur_func.inst_table[use_id];
             if load_or_store.opcode == Opcode::Store {
                 let store = load_or_store;
@@ -103,7 +103,7 @@ impl<'a> Mem2RegOnFunction<'a> {
             if load_or_store.opcode == Opcode::Load {
                 let load = load_or_store;
                 let load_id = use_id;
-                replaceable_to_src.push((load_id, load.uses.borrow().clone()));
+                replaceable_to_src.push((load_id, load.users.borrow().clone()));
                 loads_to_remove.push(load_id);
             }
         }
@@ -119,8 +119,8 @@ impl<'a> Mem2RegOnFunction<'a> {
         self.cur_func.remove_inst(alloca_id);
 
         // replace loads with src
-        for (load, uses_load) in replaceable_to_src {
-            for u in uses_load {
+        for (load, users_load) in replaceable_to_src {
+            for u in users_load {
                 let inst = &mut self.cur_func.inst_table[u];
                 inst.replace_operand(
                     &Operand::Value(Value::Instruction(InstructionValue {

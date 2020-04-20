@@ -111,7 +111,7 @@ impl Function {
             inst.set_id(id);
         }
         let inst = &self.inst_table[id];
-        inst.set_uses(&self.inst_table);
+        inst.set_users(&self.inst_table);
         id
     }
 }

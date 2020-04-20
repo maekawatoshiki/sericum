@@ -15,7 +15,7 @@ pub struct Instruction {
     pub ty: Type,
     pub id: Option<InstructionId>,
     pub parent: BasicBlockId,
-    pub uses: RefCell<Vec<InstructionId>>,
+    pub users: RefCell<Vec<InstructionId>>,
 }
 
 #[derive(Clone, Debug, Copy, PartialEq)]
@@ -60,7 +60,7 @@ impl Instruction {
             ty,
             id: None,
             parent,
-            uses: RefCell::new(vec![]),
+            users: RefCell::new(vec![]),
         }
     }
 
@@ -68,11 +68,11 @@ impl Instruction {
         self.id = Some(id);
     }
 
-    pub fn set_uses(&self, inst_arena: &Arena<Instruction>) {
+    pub fn set_users(&self, inst_arena: &Arena<Instruction>) {
         for operand in &self.operands {
             match operand {
                 Operand::Value(Value::Instruction(InstructionValue { id, .. })) => {
-                    inst_arena[*id].uses.borrow_mut().push(self.id.unwrap());
+                    inst_arena[*id].users.borrow_mut().push(self.id.unwrap());
                 }
                 _ => {}
             }
@@ -92,7 +92,7 @@ impl Instruction {
             match operand {
                 Operand::Value(Value::Instruction(InstructionValue { id, .. })) => {
                     inst_arena[*id]
-                        .uses
+                        .users
                         .borrow_mut()
                         .retain(|&use_id| use_id != self.id.unwrap());
                 }
@@ -113,10 +113,10 @@ impl Instruction {
         }
 
         format!(
-            "{} // (self:{}, uses:{:?})",
+            "{} // (self:{}, users:{:?})",
             output,
             self.id.unwrap().index(),
-            self.uses.borrow()
+            self.users.borrow()
         )
     }
 }
