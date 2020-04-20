@@ -91,15 +91,14 @@ impl Function {
     }
 
     pub fn alloc_inst(&mut self, inst: Instruction) -> InstructionId {
-        // inst.set_uses(&mut self.inst_table);
-
+        // TODO
         let id = self.inst_table.alloc(inst);
-
         {
             let inst = &mut self.inst_table[id];
             inst.set_id(id);
         }
-
+        let inst = &self.inst_table[id];
+        inst.set_uses(&self.inst_table);
         id
     }
 }

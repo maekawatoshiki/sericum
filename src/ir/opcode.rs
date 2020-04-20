@@ -1,5 +1,5 @@
 use super::{basic_block::BasicBlockId, module::Module, types::*, value::*};
-use id_arena::Id;
+use id_arena::{Arena, Id};
 use std::cell::RefCell;
 
 pub type InstructionId = Id<Instruction>;
@@ -68,8 +68,16 @@ impl Instruction {
         self.id = Some(id);
     }
 
-    // pub fn set_uses(&mut self, inst_arena: &Arena<Instruction>) {
-    // }
+    pub fn set_uses(&self, inst_arena: &Arena<Instruction>) {
+        for operand in &self.operands {
+            match operand {
+                Operand::Value(Value::Instruction(InstructionValue { id, .. })) => {
+                    inst_arena[*id].uses.borrow_mut().push(self.id.unwrap());
+                }
+                _ => {}
+            }
+        }
+    }
 
     pub fn to_string(&self, parent: &Module) -> String {
         let mut output = self.opcode.to_string().to_owned();
@@ -81,7 +89,12 @@ impl Instruction {
                 operand.to_string(parent)
             );
         }
-        output
+        format!(
+            "{} ({}, {:?})",
+            output,
+            self.id.unwrap().index(),
+            self.uses.borrow()
+        )
     }
 }
 

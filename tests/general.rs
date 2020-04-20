@@ -6,6 +6,28 @@ use cilk::{
 };
 
 #[test]
+fn test_mem2reg() {
+    let mut m = module::Module::new("cilk");
+
+    let func = cilk_ir!(m; define [void] func [] {
+    entry:
+        i = alloca i32;
+        store (i32 1), (%i);
+        li = load (%i);
+        tmp = add (%li), (i32 2);
+        store (%tmp), (%i);
+        li = load (%i);
+        ret (void);
+    });
+
+    println!("{}", m.dump(func));
+
+    let mut jit = exec::jit::JITExecutor::new(&m);
+    let func = jit.find_function_by_name("func").unwrap();
+    jit.run(func, vec![]);
+}
+
+#[test]
 fn pointer() {
     let mut m = module::Module::new("cilk");
 

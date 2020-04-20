@@ -24,8 +24,6 @@ impl<'a> IRLivenessAnalyzer<'a> {
                 let inst_id = inst_val.get_inst_id().unwrap();
                 let inst = &f.inst_table[inst_id];
 
-                // inst.operands[0];
-
                 if inst.opcode == Opcode::Call
                     && self
                         .module
@@ -50,38 +48,7 @@ impl<'a> IRLivenessAnalyzer<'a> {
         for (bb_id, bb) in &f.basic_block_arena {
             for inst_val in &*bb.iseq.borrow() {
                 let inst = &f.inst_table[inst_val.get_inst_id().unwrap()];
-
                 self.visit_operands(f, bb_id, &inst.operands);
-                // match &inst.opcode {
-                //     Opcode::Call(func, args) => {
-                //         some_then!(id, func.get_inst_id(), self.propagate(f, bb_id, id));
-                //         for arg in args {
-                //             some_then!(id, arg.get_inst_id(), self.propagate(f, bb_id, id));
-                //         }
-                //     }
-                //     Opcode::CondBr(v, _, _) | Opcode::Ret(v) | Opcode::Load(v) => {
-                //         some_then!(id, v.get_inst_id(), self.propagate(f, bb_id, id));
-                //     }
-                //     Opcode::Phi(vals) => {
-                //         for (val, _) in vals {
-                //             some_then!(id, val.get_inst_id(), self.propagate(f, bb_id, id));
-                //         }
-                //     }
-                //     Opcode::GetElementPtr(base, idx) => {
-                //         some_then!(id, base.get_inst_id(), self.propagate(f, bb_id, id));
-                //         for idx in idx {
-                //             some_then!(id, idx.get_inst_id(), self.propagate(f, bb_id, id));
-                //         }
-                //     }
-                //     Opcode::Store(v1, v2)
-                //     | Opcode::ICmp(_, v1, v2)
-                //     | Opcode::Add(v1, v2)
-                //     | Opcode::Sub(v1, v2) => {
-                //         some_then!(id, v1.get_inst_id(), self.propagate(f, bb_id, id));
-                //         some_then!(id, v2.get_inst_id(), self.propagate(f, bb_id, id));
-                //     }
-                //     _ => {}
-                // }
             }
         }
     }
