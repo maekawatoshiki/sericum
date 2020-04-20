@@ -90,8 +90,17 @@ impl Function {
         Some(params_ty[idx])
     }
 
-    pub fn inst_id(&mut self, inst: Instruction) -> InstructionId {
-        self.inst_table.alloc(inst)
+    pub fn alloc_inst(&mut self, inst: Instruction) -> InstructionId {
+        // inst.set_uses(&mut self.inst_table);
+
+        let id = self.inst_table.alloc(inst);
+
+        {
+            let inst = &mut self.inst_table[id];
+            inst.set_id(id);
+        }
+
+        id
     }
 }
 

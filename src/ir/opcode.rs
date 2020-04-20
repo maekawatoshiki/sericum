@@ -1,5 +1,6 @@
 use super::{basic_block::BasicBlockId, module::Module, types::*, value::*};
-use id_arena::*;
+use id_arena::Id;
+use std::cell::RefCell;
 
 pub type InstructionId = Id<Instruction>;
 pub type VirtualRegister = usize;
@@ -11,7 +12,9 @@ pub struct Register(usize);
 pub struct Instruction {
     pub opcode: Opcode,
     pub ty: Type,
+    pub id: Option<InstructionId>,
     pub parent: BasicBlockId,
+    pub uses: RefCell<Vec<InstructionId>>,
 }
 
 #[derive(Clone, Debug)]
@@ -42,8 +45,21 @@ pub enum ICmpKind {
 
 impl Instruction {
     pub fn new(opcode: Opcode, ty: Type, parent: BasicBlockId) -> Self {
-        Self { opcode, ty, parent }
+        Self {
+            opcode,
+            ty,
+            id: None,
+            parent,
+            uses: RefCell::new(vec![]),
+        }
     }
+
+    pub fn set_id(&mut self, id: InstructionId) {
+        self.id = Some(id);
+    }
+
+    // pub fn set_uses(&mut self, inst_arena: &Arena<Instruction>) {
+    // }
 
     pub fn to_string(&self, parent: &Module) -> String {
         self.opcode.to_string(parent)
@@ -54,7 +70,7 @@ impl Opcode {
     pub fn returns_value(&self) -> bool {
         match self {
             Opcode::Br(_) | Opcode::CondBr(_, _, _) | Opcode::Ret(_) | Opcode::Store(_, _) | Opcode::Call(_, _) |
-                /* alloca doesn't return value = */ Opcode::Alloca(_)=> false,
+                /* alloca doesn't return value = */ Opcode::Alloca(_) => false,
             _ => true,
         }
     }

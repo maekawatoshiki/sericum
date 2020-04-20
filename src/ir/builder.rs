@@ -188,7 +188,7 @@ impl<'a> Builder<'a> {
 
     fn create_inst_value(&mut self, opcode: Opcode, ret_ty: Type) -> Value {
         let inst = Instruction::new(opcode, ret_ty, self.cur_bb.unwrap());
-        let inst_id = self.function_ref_mut().inst_id(inst);
+        let inst_id = self.function_ref_mut().alloc_inst(inst);
         Value::Instruction(InstructionValue {
             func_id: self.func_id,
             id: inst_id,
