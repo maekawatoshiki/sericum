@@ -1,4 +1,4 @@
-use super::{basic_block::*, module::Module, types::*, value::*};
+use super::{basic_block::BasicBlockId, module::Module, types::*, value::*};
 use id_arena::*;
 
 pub type InstructionId = Id<Instruction>;
@@ -11,6 +11,7 @@ pub struct Register(usize);
 pub struct Instruction {
     pub opcode: Opcode,
     pub ty: Type,
+    pub parent: BasicBlockId,
 }
 
 #[derive(Clone, Debug)]
@@ -40,8 +41,8 @@ pub enum ICmpKind {
 }
 
 impl Instruction {
-    pub fn new(opcode: Opcode, ty: Type) -> Self {
-        Self { opcode, ty }
+    pub fn new(opcode: Opcode, ty: Type, parent: BasicBlockId) -> Self {
+        Self { opcode, ty, parent }
     }
 
     pub fn to_string(&self, parent: &Module) -> String {
