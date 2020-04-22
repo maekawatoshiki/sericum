@@ -110,6 +110,17 @@ impl Instruction {
         }
     }
 
+    pub fn fold_const(&self) -> Option<Value> {
+        let operands = self.operands.borrow();
+        match self.opcode {
+            Opcode::Add => operands[0].as_value().const_add(&operands[1].as_value()),
+            Opcode::Sub => operands[0].as_value().const_sub(&operands[1].as_value()),
+            Opcode::Mul => operands[0].as_value().const_mul(&operands[1].as_value()),
+            Opcode::Rem => operands[0].as_value().const_rem(&operands[1].as_value()),
+            _ => None,
+        }
+    }
+
     pub fn to_string(&self, parent: &Module) -> String {
         let mut output = self.opcode.to_string().to_owned();
         for (i, operand) in self.operands.borrow().iter().enumerate() {

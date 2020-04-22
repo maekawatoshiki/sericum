@@ -26,22 +26,25 @@ fn test0_mem2reg() {
 
     let mut jit = exec::jit::JITExecutor::new(&m);
     let func = jit.find_function_by_name("func").unwrap();
-    jit.run(func, vec![]);
+    assert_eq!(jit.run(func, vec![]), exec::jit::GenericValue::Int32(3));
 }
 
 #[test]
-#[should_panic]
 fn test1_mem2reg() {
     let mut m = module::Module::new("cilk");
 
     let func = cilk_ir!(m; define [i32] func [] {
     entry:
         i = alloca i32;
+        k = alloca i32;
         br label;
     label:
         store (i32 3), (%i);
         li = load (%i);
         tmp = add (%li), (i32 2);
+        store (%tmp), (%k);
+        lk = load (%k);
+        tmp = add (%li), (%lk);
         store (%tmp), (%i);
         li = load (%i);
         ret (%li);
@@ -50,10 +53,11 @@ fn test1_mem2reg() {
     println!("{}", m.dump(func));
 
     ir::mem2reg::Mem2Reg::new().run_on_module(&mut m);
+    ir::const_folding::ConstantFolding::new().run_on_module(&mut m);
 
     let mut jit = exec::jit::JITExecutor::new(&m);
     let func = jit.find_function_by_name("func").unwrap();
-    jit.run(func, vec![]);
+    assert_eq!(jit.run(func, vec![]), exec::jit::GenericValue::Int32(8));
 }
 
 #[test]
