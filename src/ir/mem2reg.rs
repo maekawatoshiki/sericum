@@ -70,6 +70,10 @@ impl<'a> Mem2RegOnFunction<'a> {
                     continue;
                 }
 
+                // stores and loads in multiple basic blocks
+                // if is_promotable {
+                // }
+
                 // TODO: support other cases...
             }
         }
@@ -81,30 +85,6 @@ impl<'a> Mem2RegOnFunction<'a> {
         for alloca in single_block_allocas {
             self.promote_single_block_alloca(alloca);
         }
-    }
-
-    fn is_alloca_promotable(&self, alloca: &Instruction) -> bool {
-        let func = &self.cur_func;
-        alloca.users.borrow().iter().all(|&use_id| {
-            let should_be_load_or_store = &func.inst_table[use_id];
-            matches!(should_be_load_or_store.opcode, Opcode::Load | Opcode::Store)
-        })
-    }
-
-    fn is_alloca_stored_only_once(&self, alloca: &Instruction) -> bool {
-        alloca.users.borrow().iter().fold(0usize, |acc, &use_id| {
-            matches!(self.cur_func.inst_table[use_id].opcode, Opcode::Store) as usize + acc
-        }) == 1
-    }
-
-    fn is_alloca_only_used_in_single_block(&self, alloca: &Instruction) -> bool {
-        let mut last_parent: Option<BasicBlockId> = None;
-        alloca.users.borrow().iter().all(|&user_id| {
-            let user = &self.cur_func.inst_table[user_id];
-            let same_parent = last_parent.get_or_insert(user.parent) == &user.parent;
-            last_parent = Some(user.parent);
-            matches!(user.opcode, Opcode::Load | Opcode::Store) && same_parent
-        })
     }
 
     fn promote_single_store_alloca(&mut self, alloca_id: InstructionId) {
@@ -120,9 +100,7 @@ impl<'a> Mem2RegOnFunction<'a> {
                     src = Some(inst.operands.borrow()[0]);
                     store_to_remove = Some(use_id);
                 }
-                Opcode::Load => {
-                    loads_to_remove.push((use_id, inst.users.borrow().clone()));
-                }
+                Opcode::Load => loads_to_remove.push((use_id, inst.users.borrow().clone())),
                 _ => unreachable!(),
             }
         }
@@ -134,8 +112,14 @@ impl<'a> Mem2RegOnFunction<'a> {
         // can't handle loads before store so ignore them
         let mut all_loads_removable = true;
         loads_to_remove.retain(|&(id, _)| {
-            let load_idx = self.inst_indexes.get_index(&self.cur_func, id);
-            let valid = store_idx < load_idx;
+            let load_parent = self.cur_func.inst_table[id].parent;
+            let store_parent = self.cur_func.inst_table[store_to_remove].parent;
+            let valid = if load_parent == store_parent {
+                let load_idx = self.inst_indexes.get_index(&self.cur_func, id);
+                store_idx < load_idx
+            } else {
+                self.dominate_bb(store_parent, load_parent)
+            };
             all_loads_removable &= valid;
             valid
         });
@@ -223,6 +207,43 @@ impl<'a> Mem2RegOnFunction<'a> {
         if all_access_removable {
             self.cur_func.remove_inst(alloca_id);
         }
+    }
+
+    fn is_alloca_promotable(&self, alloca: &Instruction) -> bool {
+        let func = &self.cur_func;
+        alloca.users.borrow().iter().all(|&use_id| {
+            let should_be_load_or_store = &func.inst_table[use_id];
+            matches!(should_be_load_or_store.opcode, Opcode::Load | Opcode::Store)
+        })
+    }
+
+    fn is_alloca_stored_only_once(&self, alloca: &Instruction) -> bool {
+        alloca.users.borrow().iter().fold(0usize, |acc, &use_id| {
+            matches!(self.cur_func.inst_table[use_id].opcode, Opcode::Store) as usize + acc
+        }) == 1
+    }
+
+    fn is_alloca_only_used_in_single_block(&self, alloca: &Instruction) -> bool {
+        let mut last_parent: Option<BasicBlockId> = None;
+        alloca.users.borrow().iter().all(|&user_id| {
+            let user = &self.cur_func.inst_table[user_id];
+            let same_parent = last_parent.get_or_insert(user.parent) == &user.parent;
+            last_parent = Some(user.parent);
+            matches!(user.opcode, Opcode::Load | Opcode::Store) && same_parent
+        })
+    }
+
+    fn dominate_bb(&self, bb1: BasicBlockId, bb2: BasicBlockId) -> bool {
+        let cur_bb = &self.cur_func.basic_block_arena[bb1];
+        for succ in &cur_bb.succ {
+            if *succ == bb2 {
+                return true;
+            }
+            if self.dominate_bb(*succ, bb2) {
+                return true;
+            }
+        }
+        false
     }
 }
 

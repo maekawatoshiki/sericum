@@ -61,6 +61,32 @@ fn test1_mem2reg() {
 }
 
 #[test]
+fn test2_mem2reg() {
+    let mut m = module::Module::new("cilk");
+
+    let func = cilk_ir!(m; define [i32] func [] {
+    entry:
+        i = alloca i32;
+        br label1;
+    label1:
+        store (i32 3), (%i);
+        br label2;
+    label2:
+        li = load (%i);
+        ret (%li);
+    });
+
+    println!("{}", m.dump(func));
+
+    ir::mem2reg::Mem2Reg::new().run_on_module(&mut m);
+    ir::const_folding::ConstantFolding::new().run_on_module(&mut m);
+
+    let mut jit = exec::jit::JITExecutor::new(&m);
+    let func = jit.find_function_by_name("func").unwrap();
+    assert_eq!(jit.run(func, vec![]), exec::jit::GenericValue::Int32(3));
+}
+
+#[test]
 fn pointer() {
     let mut m = module::Module::new("cilk");
 
