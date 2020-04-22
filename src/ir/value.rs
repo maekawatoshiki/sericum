@@ -165,6 +165,13 @@ impl Value {
             _ => panic!(),
         }
     }
+
+    pub fn as_instruction(&self) -> &InstructionValue {
+        match self {
+            Self::Instruction(iv) => iv,
+            _ => panic!(),
+        }
+    }
 }
 
 impl ImmediateValue {

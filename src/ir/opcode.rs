@@ -1,4 +1,4 @@
-use super::{basic_block::BasicBlockId, module::Module, types::*, value::*};
+use super::{basic_block::BasicBlockId, function::FunctionId, module::Module, types::*, value::*};
 use id_arena::{Arena, Id};
 use std::cell::RefCell;
 
@@ -151,6 +151,10 @@ impl Opcode {
 }
 
 impl Operand {
+    pub fn new_inst(func_id: FunctionId, id: InstructionId) -> Self {
+        Operand::Value(Value::Instruction(InstructionValue { func_id, id }))
+    }
+
     // TODO: should return cow?
     pub fn to_string(&self, parent: &Module) -> String {
         match self {
