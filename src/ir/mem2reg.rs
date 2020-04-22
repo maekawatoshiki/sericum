@@ -31,13 +31,13 @@ impl Mem2Reg {
                 cur_func: func,
                 inst_indexes: InstructionIndexes::new(),
             }
-            .run_on_function(&module.types);
+            .run(&module.types);
         }
     }
 }
 
 impl<'a> Mem2RegOnFunction<'a> {
-    fn run_on_function(&mut self, _tys: &Types) {
+    fn run(&mut self, _tys: &Types) {
         let mut single_store_allocas = vec![];
         let mut single_block_allocas = vec![];
 
@@ -118,7 +118,7 @@ impl<'a> Mem2RegOnFunction<'a> {
                 let load_idx = self.inst_indexes.get_index(&self.cur_func, id);
                 store_idx < load_idx
             } else {
-                self.dominate_bb(store_parent, load_parent)
+                self.strictly_dominate_bb(store_parent, load_parent)
             };
             all_loads_removable &= valid;
             valid
@@ -233,17 +233,17 @@ impl<'a> Mem2RegOnFunction<'a> {
         })
     }
 
-    fn dominate_bb(&self, bb1: BasicBlockId, bb2: BasicBlockId) -> bool {
-        let cur_bb = &self.cur_func.basic_block_arena[bb1];
-        for succ in &cur_bb.succ {
-            if *succ == bb2 {
-                return true;
-            }
-            if self.dominate_bb(*succ, bb2) {
-                return true;
-            }
-        }
-        false
+    pub fn strictly_dominate_bb(&self, bb0: BasicBlockId, bb1: BasicBlockId) -> bool {
+        // strictly dominate means that bb1 can't reach bb0 and bb0 can reach bb1
+        !self.dominate_bb(bb1, bb0) && self.dominate_bb(bb0, bb1)
+    }
+
+    pub fn dominate_bb(&self, bb0: BasicBlockId, bb1: BasicBlockId) -> bool {
+        bb0 == bb1
+            || self.cur_func.basic_block_arena[bb0]
+                .succ
+                .iter()
+                .any(|&succ| succ == bb1 || self.dominate_bb(succ, bb1))
     }
 }
 

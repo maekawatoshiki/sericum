@@ -70,6 +70,8 @@ fn test2_mem2reg() {
         br label1;
     label1:
         store (i32 3), (%i);
+        br label3;
+    label3:
         br label2;
     label2:
         li = load (%i);
