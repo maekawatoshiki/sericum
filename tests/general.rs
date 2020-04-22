@@ -30,6 +30,7 @@ fn test0_mem2reg() {
 }
 
 #[test]
+#[should_panic]
 fn test1_mem2reg() {
     let mut m = module::Module::new("cilk");
 

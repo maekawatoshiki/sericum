@@ -78,26 +78,12 @@ impl<'a> Mem2RegOnFunction<'a> {
             self.promote_single_store_alloca(alloca);
         }
 
-        // for alloca in single_block_allocas {
-        //     self.promote_single_block_alloca(alloca);
-        // }
+        for alloca in single_block_allocas {
+            self.promote_single_block_alloca(alloca);
+        }
     }
 
     fn is_alloca_promotable(&self, alloca: &Instruction) -> bool {
-        // let mut last_parent: Option<BasicBlockId> = None;
-        // alloca.users.borrow().iter().all(|&use_id| {
-        //     let should_be_load_or_store = &func.inst_table[use_id];
-        //     let same_parent = if last_parent.is_some() {
-        //         let eq = last_parent.unwrap() == should_be_load_or_store.parent;
-        //         last_parent = Some(should_be_load_or_store.parent);
-        //         eq
-        //     } else {
-        //         last_parent = Some(should_be_load_or_store.parent);
-        //         true
-        //     };
-        //     matches!(should_be_load_or_store.opcode, Opcode::Load | Opcode::Store) && same_parent
-        // })
-
         let func = &self.cur_func;
         alloca.users.borrow().iter().all(|&use_id| {
             let should_be_load_or_store = &func.inst_table[use_id];
@@ -131,15 +117,11 @@ impl<'a> Mem2RegOnFunction<'a> {
             let inst = &self.cur_func.inst_table[use_id];
             match inst.opcode {
                 Opcode::Store => {
-                    let store = inst;
-                    let store_id = use_id;
-                    src = Some(store.operands[0]);
-                    store_to_remove = Some(store_id);
+                    src = Some(inst.operands[0]);
+                    store_to_remove = Some(use_id);
                 }
                 Opcode::Load => {
-                    let load = inst;
-                    let load_id = use_id;
-                    loads_to_remove.push((load_id, load.users.borrow().clone()));
+                    loads_to_remove.push((use_id, inst.users.borrow().clone()));
                 }
                 _ => unreachable!(),
             }
@@ -164,18 +146,76 @@ impl<'a> Mem2RegOnFunction<'a> {
         }
 
         // remove loads and replace them with src
-        for (load, users_load) in loads_to_remove {
+        for (load, load_users) in loads_to_remove {
             self.cur_func.remove_inst(load);
 
-            for u in users_load {
+            for u in load_users {
                 let inst = &mut self.cur_func.inst_table[u];
                 inst.replace_operand(&Operand::new_inst(self.cur_func.id.unwrap(), load), src)
             }
         }
     }
 
-    // fn promote_single_block_alloca(&mut self, alloca_id: InstructionId) {
-    // }
+    fn promote_single_block_alloca(&mut self, alloca_id: InstructionId) {
+        let alloca = &self.cur_func.inst_table[alloca_id];
+        let mut stores_and_indexes = vec![];
+        let mut loads = vec![];
+
+        fn find_nearest_store(
+            stores_and_indexes: &Vec<(InstructionId, usize)>,
+            load_idx: InstructionIndex,
+        ) -> Option<InstructionId> {
+            let mut dis = None;
+            let mut nearest_store = None;
+            for &(store_id, store_idx) in stores_and_indexes {
+                if store_idx < load_idx
+                    && *dis.get_or_insert(load_idx - store_idx) >= load_idx - store_idx
+                {
+                    dis = Some(load_idx - store_idx);
+                    nearest_store = Some(store_id);
+                }
+            }
+            nearest_store
+        }
+
+        for &use_id in &*alloca.users.borrow() {
+            let inst = &self.cur_func.inst_table[use_id];
+            match inst.opcode {
+                Opcode::Store => stores_and_indexes
+                    .push((use_id, self.inst_indexes.get_index(&self.cur_func, use_id))),
+                Opcode::Load => loads.push((use_id, inst.users.borrow().clone())),
+                _ => unreachable!(),
+            }
+        }
+
+        let mut all_access_removable = true;
+        for (load_id, load_users) in loads {
+            let load_idx = self.inst_indexes.get_index(&self.cur_func, load_id);
+            let nearest_store_id = match find_nearest_store(&stores_and_indexes, load_idx) {
+                Some(nearest_store_id) => nearest_store_id,
+                None => {
+                    all_access_removable = false;
+                    continue;
+                }
+            };
+
+            let nearest_store = &self.cur_func.inst_table[nearest_store_id];
+            let src = nearest_store.operands[0];
+
+            self.cur_func.remove_inst(nearest_store_id);
+            self.cur_func.remove_inst(load_id);
+
+            // remove loads and replace them with src
+            for u in load_users {
+                let inst = &mut self.cur_func.inst_table[u];
+                inst.replace_operand(&Operand::new_inst(self.cur_func.id.unwrap(), load_id), src)
+            }
+        }
+
+        if all_access_removable {
+            self.cur_func.remove_inst(alloca_id);
+        }
+    }
 }
 
 impl InstructionIndexes {
