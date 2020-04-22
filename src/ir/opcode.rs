@@ -11,7 +11,7 @@ pub struct Register(usize);
 #[derive(Clone, Debug)]
 pub struct Instruction {
     pub opcode: Opcode,
-    pub operands: Vec<Operand>,
+    pub operands: RefCell<Vec<Operand>>,
     pub ty: Type,
     pub id: Option<InstructionId>,
     pub parent: BasicBlockId,
@@ -56,7 +56,7 @@ impl Instruction {
     pub fn new(opcode: Opcode, operands: Vec<Operand>, ty: Type, parent: BasicBlockId) -> Self {
         Self {
             opcode,
-            operands,
+            operands: RefCell::new(operands),
             ty,
             id: None,
             parent,
@@ -69,7 +69,7 @@ impl Instruction {
     }
 
     pub fn set_users(&self, inst_arena: &Arena<Instruction>) {
-        for operand in &self.operands {
+        for operand in &*self.operands.borrow() {
             match operand {
                 Operand::Value(Value::Instruction(InstructionValue { id, .. })) => {
                     inst_arena[*id].users.borrow_mut().push(self.id.unwrap());
@@ -79,16 +79,25 @@ impl Instruction {
         }
     }
 
-    pub fn replace_operand(&mut self, from: &Operand, to: Operand) {
-        for operand in &mut self.operands {
+    pub fn set_user(&self, inst_arena: &Arena<Instruction>, new: InstructionId) {
+        inst_arena[self.id.unwrap()].users.borrow_mut().push(new);
+    }
+
+    pub fn replace_operand(&self, inst_arena: &Arena<Instruction>, from: &Operand, to: Operand) {
+        let self_id = self.id.unwrap();
+        for operand in &mut *self.operands.borrow_mut() {
             if *operand == *from {
+                // remove self from operand's users if necessary
+                operand.remove_from_users(inst_arena, self_id);
                 *operand = to;
+                // add self to operand's users if necessary
+                operand.set_user(&inst_arena, self_id);
             }
         }
     }
 
     pub fn remove(&self, inst_arena: &Arena<Instruction>) {
-        for operand in &self.operands {
+        for operand in &*self.operands.borrow() {
             match operand {
                 Operand::Value(Value::Instruction(InstructionValue { id, .. })) => {
                     inst_arena[*id]
@@ -103,7 +112,7 @@ impl Instruction {
 
     pub fn to_string(&self, parent: &Module) -> String {
         let mut output = self.opcode.to_string().to_owned();
-        for (i, operand) in self.operands.iter().enumerate() {
+        for (i, operand) in self.operands.borrow().iter().enumerate() {
             output = format!(
                 "{}{}{}",
                 output,
@@ -187,6 +196,21 @@ impl Operand {
         match self {
             Self::Value(v) => v,
             _ => panic!(),
+        }
+    }
+
+    pub fn remove_from_users(&self, inst_arena: &Arena<Instruction>, remove: InstructionId) {
+        if let Operand::Value(Value::Instruction(InstructionValue { id, .. })) = self {
+            inst_arena[*id]
+                .users
+                .borrow_mut()
+                .retain(|&use_id| use_id != remove);
+        }
+    }
+
+    pub fn set_user(&self, inst_arena: &Arena<Instruction>, new: InstructionId) {
+        if let Operand::Value(Value::Instruction(InstructionValue { id, .. })) = self {
+            inst_arena[*id].set_user(inst_arena, new);
         }
     }
 }

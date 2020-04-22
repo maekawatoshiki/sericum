@@ -184,14 +184,14 @@ impl<'a> ConvertToDAG<'a> {
 
             match inst.opcode {
                 Opcode::Alloca => {
-                    let ty = inst.operands[0].as_type();
-                    let fi_ty = self.types.new_pointer_ty(*ty);
+                    let ty = *inst.operands.borrow()[0].as_type();
+                    let fi_ty = self.types.new_pointer_ty(ty);
                     let fi = self.cur_conv_info_mut_with(|c| {
-                        let frinfo = c.local_mgr.alloc(ty);
+                        let frinfo = c.local_mgr.alloc(&ty);
                         c.dag_heap.alloc(DAGNode::new(
                             NodeKind::Operand(OperandNodeKind::FrameIndex(frinfo.clone())), // TODO
                             vec![],
-                            *ty,
+                            ty,
                         ))
                     });
                     let fiaddr = self.cur_conv_info_mut_with(|c| {
@@ -204,8 +204,8 @@ impl<'a> ConvertToDAG<'a> {
                     self.inst_id_node_id.insert(inst_id, fiaddr);
                 }
                 Opcode::Load => {
-                    let v = inst.operands[0].as_value();
-                    let v = self.get_dag_id_from_value(v);
+                    let v = *inst.operands.borrow()[0].as_value();
+                    let v = self.get_dag_id_from_value(&v);
                     let load_id = self.cur_conv_info_mut().dag_heap.alloc(DAGNode::new(
                         NodeKind::IR(IRNodeKind::Load),
                         vec![v],
@@ -222,8 +222,8 @@ impl<'a> ConvertToDAG<'a> {
                     }
                 }
                 Opcode::Store => {
-                    let src = self.get_dag_id_from_value(inst.operands[0].as_value());
-                    let dst = self.get_dag_id_from_value(inst.operands[1].as_value());
+                    let src = self.get_dag_id_from_value(inst.operands.borrow()[0].as_value());
+                    let dst = self.get_dag_id_from_value(inst.operands.borrow()[1].as_value());
                     let id = self.cur_conv_info_mut().dag_heap.alloc(DAGNode::new(
                         NodeKind::IR(IRNodeKind::Store),
                         vec![dst, src],
@@ -232,21 +232,29 @@ impl<'a> ConvertToDAG<'a> {
                     make_chain!(id);
                 }
                 Opcode::GetElementPtr => {
-                    let indices: Vec<Value> =
-                        inst.operands[1..].iter().map(|v| *v.as_value()).collect();
-                    let gep =
-                        self.construct_dag_for_gep(inst, inst.operands[0].as_value(), &indices);
+                    let indices: Vec<Value> = inst.operands.borrow()[1..]
+                        .iter()
+                        .map(|v| *v.as_value())
+                        .collect();
+                    let gep = self.construct_dag_for_gep(
+                        inst,
+                        inst.operands.borrow()[0].as_value(),
+                        &indices,
+                    );
                     if bb.liveness.borrow().live_out.contains(&inst_id) {
                         make_chain!(gep);
                     }
                     self.inst_id_node_id.insert(inst_id, gep);
                 }
                 Opcode::Call => {
-                    let mut operands: Vec<Raw<DAGNode>> = inst.operands[1..]
+                    let mut operands: Vec<Raw<DAGNode>> = inst.operands.borrow()[1..]
                         .iter()
                         .map(|v| self.get_dag_id_from_value(v.as_value()))
                         .collect();
-                    operands.insert(0, self.get_dag_id_from_value(inst.operands[0].as_value()));
+                    operands.insert(
+                        0,
+                        self.get_dag_id_from_value(inst.operands.borrow()[0].as_value()),
+                    );
                     let id = self.cur_conv_info_mut().dag_heap.alloc(DAGNode::new(
                         NodeKind::IR(IRNodeKind::Call),
                         operands,
@@ -264,8 +272,8 @@ impl<'a> ConvertToDAG<'a> {
                     }
                 }
                 Opcode::Add | Opcode::Sub | Opcode::Mul | Opcode::Rem => {
-                    let v1 = self.get_dag_id_from_value(inst.operands[0].as_value());
-                    let v2 = self.get_dag_id_from_value(inst.operands[1].as_value());
+                    let v1 = self.get_dag_id_from_value(inst.operands.borrow()[0].as_value());
+                    let v2 = self.get_dag_id_from_value(inst.operands.borrow()[1].as_value());
                     let bin_id = self.cur_conv_info_mut().dag_heap.alloc(DAGNode::new(
                         match inst.opcode {
                             Opcode::Add => NodeKind::IR(IRNodeKind::Add),
@@ -289,7 +297,7 @@ impl<'a> ConvertToDAG<'a> {
                 Opcode::Br => make_chain!(self.cur_conv_info_mut_with(|c| {
                     let bb = c.dag_heap.alloc(DAGNode::new(
                         NodeKind::Operand(OperandNodeKind::BasicBlock(
-                            c.get_dag_bb(*inst.operands[0].as_basic_block()),
+                            c.get_dag_bb(*inst.operands.borrow()[0].as_basic_block()),
                         )),
                         vec![],
                         Type::Void,
@@ -301,14 +309,14 @@ impl<'a> ConvertToDAG<'a> {
                     ))
                 })),
                 Opcode::CondBr => {
-                    let v = inst.operands[0].as_value();
-                    let then_ = inst.operands[1].as_basic_block();
-                    let else_ = inst.operands[2].as_basic_block();
-                    let v = self.get_dag_id_from_value(v);
+                    let v = *inst.operands.borrow()[0].as_value();
+                    let then_ = *inst.operands.borrow()[1].as_basic_block();
+                    let else_ = *inst.operands.borrow()[2].as_basic_block();
+                    let v = self.get_dag_id_from_value(&v);
                     make_chain!({
                         let c = self.cur_conv_info_mut();
                         let bb = c.dag_heap.alloc(DAGNode::new(
-                            NodeKind::Operand(OperandNodeKind::BasicBlock(c.get_dag_bb(*then_))),
+                            NodeKind::Operand(OperandNodeKind::BasicBlock(c.get_dag_bb(then_))),
                             vec![],
                             Type::Void,
                         ));
@@ -320,7 +328,7 @@ impl<'a> ConvertToDAG<'a> {
                     });
                     make_chain!(self.cur_conv_info_mut_with(|c| {
                         let bb = c.dag_heap.alloc(DAGNode::new(
-                            NodeKind::Operand(OperandNodeKind::BasicBlock(c.get_dag_bb(*else_))),
+                            NodeKind::Operand(OperandNodeKind::BasicBlock(c.get_dag_bb(else_))),
                             vec![],
                             Type::Void,
                         ));
@@ -332,11 +340,11 @@ impl<'a> ConvertToDAG<'a> {
                     }));
                 }
                 Opcode::ICmp => {
-                    let c = inst.operands[0].as_icmp_kind();
-                    let v1 = self.get_dag_id_from_value(inst.operands[1].as_value());
-                    let v2 = self.get_dag_id_from_value(inst.operands[2].as_value());
+                    let c = *inst.operands.borrow()[0].as_icmp_kind();
+                    let v1 = self.get_dag_id_from_value(inst.operands.borrow()[1].as_value());
+                    let v2 = self.get_dag_id_from_value(inst.operands.borrow()[2].as_value());
                     let cond = self.cur_conv_info_mut().dag_heap.alloc(DAGNode::new(
-                        NodeKind::Operand(OperandNodeKind::CondKind((*c).into())),
+                        NodeKind::Operand(OperandNodeKind::CondKind((c).into())),
                         vec![],
                         Type::Void,
                     ));
@@ -355,13 +363,13 @@ impl<'a> ConvertToDAG<'a> {
                 }
                 Opcode::Phi => {
                     let mut operands = vec![];
-                    for i in (0..inst.operands.len()).step_by(2) {
+                    for i in (0..inst.operands.borrow().len()).step_by(2) {
                         let (val, bb) = (
-                            inst.operands[i].as_value(),
-                            inst.operands[i + 1].as_basic_block(),
+                            *inst.operands.borrow()[i].as_value(),
+                            *inst.operands.borrow()[i + 1].as_basic_block(),
                         );
                         // Remove CopyFromReg if necessary
-                        let val = self.get_dag_id_from_value(val);
+                        let val = self.get_dag_id_from_value(&val);
                         operands.push(match val.kind {
                             NodeKind::IR(IRNodeKind::CopyFromReg) => val.operand[0],
                             _ => val,
@@ -369,7 +377,7 @@ impl<'a> ConvertToDAG<'a> {
 
                         operands.push(self.cur_conv_info_mut_with(|c| {
                             c.dag_heap.alloc(DAGNode::new(
-                                NodeKind::Operand(OperandNodeKind::BasicBlock(c.get_dag_bb(*bb))),
+                                NodeKind::Operand(OperandNodeKind::BasicBlock(c.get_dag_bb(bb))),
                                 vec![],
                                 Type::Void,
                             ))
@@ -389,7 +397,7 @@ impl<'a> ConvertToDAG<'a> {
                     }
                 }
                 Opcode::Ret => {
-                    let v = self.get_dag_id_from_value(inst.operands[0].as_value());
+                    let v = self.get_dag_id_from_value(inst.operands.borrow()[0].as_value());
                     make_chain!(self.cur_conv_info_mut().dag_heap.alloc(DAGNode::new(
                         NodeKind::IR(IRNodeKind::Ret),
                         vec![v],
