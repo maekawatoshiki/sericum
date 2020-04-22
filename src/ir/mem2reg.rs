@@ -153,17 +153,13 @@ impl<'a> Mem2RegOnFunction<'a> {
             stores_and_indexes: &Vec<(InstructionId, usize)>,
             load_idx: InstructionIndex,
         ) -> Option<InstructionId> {
-            let mut dis = None;
-            let mut nearest_store = None;
-            for &(store_id, store_idx) in stores_and_indexes {
-                if store_idx < load_idx
-                    && *dis.get_or_insert(load_idx - store_idx) >= load_idx - store_idx
-                {
-                    dis = Some(load_idx - store_idx);
-                    nearest_store = Some(store_id);
-                }
+            let i = stores_and_indexes
+                .binary_search_by(|(_, store_idx)| store_idx.cmp(&load_idx))
+                .unwrap_or_else(|x| x);
+            if i == 0 {
+                return None;
             }
-            nearest_store
+            Some(stores_and_indexes[i - 1].0)
         }
 
         for &use_id in &*alloca.users.borrow() {
@@ -175,6 +171,8 @@ impl<'a> Mem2RegOnFunction<'a> {
                 _ => unreachable!(),
             }
         }
+
+        stores_and_indexes.sort_by(|(_, idx0), (_, idx1)| idx0.cmp(idx1)); // sort to make it more efficient to find
 
         let mut all_access_removable = true;
         for (load_id, load_users) in loads {
