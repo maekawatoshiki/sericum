@@ -240,17 +240,19 @@ impl<'a> Mem2RegOnFunction<'a> {
         })
     }
 
-    // pub fn strictly_dominate_bb(&self, bb0: BasicBlockId, bb1: BasicBlockId) -> bool {
-    //     // strictly dominate means that bb1 can't reach bb0 and bb0 can reach bb1
-    //     !self.dominate_bb(bb1, bb0) && self.dominate_bb(bb0, bb1)
-    // }
-
     pub fn dominate_bb(&self, bb0: BasicBlockId, bb1: BasicBlockId) -> bool {
-        bb0 == bb1
+        let bb0_reaches_bb1 = bb0 == bb1
             || self.cur_func.basic_block_arena[bb0]
                 .succ
                 .iter()
-                .any(|&succ| succ == bb1 || self.dominate_bb(succ, bb1))
+                .any(|&succ| succ == bb1 || self.dominate_bb(succ, bb1));
+        let no_multi_branches_from_entry_to_bb0 = self.cur_func.basic_block_arena[bb0]
+            .pred
+            .iter()
+            .all(|&pred| {
+                self.cur_func.basic_block_arena[pred].succ.len() <= 1 && self.dominate_bb(pred, bb0)
+            });
+        bb0_reaches_bb1 && no_multi_branches_from_entry_to_bb0
     }
 }
 
