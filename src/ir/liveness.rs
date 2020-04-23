@@ -28,7 +28,7 @@ impl<'a> IRLivenessAnalyzer<'a> {
                     && self
                         .module
                         .types
-                        .as_function_ty(inst.operands.borrow()[0].as_value().get_type(self.module))
+                        .as_function_ty(inst.operands[0].as_value().get_type(self.module))
                         .unwrap()
                         .ret_ty
                         != Type::Void
@@ -48,7 +48,7 @@ impl<'a> IRLivenessAnalyzer<'a> {
         for (bb_id, bb) in &f.basic_block_arena {
             for inst_val in &*bb.iseq.borrow() {
                 let inst = &f.inst_table[inst_val.get_inst_id().unwrap()];
-                self.visit_operands(f, bb_id, &inst.operands.borrow());
+                self.visit_operands(f, bb_id, &inst.operands);
             }
         }
     }

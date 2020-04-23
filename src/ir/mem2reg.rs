@@ -97,7 +97,7 @@ impl<'a> Mem2RegOnFunction<'a> {
             let inst = &self.cur_func.inst_table[use_id];
             match inst.opcode {
                 Opcode::Store => {
-                    src = Some(inst.operands.borrow()[0]);
+                    src = Some(inst.operands[0]);
                     store_to_remove = Some(use_id);
                 }
                 Opcode::Load => loads_to_remove.push((use_id, inst.users.borrow().clone())),
@@ -134,9 +134,10 @@ impl<'a> Mem2RegOnFunction<'a> {
             self.cur_func.remove_inst(load);
 
             for u in load_users {
-                let inst = &self.cur_func.inst_table[u];
-                inst.replace_operand(
-                    &self.cur_func.inst_table,
+                // let inst = &self.cur_func.inst_table[u];
+                Instruction::replace_operand(
+                    &mut self.cur_func.inst_table,
+                    u,
                     &Operand::new_inst(self.cur_func.id.unwrap(), load),
                     src,
                 )
@@ -186,16 +187,17 @@ impl<'a> Mem2RegOnFunction<'a> {
             };
 
             let nearest_store = &self.cur_func.inst_table[nearest_store_id];
-            let src = nearest_store.operands.borrow()[0];
+            let src = nearest_store.operands[0];
 
             self.cur_func.remove_inst(nearest_store_id);
             self.cur_func.remove_inst(load_id);
 
             // remove loads and replace them with src
             for u in load_users {
-                let inst = &self.cur_func.inst_table[u];
-                inst.replace_operand(
-                    &self.cur_func.inst_table,
+                // let inst = &self.cur_func.inst_table[u];
+                Instruction::replace_operand(
+                    &mut self.cur_func.inst_table,
+                    u,
                     &Operand::new_inst(self.cur_func.id.unwrap(), load_id),
                     src,
                 )

@@ -51,14 +51,15 @@ impl<'a> ConstantFoldingOnFunction<'a> {
                 Some(folded) => folded,
                 None => continue,
             };
-            let users = inst.users.borrow().clone();
-            for user_id in users {
-                let user = &self.cur_func.inst_table[user_id];
-                user.replace_operand(
-                    &self.cur_func.inst_table,
+            let users = inst.users.clone();
+            for &user_id in &*users.borrow() {
+                Instruction::replace_operand(
+                    &mut self.cur_func.inst_table,
+                    user_id,
                     &Operand::new_inst(self.cur_func.id.unwrap(), inst_id),
                     Operand::Value(folded),
                 );
+                let user = &self.cur_func.inst_table[user_id];
                 if Self::is_foldable(user) {
                     worklist.push_back(user_id)
                 }
@@ -71,7 +72,6 @@ impl<'a> ConstantFoldingOnFunction<'a> {
         matches!(inst.opcode, Opcode::Add | Opcode::Sub | Opcode::Mul)
             && inst
                 .operands
-                .borrow()
                 .iter()
                 .all(|op| matches!(op, Operand::Value(Value::Immediate(_))))
     }
