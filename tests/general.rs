@@ -89,6 +89,41 @@ fn test2_mem2reg() {
 }
 
 #[test]
+fn test3_mem2reg() {
+    let mut m = module::Module::new("cilk");
+
+    let func = cilk_ir!(m; define [i32] func [(i32)] {
+    entry:
+        i = alloca i32;
+        br label1;
+    label1:
+        store (i32 3), (%i);
+        cond = icmp eq (%arg.0), (i32 2);
+        br (%cond) label2, label3;
+    label2:
+        store (i32 5), (%i);
+        br label4;
+    label3:
+        br label4;
+    label4:
+        li = load (%i);
+        ret (%li);
+    });
+
+    println!("{}", m.dump(func));
+
+    ir::mem2reg::Mem2Reg::new().run_on_module(&mut m);
+    ir::const_folding::ConstantFolding::new().run_on_module(&mut m);
+
+    let mut jit = exec::jit::JITExecutor::new(&m);
+    let func = jit.find_function_by_name("func").unwrap();
+    assert_eq!(
+        jit.run(func, vec![exec::jit::GenericValue::Int32(2)]),
+        exec::jit::GenericValue::Int32(5)
+    );
+}
+
+#[test]
 fn pointer() {
     let mut m = module::Module::new("cilk");
 

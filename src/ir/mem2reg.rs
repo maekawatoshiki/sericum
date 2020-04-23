@@ -40,6 +40,7 @@ impl<'a> Mem2RegOnFunction<'a> {
     fn run(&mut self, _tys: &Types) {
         let mut single_store_allocas = vec![];
         let mut single_block_allocas = vec![];
+        let mut multi_block_allocas = vec![];
 
         for &id in &self.cur_func.basic_blocks {
             let bb = &self.cur_func.basic_block_arena[id];
@@ -71,8 +72,9 @@ impl<'a> Mem2RegOnFunction<'a> {
                 }
 
                 // stores and loads in multiple basic blocks
-                // if is_promotable {
-                // }
+                if is_promotable {
+                    multi_block_allocas.push(inst_id);
+                }
 
                 // TODO: support other cases...
             }
@@ -84,6 +86,10 @@ impl<'a> Mem2RegOnFunction<'a> {
 
         for alloca in single_block_allocas {
             self.promote_single_block_alloca(alloca);
+        }
+
+        for alloca in multi_block_allocas {
+            self.promote_multi_block_alloca(alloca);
         }
     }
 
@@ -118,7 +124,7 @@ impl<'a> Mem2RegOnFunction<'a> {
                 let load_idx = self.inst_indexes.get_index(&self.cur_func, id);
                 store_idx < load_idx
             } else {
-                self.strictly_dominate_bb(store_parent, load_parent)
+                self.dominate_bb(store_parent, load_parent)
             };
             all_loads_removable &= valid;
             valid
@@ -134,7 +140,6 @@ impl<'a> Mem2RegOnFunction<'a> {
             self.cur_func.remove_inst(load);
 
             for u in load_users {
-                // let inst = &self.cur_func.inst_table[u];
                 Instruction::replace_operand(
                     &mut self.cur_func.inst_table,
                     u,
@@ -209,6 +214,8 @@ impl<'a> Mem2RegOnFunction<'a> {
         }
     }
 
+    fn promote_multi_block_alloca(&mut self, _alloca_id: InstructionId) {}
+
     fn is_alloca_promotable(&self, alloca: &Instruction) -> bool {
         let func = &self.cur_func;
         alloca.users.borrow().iter().all(|&use_id| {
@@ -233,10 +240,10 @@ impl<'a> Mem2RegOnFunction<'a> {
         })
     }
 
-    pub fn strictly_dominate_bb(&self, bb0: BasicBlockId, bb1: BasicBlockId) -> bool {
-        // strictly dominate means that bb1 can't reach bb0 and bb0 can reach bb1
-        !self.dominate_bb(bb1, bb0) && self.dominate_bb(bb0, bb1)
-    }
+    // pub fn strictly_dominate_bb(&self, bb0: BasicBlockId, bb1: BasicBlockId) -> bool {
+    //     // strictly dominate means that bb1 can't reach bb0 and bb0 can reach bb1
+    //     !self.dominate_bb(bb1, bb0) && self.dominate_bb(bb0, bb1)
+    // }
 
     pub fn dominate_bb(&self, bb0: BasicBlockId, bb1: BasicBlockId) -> bool {
         bb0 == bb1
