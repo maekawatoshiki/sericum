@@ -1,17 +1,19 @@
 use crate::ir::{
     basic_block::BasicBlockId,
+    dom_tree::{DominatorTree, DominatorTreeConstructor},
     function::Function,
     module::Module,
     opcode::{Instruction, InstructionId, Opcode, Operand},
     types::Types,
 };
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 pub struct Mem2Reg {}
 
 struct Mem2RegOnFunction<'a> {
     cur_func: &'a mut Function,
     inst_indexes: InstructionIndexes,
+    dom_tree: DominatorTree,
 }
 
 pub type InstructionIndex = usize;
@@ -28,6 +30,7 @@ impl Mem2Reg {
     pub fn run_on_module(&mut self, module: &mut Module) {
         for (_, func) in &mut module.functions {
             Mem2RegOnFunction {
+                dom_tree: DominatorTreeConstructor::new(func).construct(),
                 cur_func: func,
                 inst_indexes: InstructionIndexes::new(),
             }
@@ -124,7 +127,7 @@ impl<'a> Mem2RegOnFunction<'a> {
                 let load_idx = self.inst_indexes.get_index(&self.cur_func, id);
                 store_idx < load_idx
             } else {
-                self.dominate_bb(store_parent, load_parent)
+                self.dom_tree.dominate_bb(store_parent, load_parent)
             };
             all_loads_removable &= valid;
             valid
@@ -214,7 +217,39 @@ impl<'a> Mem2RegOnFunction<'a> {
         }
     }
 
-    fn promote_multi_block_alloca(&mut self, _alloca_id: InstructionId) {}
+    fn promote_multi_block_alloca(&mut self, alloca_id: InstructionId) {
+        println!("dom tree: {:?}", self.dom_tree.tree);
+
+        let alloca = &self.cur_func.inst_table[alloca_id];
+        let mut def_blocks = vec![];
+        let mut using_blocks = vec![];
+        let mut livein_blocks = FxHashSet::default();
+
+        for &use_id in &*alloca.users.borrow() {
+            let inst = &self.cur_func.inst_table[use_id];
+            match inst.opcode {
+                Opcode::Store => def_blocks.push(inst.parent),
+                Opcode::Load => using_blocks.push(inst.parent),
+                _ => unreachable!(),
+            }
+        }
+
+        // compute livein blocks
+        let mut worklist = using_blocks.clone();
+        while let Some(bb) = worklist.pop() {
+            if !livein_blocks.insert(bb) {
+                continue;
+            }
+            for pred in &self.cur_func.basic_block_arena[bb].pred {
+                if def_blocks.contains(pred) {
+                    continue;
+                }
+                worklist.push(*pred);
+            }
+        }
+        println!("def: {:?}", def_blocks);
+        println!("livein: {:?}", livein_blocks);
+    }
 
     fn is_alloca_promotable(&self, alloca: &Instruction) -> bool {
         let func = &self.cur_func;
@@ -238,21 +273,6 @@ impl<'a> Mem2RegOnFunction<'a> {
             last_parent = Some(user.parent);
             matches!(user.opcode, Opcode::Load | Opcode::Store) && same_parent
         })
-    }
-
-    pub fn dominate_bb(&self, bb0: BasicBlockId, bb1: BasicBlockId) -> bool {
-        let bb0_reaches_bb1 = bb0 == bb1
-            || self.cur_func.basic_block_arena[bb0]
-                .succ
-                .iter()
-                .any(|&succ| succ == bb1 || self.dominate_bb(succ, bb1));
-        let no_multi_branches_from_entry_to_bb0 = self.cur_func.basic_block_arena[bb0]
-            .pred
-            .iter()
-            .all(|&pred| {
-                self.cur_func.basic_block_arena[pred].succ.len() <= 1 && self.dominate_bb(pred, bb0)
-            });
-        bb0_reaches_bb1 && no_multi_branches_from_entry_to_bb0
     }
 }
 
