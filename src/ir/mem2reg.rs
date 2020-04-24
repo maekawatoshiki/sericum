@@ -29,6 +29,11 @@ impl Mem2Reg {
 
     pub fn run_on_module(&mut self, module: &mut Module) {
         for (_, func) in &mut module.functions {
+            // ignore internal function TODO
+            if func.basic_blocks.len() == 0 {
+                continue;
+            }
+
             Mem2RegOnFunction {
                 dom_tree: DominatorTreeConstructor::new(func).construct(),
                 cur_func: func,
@@ -218,20 +223,38 @@ impl<'a> Mem2RegOnFunction<'a> {
     }
 
     fn promote_multi_block_alloca(&mut self, alloca_id: InstructionId) {
-        println!("dom tree: {:?}", self.dom_tree.tree);
+        // println!("dom tree: {:?}", self.dom_tree.tree);
 
-        let alloca = &self.cur_func.inst_table[alloca_id];
         let mut def_blocks = vec![];
         let mut using_blocks = vec![];
         let mut livein_blocks = FxHashSet::default();
+        let mut bb_to_insts: FxHashMap<
+            BasicBlockId,
+            /*sorted by inst idx=*/ Vec<(InstructionIndex, InstructionId)>,
+        > = FxHashMap::default();
 
-        for &use_id in &*alloca.users.borrow() {
+        for &use_id in &*self.cur_func.inst_table[alloca_id].users.borrow() {
             let inst = &self.cur_func.inst_table[use_id];
             match inst.opcode {
-                Opcode::Store => def_blocks.push(inst.parent),
-                Opcode::Load => using_blocks.push(inst.parent),
+                Opcode::Store => {
+                    def_blocks.push(inst.parent);
+                    bb_to_insts
+                        .entry(inst.parent)
+                        .or_insert(vec![])
+                        .push((self.inst_indexes.get_index(&self.cur_func, use_id), use_id));
+                }
+                Opcode::Load => {
+                    using_blocks.push(inst.parent);
+                    bb_to_insts
+                        .entry(inst.parent)
+                        .or_insert(vec![])
+                        .push((self.inst_indexes.get_index(&self.cur_func, use_id), use_id));
+                }
                 _ => unreachable!(),
             }
+        }
+        for (_, insts) in &mut bb_to_insts {
+            insts.sort_by(|(idx1, _), (idx2, _)| idx1.cmp(idx2))
         }
 
         // compute livein blocks
@@ -247,8 +270,98 @@ impl<'a> Mem2RegOnFunction<'a> {
                 worklist.push(*pred);
             }
         }
-        println!("def: {:?}", def_blocks);
-        println!("livein: {:?}", livein_blocks);
+        // println!("def: {:?}", def_blocks);
+        // println!("livein: {:?}", livein_blocks);
+
+        let mut phi = vec![];
+
+        for d in &def_blocks {
+            for livein in &livein_blocks {
+                for pred in &self.cur_func.basic_block_arena[*livein].pred {
+                    if self.dom_tree.dominate_bb(*d, *pred)
+                        && !(self.dom_tree.dominate_bb(*d, *livein) && *d != *livein)
+                    {
+                        phi.push(*livein);
+                    }
+                }
+            }
+        }
+
+        let mut phi_map = FxHashMap::default();
+        for p in phi.clone() {
+            let mut worklist = phi.clone();
+            while let Some(bb) = worklist.pop() {
+                if def_blocks.contains(&bb) {
+                    phi_map.entry(p).or_insert(vec![]).push(bb);
+                    continue;
+                }
+                for pred in &self.cur_func.basic_block_arena[bb].pred {
+                    worklist.push(*pred);
+                }
+            }
+        }
+
+        println!("PHI PAIR: {:?}", phi_map);
+
+        for (phi_bb, def_bbs) in &phi_map {
+            let phi_insts = bb_to_insts.get(phi_bb).unwrap();
+            let mut leading_loads = vec![];
+            for (_, phi_inst) in phi_insts {
+                let inst = &self.cur_func.inst_table[*phi_inst];
+                if inst.opcode == Opcode::Store {
+                    break;
+                }
+                leading_loads.push(*phi_inst);
+                println!("to be phi: {:?}", inst);
+            }
+
+            let mut srcs = vec![];
+            let mut stores = vec![];
+            for def_bb in def_bbs {
+                let def_insts = bb_to_insts.get(def_bb).unwrap();
+                for (_, phi_inst) in def_insts.iter().rev() {
+                    let inst = &self.cur_func.inst_table[*phi_inst];
+                    if inst.opcode != Opcode::Store {
+                        continue;
+                    }
+                    srcs.push((inst.operands[0], *def_bb));
+                    stores.push(*phi_inst);
+                }
+            }
+
+            for load in leading_loads {
+                let ty = self.cur_func.inst_table[load].ty;
+                let parent = self.cur_func.inst_table[load].parent;
+                let mut operands = vec![];
+                for (v, bb) in &srcs {
+                    operands.push(*v);
+                    operands.push(Operand::BasicBlock(*bb));
+                }
+                let inst = Instruction::new(Opcode::Phi, operands, ty, parent);
+                self.cur_func.change_inst(load, inst);
+            }
+
+            for store_id in stores {
+                let store = &self.cur_func.inst_table[store_id];
+                if store.users.borrow().len() == 0 {
+                    self.cur_func.remove_inst(store_id);
+                }
+            }
+
+            if self.cur_func.inst_table[alloca_id].users.borrow().len() == 0 {
+                self.cur_func.remove_inst(alloca_id);
+            }
+
+            // for def_bb in def_bbs {
+            //     let def_insts = bb_to_insts.get(def_bb).unwrap();
+            //     for (_, phi_inst) in def_insts.iter().rev() {
+            //         let inst = &self.cur_func.inst_table[*phi_inst];
+            //         if inst.opcode == Opcode::Store {
+            //             println!("{:?}", inst.users);
+            //         }
+            //     }
+            // }
+        }
     }
 
     fn is_alloca_promotable(&self, alloca: &Instruction) -> bool {

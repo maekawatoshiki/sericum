@@ -21,6 +21,9 @@ impl DominatorTree {
     }
 
     pub fn dominate_bb(&self, bb0: BasicBlockId, bb1: BasicBlockId) -> bool {
+        if bb0 == bb1 {
+            return true;
+        }
         if let Some(set) = self.tree.get(&bb0) {
             if set.contains(&bb1) {
                 return true;
@@ -63,7 +66,7 @@ impl<'a> DominatorTreeConstructor<'a> {
 
         for (a, bs) in &strictly_dominated {
             for b in bs {
-                if bs.iter().any(|bb| {
+                if !bs.iter().any(|bb| {
                     if bb == b {
                         return false;
                     }
@@ -74,7 +77,7 @@ impl<'a> DominatorTreeConstructor<'a> {
             }
         }
 
-        for (b, a) in idom {
+        for (&b, &a) in &idom {
             self.tree
                 .tree
                 .entry(a)

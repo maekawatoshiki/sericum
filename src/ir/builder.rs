@@ -45,6 +45,15 @@ impl<'a> Builder<'a> {
         self.insert_point = pt;
     }
 
+    pub fn set_insert_point_before_inst(&mut self, inst_id: InstructionId) -> Option<()> {
+        let (bb_id, inst_pos) = self
+            .module
+            .function_ref_mut(self.func_id)
+            .find_inst_pos(inst_id)?;
+        self.set_insert_point_at(inst_pos, bb_id);
+        Some(())
+    }
+
     pub fn build_alloca(&mut self, ty: Type) -> Value {
         let ptr_ty = self.module.types.new_pointer_ty(ty);
         let inst = self.create_inst_value(Opcode::Alloca, vec![Operand::Type(ty)], ptr_ty);

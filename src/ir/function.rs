@@ -103,6 +103,10 @@ impl Function {
         self.basic_block_arena[bb_id].iseq_ref_mut().remove(pos);
     }
 
+    fn remove_inst_left_in_bb(&self, inst_id: InstructionId) {
+        self.inst_table[inst_id].remove(&self.inst_table);
+    }
+
     pub fn alloc_inst(&mut self, inst: Instruction) -> InstructionId {
         // TODO
         let id = self.inst_table.alloc(inst);
@@ -113,6 +117,16 @@ impl Function {
         let inst = &self.inst_table[id];
         inst.set_users(&self.inst_table);
         id
+    }
+
+    pub fn change_inst(&mut self, id: InstructionId, mut inst: Instruction) {
+        inst.set_id(id);
+        let users = self.inst_table[id].users.clone();
+        inst.users = users;
+        self.remove_inst_left_in_bb(id);
+        self.inst_table[id] = inst;
+        let inst = &self.inst_table[id];
+        inst.set_users(&self.inst_table);
     }
 }
 

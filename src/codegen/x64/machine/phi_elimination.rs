@@ -27,7 +27,6 @@ impl PhiElimination {
             })
             .flatten()
             .collect();
-
         for (phi_id, phi) in phi_list {
             for i in (0..phi.operand.len()).step_by(2) {
                 let val = &phi.operand[i + 0];

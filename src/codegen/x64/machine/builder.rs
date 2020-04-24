@@ -133,14 +133,17 @@ impl<'a> BuilderTrait for BuilderWithLiveInfoEdit<'a> {
 
     fn back_insert_point_while<F: Fn(&MachineInst) -> bool>(&mut self, f: F) {
         loop {
-            if self.insert_point > 0 {
-                self.insert_point -= 1;
+            if self.insert_point == 0 {
+                break;
             }
+
+            self.insert_point -= 1;
 
             let inst_id = self.function.body.basic_blocks.arena[self.cur_bb_id.unwrap()].iseq_ref()
                 [self.insert_point];
             let inst = &self.function.body.inst_arena[inst_id];
-            if f(inst) {
+            if !f(inst) {
+                self.insert_point += 1;
                 break;
             }
         }
@@ -202,14 +205,17 @@ impl<'a> BuilderTrait for Builder<'a> {
 
     fn back_insert_point_while<F: Fn(&MachineInst) -> bool>(&mut self, f: F) {
         loop {
-            if self.insert_point > 0 {
-                self.insert_point -= 1;
+            if self.insert_point == 0 {
+                break;
             }
+
+            self.insert_point -= 1;
 
             let inst_id = self.function.body.basic_blocks.arena[self.cur_bb_id.unwrap()].iseq_ref()
                 [self.insert_point];
             let inst = &self.function.body.inst_arena[inst_id];
-            if f(inst) {
+            if !f(inst) {
+                self.insert_point += 1;
                 break;
             }
         }
