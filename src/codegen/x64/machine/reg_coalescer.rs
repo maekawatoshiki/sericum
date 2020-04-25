@@ -21,7 +21,6 @@ pub fn coalesce_function(matrix: &mut LiveRegMatrix, f: &mut MachineFunction) {
         //     copy.def[0],
         //     copy.operand[0].as_register()
         // ));
-
         let copy_dst = &copy.def[0];
         let copy_src = copy.operand[0].as_register();
 

@@ -105,6 +105,8 @@ impl RegisterAllocator {
         }
 
         self.rewrite_vregs(cur_func, &matrix);
+
+        coalesce_function(&mut matrix, cur_func); // spilling may cause another coalesce needs
     }
 
     fn rewrite_vregs(&mut self, cur_func: &mut MachineFunction, matrix: &LiveRegMatrix) {

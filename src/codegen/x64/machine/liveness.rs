@@ -34,7 +34,7 @@ pub struct LiveRange {
     pub segments: Vec<LiveSegment>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct LiveSegment {
     start: ProgramPoint,
     end: ProgramPoint,
@@ -316,11 +316,29 @@ impl LiveRange {
     }
 
     pub fn add_segment(&mut self, seg: LiveSegment) {
-        let pt = self
-            .segments
-            .binary_search_by(|s| s.start.cmp(&seg.start))
-            .unwrap_or_else(|x| x);
-        self.segments.insert(pt, seg);
+        let pt = self.segments.binary_search_by(|s| s.start.cmp(&seg.start));
+        let found = pt.is_ok();
+        let pt = pt.unwrap_or_else(|x| x);
+        if pt == 0 {
+            self.segments.insert(pt, seg);
+            return;
+        }
+        /* pt > 0 */
+        let mpt = if found { pt } else { pt - 1 };
+        let prev_seg = self.segments[mpt];
+        if prev_seg.end == seg.start {
+            self.segments[mpt].end = seg.end;
+            return;
+        }
+        if prev_seg.start != seg.start {
+            self.segments.insert(pt, seg);
+            return;
+        }
+        // prev_seg.start == seg.start
+        if prev_seg.end < seg.end {
+            self.segments[mpt].end = seg.end;
+            return;
+        }
     }
 
     pub fn unite_range(&mut self, range: LiveRange) {
@@ -745,6 +763,8 @@ impl LivenessAnalysis {
 
             bb_idx += 1;
         }
+
+        // println!("{:?}", vreg2range);
 
         LiveRegMatrix::new(
             vreg2entity,
