@@ -348,7 +348,29 @@ impl LiveRange {
     }
 
     pub fn remove_segment(&mut self, seg: &LiveSegment) {
-        self.segments.retain(|seg_| seg_.start != seg.start);
+        let mut found = false;
+        let pt = match self.segments.binary_search_by(|s| s.start.cmp(&seg.start)) {
+            Ok(pt) => {
+                found = true;
+                pt
+            }
+            Err(pt) => pt,
+        };
+
+        if found {
+            if self.segments[pt].end == seg.end {
+                self.segments.remove(pt);
+                return;
+            }
+            if seg.end < self.segments[pt].end {
+                let s = self.segments[pt];
+                self.segments.remove(pt);
+                self.add_segment(LiveSegment::new(seg.end, s.end));
+                return;
+            }
+        }
+
+        unimplemented!("WOW");
     }
 
     pub fn remove_range(&mut self, range: &LiveRange) {
