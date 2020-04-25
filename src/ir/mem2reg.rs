@@ -351,16 +351,6 @@ impl<'a> Mem2RegOnFunction<'a> {
             if self.cur_func.inst_table[alloca_id].users.borrow().len() == 0 {
                 self.cur_func.remove_inst(alloca_id);
             }
-
-            // for def_bb in def_bbs {
-            //     let def_insts = bb_to_insts.get(def_bb).unwrap();
-            //     for (_, phi_inst) in def_insts.iter().rev() {
-            //         let inst = &self.cur_func.inst_table[*phi_inst];
-            //         if inst.opcode == Opcode::Store {
-            //             println!("{:?}", inst.users);
-            //         }
-            //     }
-            // }
         }
     }
 
@@ -368,7 +358,10 @@ impl<'a> Mem2RegOnFunction<'a> {
         let func = &self.cur_func;
         alloca.users.borrow().iter().all(|&use_id| {
             let should_be_load_or_store = &func.inst_table[use_id];
-            matches!(should_be_load_or_store.opcode, Opcode::Load | Opcode::Store)
+            use super::types::Type;
+            (should_be_load_or_store.opcode == Opcode::Load
+                && should_be_load_or_store.ty == Type::Int32)
+                || matches!(should_be_load_or_store.opcode, Opcode::Load | Opcode::Store)
         })
     }
 
