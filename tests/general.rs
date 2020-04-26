@@ -129,6 +129,7 @@ fn test4_mem2reg() {
     let func = cilk_ir!(m; define [i32] func [(i32)] {
     entry:
         i = alloca i32;
+        k = alloca i32;
         store (i32 1), (%i);
         br label1;
     label1:
@@ -137,10 +138,16 @@ fn test4_mem2reg() {
         br (%cond) label2, label3;
     label2:
         store (i32 3), (%i);
-        br label3;
+        store (i32 6), (%k);
+        br label4;
     label3:
+        store (i32 4), (%k);
+        br label4;
+    label4:
         li = load (%i);
-        ret (%li);
+        lk = load (%k);
+        a = add (%li), (%lk);
+        ret (%a);
     });
 
     println!("{}", m.dump(func));
@@ -152,7 +159,11 @@ fn test4_mem2reg() {
     let func = jit.find_function_by_name("func").unwrap();
     assert_eq!(
         jit.run(func, vec![exec::jit::GenericValue::Int32(2)]),
-        exec::jit::GenericValue::Int32(3)
+        exec::jit::GenericValue::Int32(9)
+    );
+    assert_eq!(
+        jit.run(func, vec![exec::jit::GenericValue::Int32(0)]),
+        exec::jit::GenericValue::Int32(5)
     );
 }
 

@@ -290,8 +290,6 @@ impl<'a> ConversionInfo<'a> {
             }
             e => {
                 println!("{:?}", e);
-                println!("{:?}", *node.operand[0]);
-                println!("{:?}", *node.operand[1]);
                 None
             }
         };

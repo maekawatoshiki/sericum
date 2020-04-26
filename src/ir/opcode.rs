@@ -196,7 +196,7 @@ impl Instruction {
             "{} // (self:{}, users:{:?})",
             output,
             self.id.unwrap().index(),
-            self.users.borrow()
+            self.users.borrow().iter().take(10).collect::<Vec<_>>()
         )
     }
 }

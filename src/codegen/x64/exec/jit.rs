@@ -45,23 +45,21 @@ impl JITExecutor {
 
         let mut dag_module = dag::convert::ConvertToDAG::new(module).convert_module();
 
-        debug!(println!("dag: before: {:?}", dag_module));
+        // debug!(println!("dag: before: {:?}", dag_module));
 
         dag::combine::Combine::new().combine_module(&mut dag_module);
         // debug!(println!("dag: comibine: {:?}", dag_module));
         dag::legalize::Legalize::new().run_on_module(&mut dag_module);
         // debug!(println!("dag: legalize: {:?}", dag_module));
         dag::isel::MISelector::new().run_on_module(&mut dag_module);
-        debug!(println!("dag: isel: {:?}", dag_module));
+        // debug!(println!("dag: isel: {:?}", dag_module));
 
         let mut machine_module = dag::mc_convert::convert_module(dag_module);
 
         // debug!(println!("{:?}", machine_module));
 
-        debug!(println!("{:?}", machine_module));
         machine::phi_elimination::PhiElimination::new().run_on_module(&mut machine_module); //
         machine::two_addr::TwoAddressConverter::new().run_on_module(&mut machine_module);
-        debug!(println!("{:?}", machine_module));
         machine::regalloc::RegisterAllocator::new().run_on_module(&mut machine_module); //
         machine::pro_epi_inserter::PrologueEpilogueInserter::new()
             .run_on_module(&mut machine_module);

@@ -4,7 +4,7 @@ use crate::ir::{
     function::Function,
     module::Module,
     opcode::{Instruction, InstructionId, Opcode, Operand},
-    types::{Type, Types},
+    types::Types,
     value::{InstructionValue, Value},
 };
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -15,6 +15,7 @@ struct Mem2RegOnFunction<'a> {
     cur_func: &'a mut Function,
     inst_indexes: InstructionIndexes,
     dom_tree: DominatorTree,
+    phi_block_to_allocas: FxHashMap<BasicBlockId, Vec<InstructionId>>,
 }
 
 pub type InstructionIndex = usize;
@@ -39,6 +40,7 @@ impl Mem2Reg {
                 dom_tree: DominatorTreeConstructor::new(func).construct(),
                 cur_func: func,
                 inst_indexes: InstructionIndexes::new(),
+                phi_block_to_allocas: FxHashMap::default(),
             }
             .run(&module.types);
         }
@@ -84,8 +86,6 @@ impl<'a> Mem2RegOnFunction<'a> {
                 if is_promotable {
                     multi_block_allocas.push(inst_id);
                 }
-
-                // TODO: support other cases...
             }
         }
 
@@ -97,9 +97,11 @@ impl<'a> Mem2RegOnFunction<'a> {
             self.promote_single_block_alloca(alloca);
         }
 
-        for alloca in multi_block_allocas {
+        for &alloca in &multi_block_allocas {
             self.promote_multi_block_alloca(alloca);
         }
+
+        self.rename(multi_block_allocas);
     }
 
     fn promote_single_store_alloca(&mut self, alloca_id: InstructionId) {
@@ -224,38 +226,21 @@ impl<'a> Mem2RegOnFunction<'a> {
     }
 
     fn promote_multi_block_alloca(&mut self, alloca_id: InstructionId) {
-        // println!("dom tree: {:?}", self.dom_tree.tree);
-
         let mut def_blocks = vec![];
         let mut using_blocks = vec![];
         let mut livein_blocks = FxHashSet::default();
-        let mut bb_to_insts: FxHashMap<
-            BasicBlockId,
-            /*sorted by inst idx=*/ Vec<(InstructionIndex, InstructionId)>,
-        > = FxHashMap::default();
 
         for &use_id in &*self.cur_func.inst_table[alloca_id].users.borrow() {
             let inst = &self.cur_func.inst_table[use_id];
             match inst.opcode {
                 Opcode::Store => {
                     def_blocks.push(inst.parent);
-                    bb_to_insts
-                        .entry(inst.parent)
-                        .or_insert(vec![])
-                        .push((self.inst_indexes.get_index(&self.cur_func, use_id), use_id));
                 }
                 Opcode::Load => {
                     using_blocks.push(inst.parent);
-                    bb_to_insts
-                        .entry(inst.parent)
-                        .or_insert(vec![])
-                        .push((self.inst_indexes.get_index(&self.cur_func, use_id), use_id));
                 }
                 _ => unreachable!(),
             }
-        }
-        for (_, insts) in &mut bb_to_insts {
-            insts.sort_by(|(idx1, _), (idx2, _)| idx1.cmp(idx2))
         }
 
         // compute livein blocks
@@ -274,68 +259,71 @@ impl<'a> Mem2RegOnFunction<'a> {
         // println!("def: {:?}", def_blocks);
         // println!("livein: {:?}", livein_blocks);
 
-        let mut phi_bb = FxHashSet::default();
+        // let mut phi_bb = FxHashSet::default();
 
+        // TODO: so slow
         for d in &def_blocks {
             for livein in &livein_blocks {
                 for pred in &self.cur_func.basic_block_arena[*livein].pred {
                     if self.dom_tree.dominate_bb(*d, *pred)
                         && !(self.dom_tree.dominate_bb(*d, *livein) && *d != *livein)
                     {
-                        phi_bb.insert(*livein);
+                        self.phi_block_to_allocas
+                            .entry(*livein)
+                            .or_insert(vec![])
+                            .push(alloca_id);
                     }
                 }
             }
         }
+    }
 
-        // let mut phi_map = FxHashMap::default(); // phi bb, pred
-        // for p in phi.clone() {
-        //     let mut worklist = phi.clone();
-        //     while let Some(bb) = worklist.pop() {
-        //         if def_blocks.contains(&bb) {
-        //             phi_map.entry(p).or_insert(vec![]).push(bb);
-        //             continue;
-        //         }
-        //         for pred in &self.cur_func.basic_block_arena[bb].pred {
-        //             worklist.push(*pred);
-        //         }
-        //     }
-        // }
-        //
-        // println!("PHI PAIR: {:?}", phi_map);
-
-        let e = self.cur_func.basic_blocks[0];
-
-        let mut worklist: Vec<(BasicBlockId, Option<BasicBlockId>, Option<Operand>)> =
-            vec![(e, None, None)];
+    fn rename(&mut self, allocas: Vec<InstructionId>) {
+        let entry = self.cur_func.basic_blocks[0];
+        let mut worklist: Vec<(
+            BasicBlockId,
+            Option<BasicBlockId>,
+            FxHashMap<InstructionId, Operand>, // alloca id -> incoming
+        )> = vec![(entry, None, FxHashMap::default())];
         let mut visited = FxHashSet::default();
-        let mut phi_added: FxHashMap<BasicBlockId, Value> = FxHashMap::default();
-        while let Some((w, mut pred, mut incoming)) = worklist.pop() {
-            let mut cur = w;
+        let mut phi_added: FxHashMap<InstructionId, Operand> = FxHashMap::default(); // Alloca id -> phi
+
+        // TODO: refactoring
+        while let Some((mut cur, mut pred, mut incoming)) = worklist.pop() {
             loop {
-                println!("cur {:?}", cur);
-                if phi_bb.contains(&cur) {
-                    if let Some(val) = phi_added.get(&cur) {
-                        // incoming = Some(Operand::Value(*val));
-                        let phi_id = val.as_instruction().id;
+                for alloca_id in self.phi_block_to_allocas.get(&cur).unwrap_or(&vec![]) {
+                    if let Some(val) = phi_added.get(alloca_id) {
+                        let incoming_val = incoming.get_mut(alloca_id).unwrap();
+
+                        // skip if incoming is not updated
+                        if *val == *incoming_val {
+                            continue;
+                        }
+
+                        // append new incoming to phi
+                        let phi_id = val.as_value().as_instruction().id;
                         Instruction::add_operand(
                             &mut self.cur_func.inst_table,
                             phi_id,
-                            incoming.unwrap(),
+                            *incoming_val,
                         );
                         Instruction::add_operand(
                             &mut self.cur_func.inst_table,
                             phi_id,
                             Operand::BasicBlock(pred.unwrap()),
                         );
+
                         let phi = &self.cur_func.inst_table[phi_id];
-                        phi.set_users(&self.cur_func.inst_table);
+                        phi.set_users(&self.cur_func.inst_table); // add phi_id to operands' users
+
+                        *incoming_val = *val;
                     } else {
-                        // let mut operands = vec![];
+                        let incoming_val = incoming.get_mut(alloca_id).unwrap();
+                        let ty = self.cur_func.inst_table[*alloca_id].ty;
                         let inst = Instruction::new(
                             Opcode::Phi,
-                            vec![incoming.unwrap(), Operand::BasicBlock(pred.unwrap())],
-                            Type::Int32,
+                            vec![*incoming_val, Operand::BasicBlock(pred.unwrap())],
+                            ty,
                             cur,
                         );
                         let id = self.cur_func.alloc_inst(inst);
@@ -346,9 +334,8 @@ impl<'a> Mem2RegOnFunction<'a> {
                         self.cur_func.basic_block_arena[cur]
                             .iseq_ref_mut()
                             .insert(0, val);
-                        phi_added.insert(cur, val);
-                        incoming = Some(Operand::Value(val));
-                        // self.cur_func.change_inst(load, inst);
+                        phi_added.insert(*alloca_id, Operand::Value(val));
+                        *incoming_val = Operand::Value(val);
                     }
                 }
 
@@ -360,28 +347,34 @@ impl<'a> Mem2RegOnFunction<'a> {
                 let mut removal_list = vec![];
                 for inst_id in &*bb.iseq_ref() {
                     let inst_id = inst_id.as_instruction().id;
-                    if !self.cur_func.inst_table[alloca_id]
-                        .users
-                        .borrow()
-                        .contains(&inst_id)
-                    {
-                        continue;
-                    }
-                    let (opcode, op0) = {
+                    let (opcode, op0, alloca_id) = {
                         let inst = &self.cur_func.inst_table[inst_id];
-                        (inst.opcode, inst.operands[0])
+                        let alloca_id = match inst.opcode {
+                            Opcode::Store => inst.operands[1],
+                            Opcode::Load => inst.operands[0],
+                            _ => continue,
+                        }
+                        .as_value()
+                        .as_instruction()
+                        .id;
+                        if !allocas.contains(&alloca_id) {
+                            continue;
+                        }
+                        (inst.opcode, inst.operands[0], alloca_id)
                     };
                     match opcode {
                         Opcode::Store => {
-                            incoming = Some(op0);
+                            *incoming
+                                .entry(alloca_id)
+                                .or_insert(Operand::Value(Value::None)) = op0;
                             removal_list.push(inst_id);
                         }
                         Opcode::Load => {
-                            if let Some(val) = incoming {
+                            if let Some(val) = incoming.get(&alloca_id) {
                                 Instruction::replace_all_uses(
                                     &mut self.cur_func.inst_table,
                                     inst_id,
-                                    val,
+                                    *val,
                                 );
                             }
                             removal_list.push(inst_id);
@@ -401,12 +394,14 @@ impl<'a> Mem2RegOnFunction<'a> {
                 pred = Some(cur);
                 cur = bb.succ[0];
                 for &succ in &bb.succ[1..] {
-                    worklist.push((succ, pred, incoming));
+                    worklist.push((succ, pred, incoming.clone()));
                 }
             }
         }
 
-        self.cur_func.remove_inst(alloca_id);
+        for alloca_id in allocas {
+            self.cur_func.remove_inst(alloca_id);
+        }
     }
 
     fn is_alloca_promotable(&self, alloca: &Instruction) -> bool {

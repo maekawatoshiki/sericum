@@ -219,8 +219,8 @@ impl Legalize {
 
     fn run_on_node_brcc(
         &mut self,
-        _tys: &Types,
-        _heap: &mut DAGHeap,
+        tys: &Types,
+        heap: &mut DAGHeap,
         node: Raw<DAGNode>,
     ) -> Raw<DAGNode> {
         let mut cond = node.operand[0];
@@ -233,6 +233,7 @@ impl Legalize {
                 *kind = kind.flip();
             }
         }
+        self.run_on_node_operand(tys, heap, node);
         node
     }
 
