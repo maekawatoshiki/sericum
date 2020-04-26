@@ -82,6 +82,8 @@ pub enum CondKind {
     Eq,
     Le,
     Lt,
+    Ge,
+    Gt,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -105,6 +107,16 @@ impl Into<CondKind> for ICmpKind {
             ICmpKind::Eq => CondKind::Eq,
             ICmpKind::Le => CondKind::Le,
             ICmpKind::Lt => CondKind::Lt,
+        }
+    }
+}
+
+impl CondKind {
+    pub fn flip(self) -> CondKind {
+        match self {
+            Self::Le => Self::Ge,
+            Self::Lt => Self::Gt,
+            e => e,
         }
     }
 }

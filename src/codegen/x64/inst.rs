@@ -353,6 +353,8 @@ pub enum TargetOpcode {
     JE,
     JLE,
     JL,
+    JG,
+    JGE,
     JMP,
 
     Phi,

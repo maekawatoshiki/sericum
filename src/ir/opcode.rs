@@ -69,10 +69,15 @@ impl Instruction {
     }
 
     pub fn set_users(&self, inst_arena: &Arena<Instruction>) {
+        let self_id = self.id.unwrap();
         for operand in &self.operands {
             match operand {
                 Operand::Value(Value::Instruction(InstructionValue { id, .. })) => {
-                    inst_arena[*id].users.borrow_mut().push(self.id.unwrap());
+                    let mut users = inst_arena[*id].users.borrow_mut();
+                    if users.contains(&self_id) {
+                        continue;
+                    }
+                    users.push(self_id);
                 }
                 _ => {}
             }
@@ -81,6 +86,16 @@ impl Instruction {
 
     pub fn set_user(&self, inst_arena: &Arena<Instruction>, new: InstructionId) {
         inst_arena[self.id.unwrap()].users.borrow_mut().push(new);
+    }
+
+    pub fn add_operand(arena: &mut Arena<Instruction>, self_id: InstructionId, operand: Operand) {
+        if let Operand::Value(Value::Instruction(InstructionValue { id, .. })) = &operand {
+            let mut users = arena[*id].users.borrow_mut();
+            if !users.contains(&self_id) {
+                users.push(self_id);
+            }
+        }
+        arena[self_id].operands.push(operand);
     }
 
     // TODO: any better idea?
@@ -104,6 +119,41 @@ impl Instruction {
                 *operand = to;
             }
         }
+    }
+
+    // TODO: any better idea?
+    pub fn replace_operand_insts(
+        arena: &mut Arena<Instruction>,
+        self_id: InstructionId,
+        from: InstructionId,
+        to: Operand,
+    ) {
+        for operand in &arena[self_id].operands {
+            match operand {
+                Operand::Value(Value::Instruction(InstructionValue { id, .. })) if *id == from => {}
+                _ => continue,
+            };
+            // remove self from operand's users if necessary
+            operand.remove_from_users(arena, self_id);
+            // add self to operand's users if necessary
+            to.set_user(arena, self_id);
+        }
+        for operand in &mut arena[self_id].operands {
+            match operand {
+                Operand::Value(Value::Instruction(InstructionValue { id, .. })) if *id == from => {}
+                _ => continue,
+            };
+            // actually replace from with to
+            *operand = to;
+        }
+    }
+
+    pub fn replace_all_uses(arena: &mut Arena<Instruction>, self_id: InstructionId, to: Operand) {
+        let users = arena[self_id].users.borrow().clone();
+        for u in users {
+            Self::replace_operand_insts(arena, u, self_id, to);
+        }
+        assert!(arena[self_id].users.borrow().len() == 0);
     }
 
     pub fn remove(&self, inst_arena: &Arena<Instruction>) {

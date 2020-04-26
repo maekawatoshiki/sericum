@@ -225,6 +225,7 @@ impl<'a> ConversionInfo<'a> {
                         CondKind::Eq => MachineOpcode::Seteq,
                         CondKind::Le => MachineOpcode::Setle,
                         CondKind::Lt => MachineOpcode::Setlt,
+                        _ => unimplemented!(),
                     },
                     vec![new_op1, new_op2],
                     ty2rc(&node.ty),
@@ -274,6 +275,8 @@ impl<'a> ConversionInfo<'a> {
                         CondKind::Eq => MachineOpcode::JE,
                         CondKind::Le => MachineOpcode::JLE,
                         CondKind::Lt => MachineOpcode::JL,
+                        CondKind::Ge => MachineOpcode::JGE,
+                        CondKind::Gt => MachineOpcode::JG,
                     },
                     vec![MachineOperand::Branch(
                         self.get_machine_bb(bb!(node.operand[3])),

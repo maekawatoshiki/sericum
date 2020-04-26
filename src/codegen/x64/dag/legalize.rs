@@ -48,6 +48,7 @@ impl Legalize {
             NodeKind::IR(IRNodeKind::Store) => self.run_on_node_store(tys, heap, node),
             NodeKind::IR(IRNodeKind::Add) => self.run_on_node_add(tys, heap, node),
             NodeKind::IR(IRNodeKind::Sext) => self.run_on_node_sext(tys, heap, node),
+            NodeKind::IR(IRNodeKind::Brcc) => self.run_on_node_brcc(tys, heap, node),
             _ => {
                 self.run_on_node_operand(tys, heap, node);
                 node
@@ -213,6 +214,25 @@ impl Legalize {
         }
 
         self.run_on_node_operand(tys, heap, node);
+        node
+    }
+
+    fn run_on_node_brcc(
+        &mut self,
+        _tys: &Types,
+        _heap: &mut DAGHeap,
+        node: Raw<DAGNode>,
+    ) -> Raw<DAGNode> {
+        let mut cond = node.operand[0];
+        let mut lhs = node.operand[1];
+        let mut rhs = node.operand[2];
+        // lhs must be register
+        if lhs.is_constant() && rhs.is_maybe_register() {
+            ::std::mem::swap(&mut *lhs, &mut *rhs);
+            if let NodeKind::Operand(OperandNodeKind::CondKind(kind)) = &mut cond.kind {
+                *kind = kind.flip();
+            }
+        }
         node
     }
 

@@ -4,7 +4,8 @@ use crate::ir::{
     function::Function,
     module::Module,
     opcode::{Instruction, InstructionId, Opcode, Operand},
-    types::Types,
+    types::{Type, Types},
+    value::{InstructionValue, Value},
 };
 use rustc_hash::{FxHashMap, FxHashSet};
 
@@ -273,7 +274,7 @@ impl<'a> Mem2RegOnFunction<'a> {
         // println!("def: {:?}", def_blocks);
         // println!("livein: {:?}", livein_blocks);
 
-        let mut phi = vec![];
+        let mut phi_bb = FxHashSet::default();
 
         for d in &def_blocks {
             for livein in &livein_blocks {
@@ -281,93 +282,131 @@ impl<'a> Mem2RegOnFunction<'a> {
                     if self.dom_tree.dominate_bb(*d, *pred)
                         && !(self.dom_tree.dominate_bb(*d, *livein) && *d != *livein)
                     {
-                        phi.push(*livein);
+                        phi_bb.insert(*livein);
                     }
                 }
             }
         }
 
-        let mut phi_map = FxHashMap::default();
-        for p in phi.clone() {
-            let mut worklist = phi.clone();
-            while let Some(bb) = worklist.pop() {
-                if def_blocks.contains(&bb) {
-                    phi_map.entry(p).or_insert(vec![]).push(bb);
-                    continue;
-                }
-                for pred in &self.cur_func.basic_block_arena[bb].pred {
-                    worklist.push(*pred);
-                }
-            }
-        }
-
-        println!("PHI PAIR: {:?}", phi_map);
-
-        // let e = self.cur_func.basic_blocks[0];
-        //
-        // let mut worklist = vec![e];
-        // let mut visited = FxHashSet::default();
-        // while let Some(bb_id) = worklist.pop() {
-        //     let bb = &self.cur_func.basic_block_arena[bb_id];
-        //     if !visited.insert(bb_id) {
-        //         continue;
-        //     }
-        //
-        //     for inst_id in &*bb.iseq_ref() {
-        //         let inst_id = inst_id.as_instruction().id;
-        //         let inst = &self.cur_func.inst_table[inst_id];
+        // let mut phi_map = FxHashMap::default(); // phi bb, pred
+        // for p in phi.clone() {
+        //     let mut worklist = phi.clone();
+        //     while let Some(bb) = worklist.pop() {
+        //         if def_blocks.contains(&bb) {
+        //             phi_map.entry(p).or_insert(vec![]).push(bb);
+        //             continue;
+        //         }
+        //         for pred in &self.cur_func.basic_block_arena[bb].pred {
+        //             worklist.push(*pred);
+        //         }
         //     }
         // }
+        //
+        // println!("PHI PAIR: {:?}", phi_map);
 
-        for (phi_bb, def_bbs) in &phi_map {
-            let phi_insts = bb_to_insts.get(phi_bb).unwrap();
-            let mut leading_loads = vec![];
-            for (_, phi_inst) in phi_insts {
-                let inst = &self.cur_func.inst_table[*phi_inst];
-                if inst.opcode == Opcode::Store {
+        let e = self.cur_func.basic_blocks[0];
+
+        let mut worklist: Vec<(BasicBlockId, Option<BasicBlockId>, Option<Operand>)> =
+            vec![(e, None, None)];
+        let mut visited = FxHashSet::default();
+        let mut phi_added: FxHashMap<BasicBlockId, Value> = FxHashMap::default();
+        while let Some((w, mut pred, mut incoming)) = worklist.pop() {
+            let mut cur = w;
+            loop {
+                println!("cur {:?}", cur);
+                if phi_bb.contains(&cur) {
+                    if let Some(val) = phi_added.get(&cur) {
+                        // incoming = Some(Operand::Value(*val));
+                        let phi_id = val.as_instruction().id;
+                        Instruction::add_operand(
+                            &mut self.cur_func.inst_table,
+                            phi_id,
+                            incoming.unwrap(),
+                        );
+                        Instruction::add_operand(
+                            &mut self.cur_func.inst_table,
+                            phi_id,
+                            Operand::BasicBlock(pred.unwrap()),
+                        );
+                        let phi = &self.cur_func.inst_table[phi_id];
+                        phi.set_users(&self.cur_func.inst_table);
+                    } else {
+                        // let mut operands = vec![];
+                        let inst = Instruction::new(
+                            Opcode::Phi,
+                            vec![incoming.unwrap(), Operand::BasicBlock(pred.unwrap())],
+                            Type::Int32,
+                            cur,
+                        );
+                        let id = self.cur_func.alloc_inst(inst);
+                        let val = Value::Instruction(InstructionValue {
+                            func_id: self.cur_func.id.unwrap(),
+                            id,
+                        });
+                        self.cur_func.basic_block_arena[cur]
+                            .iseq_ref_mut()
+                            .insert(0, val);
+                        phi_added.insert(cur, val);
+                        incoming = Some(Operand::Value(val));
+                        // self.cur_func.change_inst(load, inst);
+                    }
+                }
+
+                let bb = &self.cur_func.basic_block_arena[cur];
+                if !visited.insert(cur) {
                     break;
                 }
-                leading_loads.push(*phi_inst);
-                println!("to be phi: {:?}", inst);
-            }
 
-            let mut srcs = vec![];
-            let mut stores = vec![];
-            for def_bb in def_bbs {
-                let def_insts = bb_to_insts.get(def_bb).unwrap();
-                for (_, phi_inst) in def_insts.iter().rev() {
-                    let inst = &self.cur_func.inst_table[*phi_inst];
-                    if inst.opcode != Opcode::Store {
+                let mut removal_list = vec![];
+                for inst_id in &*bb.iseq_ref() {
+                    let inst_id = inst_id.as_instruction().id;
+                    if !self.cur_func.inst_table[alloca_id]
+                        .users
+                        .borrow()
+                        .contains(&inst_id)
+                    {
                         continue;
                     }
-                    srcs.push((inst.operands[0], *def_bb));
-                    stores.push(*phi_inst);
+                    let (opcode, op0) = {
+                        let inst = &self.cur_func.inst_table[inst_id];
+                        (inst.opcode, inst.operands[0])
+                    };
+                    match opcode {
+                        Opcode::Store => {
+                            incoming = Some(op0);
+                            removal_list.push(inst_id);
+                        }
+                        Opcode::Load => {
+                            if let Some(val) = incoming {
+                                Instruction::replace_all_uses(
+                                    &mut self.cur_func.inst_table,
+                                    inst_id,
+                                    val,
+                                );
+                            }
+                            removal_list.push(inst_id);
+                        }
+                        _ => unreachable!(),
+                    }
                 }
-            }
 
-            for load in leading_loads {
-                let ty = self.cur_func.inst_table[load].ty;
-                let parent = self.cur_func.inst_table[load].parent;
-                let mut operands = vec![];
-                for (v, bb) in &srcs {
-                    operands.push(*v);
-                    operands.push(Operand::BasicBlock(*bb));
+                for remove in removal_list {
+                    self.cur_func.remove_inst(remove);
                 }
-                let inst = Instruction::new(Opcode::Phi, operands, ty, parent);
-                self.cur_func.change_inst(load, inst);
-            }
 
-            for store_id in stores {
-                let store = &self.cur_func.inst_table[store_id];
-                if store.users.borrow().len() == 0 {
-                    self.cur_func.remove_inst(store_id);
+                if bb.succ.len() == 0 {
+                    break;
                 }
-            }
 
-            if self.cur_func.inst_table[alloca_id].users.borrow().len() == 0 {
-                self.cur_func.remove_inst(alloca_id);
+                pred = Some(cur);
+                cur = bb.succ[0];
+                for &succ in &bb.succ[1..] {
+                    worklist.push((succ, pred, incoming));
+                }
             }
         }
+
+        self.cur_func.remove_inst(alloca_id);
     }
 
     fn is_alloca_promotable(&self, alloca: &Instruction) -> bool {

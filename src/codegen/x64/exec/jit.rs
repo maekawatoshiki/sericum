@@ -52,7 +52,7 @@ impl JITExecutor {
         dag::legalize::Legalize::new().run_on_module(&mut dag_module);
         // debug!(println!("dag: legalize: {:?}", dag_module));
         dag::isel::MISelector::new().run_on_module(&mut dag_module);
-        // debug!(println!("dag: isel: {:?}", dag_module));
+        debug!(println!("dag: isel: {:?}", dag_module));
 
         let mut machine_module = dag::mc_convert::convert_module(dag_module);
 
@@ -251,6 +251,8 @@ impl JITCompiler {
                     MachineOpcode::JE => self.compile_je(inst),
                     MachineOpcode::JLE => self.compile_jle(inst),
                     MachineOpcode::JL => self.compile_jl(inst),
+                    MachineOpcode::JG => self.compile_jg(inst),
+                    MachineOpcode::JGE => self.compile_jge(inst),
                     MachineOpcode::JMP => self.compile_jmp(inst),
                     MachineOpcode::Ret => self.compile_return(&frame_objects, inst),
                     op => unimplemented!("{:?}", op),
@@ -701,6 +703,16 @@ impl JITCompiler {
     fn compile_jl(&mut self, inst: &MachineInst) {
         let l = self.get_label(inst.operand[0].as_basic_block());
         dynasm!(self.asm; jl => l);
+    }
+
+    fn compile_jg(&mut self, inst: &MachineInst) {
+        let l = self.get_label(inst.operand[0].as_basic_block());
+        dynasm!(self.asm; jg => l);
+    }
+
+    fn compile_jge(&mut self, inst: &MachineInst) {
+        let l = self.get_label(inst.operand[0].as_basic_block());
+        dynasm!(self.asm; jge => l);
     }
 
     fn compile_movsxd_r64m32(&mut self, fo: &FrameObjectsInfo, inst: &MachineInst) {
