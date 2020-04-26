@@ -44,7 +44,6 @@ impl JITExecutor {
         use super::super::{dag, machine};
 
         let mut dag_module = dag::convert::ConvertToDAG::new(module).convert_module();
-        // println!("H
 
         debug!(println!("dag: before: {:?}", dag_module));
 
@@ -155,6 +154,8 @@ impl JITCompiler {
 
         match module
             .types
+            .base
+            .borrow()
             .as_function_ty(module.function_ref(id).ty)
             .unwrap()
             .ret_ty

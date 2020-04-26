@@ -77,7 +77,7 @@ impl Value {
                 // parent,
             }) => {
                 let f = parent.function_ref(*func_id);
-                f.get_param_type(&parent.types, *index).unwrap()
+                f.get_param_type(*index).unwrap()
             }
             Value::Instruction(InstructionValue {
                 func_id,
@@ -117,7 +117,7 @@ impl Value {
                 // parent,
             }) => {
                 let f = parent.function_ref(*func_id);
-                let ty = f.get_param_type(&parent.types, *index).unwrap();
+                let ty = f.get_param_type(*index).unwrap();
                 format!("{} %arg.{}", ty.to_string(), index)
             }
             Value::Immediate(iv) => match iv {
@@ -152,8 +152,14 @@ impl Value {
             }
             Value::Function(FunctionValue { func_id }) => {
                 let f = parent.function_ref(*func_id);
-                let fty = parent.types.as_function_ty(f.ty).unwrap();
-                format!("{} {}", parent.types.to_string(fty.ret_ty), f.name)
+                let ret_ty = parent
+                    .types
+                    .base
+                    .borrow()
+                    .as_function_ty(f.ty)
+                    .unwrap()
+                    .ret_ty;
+                format!("{} {}", parent.types.to_string(ret_ty), f.name)
             }
             Value::None => "".to_string(),
         }

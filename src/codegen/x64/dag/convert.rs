@@ -119,7 +119,7 @@ impl<'a> ConvertToDAG<'a> {
                 let ty = self
                     .module
                     .function_ref(av.func_id)
-                    .get_param_type(&self.types, av.index)
+                    .get_param_type(av.index)
                     .unwrap();
                 let fi_ty = self.types.new_pointer_ty(ty);
                 let fi = self.alloc_node(DAGNode::new(

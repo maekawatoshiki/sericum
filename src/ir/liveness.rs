@@ -28,6 +28,8 @@ impl<'a> IRLivenessAnalyzer<'a> {
                     && self
                         .module
                         .types
+                        .base
+                        .borrow()
                         .as_function_ty(inst.operands[0].as_value().get_type(self.module))
                         .unwrap()
                         .ret_ty

@@ -107,10 +107,10 @@ impl PrologueEpilogueInserter {
         let sub_rsp = builder.function.body.inst_arena.alloc(sub_rsp);
         builder.insert(sub_rsp);
 
-        self.insert_arg_copy(tys, &mut builder);
+        self.insert_arg_copy(&tys.base.borrow(), &mut builder);
     }
 
-    fn insert_arg_copy<'a>(&mut self, tys: &'a Types, builder: &'a mut Builder<'a>) {
+    fn insert_arg_copy<'a>(&mut self, tys: &'a TypesBase, builder: &'a mut Builder<'a>) {
         CopyArgs::new(
             builder,
             &tys.as_function_ty(builder.function.ty).unwrap().params_ty,

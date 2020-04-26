@@ -19,11 +19,9 @@ impl<'a> Builder<'a> {
     }
 
     pub fn get_param(&self, idx: usize) -> Option<Value> {
-        self.module.function_ref(self.func_id).get_param_value(
-            &self.module.types,
-            self.func_id,
-            idx,
-        )
+        self.module
+            .function_ref(self.func_id)
+            .get_param_value(self.func_id, idx)
     }
 
     pub fn append_basic_block(&mut self) -> BasicBlockId {
@@ -224,6 +222,8 @@ impl<'a> Builder<'a> {
         let ret_ty = self
             .module
             .types
+            .base
+            .borrow()
             .as_function_ty(f.get_type(self.module))
             .unwrap()
             .ret_ty;

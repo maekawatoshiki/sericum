@@ -15,14 +15,12 @@ impl TypeSize for Type {
             Type::Int32 => 4,
             Type::Int64 => 8,
             Type::F64 => 8,
-            Type::Array(id) => {
-                let ary = tys.non_primitive_types[*id].as_array();
-                ary.size_in_byte(tys)
-            }
-            Type::Struct(id) => {
-                let s = tys.non_primitive_types[*id].as_struct();
-                s.size_in_byte(tys)
-            }
+            Type::Array(id) => tys.base.borrow().non_primitive_types[*id]
+                .as_array()
+                .size_in_byte(tys),
+            Type::Struct(id) => tys.base.borrow().non_primitive_types[*id]
+                .as_struct()
+                .size_in_byte(tys),
             Type::Pointer(_) => 8,
             Type::Function(_) => unimplemented!(),
             Type::Void => 0,

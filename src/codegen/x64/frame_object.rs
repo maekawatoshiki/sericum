@@ -37,6 +37,8 @@ impl FrameObjectsInfo {
         let mut offset = 0;
 
         for (i, param_ty) in tys
+            .base
+            .borrow()
             .as_function_ty(f.ty)
             .unwrap()
             .params_ty

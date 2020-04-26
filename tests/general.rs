@@ -95,18 +95,21 @@ fn test3_mem2reg() {
     let func = cilk_ir!(m; define [i32] func [(i32)] {
     entry:
         i = alloca i32;
+        store (i32 0), (%i);
         br label1;
     label1:
-        store (i32 3), (%i);
-        cond = icmp eq (%arg.0), (i32 2);
+        // store (i32 3), (%i);
+        li = load (%i);
+        cond = icmp le (%li), (%arg.0);
         br (%cond) label2, label3;
     label2:
-        store (i32 5), (%i);
-        br label4;
+        a = add (%li), (i32 1);
+        store (%a), (%i);
+        br label1;
     label3:
-        br label4;
-    label4:
-        li = load (%i);
+        // br label4;
+    // label4:
+    //     li = load (%i);
         ret (%li);
     });
 
@@ -118,8 +121,8 @@ fn test3_mem2reg() {
     let mut jit = exec::jit::JITExecutor::new(&m);
     let func = jit.find_function_by_name("func").unwrap();
     assert_eq!(
-        jit.run(func, vec![exec::jit::GenericValue::Int32(2)]),
-        exec::jit::GenericValue::Int32(5)
+        jit.run(func, vec![exec::jit::GenericValue::Int32(10)]),
+        exec::jit::GenericValue::Int32(11)
     );
 }
 

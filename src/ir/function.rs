@@ -34,6 +34,8 @@ pub struct Function {
     pub inst_table: Arena<Instruction>,
 
     pub id: Option<FunctionId>,
+
+    pub types: Types,
 }
 
 impl Function {
@@ -46,6 +48,7 @@ impl Function {
             basic_blocks: vec![],
             inst_table: Arena::new(),
             id: None,
+            types: module.types.clone(),
             // TODO
             // internal: match name {
             //     "cilk.memset.p0i32.i32" | "cilk.println.i32" | "cilk.printch.i32" => true, // TODO
@@ -72,8 +75,17 @@ impl Function {
         &mut self.basic_block_arena[id]
     }
 
-    pub fn get_param_value(&self, tys: &Types, func_id: FunctionId, idx: usize) -> Option<Value> {
-        if idx >= tys.as_function_ty(self.ty).unwrap().params_ty.len() {
+    pub fn get_param_value(&self, func_id: FunctionId, idx: usize) -> Option<Value> {
+        if idx
+            >= self
+                .types
+                .base
+                .borrow()
+                .as_function_ty(self.ty)
+                .unwrap()
+                .params_ty
+                .len()
+        {
             return None;
         }
         Some(Value::Argument(ArgumentValue {
@@ -82,8 +94,9 @@ impl Function {
         }))
     }
 
-    pub fn get_param_type(&self, tys: &Types, idx: usize) -> Option<Type> {
-        let params_ty = &tys.as_function_ty(self.ty).unwrap().params_ty;
+    pub fn get_param_type(&self, idx: usize) -> Option<Type> {
+        let base = self.types.base.borrow();
+        let params_ty = &base.as_function_ty(self.ty).unwrap().params_ty;
         if idx >= params_ty.len() {
             return None;
         }
@@ -132,15 +145,16 @@ impl Function {
 
 impl DumpToString for &Function {
     fn dump(&self, module: &Module) -> String {
-        let ty = module.types.as_function_ty(self.ty).unwrap();
+        let base = module.types.base.borrow();
+        let ty = base.as_function_ty(self.ty).unwrap();
         format!(
             "define {} {}({}) {{\n{}}}",
-            module.types.to_string(ty.ret_ty),
+            base.to_string(ty.ret_ty),
             self.name,
             ty.params_ty
                 .iter()
                 .fold("".to_string(), |mut s, p| {
-                    s += &(module.types.to_string(*p) + ", ");
+                    s += &(base.to_string(*p) + ", ");
                     s
                 })
                 .trim_matches(&[',', ' '][0..]),

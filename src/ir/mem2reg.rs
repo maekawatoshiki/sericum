@@ -303,6 +303,22 @@ impl<'a> Mem2RegOnFunction<'a> {
 
         println!("PHI PAIR: {:?}", phi_map);
 
+        // let e = self.cur_func.basic_blocks[0];
+        //
+        // let mut worklist = vec![e];
+        // let mut visited = FxHashSet::default();
+        // while let Some(bb_id) = worklist.pop() {
+        //     let bb = &self.cur_func.basic_block_arena[bb_id];
+        //     if !visited.insert(bb_id) {
+        //         continue;
+        //     }
+        //
+        //     for inst_id in &*bb.iseq_ref() {
+        //         let inst_id = inst_id.as_instruction().id;
+        //         let inst = &self.cur_func.inst_table[inst_id];
+        //     }
+        // }
+
         for (phi_bb, def_bbs) in &phi_map {
             let phi_insts = bb_to_insts.get(phi_bb).unwrap();
             let mut leading_loads = vec![];
@@ -355,14 +371,15 @@ impl<'a> Mem2RegOnFunction<'a> {
     }
 
     fn is_alloca_promotable(&self, alloca: &Instruction) -> bool {
-        let func = &self.cur_func;
-        alloca.users.borrow().iter().all(|&use_id| {
-            let should_be_load_or_store = &func.inst_table[use_id];
-            use super::types::Type;
-            (should_be_load_or_store.opcode == Opcode::Load
-                && should_be_load_or_store.ty == Type::Int32)
-                || matches!(should_be_load_or_store.opcode, Opcode::Load | Opcode::Store)
-        })
+        self.cur_func
+            .types
+            .get_element_ty(alloca.ty, None)
+            .unwrap()
+            .is_atomic()
+            && alloca.users.borrow().iter().all(|&use_id| {
+                let inst = &self.cur_func.inst_table[use_id];
+                matches!(inst.opcode, Opcode::Load | Opcode::Store)
+            })
     }
 
     fn is_alloca_stored_only_once(&self, alloca: &Instruction) -> bool {
