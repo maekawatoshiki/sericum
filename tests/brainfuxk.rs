@@ -283,6 +283,10 @@ fn brainfuxk() {
 
     builder.build_ret(value::Value::None);
 
+    // Comment out and get faster
+    // ir::mem2reg::Mem2Reg::new().run_on_module(&mut m);
+    // ir::const_folding::ConstantFolding::new().run_on_module(&mut m);
+
     println!("IR: {}", m.dump(f_id));
 
     let mut jit = exec::jit::JITExecutor::new(&m);

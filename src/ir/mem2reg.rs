@@ -8,6 +8,8 @@ use crate::ir::{
     value::{InstructionValue, Value},
 };
 use rustc_hash::{FxHashMap, FxHashSet};
+use std::cmp::Ordering;
+use std::collections::BinaryHeap;
 
 pub struct Mem2Reg {}
 
@@ -23,6 +25,8 @@ pub type InstructionIndex = usize;
 struct InstructionIndexes {
     inst2index: FxHashMap<InstructionId, InstructionIndex>,
 }
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+struct LeveledBB(usize, BasicBlockId);
 
 impl Mem2Reg {
     pub fn new() -> Self {
@@ -233,12 +237,8 @@ impl<'a> Mem2RegOnFunction<'a> {
         for &use_id in &*self.cur_func.inst_table[alloca_id].users.borrow() {
             let inst = &self.cur_func.inst_table[use_id];
             match inst.opcode {
-                Opcode::Store => {
-                    def_blocks.push(inst.parent);
-                }
-                Opcode::Load => {
-                    using_blocks.push(inst.parent);
-                }
+                Opcode::Store => def_blocks.push(inst.parent),
+                Opcode::Load => using_blocks.push(inst.parent),
                 _ => unreachable!(),
             }
         }
@@ -258,20 +258,51 @@ impl<'a> Mem2RegOnFunction<'a> {
         }
         // println!("def: {:?}", def_blocks);
         // println!("livein: {:?}", livein_blocks);
+        // println!("dom: {:?}", self.dom_tree.tree);
 
-        // let mut phi_bb = FxHashSet::default();
+        let mut queue = def_blocks
+            .iter()
+            .map(|&def| LeveledBB(self.dom_tree.get_level_of(def), def))
+            .collect::<BinaryHeap<_>>();
+        let mut visited_worklist = FxHashSet::default();
+        let mut visited_queue = FxHashSet::default();
+        while let Some(root) = queue.pop() {
+            let root_level = root.0;
+            let root_id = root.1;
+            let mut worklist = vec![];
 
-        // TODO: so slow
-        for d in &def_blocks {
-            for livein in &livein_blocks {
-                for pred in &self.cur_func.basic_block_arena[*livein].pred {
-                    if self.dom_tree.dominate_bb(*d, *pred)
-                        && !(self.dom_tree.dominate_bb(*d, *livein) && *d != *livein)
-                    {
-                        self.phi_block_to_allocas
-                            .entry(*livein)
-                            .or_insert(vec![])
-                            .push(alloca_id);
+            worklist.push(root_id);
+            visited_worklist.insert(root_id);
+
+            while let Some(bb_id) = worklist.pop() {
+                let bb = &self.cur_func.basic_block_arena[bb_id];
+                for &succ_id in &bb.succ {
+                    let succ_level = self.dom_tree.get_level_of(succ_id);
+                    if succ_level > root_level {
+                        continue;
+                    }
+                    if !visited_queue.insert(succ_id) {
+                        continue;
+                    }
+                    if !livein_blocks.contains(&succ_id) {
+                        continue;
+                    }
+
+                    self.phi_block_to_allocas
+                        .entry(succ_id)
+                        .or_insert(vec![])
+                        .push(alloca_id);
+
+                    if !def_blocks.contains(&succ_id) {
+                        queue.push(LeveledBB(succ_level, succ_id));
+                    }
+                }
+
+                if let Some(dom_children) = self.dom_tree.tree.get(&bb_id) {
+                    for child in dom_children {
+                        if visited_worklist.insert(*child) {
+                            worklist.push(*child)
+                        }
                     }
                 }
             }
@@ -466,5 +497,16 @@ impl InstructionIndexes {
 
     pub fn is_interesting_opcode(opcode: Opcode) -> bool {
         matches!(opcode, Opcode::Store | Opcode::Load | Opcode::Alloca)
+    }
+}
+
+impl Ord for LeveledBB {
+    fn cmp(&self, other: &LeveledBB) -> Ordering {
+        self.0.cmp(&other.0)
+    }
+}
+impl PartialOrd for LeveledBB {
+    fn partial_cmp(&self, other: &LeveledBB) -> Option<Ordering> {
+        Some(self.cmp(other))
     }
 }

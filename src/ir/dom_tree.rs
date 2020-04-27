@@ -5,6 +5,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 
 pub struct DominatorTree {
     pub tree: FxHashMap<BasicBlockId, FxHashSet<BasicBlockId>>,
+    pub level: FxHashMap<BasicBlockId, usize>,
 }
 
 pub struct DominatorTreeConstructor<'a> {
@@ -17,6 +18,7 @@ impl DominatorTree {
     pub fn new() -> Self {
         Self {
             tree: FxHashMap::default(),
+            level: FxHashMap::default(),
         }
     }
 
@@ -35,6 +37,10 @@ impl DominatorTree {
             }
         }
         false
+    }
+
+    pub fn get_level_of(&self, bb: BasicBlockId) -> usize {
+        *self.level.get(&bb).unwrap()
     }
 }
 
@@ -84,6 +90,24 @@ impl<'a> DominatorTreeConstructor<'a> {
                 .or_insert(FxHashSet::default())
                 .insert(b);
         }
+
+        fn leveling(
+            level: &mut FxHashMap<BasicBlockId, usize>,
+            dom: &FxHashMap<BasicBlockId, FxHashSet<BasicBlockId>>,
+            cur: BasicBlockId,
+            cur_level: usize,
+        ) {
+            level.insert(cur, cur_level);
+            if dom.get(&cur).is_none() {
+                return;
+            }
+            for &child in dom.get(&cur).unwrap() {
+                leveling(level, dom, child, cur_level + 1);
+            }
+        }
+
+        let entry = self.func.basic_blocks[0];
+        leveling(&mut self.tree.level, &self.tree.tree, entry, 0);
 
         self.tree
     }
