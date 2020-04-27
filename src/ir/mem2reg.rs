@@ -319,7 +319,11 @@ impl<'a> Mem2RegOnFunction<'a> {
                         *incoming_val = *val;
                     } else {
                         let incoming_val = incoming.get_mut(alloca_id).unwrap();
-                        let ty = self.cur_func.inst_table[*alloca_id].ty;
+                        let ty = self
+                            .cur_func
+                            .types
+                            .get_element_ty(self.cur_func.inst_table[*alloca_id].ty, None)
+                            .unwrap();
                         let inst = Instruction::new(
                             Opcode::Phi,
                             vec![*incoming_val, Operand::BasicBlock(pred.unwrap())],
