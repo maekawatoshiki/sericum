@@ -286,13 +286,13 @@ impl<'a> Mem2RegOnFunction<'a> {
             FxHashMap<InstructionId, Operand>, // alloca id -> incoming
         )> = vec![(entry, None, FxHashMap::default())];
         let mut visited = FxHashSet::default();
-        let mut phi_added: FxHashMap<InstructionId, Operand> = FxHashMap::default(); // Alloca id -> phi
+        let mut added_phi: FxHashMap<(BasicBlockId, InstructionId), Operand> = FxHashMap::default(); // Alloca id -> phi
 
         // TODO: refactoring
         while let Some((mut cur, mut pred, mut incoming)) = worklist.pop() {
             loop {
                 for alloca_id in self.phi_block_to_allocas.get(&cur).unwrap_or(&vec![]) {
-                    if let Some(val) = phi_added.get(alloca_id) {
+                    if let Some(val) = added_phi.get(&(cur, *alloca_id)) {
                         let incoming_val = incoming.get_mut(alloca_id).unwrap();
 
                         // skip if incoming is not updated
@@ -338,7 +338,7 @@ impl<'a> Mem2RegOnFunction<'a> {
                         self.cur_func.basic_block_arena[cur]
                             .iseq_ref_mut()
                             .insert(0, val);
-                        phi_added.insert(*alloca_id, Operand::Value(val));
+                        added_phi.insert((cur, *alloca_id), Operand::Value(val));
                         *incoming_val = Operand::Value(val);
                     }
                 }

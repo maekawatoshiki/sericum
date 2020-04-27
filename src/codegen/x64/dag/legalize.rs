@@ -213,6 +213,14 @@ impl Legalize {
             ));
         }
 
+        // TODO: Need instruction that converts Int32 to Int64
+        if node.ty == Type::Int64 && node.operand[0].ty == Type::Int32
+        // && node.operand[0].operand[0].kind == NodeKind::IR(IRNodeKind::FIAddr)
+        {
+            return self.run_on_node(tys, heap, node.operand[0]);
+            // return node
+        }
+
         self.run_on_node_operand(tys, heap, node);
         node
     }

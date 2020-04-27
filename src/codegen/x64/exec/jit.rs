@@ -45,7 +45,7 @@ impl JITExecutor {
 
         let mut dag_module = dag::convert::ConvertToDAG::new(module).convert_module();
 
-        // debug!(println!("dag: before: {:?}", dag_module));
+        // println!("dag: before: {:?}", dag_module);
 
         dag::combine::Combine::new().combine_module(&mut dag_module);
         // debug!(println!("dag: comibine: {:?}", dag_module));
@@ -66,7 +66,7 @@ impl JITExecutor {
         machine::replace_data::ConstDataReplacer::new().run_on_module(&mut machine_module);
         machine::replace_copy::ReplaceCopyWithProperMInst::new().run_on_module(&mut machine_module);
 
-        debug!(println!("{:?}", machine_module));
+        // debug!(println!("{:?}", machine_module));
 
         // use crate::codegen::x64::asm::print::MachineAsmPrinter;
         // let mut printer = MachineAsmPrinter::new();
