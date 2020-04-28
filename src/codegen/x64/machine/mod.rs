@@ -1,5 +1,6 @@
 pub mod basic_block;
 pub mod builder;
+pub mod calc_spill_weight;
 pub mod const_data;
 pub mod function;
 pub mod inst;

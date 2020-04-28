@@ -1,5 +1,6 @@
 use crate::ir::{
     basic_block::BasicBlockId,
+    const_folding::ConstantFolding,
     dom_tree::{DominatorTree, DominatorTreeConstructor},
     function::Function,
     module::Module,
@@ -48,6 +49,8 @@ impl Mem2Reg {
             }
             .run(&module.types);
         }
+
+        ConstantFolding::new().run_on_module(module)
     }
 }
 

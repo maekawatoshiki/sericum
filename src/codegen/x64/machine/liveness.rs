@@ -26,6 +26,7 @@ pub struct LiveInterval {
     pub vreg: VirtReg,
     pub reg: Option<PhysReg>,
     pub range: LiveRange,
+    pub spill_weight: usize,
 }
 
 #[derive(Debug, Clone)]
@@ -255,6 +256,7 @@ impl VirtRegInterval {
             vreg,
             range,
             reg: None,
+            spill_weight: 0,
         });
     }
 
@@ -278,6 +280,7 @@ impl LiveInterval {
             vreg,
             range,
             reg: None,
+            spill_weight: 0,
         }
     }
 

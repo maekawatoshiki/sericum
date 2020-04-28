@@ -53,7 +53,6 @@ fn test1_mem2reg() {
     println!("{}", m.dump(func));
 
     ir::mem2reg::Mem2Reg::new().run_on_module(&mut m);
-    ir::const_folding::ConstantFolding::new().run_on_module(&mut m);
 
     let mut jit = exec::jit::JITExecutor::new(&m);
     let func = jit.find_function_by_name("func").unwrap();
@@ -81,7 +80,6 @@ fn test2_mem2reg() {
     println!("{}", m.dump(func));
 
     ir::mem2reg::Mem2Reg::new().run_on_module(&mut m);
-    ir::const_folding::ConstantFolding::new().run_on_module(&mut m);
 
     let mut jit = exec::jit::JITExecutor::new(&m);
     let func = jit.find_function_by_name("func").unwrap();
@@ -112,7 +110,6 @@ fn test3_mem2reg() {
     println!("{}", m.dump(func));
 
     ir::mem2reg::Mem2Reg::new().run_on_module(&mut m);
-    ir::const_folding::ConstantFolding::new().run_on_module(&mut m);
 
     let mut jit = exec::jit::JITExecutor::new(&m);
     let func = jit.find_function_by_name("func").unwrap();
@@ -153,7 +150,6 @@ fn test4_mem2reg() {
     println!("{}", m.dump(func));
 
     ir::mem2reg::Mem2Reg::new().run_on_module(&mut m);
-    ir::const_folding::ConstantFolding::new().run_on_module(&mut m);
 
     let mut jit = exec::jit::JITExecutor::new(&m);
     let func = jit.find_function_by_name("func").unwrap();
