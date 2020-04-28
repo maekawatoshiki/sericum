@@ -26,7 +26,7 @@ pub struct LiveInterval {
     pub vreg: VirtReg,
     pub reg: Option<PhysReg>,
     pub range: LiveRange,
-    pub spill_weight: usize,
+    pub spill_weight: f32,
 }
 
 #[derive(Debug, Clone)]
@@ -239,6 +239,10 @@ impl VirtRegInterval {
         &self.0
     }
 
+    pub fn inner_mut(&mut self) -> &mut FxHashMap<VirtReg, LiveInterval> {
+        &mut self.0
+    }
+
     pub fn get(&self, vreg: &VirtReg) -> Option<&LiveInterval> {
         self.0.get(vreg)
     }
@@ -252,12 +256,7 @@ impl VirtRegInterval {
     }
 
     pub fn add(&mut self, vreg: VirtReg, range: LiveRange) {
-        self.0.entry(vreg).or_insert(LiveInterval {
-            vreg,
-            range,
-            reg: None,
-            spill_weight: 0,
-        });
+        self.0.entry(vreg).or_insert(LiveInterval::new(vreg, range));
     }
 
     pub fn collect_virt_regs(&self) -> Vec<VirtReg> {
@@ -280,7 +279,7 @@ impl LiveInterval {
             vreg,
             range,
             reg: None,
-            spill_weight: 0,
+            spill_weight: 0.0,
         }
     }
 

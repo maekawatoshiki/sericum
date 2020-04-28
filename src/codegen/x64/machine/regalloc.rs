@@ -33,6 +33,8 @@ impl RegisterAllocator {
 
     pub fn run_on_function(&mut self, tys: &Types, cur_func: &mut MachineFunction) {
         let mut matrix = LivenessAnalysis::new().analyze_function(cur_func);
+        use super::calc_spill_weight::calc_spill_weight;
+        calc_spill_weight(cur_func, &mut matrix);
 
         // debug!(println!("before coalesing {:?}", cur_func));
 
