@@ -3,6 +3,7 @@ use super::super::{
     frame_object::*,
     register::*,
 };
+use super::calc_spill_weight::calc_spill_weight;
 use super::reg_coalescer::coalesce_function;
 use super::{builder::*, function::*, inst::*, liveness::*, module::*, spiller::Spiller};
 use crate::ir::types::Types;
@@ -33,7 +34,6 @@ impl RegisterAllocator {
 
     pub fn run_on_function(&mut self, tys: &Types, cur_func: &mut MachineFunction) {
         let mut matrix = LivenessAnalysis::new().analyze_function(cur_func);
-        use super::calc_spill_weight::calc_spill_weight;
         calc_spill_weight(cur_func, &mut matrix);
 
         // debug!(println!("before coalesing {:?}", cur_func));
@@ -44,29 +44,7 @@ impl RegisterAllocator {
 
         self.preserve_vreg_uses_across_call(tys, cur_func, &mut matrix);
 
-        fn sort_queue(mut queue: Vec<VirtReg>, matrix: &LiveRegMatrix) -> Vec<VirtReg> {
-            queue.sort_by(|x, y| {
-                let x = matrix
-                    .virt_reg_interval
-                    .get(x)
-                    .unwrap()
-                    .start_point()
-                    .unwrap();
-                let y = matrix
-                    .virt_reg_interval
-                    .get(y)
-                    .unwrap()
-                    .start_point()
-                    .unwrap();
-                x.cmp(&y)
-            });
-            queue
-        }
-
-        // TODO: not efficient
-        self.queue = sort_queue(matrix.collect_virt_regs(), &matrix)
-            .into_iter()
-            .collect();
+        self.queue = matrix.collect_virt_regs().into_iter().collect();
 
         while let Some(vreg) = self.queue.pop_front() {
             let mut allocated = false;
@@ -89,10 +67,15 @@ impl RegisterAllocator {
             }
 
             let interfering = matrix.collect_interfering_vregs(vreg);
-            let reg_to_spill = matrix
-                // TODO: spill weight is coming soon
-                .pick_assigned_and_longest_lived_vreg(&interfering)
-                .unwrap();
+            let mut reg_to_spill = VirtReg(0);
+            let mut last_spill_weight = f32::MAX;
+            for &vreg in &interfering {
+                let spill_weight = matrix.virt_reg_interval.get(&vreg).unwrap().spill_weight;
+                if spill_weight < last_spill_weight {
+                    reg_to_spill = vreg;
+                    last_spill_weight = spill_weight;
+                }
+            }
             let phy_reg = matrix.unassign_reg(reg_to_spill).unwrap();
             matrix.assign_reg(vreg, phy_reg);
 
