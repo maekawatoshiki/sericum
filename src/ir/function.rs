@@ -18,7 +18,7 @@ impl<'a> From<&'a str> for FunctionName<'a> {
 }
 
 pub trait FunctionTrait {
-    type BasicBlocksTy;
+    type BasicBlocksTy: BasicBlocksTrait;
     fn get_basic_blocks(&self) -> &Self::BasicBlocksTy;
 }
 

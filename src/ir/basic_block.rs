@@ -14,7 +14,7 @@ pub trait BasicBlockTrait: Sized {
 }
 
 pub trait BasicBlocksTrait: Sized {
-    type BasicBlockTy;
+    type BasicBlockTy: BasicBlockTrait;
     fn get_arena(&self) -> &Arena<Self::BasicBlockTy>;
     fn get_order(&self) -> &Vec<Id<Self::BasicBlockTy>>;
 }
@@ -90,6 +90,16 @@ impl BasicBlock {
                 _ => false,
             })
             .map(|(i, _)| i)
+    }
+}
+
+impl BasicBlockTrait for BasicBlock {
+    fn get_preds(&self) -> &Vec<Id<Self>> {
+        &self.pred
+    }
+
+    fn get_succs(&self) -> &Vec<Id<Self>> {
+        &self.succ
     }
 }
 

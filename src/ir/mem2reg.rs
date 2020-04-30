@@ -1,5 +1,5 @@
 use crate::ir::{
-    basic_block::BasicBlockId,
+    basic_block::{BasicBlock, BasicBlockId},
     const_folding::ConstantFolding,
     dom_tree::{DominatorTree, DominatorTreeConstructor},
     function::Function,
@@ -17,7 +17,7 @@ pub struct Mem2Reg {}
 struct Mem2RegOnFunction<'a> {
     cur_func: &'a mut Function,
     inst_indexes: InstructionIndexes,
-    dom_tree: DominatorTree,
+    dom_tree: DominatorTree<BasicBlock>,
     phi_block_to_allocas: FxHashMap<BasicBlockId, Vec<InstructionId>>,
 }
 
