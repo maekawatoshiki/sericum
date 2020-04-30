@@ -1,7 +1,7 @@
 // TODO: refactoring!!!
 
 use super::{
-    basic_block::{BasicBlockId, BasicBlockTrait, BasicBlocks, BasicBlocksTrait},
+    basic_block::{BasicBlock, BasicBlockId, BasicBlockTrait, BasicBlocks, BasicBlocksTrait},
     function::FunctionTrait,
 };
 use id_arena::Id;
@@ -12,13 +12,12 @@ pub struct DominatorTree<T: BasicBlockTrait> {
     pub level: FxHashMap<Id<T>, usize>,
 }
 
+pub type BB<T> = <<T as FunctionTrait>::BBS as BasicBlocksTrait>::BB;
+
 pub struct DominatorTreeConstructor<'a, F: FunctionTrait> {
     func: &'a F,
-    tree: DominatorTree<<<F as FunctionTrait>::BasicBlocksTy as BasicBlocksTrait>::BasicBlockTy>,
-    dom: FxHashMap<
-        Id<<<F as FunctionTrait>::BasicBlocksTy as BasicBlocksTrait>::BasicBlockTy>,
-        FxHashSet<Id<<<F as FunctionTrait>::BasicBlocksTy as BasicBlocksTrait>::BasicBlockTy>>,
-    >, // <a, bs>, b dominates a
+    tree: DominatorTree<BB<F>>,
+    dom: FxHashMap<Id<BB<F>>, FxHashSet<Id<BB<F>>>>, // <a, bs>, b dominates a
 }
 
 impl<T: BasicBlockTrait> DominatorTree<T> {
@@ -60,10 +59,7 @@ impl<'a, F: FunctionTrait> DominatorTreeConstructor<'a, F> {
         }
     }
 
-    pub fn construct(
-        mut self,
-    ) -> DominatorTree<<<F as FunctionTrait>::BasicBlocksTy as BasicBlocksTrait>::BasicBlockTy>
-    {
+    pub fn construct(mut self) -> DominatorTree<BB<F>> {
         self.inspect_dominators();
 
         let mut strictly_dominated = FxHashMap::default();
@@ -149,10 +145,7 @@ impl<'a, F: FunctionTrait> DominatorTreeConstructor<'a, F> {
         }
     }
 
-    fn inspect_dominators_of(
-        &mut self,
-        cur_bb: Id<<<F as FunctionTrait>::BasicBlocksTy as BasicBlocksTrait>::BasicBlockTy>,
-    ) -> bool {
+    fn inspect_dominators_of(&mut self, cur_bb: Id<BB<F>>) -> bool {
         let mut set = None;
         for &pred in self.func.get_basic_blocks().get_arena()[cur_bb].get_preds() {
             let dominators_of_pred = self.dom.get(&pred).unwrap().clone();

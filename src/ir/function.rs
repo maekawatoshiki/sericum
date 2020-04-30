@@ -18,8 +18,9 @@ impl<'a> From<&'a str> for FunctionName<'a> {
 }
 
 pub trait FunctionTrait {
-    type BasicBlocksTy: BasicBlocksTrait;
-    fn get_basic_blocks(&self) -> &Self::BasicBlocksTy;
+    type BB: BasicBlockTrait;
+    type BBS: BasicBlocksTrait;
+    fn get_basic_blocks(&self) -> &Self::BBS;
 }
 
 #[derive(Debug, Clone)]
@@ -150,9 +151,10 @@ impl Function {
 }
 
 impl FunctionTrait for Function {
-    type BasicBlocksTy = BasicBlocks;
+    type BBS = BasicBlocks;
+    type BB = BasicBlock;
 
-    fn get_basic_blocks(&self) -> &Self::BasicBlocksTy {
+    fn get_basic_blocks(&self) -> &Self::BBS {
         &self.basic_blocks
     }
 }

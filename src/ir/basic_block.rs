@@ -14,9 +14,9 @@ pub trait BasicBlockTrait: Sized {
 }
 
 pub trait BasicBlocksTrait: Sized {
-    type BasicBlockTy: BasicBlockTrait;
-    fn get_arena(&self) -> &Arena<Self::BasicBlockTy>;
-    fn get_order(&self) -> &Vec<Id<Self::BasicBlockTy>>;
+    type BB: BasicBlockTrait;
+    fn get_arena(&self) -> &Arena<Self::BB>;
+    fn get_order(&self) -> &Vec<Id<Self::BB>>;
 }
 
 #[derive(Debug, Clone)]
@@ -104,13 +104,13 @@ impl BasicBlockTrait for BasicBlock {
 }
 
 impl BasicBlocksTrait for BasicBlocks {
-    type BasicBlockTy = BasicBlock;
+    type BB = BasicBlock;
 
-    fn get_arena(&self) -> &Arena<Self::BasicBlockTy> {
+    fn get_arena(&self) -> &Arena<Self::BB> {
         &self.arena
     }
 
-    fn get_order(&self) -> &Vec<Id<Self::BasicBlockTy>> {
+    fn get_order(&self) -> &Vec<Id<Self::BB>> {
         &self.order
     }
 }
@@ -125,7 +125,7 @@ impl<'a, T: BasicBlocksTrait> BasicBlocksIter<'a, T> {
 }
 
 impl<'a, T: BasicBlocksTrait> Iterator for BasicBlocksIter<'a, T> {
-    type Item = (Id<T::BasicBlockTy>, &'a T::BasicBlockTy);
+    type Item = (Id<T::BB>, &'a T::BB);
 
     fn next(&mut self) -> Option<Self::Item> {
         self.nth += 1;
