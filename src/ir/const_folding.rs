@@ -33,8 +33,8 @@ impl<'a> ConstantFoldingOnFunction<'a> {
     pub fn run(&mut self) {
         let mut worklist = VecDeque::new();
 
-        for &id in &self.cur_func.basic_blocks {
-            let bb = &self.cur_func.basic_block_arena[id];
+        for &id in &self.cur_func.basic_blocks.order {
+            let bb = &self.cur_func.basic_blocks.arena[id];
             for val in &*bb.iseq.borrow() {
                 let inst_id = val.get_inst_id().unwrap();
                 let inst = &self.cur_func.inst_table[inst_id];

@@ -13,6 +13,24 @@ pub trait BasicBlockTrait: Sized {
     fn get_succs(&self) -> &Vec<Id<Self>>;
 }
 
+pub trait BasicBlocksTrait: Sized {
+    type BasicBlockTy;
+    fn get_arena(&self) -> &Arena<Self::BasicBlockTy>;
+    fn get_order(&self) -> &Vec<Id<Self::BasicBlockTy>>;
+}
+
+#[derive(Debug, Clone)]
+pub struct BasicBlocksIter<'a, T: BasicBlocksTrait> {
+    basic_blocks: &'a T,
+    nth: usize,
+}
+
+#[derive(Debug, Clone)]
+pub struct BasicBlocks {
+    pub arena: Arena<BasicBlock>,
+    pub order: Vec<BasicBlockId>,
+}
+
 #[derive(Clone, Debug)]
 pub struct BasicBlock {
     /// Information for liveness analysis
@@ -34,6 +52,15 @@ pub struct LivenessInfo {
     pub def: FxHashSet<InstructionId>,
     pub live_in: FxHashSet<InstructionId>,
     pub live_out: FxHashSet<InstructionId>,
+}
+
+impl BasicBlocks {
+    pub fn new() -> Self {
+        Self {
+            arena: Arena::new(),
+            order: vec![],
+        }
+    }
 }
 
 impl BasicBlock {
@@ -63,6 +90,37 @@ impl BasicBlock {
                 _ => false,
             })
             .map(|(i, _)| i)
+    }
+}
+
+impl BasicBlocksTrait for BasicBlocks {
+    type BasicBlockTy = BasicBlock;
+
+    fn get_arena(&self) -> &Arena<Self::BasicBlockTy> {
+        &self.arena
+    }
+
+    fn get_order(&self) -> &Vec<Id<Self::BasicBlockTy>> {
+        &self.order
+    }
+}
+
+impl<'a, T: BasicBlocksTrait> BasicBlocksIter<'a, T> {
+    pub fn new(basic_blocks: &'a T) -> Self {
+        Self {
+            basic_blocks,
+            nth: 0,
+        }
+    }
+}
+
+impl<'a, T: BasicBlocksTrait> Iterator for BasicBlocksIter<'a, T> {
+    type Item = (Id<T::BasicBlockTy>, &'a T::BasicBlockTy);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.nth += 1;
+        let id = *self.basic_blocks.get_order().get(self.nth - 1)?;
+        Some((id, &self.basic_blocks.get_arena()[id]))
     }
 }
 

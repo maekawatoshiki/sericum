@@ -17,7 +17,7 @@ impl<'a> IRLivenessAnalyzer<'a> {
     }
 
     pub fn set_def(&mut self, f: &Function) {
-        for (_, bb) in &f.basic_block_arena {
+        for (_, bb) in &f.basic_blocks.arena {
             let def = &mut bb.liveness.borrow_mut().def;
 
             for inst_val in &*bb.iseq.borrow() {
@@ -47,7 +47,7 @@ impl<'a> IRLivenessAnalyzer<'a> {
     }
 
     pub fn visit(&mut self, f: &Function) {
-        for (bb_id, bb) in &f.basic_block_arena {
+        for (bb_id, bb) in &f.basic_blocks.arena {
             for inst_val in &*bb.iseq.borrow() {
                 let inst = &f.inst_table[inst_val.get_inst_id().unwrap()];
                 self.visit_operands(f, bb_id, &inst.operands);
@@ -69,7 +69,7 @@ impl<'a> IRLivenessAnalyzer<'a> {
     }
 
     pub fn propagate(&mut self, f: &Function, bb_id: BasicBlockId, inst_id: InstructionId) {
-        let bb = &f.basic_block_arena[bb_id];
+        let bb = &f.basic_blocks.arena[bb_id];
 
         {
             let mut bb_liveness = bb.liveness.borrow_mut();
@@ -85,7 +85,7 @@ impl<'a> IRLivenessAnalyzer<'a> {
         }
 
         for pred_id in &bb.pred {
-            let pred = &f.basic_block_arena[*pred_id];
+            let pred = &f.basic_blocks.arena[*pred_id];
             if pred.liveness.borrow_mut().live_out.insert(inst_id) {
                 // live_out didn't have the value inst_id
                 self.propagate(f, *pred_id, inst_id);

@@ -1,6 +1,9 @@
 // TODO: refactoring!!!
 
-use super::{basic_block::BasicBlockId, function::Function};
+use super::{
+    basic_block::{BasicBlockId, BasicBlocks, BasicBlocksTrait},
+    function::FunctionTrait,
+};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 pub struct DominatorTree {
@@ -8,8 +11,8 @@ pub struct DominatorTree {
     pub level: FxHashMap<BasicBlockId, usize>,
 }
 
-pub struct DominatorTreeConstructor<'a> {
-    func: &'a Function,
+pub struct DominatorTreeConstructor<'a, F: FunctionTrait> {
+    func: &'a F,
     tree: DominatorTree,
     dom: FxHashMap<BasicBlockId, FxHashSet<BasicBlockId>>, // <a, bs>, b dominates a
 }
@@ -44,8 +47,8 @@ impl DominatorTree {
     }
 }
 
-impl<'a> DominatorTreeConstructor<'a> {
-    pub fn new(func: &'a Function) -> Self {
+impl<'a, F: FunctionTrait<BasicBlocksTy = BasicBlocks>> DominatorTreeConstructor<'a, F> {
+    pub fn new(func: &'a F) -> Self {
         Self {
             func,
             tree: DominatorTree::new(),
@@ -106,7 +109,7 @@ impl<'a> DominatorTreeConstructor<'a> {
             }
         }
 
-        let entry = self.func.basic_blocks[0];
+        let entry = self.func.get_basic_blocks().get_order()[0];
         leveling(&mut self.tree.level, &self.tree.tree, entry, 0);
 
         self.tree
@@ -115,21 +118,22 @@ impl<'a> DominatorTreeConstructor<'a> {
     fn inspect_dominators(&mut self) {
         let all = self
             .func
-            .basic_blocks
+            .get_basic_blocks()
+            .get_order()
             .iter()
             .map(|&x| x)
             .collect::<FxHashSet<_>>();
-        let entry = self.func.basic_blocks[0];
+        let entry = self.func.get_basic_blocks().get_order()[0];
         self.dom
             .entry(entry)
             .or_insert(FxHashSet::default())
             .insert(entry);
-        for cur in &self.func.basic_blocks[1..] {
+        for cur in &self.func.get_basic_blocks().get_order()[1..] {
             self.dom.insert(*cur, all.clone());
         }
         loop {
             let mut changed = false;
-            for cur in &self.func.basic_blocks[1..] {
+            for cur in &self.func.get_basic_blocks().get_order()[1..] {
                 changed |= self.inspect_dominators_of(*cur);
             }
             if !changed {
@@ -140,7 +144,7 @@ impl<'a> DominatorTreeConstructor<'a> {
 
     fn inspect_dominators_of(&mut self, cur_bb: BasicBlockId) -> bool {
         let mut set = None;
-        for &pred in &self.func.basic_block_arena[cur_bb].pred {
+        for &pred in &self.func.get_basic_blocks().get_arena()[cur_bb].pred {
             let dominators_of_pred = self.dom.get(&pred).unwrap().clone();
             if let Some(ref mut set) = &mut set {
                 *set = &*set & &dominators_of_pred;

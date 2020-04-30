@@ -66,7 +66,7 @@ impl<'a> ConvertToDAG<'a> {
         let mut dag_bb_arena: Arena<DAGBasicBlock> = Arena::new();
         let mut dag_bb_list: Vec<DAGBasicBlockId> = vec![];
 
-        for bb_id in &func.basic_blocks {
+        for bb_id in &func.basic_blocks.order {
             let dag_bb_id = dag_bb_arena.alloc(DAGBasicBlock::new());
             self.cur_conv_info_mut()
                 .bb_to_dag_bb
@@ -76,8 +76,8 @@ impl<'a> ConvertToDAG<'a> {
 
         self.set_dag_bb_pred_and_succ(func, &mut dag_bb_arena);
 
-        for bb_id in &func.basic_blocks {
-            let bb = &func.basic_block_arena[*bb_id];
+        for bb_id in &func.basic_blocks.order {
+            let bb = &func.basic_blocks.arena[*bb_id];
             let id = self.construct_dag_from_basic_block(func, bb);
             dag_bb_arena[self.cur_conv_info_ref().get_dag_bb(*bb_id)].set_entry(id);
         }
@@ -475,12 +475,12 @@ impl<'a> ConvertToDAG<'a> {
     ) {
         let conv_info = self.cur_conv_info_ref();
         for (bb, dag_bb) in &conv_info.bb_to_dag_bb {
-            dag_bb_arena[*dag_bb].pred = func.basic_block_arena[*bb]
+            dag_bb_arena[*dag_bb].pred = func.basic_blocks.arena[*bb]
                 .pred
                 .iter()
                 .map(|bb| conv_info.get_dag_bb(*bb))
                 .collect();
-            dag_bb_arena[*dag_bb].succ = func.basic_block_arena[*bb]
+            dag_bb_arena[*dag_bb].succ = func.basic_blocks.arena[*bb]
                 .succ
                 .iter()
                 .map(|bb| conv_info.get_dag_bb(*bb))

@@ -37,7 +37,7 @@ impl Mem2Reg {
     pub fn run_on_module(&mut self, module: &mut Module) {
         for (_, func) in &mut module.functions {
             // ignore internal function TODO
-            if func.basic_blocks.len() == 0 {
+            if func.basic_blocks.order.len() == 0 {
                 continue;
             }
 
@@ -60,8 +60,8 @@ impl<'a> Mem2RegOnFunction<'a> {
         let mut single_block_allocas = vec![];
         let mut multi_block_allocas = vec![];
 
-        for &id in &self.cur_func.basic_blocks {
-            let bb = &self.cur_func.basic_block_arena[id];
+        for &id in &self.cur_func.basic_blocks.order {
+            let bb = &self.cur_func.basic_blocks.arena[id];
             for val in &*bb.iseq.borrow() {
                 let inst_id = val.get_inst_id().unwrap();
                 let inst = &self.cur_func.inst_table[inst_id];
@@ -252,7 +252,7 @@ impl<'a> Mem2RegOnFunction<'a> {
             if !livein_blocks.insert(bb) {
                 continue;
             }
-            for pred in &self.cur_func.basic_block_arena[bb].pred {
+            for pred in &self.cur_func.basic_blocks.arena[bb].pred {
                 if def_blocks.contains(pred) {
                     continue;
                 }
@@ -278,7 +278,7 @@ impl<'a> Mem2RegOnFunction<'a> {
             visited_worklist.insert(root_id);
 
             while let Some(bb_id) = worklist.pop() {
-                let bb = &self.cur_func.basic_block_arena[bb_id];
+                let bb = &self.cur_func.basic_blocks.arena[bb_id];
                 for &succ_id in &bb.succ {
                     let succ_level = self.dom_tree.get_level_of(succ_id);
                     if succ_level > root_level {
@@ -313,7 +313,7 @@ impl<'a> Mem2RegOnFunction<'a> {
     }
 
     fn rename(&mut self, allocas: Vec<InstructionId>) {
-        let entry = self.cur_func.basic_blocks[0];
+        let entry = self.cur_func.basic_blocks.order[0];
         let mut worklist: Vec<(
             BasicBlockId,
             Option<BasicBlockId>,
@@ -369,7 +369,7 @@ impl<'a> Mem2RegOnFunction<'a> {
                             func_id: self.cur_func.id.unwrap(),
                             id,
                         });
-                        self.cur_func.basic_block_arena[cur]
+                        self.cur_func.basic_blocks.arena[cur]
                             .iseq_ref_mut()
                             .insert(0, val);
                         added_phi.insert((cur, *alloca_id), Operand::Value(val));
@@ -377,7 +377,7 @@ impl<'a> Mem2RegOnFunction<'a> {
                     }
                 }
 
-                let bb = &self.cur_func.basic_block_arena[cur];
+                let bb = &self.cur_func.basic_blocks.arena[cur];
                 if !visited.insert(cur) {
                     break;
                 }
@@ -485,7 +485,7 @@ impl InstructionIndexes {
 
         let inst = &cur_func.inst_table[inst_id];
         let mut i = 0;
-        let bb = &cur_func.basic_block_arena[inst.parent];
+        let bb = &cur_func.basic_blocks.arena[inst.parent];
         for val in &*bb.iseq_ref() {
             let inst_id = val.as_instruction().id;
             let opcode = cur_func.inst_table[inst_id].opcode;

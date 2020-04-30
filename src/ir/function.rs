@@ -17,6 +17,11 @@ impl<'a> From<&'a str> for FunctionName<'a> {
     }
 }
 
+pub trait FunctionTrait {
+    type BasicBlocksTy;
+    fn get_basic_blocks(&self) -> &Self::BasicBlocksTy;
+}
+
 #[derive(Debug, Clone)]
 pub struct Function {
     /// Function name
@@ -26,9 +31,10 @@ pub struct Function {
     pub ty: Type,
 
     /// Basic blocks
-    pub basic_block_arena: Arena<BasicBlock>,
-
-    pub basic_blocks: Vec<BasicBlockId>,
+    // pub basic_block_arena: Arena<BasicBlock>,
+    //
+    // pub basic_blocks: Vec<BasicBlockId>,
+    pub basic_blocks: BasicBlocks,
 
     /// Instruction arena
     pub inst_table: Arena<Instruction>,
@@ -44,8 +50,8 @@ impl Function {
         module.add_function(Self {
             name: name.to_string(),
             ty,
-            basic_block_arena: Arena::new(),
-            basic_blocks: vec![],
+            // basic_block_arena: Arena::new(),
+            basic_blocks: BasicBlocks::new(),
             inst_table: Arena::new(),
             id: None,
             types: module.types.clone(),
@@ -58,21 +64,21 @@ impl Function {
     }
 
     pub fn append_basic_block(&mut self) -> BasicBlockId {
-        let id = self.basic_block_arena.alloc(BasicBlock::new());
+        let id = self.basic_blocks.arena.alloc(BasicBlock::new());
         // self.basic_blocks.push(id);
         id
     }
 
     pub fn append_existing_basic_block(&mut self, bb_id: BasicBlockId) {
-        self.basic_blocks.push(bb_id);
+        self.basic_blocks.order.push(bb_id);
     }
 
     pub fn basic_block_ref(&self, id: BasicBlockId) -> &BasicBlock {
-        &self.basic_block_arena[id]
+        &self.basic_blocks.arena[id]
     }
 
     pub fn basic_block_ref_mut(&mut self, id: BasicBlockId) -> &mut BasicBlock {
-        &mut self.basic_block_arena[id]
+        &mut self.basic_blocks.arena[id]
     }
 
     pub fn get_param_value(&self, func_id: FunctionId, idx: usize) -> Option<Value> {
@@ -105,7 +111,7 @@ impl Function {
 
     pub fn find_inst_pos(&self, inst_id: InstructionId) -> Option<(BasicBlockId, usize)> {
         let parent = self.inst_table[inst_id].parent;
-        self.basic_block_arena[parent]
+        self.basic_blocks.arena[parent]
             .find_inst_pos(inst_id)
             .map(|pos| (parent, pos))
     }
@@ -113,7 +119,7 @@ impl Function {
     pub fn remove_inst(&self, inst_id: InstructionId) {
         let (bb_id, pos) = self.find_inst_pos(inst_id).unwrap();
         self.inst_table[inst_id].remove(&self.inst_table);
-        self.basic_block_arena[bb_id].iseq_ref_mut().remove(pos);
+        self.basic_blocks.arena[bb_id].iseq_ref_mut().remove(pos);
     }
 
     fn remove_inst_left_in_bb(&self, inst_id: InstructionId) {
@@ -143,6 +149,14 @@ impl Function {
     }
 }
 
+impl FunctionTrait for Function {
+    type BasicBlocksTy = BasicBlocks;
+
+    fn get_basic_blocks(&self) -> &Self::BasicBlocksTy {
+        &self.basic_blocks
+    }
+}
+
 impl DumpToString for &Function {
     fn dump(&self, module: &Module) -> String {
         let base = module.types.base.borrow();
@@ -158,7 +172,7 @@ impl DumpToString for &Function {
                     s
                 })
                 .trim_matches(&[',', ' '][0..]),
-            self.basic_block_arena.dump(module)
+            self.basic_blocks.arena.dump(module)
         )
     }
 }
