@@ -8,6 +8,11 @@ use std::{
 
 pub type BasicBlockId = Id<BasicBlock>;
 
+pub trait BasicBlockTrait: Sized {
+    fn get_preds(&self) -> &Vec<Id<Self>>;
+    fn get_succs(&self) -> &Vec<Id<Self>>;
+}
+
 #[derive(Clone, Debug)]
 pub struct BasicBlock {
     /// Information for liveness analysis
