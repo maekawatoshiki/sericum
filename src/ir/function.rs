@@ -1,4 +1,5 @@
 use super::{basic_block::*, module::Module, opcode::*, types::*, value::*, DumpToString};
+use crate::traits::function::FunctionTrait;
 use id_arena::*;
 
 pub type FunctionId = Id<Function>;
@@ -17,12 +18,6 @@ impl<'a> From<&'a str> for FunctionName<'a> {
     }
 }
 
-pub trait FunctionTrait {
-    type BB: BasicBlockTrait;
-    type BBS: BasicBlocksTrait;
-    fn get_basic_blocks(&self) -> &Self::BBS;
-}
-
 #[derive(Debug, Clone)]
 pub struct Function {
     /// Function name
@@ -32,9 +27,6 @@ pub struct Function {
     pub ty: Type,
 
     /// Basic blocks
-    // pub basic_block_arena: Arena<BasicBlock>,
-    //
-    // pub basic_blocks: Vec<BasicBlockId>,
     pub basic_blocks: BasicBlocks,
 
     /// Instruction arena
@@ -51,7 +43,6 @@ impl Function {
         module.add_function(Self {
             name: name.to_string(),
             ty,
-            // basic_block_arena: Arena::new(),
             basic_blocks: BasicBlocks::new(),
             inst_table: Arena::new(),
             id: None,
@@ -152,7 +143,6 @@ impl Function {
 
 impl FunctionTrait for Function {
     type BBS = BasicBlocks;
-    type BB = BasicBlock;
 
     fn get_basic_blocks(&self) -> &Self::BBS {
         &self.basic_blocks

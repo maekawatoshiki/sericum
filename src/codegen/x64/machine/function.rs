@@ -1,6 +1,7 @@
 use super::super::dag::function::*;
 use super::super::register::*;
 use super::{basic_block::*, frame_object::*, inst::*};
+use crate::traits::function::FunctionTrait;
 use crate::{codegen::is_internal_function, ir::types::*};
 use id_arena::*;
 use std::cell::Ref;
@@ -61,6 +62,14 @@ impl MachineFunctionBody {
             basic_blocks: &self.basic_blocks,
             nth: 0,
         }
+    }
+}
+
+impl FunctionTrait for MachineFunction {
+    type BBS = MachineBasicBlocks;
+
+    fn get_basic_blocks(&self) -> &Self::BBS {
+        &self.body.basic_blocks
     }
 }
 

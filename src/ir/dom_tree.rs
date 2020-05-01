@@ -1,7 +1,7 @@
 // TODO: refactoring!!!
 
-use super::{
-    basic_block::{BasicBlock, BasicBlockId, BasicBlockTrait, BasicBlocks, BasicBlocksTrait},
+use crate::traits::{
+    basic_block::{BasicBlockTrait, BasicBlocksTrait},
     function::FunctionTrait,
 };
 use id_arena::Id;

@@ -1,6 +1,7 @@
 // use super::{module::*, opcode::*, value::*};
 use super::super::register::{PhysRegSet, TargetRegisterTrait, VirtReg};
 use super::inst::*;
+use crate::traits::basic_block::*;
 use id_arena::*;
 use rustc_hash::FxHashSet;
 use std::{
@@ -14,12 +15,6 @@ pub type MachineBasicBlockId = Id<MachineBasicBlock>;
 pub struct MachineBasicBlocks {
     pub arena: Arena<MachineBasicBlock>,
     pub order: Vec<MachineBasicBlockId>,
-}
-
-#[derive(Debug, Clone)]
-pub struct MachineBasicBlocksIter<'a> {
-    basic_blocks: &'a MachineBasicBlocks,
-    nth: usize,
 }
 
 #[derive(Clone, Debug)]
@@ -45,6 +40,28 @@ pub struct LivenessInfo {
     pub live_out: FxHashSet<VirtReg>,
 }
 
+impl BasicBlockTrait for MachineBasicBlock {
+    fn get_preds(&self) -> &Vec<Id<Self>> {
+        &self.pred
+    }
+
+    fn get_succs(&self) -> &Vec<Id<Self>> {
+        &self.succ
+    }
+}
+
+impl BasicBlocksTrait for MachineBasicBlocks {
+    type BB = MachineBasicBlock;
+
+    fn get_arena(&self) -> &Arena<Self::BB> {
+        &self.arena
+    }
+
+    fn get_order(&self) -> &Vec<Id<Self::BB>> {
+        &self.order
+    }
+}
+
 impl MachineBasicBlocks {
     pub fn new() -> Self {
         Self {
@@ -53,8 +70,8 @@ impl MachineBasicBlocks {
         }
     }
 
-    pub fn id_and_block(&self) -> MachineBasicBlocksIter {
-        MachineBasicBlocksIter::new(self)
+    pub fn id_and_block(&self) -> BasicBlocksIter<MachineBasicBlocks> {
+        BasicBlocksIter::new(self)
     }
 
     pub fn get_def_phys_regs(&self) -> PhysRegSet {
@@ -63,25 +80,6 @@ impl MachineBasicBlocks {
             set = set | block.liveness_ref().phys_def.clone();
         }
         set
-    }
-}
-
-impl<'a> MachineBasicBlocksIter<'a> {
-    pub fn new(basic_blocks: &'a MachineBasicBlocks) -> Self {
-        Self {
-            basic_blocks,
-            nth: 0,
-        }
-    }
-}
-
-impl<'a> Iterator for MachineBasicBlocksIter<'a> {
-    type Item = (MachineBasicBlockId, &'a MachineBasicBlock);
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.nth += 1;
-        let id = *self.basic_blocks.order.get(self.nth - 1)?;
-        Some((id, &self.basic_blocks.arena[id]))
     }
 }
 

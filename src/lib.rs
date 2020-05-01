@@ -9,6 +9,7 @@ pub mod codegen;
 pub mod exec;
 pub mod ir;
 pub mod util;
+pub mod traits;
 
 pub use ir::*;
 

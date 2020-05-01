@@ -28,11 +28,17 @@ impl RegisterAllocator {
 
     pub fn run_on_module(&mut self, module: &mut MachineModule) {
         for (_, func) in &mut module.functions {
+            if func.internal {
+                continue;
+            }
             self.run_on_function(&module.types, func);
         }
     }
 
     pub fn run_on_function(&mut self, tys: &Types, cur_func: &mut MachineFunction) {
+        use crate::ir::dom_tree::DominatorTreeConstructor;
+        let dom_tree = DominatorTreeConstructor::new(cur_func).construct();
+
         let mut matrix = LivenessAnalysis::new().analyze_function(cur_func);
         calc_spill_weight(cur_func, &mut matrix);
 
