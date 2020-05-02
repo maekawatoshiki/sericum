@@ -5,7 +5,8 @@ mod parser;
 fn main() {
     let input = r#"
 function main(a: i32): i32 {
-    var i: i32 = a;
+    var i: i32;
+    i = a + 1;
     return i;
 }
 "#;

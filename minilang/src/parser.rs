@@ -15,6 +15,7 @@ pub struct Function {
 pub enum Node {
     Number(i32),
     Identifier(String),
+    VarDecl(String, String), // name, type
     Assign(String, Box<Node>),
     Eq(Box<Node>, Box<Node>),
     // Ne(Box<Node>, Box<Node>),
@@ -51,7 +52,8 @@ peg::parser!(pub grammar parser() for str {
         = s:((s:statement() _ {s})*) { s }
 
     rule statement() -> Node
-        = if_else()
+        = var_decl()
+        / if_else()
         / while_loop()
         / return_stmt()
         / expression()
@@ -59,6 +61,9 @@ peg::parser!(pub grammar parser() for str {
     rule expression() -> Node
         = assignment()
         / binary_op()
+
+    rule var_decl() -> Node
+         = "var" _ name:identifier() _ ":" _ ty:types() _ ";" { Node::VarDecl(name, ty) }
 
     rule if_else() -> Node
         = "if" _ e:expression() _ "{" _

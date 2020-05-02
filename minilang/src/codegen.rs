@@ -9,7 +9,7 @@ pub struct CodeGenerator {
 pub struct CodeGeneratorForFunction<'a> {
     builder: cilk::builder::Builder<'a>,
     func: &'a parser::Function,
-    vars: Vec<HashMap<String, cilk::value::Value>>,
+    vars: Vec<HashMap<String, (bool, cilk::value::Value)>>, // name, (is_arg, val)
 }
 
 impl CodeGenerator {
@@ -67,7 +67,7 @@ impl<'a> CodeGeneratorForFunction<'a> {
     pub fn run(&mut self) {
         for (i, (name, _)) in self.func.params.iter().enumerate() {
             let param = self.builder.get_param(i).unwrap();
-            self.create_var(name.clone(), param);
+            self.create_var(name.clone(), true, param);
         }
 
         let entry = self.builder.append_basic_block();
@@ -80,6 +80,17 @@ impl<'a> CodeGeneratorForFunction<'a> {
 
     pub fn run_on_node(&mut self, node: &Node) -> cilk::value::Value {
         match node {
+            Node::VarDecl(name, ty) => {
+                let ty = str2type(ty.as_str());
+                let alloca = self.builder.build_alloca(ty);
+                self.create_var(name.clone(), false, alloca);
+                alloca
+            }
+            Node::Assign(dst, src) => {
+                let (_, dst) = *self.lookup_var(dst).expect("variable not found");
+                let src = self.run_on_node(src);
+                self.builder.build_store(src, dst)
+            }
             Node::IfElse(cond, then_, else_) => {
                 let cond = self.run_on_node(cond);
                 let then_bb = self.builder.append_basic_block();
@@ -137,17 +148,24 @@ impl<'a> CodeGeneratorForFunction<'a> {
                     _ => unreachable!(),
                 }
             }
-            Node::Identifier(name) => *self.lookup_var(name.as_str()).expect("variable not found"),
+            Node::Identifier(name) => {
+                let (is_arg, v) = *self.lookup_var(name.as_str()).expect("variable not found");
+                if is_arg {
+                    v
+                } else {
+                    self.builder.build_load(v)
+                }
+            }
             Node::Number(i) => cilk::value::Value::new_imm_int32(*i),
             _ => unimplemented!(),
         }
     }
 
-    pub fn create_var(&mut self, name: String, value: cilk::value::Value) {
-        self.vars.last_mut().unwrap().insert(name, value);
+    pub fn create_var(&mut self, name: String, is_arg: bool, value: cilk::value::Value) {
+        self.vars.last_mut().unwrap().insert(name, (is_arg, value));
     }
 
-    pub fn lookup_var(&self, name: &str) -> Option<&cilk::value::Value> {
+    pub fn lookup_var(&self, name: &str) -> Option<&(bool, cilk::value::Value)> {
         self.vars.last().unwrap().get(name)
     }
 }
