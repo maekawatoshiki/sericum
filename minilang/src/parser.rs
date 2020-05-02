@@ -6,8 +6,8 @@ pub struct Module {
 #[derive(Debug)]
 pub struct Function {
     pub name: String,
-    pub params: Vec<(String, String)>, // (name, type)
-    pub ret_ty: String,
+    pub params: Vec<(String, Type)>,
+    pub ret_ty: Type,
     pub body: Vec<Node>,
 }
 
@@ -15,7 +15,7 @@ pub struct Function {
 pub enum Node {
     Number(i32),
     Identifier(String),
-    VarDecl(String, String), // name, type
+    VarDecl(String, Type), // name, type
     Assign(String, Box<Node>),
     Eq(Box<Node>, Box<Node>),
     // Ne(Box<Node>, Box<Node>),
@@ -32,6 +32,12 @@ pub enum Node {
     Call(String, Vec<Node>),
     Return(Box<Node>),
     // GlobalDataAddr(String),
+}
+
+#[derive(Debug, Clone)]
+pub enum Type {
+    Int32,
+    Int64,
 }
 
 peg::parser!(pub grammar parser() for str {
@@ -109,9 +115,9 @@ peg::parser!(pub grammar parser() for str {
         = n:$(['0'..='9']+) { Node::Number(n.parse().unwrap()) }
         // / "&" i:identifier() { Node::GlobalDataAddr(i) }
 
-    rule types() -> String
-        = quiet! { t:$("i32" / "i64") { t.to_owned() } }
-        / expected!("type")
+    rule types() -> Type
+        = "i32" { Type::Int32 }
+        / "i64" { Type::Int64 }
 
     rule _() =  quiet!{[' ' | '\t' | '\n']*}
 });

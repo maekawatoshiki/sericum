@@ -34,11 +34,11 @@ impl CodeGenerator {
             worklist.push((
                 self.module.create_function(
                     func.name.as_str(),
-                    str2type(func.ret_ty.as_str()),
+                    func.ret_ty.into_cilk_type(),
                     func.params
                         .iter()
-                        .map(|(_name, ty)| str2type(ty.as_str()))
-                        .collect(),
+                        .map(|(_name, ty)| ty.into_cilk_type())
+                        .collect::<Vec<cilk::types::Type>>(),
                 ),
                 func,
             ));
@@ -81,7 +81,7 @@ impl<'a> CodeGeneratorForFunction<'a> {
     pub fn run_on_node(&mut self, node: &Node) -> cilk::value::Value {
         match node {
             Node::VarDecl(name, ty) => {
-                let ty = str2type(ty.as_str());
+                let ty = ty.into_cilk_type();
                 let alloca = self.builder.build_alloca(ty);
                 self.create_var(name.clone(), false, alloca);
                 alloca
@@ -188,10 +188,11 @@ impl<'a> CodeGeneratorForFunction<'a> {
     }
 }
 
-fn str2type(s: &str) -> cilk::ir::types::Type {
-    match s {
-        "i32" => cilk::ir::types::Type::Int32,
-        "i64" => cilk::ir::types::Type::Int64,
-        _ => unimplemented!(),
+impl parser::Type {
+    pub fn into_cilk_type(&self) -> cilk::types::Type {
+        match self {
+            parser::Type::Int32 => cilk::types::Type::Int32,
+            parser::Type::Int64 => cilk::types::Type::Int64,
+        }
     }
 }
