@@ -4,10 +4,10 @@ mod parser;
 
 fn main() {
     let input = r#"
-        function main(a: i32, b: i32): i32 {
-            return a + b;
-        }
-        "#;
+function main(a: i32): i32 {
+    return a + 1;
+}
+"#;
     let mut codegen = codegen::CodeGenerator::new();
-    codegen.generate(input);
+    codegen.run(input);
 }
