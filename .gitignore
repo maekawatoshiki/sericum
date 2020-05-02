@@ -4,3 +4,6 @@ Cargo.lock
 defs/target
 defs/**/*.rs.bk
 defs/Cargo.lock
+minilang/target
+minilang/**/*.rs.bk
+minilang/Cargo.lock
