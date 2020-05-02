@@ -5,11 +5,12 @@
 
 #[macro_use]
 pub mod macros;
+pub mod analysis;
 pub mod codegen;
 pub mod exec;
 pub mod ir;
-pub mod util;
 pub mod traits;
+pub mod util;
 
 pub use ir::*;
 

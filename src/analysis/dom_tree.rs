@@ -12,7 +12,7 @@ pub struct DominatorTree<T: BasicBlockTrait> {
     pub level: FxHashMap<Id<T>, usize>,
 }
 
-pub type BB<T> = <<T as FunctionTrait>::BBS as BasicBlocksTrait>::BB;
+type BB<T> = <<T as FunctionTrait>::BBS as BasicBlocksTrait>::BB;
 
 pub struct DominatorTreeConstructor<'a, F: FunctionTrait> {
     func: &'a F,

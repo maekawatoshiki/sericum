@@ -1,7 +1,7 @@
+use crate::analysis::dom_tree::{DominatorTree, DominatorTreeConstructor};
 use crate::ir::{
     basic_block::{BasicBlock, BasicBlockId},
     const_folding::ConstantFolding,
-    dom_tree::{DominatorTree, DominatorTreeConstructor},
     function::Function,
     module::Module,
     opcode::{Instruction, InstructionId, Opcode, Operand},
