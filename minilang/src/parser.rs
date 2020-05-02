@@ -27,7 +27,8 @@ pub enum Node {
     Add(Box<Node>, Box<Node>),
     Sub(Box<Node>, Box<Node>),
     Mul(Box<Node>, Box<Node>),
-    // Div(Box<Node>, Box<Node>),
+    Div(Box<Node>, Box<Node>),
+    Rem(Box<Node>, Box<Node>),
     Index(String, Vec<Node>),
     IfElse(Box<Node>, Vec<Node>, Option<Vec<Node>>),
     WhileLoop(Box<Node>, Vec<Node>),
@@ -38,6 +39,7 @@ pub enum Node {
 
 #[derive(Debug, Clone)]
 pub enum Type {
+    Void,
     Int32,
     Int64,
     Array(usize, Box<Type>),
@@ -66,7 +68,7 @@ peg::parser!(pub grammar parser() for str {
         / while_loop()
         / return_stmt()
         / assignment()
-        / expression()
+        / e:expression() _ ";" { e }
 
     rule expression() -> Node
         = binary_op()
@@ -101,7 +103,8 @@ peg::parser!(pub grammar parser() for str {
         a:@ _ "-" _ b:(@) { Node::Sub(Box::new(a), Box::new(b)) }
         --
         a:@ _ "*" _ b:(@) { Node::Mul(Box::new(a), Box::new(b)) }
-        // a:@ _ "/" _ b:(@) { Node::Div(Box::new(a), Box::new(b)) }
+        a:@ _ "/" _ b:(@) { Node::Div(Box::new(a), Box::new(b)) }
+        a:@ _ "%" _ b:(@) { Node::Rem(Box::new(a), Box::new(b)) }
         --
         i:index() { Node::Index(i.0, i.1) }
         // i:identifier() _ "[" indices:((_ e:expression() _ {e}) ** ",") "]" { Node::Index(i, indices) }
@@ -130,6 +133,7 @@ peg::parser!(pub grammar parser() for str {
     rule types() -> Type
         = "i32" { Type::Int32 }
         / "i64" { Type::Int64 }
+        / "void" { Type::Void }
         / "[" _ s:number_usize() _ "]" _ t:types() { Type::Array(s, Box::new(t)) }
 
     rule _() =  quiet!{[' ' | '\t' | '\n']*}

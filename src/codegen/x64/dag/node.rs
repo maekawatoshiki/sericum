@@ -49,6 +49,7 @@ pub enum IRNodeKind {
     Add,
     Sub,
     Mul,
+    Div,
     Rem,
     Call,
     Phi,

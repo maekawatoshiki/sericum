@@ -173,6 +173,49 @@ impl<'a> ConversionInfo<'a> {
                     self.cur_bb,
                 )))
             }
+            NodeKind::IR(IRNodeKind::Div) => {
+                let eax = MachineRegister::phys_reg(GR32::EAX);
+                let edx = MachineRegister::phys_reg(GR32::EDX);
+
+                let op1 = self.normal_operand(node.operand[0]);
+                let op2 = self.normal_operand(node.operand[1]);
+
+                self.push_inst(
+                    MachineInst::new_simple(mov_n_rx(32, &op1).unwrap(), vec![op1], self.cur_bb)
+                        .with_def(vec![eax.clone()]),
+                );
+
+                self.push_inst(
+                    MachineInst::new_simple(MachineOpcode::CDQ, vec![], self.cur_bb)
+                        .with_imp_def(edx.clone())
+                        .with_imp_use(eax.clone()),
+                );
+
+                assert_eq!(op2.get_type(), Some(Type::Int32));
+                let inst1 = MachineInst::new(
+                    &self.cur_func.vreg_gen,
+                    mov_n_rx(32, &op2).unwrap(),
+                    vec![op2],
+                    Some(RegisterClassKind::GR32), // TODO: support other types
+                    self.cur_bb,
+                );
+                let op2 = MachineOperand::Register(inst1.def[0].clone());
+                self.push_inst(inst1);
+
+                self.push_inst(
+                    MachineInst::new_simple(MachineOpcode::IDIV, vec![op2], self.cur_bb)
+                        .with_imp_defs(vec![eax.clone(), edx.clone()])
+                        .with_imp_uses(vec![eax.clone(), edx]),
+                );
+
+                Some(self.push_inst(MachineInst::new(
+                    &self.cur_func.vreg_gen,
+                    MachineOpcode::Copy,
+                    vec![MachineOperand::Register(eax)],
+                    Some(RegisterClassKind::GR32), // TODO
+                    self.cur_bb,
+                )))
+            }
             NodeKind::IR(IRNodeKind::Rem) => {
                 let eax = MachineRegister::phys_reg(GR32::EAX);
                 let edx = MachineRegister::phys_reg(GR32::EDX);

@@ -22,6 +22,11 @@ impl CodeGenerator {
     pub fn run(&mut self, input: &str) {
         println!("input:\n{}", input);
         let module = parser::parser::module(input).expect("parse failed");
+        let _cilk_println_i32 = self.module.create_function(
+            "cilk.println.i32",
+            cilk::types::Type::Void,
+            vec![cilk::types::Type::Int32],
+        );
         self.run_on_module(module);
     }
 
@@ -156,7 +161,9 @@ impl<'a> CodeGeneratorForFunction<'a> {
             | Node::Le(lhs, rhs)
             | Node::Add(lhs, rhs)
             | Node::Sub(lhs, rhs)
-            | Node::Mul(lhs, rhs) => {
+            | Node::Mul(lhs, rhs)
+            | Node::Div(lhs, rhs)
+            | Node::Rem(lhs, rhs) => {
                 let lhs = self.run_on_node(lhs);
                 let rhs = self.run_on_node(rhs);
                 match node {
@@ -172,8 +179,23 @@ impl<'a> CodeGeneratorForFunction<'a> {
                     Node::Add(_, _) => self.builder.build_add(lhs, rhs),
                     Node::Sub(_, _) => self.builder.build_sub(lhs, rhs),
                     Node::Mul(_, _) => self.builder.build_mul(lhs, rhs),
+                    Node::Div(_, _) => self.builder.build_div(lhs, rhs),
+                    Node::Rem(_, _) => self.builder.build_rem(lhs, rhs),
                     _ => unreachable!(),
                 }
+            }
+            Node::Call(name, args) => {
+                let name = match name.as_str() {
+                    "println_i32" => "cilk.println.i32",
+                    name => name,
+                };
+                let func_id = self.builder.module.find_function(name).unwrap();
+                let args: Vec<cilk::value::Value> =
+                    args.iter().map(|i| self.run_on_node(i)).collect();
+                self.builder.build_call(
+                    cilk::value::Value::new_func(cilk::value::FunctionValue { func_id }),
+                    args,
+                )
             }
             Node::Identifier(name) => {
                 let (is_arg, v) = *self.lookup_var(name.as_str()).expect("variable not found");
@@ -192,7 +214,6 @@ impl<'a> CodeGeneratorForFunction<'a> {
                 self.builder.build_load(gep)
             }
             Node::Number(i) => cilk::value::Value::new_imm_int32(*i),
-            _ => unimplemented!(),
         }
     }
 
@@ -208,6 +229,7 @@ impl<'a> CodeGeneratorForFunction<'a> {
 impl parser::Type {
     pub fn into_cilk_type(&self, types: &mut cilk::types::Types) -> cilk::types::Type {
         match self {
+            parser::Type::Void => cilk::types::Type::Void,
             parser::Type::Int32 => cilk::types::Type::Int32,
             parser::Type::Int64 => cilk::types::Type::Int64,
             parser::Type::Array(len, inner) => {

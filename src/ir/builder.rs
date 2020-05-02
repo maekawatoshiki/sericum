@@ -139,6 +139,20 @@ impl<'a> Builder<'a> {
         inst
     }
 
+    pub fn build_div(&mut self, v1: Value, v2: Value) -> Value {
+        if let Some(konst) = v1.const_div(&v2) {
+            return konst;
+        }
+
+        let inst = self.create_inst_value(
+            Opcode::Div,
+            vec![Operand::Value(v1), Operand::Value(v2)],
+            v1.get_type(self.module).clone(),
+        );
+        self.append_inst_to_cur_bb(inst);
+        inst
+    }
+
     pub fn build_rem(&mut self, v1: Value, v2: Value) -> Value {
         if let Some(konst) = v1.const_rem(&v2) {
             return konst;

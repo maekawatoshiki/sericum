@@ -255,7 +255,7 @@ impl<'a> ConvertToDAG<'a> {
                         self.inst_id_node_id.insert(inst_id, id);
                     }
                 }
-                Opcode::Add | Opcode::Sub | Opcode::Mul | Opcode::Rem => {
+                Opcode::Add | Opcode::Sub | Opcode::Mul | Opcode::Div | Opcode::Rem => {
                     let v1 = self.get_dag_id_from_value(inst.operands[0].as_value());
                     let v2 = self.get_dag_id_from_value(inst.operands[1].as_value());
                     let bin_id = self.alloc_node_as_necessary(
@@ -265,6 +265,7 @@ impl<'a> ConvertToDAG<'a> {
                                 Opcode::Add => NodeKind::IR(IRNodeKind::Add),
                                 Opcode::Sub => NodeKind::IR(IRNodeKind::Sub),
                                 Opcode::Mul => NodeKind::IR(IRNodeKind::Mul),
+                                Opcode::Div => NodeKind::IR(IRNodeKind::Div),
                                 Opcode::Rem => NodeKind::IR(IRNodeKind::Rem),
                                 _ => unreachable!(),
                             },
