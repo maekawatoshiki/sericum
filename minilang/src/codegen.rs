@@ -3,7 +3,7 @@ use cilk;
 use std::collections::HashMap;
 
 pub struct CodeGenerator {
-    module: cilk::module::Module,
+    pub module: cilk::module::Module,
 }
 
 pub struct CodeGeneratorForFunction<'a> {
@@ -48,8 +48,6 @@ impl CodeGenerator {
         for (func_id, func) in worklist {
             CodeGeneratorForFunction::new(&mut self.module, func_id, func).run()
         }
-
-        println!("dump:\n{:?}", self.module);
     }
 }
 
