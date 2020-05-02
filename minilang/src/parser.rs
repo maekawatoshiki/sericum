@@ -38,6 +38,7 @@ pub enum Node {
 pub enum Type {
     Int32,
     Int64,
+    Array(usize, Box<Type>),
 }
 
 peg::parser!(pub grammar parser() for str {
@@ -115,9 +116,13 @@ peg::parser!(pub grammar parser() for str {
         = n:$(['0'..='9']+) { Node::Number(n.parse().unwrap()) }
         // / "&" i:identifier() { Node::GlobalDataAddr(i) }
 
+    rule number_usize() -> usize
+        = n:$(['0'..='9']+) { n.parse().unwrap() }
+
     rule types() -> Type
         = "i32" { Type::Int32 }
         / "i64" { Type::Int64 }
+        / "[" _ s:number_usize() _ "]" _ t:types() { Type::Array(s, Box::new(t)) }
 
     rule _() =  quiet!{[' ' | '\t' | '\n']*}
 });

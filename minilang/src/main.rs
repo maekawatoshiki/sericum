@@ -14,7 +14,6 @@ function main(a: i32): i32 {
     let mut codegen = codegen::CodeGenerator::new();
     codegen.run(input);
 
-    cilk::ir::mem2reg::Mem2Reg::new().run_on_module(&mut codegen.module);
     let mut jit = cilk::codegen::x64::exec::jit::JITExecutor::new(&codegen.module);
     let func = jit.find_function_by_name("main").unwrap();
     println!(

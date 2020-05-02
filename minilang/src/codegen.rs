@@ -31,15 +31,15 @@ impl CodeGenerator {
         // Create prototypes
         let mut worklist = vec![];
         for func in &module.functions {
+            let ret_ty = func.ret_ty.into_cilk_type(&mut self.module.types);
+            let params_ty = func
+                .params
+                .iter()
+                .map(|(_name, ty)| ty.into_cilk_type(&mut self.module.types))
+                .collect::<Vec<cilk::types::Type>>();
             worklist.push((
-                self.module.create_function(
-                    func.name.as_str(),
-                    func.ret_ty.into_cilk_type(),
-                    func.params
-                        .iter()
-                        .map(|(_name, ty)| ty.into_cilk_type())
-                        .collect::<Vec<cilk::types::Type>>(),
-                ),
+                self.module
+                    .create_function(func.name.as_str(), ret_ty, params_ty),
                 func,
             ));
         }
@@ -81,7 +81,7 @@ impl<'a> CodeGeneratorForFunction<'a> {
     pub fn run_on_node(&mut self, node: &Node) -> cilk::value::Value {
         match node {
             Node::VarDecl(name, ty) => {
-                let ty = ty.into_cilk_type();
+                let ty = ty.into_cilk_type(&mut self.builder.module.types);
                 let alloca = self.builder.build_alloca(ty);
                 self.create_var(name.clone(), false, alloca);
                 alloca
@@ -189,10 +189,14 @@ impl<'a> CodeGeneratorForFunction<'a> {
 }
 
 impl parser::Type {
-    pub fn into_cilk_type(&self) -> cilk::types::Type {
+    pub fn into_cilk_type(&self, types: &mut cilk::types::Types) -> cilk::types::Type {
         match self {
             parser::Type::Int32 => cilk::types::Type::Int32,
             parser::Type::Int64 => cilk::types::Type::Int64,
+            parser::Type::Array(len, inner) => {
+                let inner = inner.into_cilk_type(types);
+                types.new_array_ty(inner, *len)
+            }
         }
     }
 }
