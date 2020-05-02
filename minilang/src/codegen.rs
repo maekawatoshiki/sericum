@@ -86,10 +86,29 @@ impl<'a> CodeGeneratorForFunction<'a> {
                 let e = self.run_on_node(e);
                 self.builder.build_ret(e)
             }
-            Node::Add(lhs, rhs) => {
+            Node::Eq(lhs, rhs)
+            | Node::Lt(lhs, rhs)
+            | Node::Le(lhs, rhs)
+            | Node::Add(lhs, rhs)
+            | Node::Sub(lhs, rhs)
+            | Node::Mul(lhs, rhs) => {
                 let lhs = self.run_on_node(lhs);
                 let rhs = self.run_on_node(rhs);
-                self.builder.build_add(lhs, rhs)
+                match node {
+                    Node::Eq(_, _) => self
+                        .builder
+                        .build_icmp(cilk::opcode::ICmpKind::Eq, lhs, rhs),
+                    Node::Lt(_, _) => self
+                        .builder
+                        .build_icmp(cilk::opcode::ICmpKind::Lt, lhs, rhs),
+                    Node::Le(_, _) => self
+                        .builder
+                        .build_icmp(cilk::opcode::ICmpKind::Le, lhs, rhs),
+                    Node::Add(_, _) => self.builder.build_add(lhs, rhs),
+                    Node::Sub(_, _) => self.builder.build_sub(lhs, rhs),
+                    Node::Mul(_, _) => self.builder.build_mul(lhs, rhs),
+                    _ => unreachable!(),
+                }
             }
             Node::Identifier(name) => *self.lookup_var(name.as_str()).expect("variable not found"),
             Node::Number(i) => cilk::value::Value::new_imm_int32(*i),
