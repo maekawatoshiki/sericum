@@ -17,6 +17,7 @@ pub enum Node {
     Identifier(String),
     VarDecl(String, Type), // name, type
     Assign(String, Box<Node>),
+    AssignIndex(String, Vec<Node>, Box<Node>),
     Eq(Box<Node>, Box<Node>),
     // Ne(Box<Node>, Box<Node>),
     Lt(Box<Node>, Box<Node>),
@@ -27,6 +28,7 @@ pub enum Node {
     Sub(Box<Node>, Box<Node>),
     Mul(Box<Node>, Box<Node>),
     // Div(Box<Node>, Box<Node>),
+    Index(String, Vec<Node>),
     IfElse(Box<Node>, Vec<Node>, Option<Vec<Node>>),
     WhileLoop(Box<Node>, Vec<Node>),
     Call(String, Vec<Node>),
@@ -63,11 +65,11 @@ peg::parser!(pub grammar parser() for str {
         / if_else()
         / while_loop()
         / return_stmt()
+        / assignment()
         / expression()
 
     rule expression() -> Node
-        = assignment()
-        / binary_op()
+        = binary_op()
 
     rule var_decl() -> Node
          = "var" _ name:identifier() _ ":" _ ty:types() _ ";" { Node::VarDecl(name, ty) }
@@ -85,6 +87,7 @@ peg::parser!(pub grammar parser() for str {
 
     rule assignment() -> Node
         = i:identifier() _ "=" _ e:expression() _ ";" {Node::Assign(i, Box::new(e))}
+        / i:index() _ "=" _ e:expression() _ ";" { Node::AssignIndex(i.0, i.1, Box::new(e))}
 
     rule binary_op() -> Node = precedence!{
         a:@ _ "==" _ b:(@) { Node::Eq(Box::new(a), Box::new(b)) }
@@ -100,10 +103,15 @@ peg::parser!(pub grammar parser() for str {
         a:@ _ "*" _ b:(@) { Node::Mul(Box::new(a), Box::new(b)) }
         // a:@ _ "/" _ b:(@) { Node::Div(Box::new(a), Box::new(b)) }
         --
+        i:index() { Node::Index(i.0, i.1) }
+        // i:identifier() _ "[" indices:((_ e:expression() _ {e}) ** ",") "]" { Node::Index(i, indices) }
         i:identifier() _ "(" args:((_ e:expression() _ {e}) ** ",") ")" { Node::Call(i, args) }
         i:identifier() { Node::Identifier(i) }
         l:literal() { l }
     }
+
+    rule index() -> (String, Vec<Node>)
+        = i:identifier() _ "[" indices:((_ e:expression() _ {e}) ** ",") "]" { (i, indices) }
 
     rule return_stmt() -> Node
         = "return" _ e:expression() _ ";" { Node::Return(Box::new(e)) }

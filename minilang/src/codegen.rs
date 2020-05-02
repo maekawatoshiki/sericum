@@ -91,6 +91,15 @@ impl<'a> CodeGeneratorForFunction<'a> {
                 let src = self.run_on_node(src);
                 self.builder.build_store(src, dst)
             }
+            Node::AssignIndex(base, indices, src) => {
+                let (_, base) = *self.lookup_var(base).expect("variable not found");
+                let mut indices: Vec<cilk::value::Value> =
+                    indices.iter().map(|i| self.run_on_node(i)).collect();
+                indices.insert(0, cilk::value::Value::new_imm_int32(0));
+                let gep = self.builder.build_gep(base, indices);
+                let src = self.run_on_node(src);
+                self.builder.build_store(src, gep)
+            }
             Node::IfElse(cond, then_, else_) => {
                 let cond = self.run_on_node(cond);
                 let then_bb = self.builder.append_basic_block();
@@ -173,6 +182,14 @@ impl<'a> CodeGeneratorForFunction<'a> {
                 } else {
                     self.builder.build_load(v)
                 }
+            }
+            Node::Index(base, indices) => {
+                let (_, base) = *self.lookup_var(base).expect("variable not found");
+                let mut indices: Vec<cilk::value::Value> =
+                    indices.iter().map(|i| self.run_on_node(i)).collect();
+                indices.insert(0, cilk::value::Value::new_imm_int32(0));
+                let gep = self.builder.build_gep(base, indices);
+                self.builder.build_load(gep)
             }
             Node::Number(i) => cilk::value::Value::new_imm_int32(*i),
             _ => unimplemented!(),

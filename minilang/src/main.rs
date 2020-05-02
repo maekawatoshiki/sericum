@@ -5,10 +5,9 @@ mod parser;
 fn main() {
     let input = r#"
 function main(a: i32): i32 {
-    var i: i32; i = 1;
-    var total: i32; total = 0;
-    while i <= a { total = total + i; i = i + 1; }
-    return total;
+    var arr: [16] i32;
+    arr[a] = 1;
+    return arr[a];
 }
 "#;
     let mut codegen = codegen::CodeGenerator::new();
