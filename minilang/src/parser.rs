@@ -1,6 +1,7 @@
 #[derive(Debug)]
 pub struct Module {
     pub functions: Vec<Function>,
+    pub structs: Vec<(String, Vec<(String, Type)>)>,
 }
 
 #[derive(Debug)]
@@ -18,6 +19,7 @@ pub enum Node {
     VarDecl(String, Type), // name, type
     Assign(String, Box<Node>),
     AssignIndex(String, Vec<Node>, Box<Node>),
+    AssignDot(String, Vec<String>, Box<Node>),
     Eq(Box<Node>, Box<Node>),
     // Ne(Box<Node>, Box<Node>),
     Lt(Box<Node>, Box<Node>),
@@ -30,6 +32,7 @@ pub enum Node {
     Div(Box<Node>, Box<Node>),
     Rem(Box<Node>, Box<Node>),
     Index(String, Vec<Node>),
+    Dot(String, Vec<String>),
     IfElse(Box<Node>, Vec<Node>, Option<Vec<Node>>),
     WhileLoop(Box<Node>, Vec<Node>),
     Call(String, Vec<Node>),
@@ -43,11 +46,38 @@ pub enum Type {
     Int32,
     Int64,
     Array(usize, Box<Type>),
+    Struct(String),
+}
+
+enum ModuleItem {
+    Function(Function),
+    StructDecl(String, Vec<(String, Type)>),
 }
 
 peg::parser!(pub grammar parser() for str {
     pub rule module() -> Module
-        = functions:((f:function() _ { f })*)  { Module { functions } }
+        = items:((_ i:module_item() _ { i })*) {
+            let mut functions = vec![];
+            let mut structs = vec![];
+            for item in items {
+                match item {
+                    ModuleItem::Function(f) => functions.push(f),
+                    ModuleItem::StructDecl(name, decls) => structs.push((name, decls)),
+                }
+            }
+            Module { functions, structs }
+        }
+
+    rule module_item() -> ModuleItem
+        = f:function()    { ModuleItem::Function(f) }
+        / s:struct_decl() { ModuleItem::StructDecl(s.0, s.1) }
+
+    rule struct_decl() -> (String, Vec<(String, Type)>)
+        = "struct" _ name:identifier() _
+        "{" _
+        d:((_ name:identifier() _ ":" _ ty:types() _ {(name, ty)}) ** ",") _
+        "}" _
+        { (name, d) }
 
     pub rule function() -> Function // (String, Vec<(String, String)>, String, Vec<Node>)
         = [' ' | '\t' | '\n']* "function" _ name:identifier() _
@@ -90,6 +120,7 @@ peg::parser!(pub grammar parser() for str {
     rule assignment() -> Node
         = i:identifier() _ "=" _ e:expression() _ ";" {Node::Assign(i, Box::new(e))}
         / i:index() _ "=" _ e:expression() _ ";" { Node::AssignIndex(i.0, i.1, Box::new(e))}
+        / i:dot() _ "=" _ e:expression() _ ";" { Node::AssignDot(i.0, i.1, Box::new(e))}
 
     rule binary_op() -> Node = precedence!{
         a:@ _ "==" _ b:(@) { Node::Eq(Box::new(a), Box::new(b)) }
@@ -107,7 +138,7 @@ peg::parser!(pub grammar parser() for str {
         a:@ _ "%" _ b:(@) { Node::Rem(Box::new(a), Box::new(b)) }
         --
         i:index() { Node::Index(i.0, i.1) }
-        // i:identifier() _ "[" indices:((_ e:expression() _ {e}) ** ",") "]" { Node::Index(i, indices) }
+        i:dot() { Node::Dot(i.0, i.1) }
         i:identifier() _ "(" args:((_ e:expression() _ {e}) ** ",") ")" { Node::Call(i, args) }
         i:identifier() { Node::Identifier(i) }
         l:literal() { l }
@@ -115,6 +146,9 @@ peg::parser!(pub grammar parser() for str {
 
     rule index() -> (String, Vec<Node>)
         = i:identifier() _ "[" indices:((_ e:expression() _ {e}) ** ",") "]" { (i, indices) }
+
+    rule dot() -> (String, Vec<String>)
+        = i:identifier() _ "." fields:((_ e:identifier() _ {e}) ** ".") { (i, fields) }
 
     rule return_stmt() -> Node
         = "return" _ e:expression() _ ";" { Node::Return(Box::new(e)) }
@@ -134,6 +168,7 @@ peg::parser!(pub grammar parser() for str {
         = "i32" { Type::Int32 }
         / "i64" { Type::Int64 }
         / "void" { Type::Void }
+        / "struct" _ name:identifier() { Type::Struct(name) }
         / "[" _ s:number_usize() _ "]" _ t:types() { Type::Array(s, Box::new(t)) }
 
     rule _() =  quiet!{[' ' | '\t' | '\n']*}

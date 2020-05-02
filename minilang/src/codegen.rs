@@ -4,25 +4,28 @@ use std::collections::HashMap;
 
 pub struct CodeGenerator {
     pub module: cilk::module::Module,
+    record_types: HashMap<String, (cilk::types::Type, HashMap<String, usize>)>,
 }
 
 pub struct CodeGeneratorForFunction<'a> {
     builder: cilk::builder::Builder<'a>,
+    record_types: &'a HashMap<String, (cilk::types::Type, HashMap<String, usize>)>,
     func: &'a parser::Function,
-    vars: Vec<HashMap<String, (bool, cilk::value::Value)>>, // name, (is_arg, val)
+    vars: Vec<HashMap<String, (bool, parser::Type, cilk::value::Value)>>, // name, (is_arg, ty, val)
 }
 
 impl CodeGenerator {
     pub fn new() -> Self {
         Self {
             module: cilk::module::Module::new("minilang"),
+            record_types: HashMap::new(),
         }
     }
 
     pub fn run(&mut self, input: &str) {
         println!("input:\n{}", input);
         let module = parser::parser::module(input).expect("parse failed");
-        let _cilk_println_i32 = self.module.create_function(
+        self.module.create_function(
             "cilk.println.i32",
             cilk::types::Type::Void,
             vec![cilk::types::Type::Int32],
@@ -33,14 +36,32 @@ impl CodeGenerator {
     pub fn run_on_module(&mut self, module: parser::Module) {
         println!("Parsed: {:?}", module);
 
-        // Create prototypes
+        // Declare struct
+        for (name, decls) in &module.structs {
+            let decls_ = decls
+                .iter()
+                .map(|(_, ty)| ty.into_cilk_type(&self.record_types, &mut self.module.types))
+                .collect();
+            let name2idx: HashMap<String, usize> = decls
+                .iter()
+                .enumerate()
+                .map(|(i, (name, _))| (name.clone(), i))
+                .collect();
+            let struct_ty = self.module.types.new_struct_ty(decls_);
+            self.record_types
+                .insert(name.clone(), (struct_ty, name2idx));
+        }
+
+        // Create function prototypes
         let mut worklist = vec![];
         for func in &module.functions {
-            let ret_ty = func.ret_ty.into_cilk_type(&mut self.module.types);
+            let ret_ty = func
+                .ret_ty
+                .into_cilk_type(&self.record_types, &mut self.module.types);
             let params_ty = func
                 .params
                 .iter()
-                .map(|(_name, ty)| ty.into_cilk_type(&mut self.module.types))
+                .map(|(_name, ty)| ty.into_cilk_type(&self.record_types, &mut self.module.types))
                 .collect::<Vec<cilk::types::Type>>();
             worklist.push((
                 self.module
@@ -51,7 +72,7 @@ impl CodeGenerator {
 
         // Actaully generate function
         for (func_id, func) in worklist {
-            CodeGeneratorForFunction::new(&mut self.module, func_id, func).run()
+            CodeGeneratorForFunction::new(&mut self.module, &self.record_types, func_id, func).run()
         }
     }
 }
@@ -59,20 +80,22 @@ impl CodeGenerator {
 impl<'a> CodeGeneratorForFunction<'a> {
     pub fn new(
         module: &'a mut cilk::module::Module,
+        record_types: &'a HashMap<String, (cilk::types::Type, HashMap<String, usize>)>,
         func_id: cilk::function::FunctionId,
         func: &'a parser::Function,
     ) -> Self {
         Self {
             builder: cilk::builder::Builder::new(module, func_id),
+            record_types,
             func,
             vars: vec![HashMap::new()],
         }
     }
 
     pub fn run(&mut self) {
-        for (i, (name, _)) in self.func.params.iter().enumerate() {
+        for (i, (name, ty)) in self.func.params.iter().enumerate() {
             let param = self.builder.get_param(i).unwrap();
-            self.create_var(name.clone(), true, param);
+            self.create_var(name.clone(), true, ty.clone(), param);
         }
 
         let entry = self.builder.append_basic_block();
@@ -86,22 +109,40 @@ impl<'a> CodeGeneratorForFunction<'a> {
     pub fn run_on_node(&mut self, node: &Node) -> cilk::value::Value {
         match node {
             Node::VarDecl(name, ty) => {
-                let ty = ty.into_cilk_type(&mut self.builder.module.types);
-                let alloca = self.builder.build_alloca(ty);
-                self.create_var(name.clone(), false, alloca);
+                let ty_ = ty.into_cilk_type(&self.record_types, &mut self.builder.module.types);
+                let alloca = self.builder.build_alloca(ty_);
+                self.create_var(name.clone(), false, ty.clone(), alloca);
                 alloca
             }
             Node::Assign(dst, src) => {
-                let (_, dst) = *self.lookup_var(dst).expect("variable not found");
+                let (_, _, dst) = *self.lookup_var(dst).expect("variable not found");
                 let src = self.run_on_node(src);
                 self.builder.build_store(src, dst)
             }
             Node::AssignIndex(base, indices, src) => {
-                let (_, base) = *self.lookup_var(base).expect("variable not found");
+                let (_, _, base) = *self.lookup_var(base).expect("variable not found");
                 let mut indices: Vec<cilk::value::Value> =
                     indices.iter().map(|i| self.run_on_node(i)).collect();
                 indices.insert(0, cilk::value::Value::new_imm_int32(0));
                 let gep = self.builder.build_gep(base, indices);
+                let src = self.run_on_node(src);
+                self.builder.build_store(src, gep)
+            }
+            Node::AssignDot(base, fields, src) => {
+                let (base, fields) = {
+                    let (_, base_ty, base) = self.lookup_var(base).expect("variable not found");
+                    let mut fields: Vec<cilk::value::Value> = fields
+                        .iter()
+                        .map(|name| {
+                            cilk::value::Value::new_imm_int32(
+                                base_ty.member_index(name.as_str(), &self.record_types) as i32,
+                            )
+                        })
+                        .collect();
+                    fields.insert(0, cilk::value::Value::new_imm_int32(0));
+                    (*base, fields)
+                };
+                let gep = self.builder.build_gep(base, fields);
                 let src = self.run_on_node(src);
                 self.builder.build_store(src, gep)
             }
@@ -198,7 +239,7 @@ impl<'a> CodeGeneratorForFunction<'a> {
                 )
             }
             Node::Identifier(name) => {
-                let (is_arg, v) = *self.lookup_var(name.as_str()).expect("variable not found");
+                let (is_arg, _, v) = *self.lookup_var(name.as_str()).expect("variable not found");
                 if is_arg {
                     v
                 } else {
@@ -206,36 +247,83 @@ impl<'a> CodeGeneratorForFunction<'a> {
                 }
             }
             Node::Index(base, indices) => {
-                let (_, base) = *self.lookup_var(base).expect("variable not found");
+                let (_, _, base) = *self.lookup_var(base).expect("variable not found");
                 let mut indices: Vec<cilk::value::Value> =
                     indices.iter().map(|i| self.run_on_node(i)).collect();
                 indices.insert(0, cilk::value::Value::new_imm_int32(0));
                 let gep = self.builder.build_gep(base, indices);
                 self.builder.build_load(gep)
             }
+            Node::Dot(base, fields) => {
+                let (base, fields) = {
+                    let (_, base_ty, base) = self.lookup_var(base).expect("variable not found");
+                    let mut fields: Vec<cilk::value::Value> = fields
+                        .iter()
+                        .map(|name| {
+                            cilk::value::Value::new_imm_int32(
+                                base_ty.member_index(name.as_str(), &self.record_types) as i32,
+                            )
+                        })
+                        .collect();
+                    fields.insert(0, cilk::value::Value::new_imm_int32(0));
+                    (*base, fields)
+                };
+                let gep = self.builder.build_gep(base, fields);
+                self.builder.build_load(gep)
+            }
             Node::Number(i) => cilk::value::Value::new_imm_int32(*i),
         }
     }
 
-    pub fn create_var(&mut self, name: String, is_arg: bool, value: cilk::value::Value) {
-        self.vars.last_mut().unwrap().insert(name, (is_arg, value));
+    pub fn create_var(
+        &mut self,
+        name: String,
+        is_arg: bool,
+        ty: parser::Type,
+        value: cilk::value::Value,
+    ) {
+        self.vars
+            .last_mut()
+            .unwrap()
+            .insert(name, (is_arg, ty, value));
     }
 
-    pub fn lookup_var(&self, name: &str) -> Option<&(bool, cilk::value::Value)> {
+    pub fn lookup_var(&self, name: &str) -> Option<&(bool, parser::Type, cilk::value::Value)> {
         self.vars.last().unwrap().get(name)
     }
 }
 
 impl parser::Type {
-    pub fn into_cilk_type(&self, types: &mut cilk::types::Types) -> cilk::types::Type {
+    pub fn into_cilk_type(
+        &self,
+        record_types: &HashMap<String, (cilk::types::Type, HashMap<String, usize>)>,
+        types: &mut cilk::types::Types,
+    ) -> cilk::types::Type {
         match self {
             parser::Type::Void => cilk::types::Type::Void,
             parser::Type::Int32 => cilk::types::Type::Int32,
             parser::Type::Int64 => cilk::types::Type::Int64,
+            parser::Type::Struct(name) => record_types.get(name.as_str()).unwrap().0,
             parser::Type::Array(len, inner) => {
-                let inner = inner.into_cilk_type(types);
+                let inner = inner.into_cilk_type(record_types, types);
                 types.new_array_ty(inner, *len)
             }
+        }
+    }
+
+    pub fn member_index(
+        &self,
+        name: &str,
+        record_types: &HashMap<String, (cilk::types::Type, HashMap<String, usize>)>,
+    ) -> usize {
+        match self {
+            parser::Type::Struct(s_name) => *record_types
+                .get(s_name.as_str())
+                .unwrap()
+                .1
+                .get(name)
+                .unwrap(),
+            _ => panic!(),
         }
     }
 }
