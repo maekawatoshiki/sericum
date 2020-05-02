@@ -210,6 +210,10 @@ impl Opcode {
         }
     }
 
+    pub fn is_terminator(&self) -> bool {
+        matches!(self, Opcode::Br | Opcode::CondBr | Opcode::Ret)
+    }
+
     pub fn to_string(&self) -> &str {
         match self {
             Opcode::Alloca => "alloca",

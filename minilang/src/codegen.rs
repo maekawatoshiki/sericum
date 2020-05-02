@@ -26,7 +26,7 @@ impl CodeGenerator {
     }
 
     pub fn run_on_module(&mut self, module: parser::Module) {
-        // println!("{:?}", module);
+        println!("Parsed: {:?}", module);
 
         // Create prototypes
         let mut worklist = vec![];
@@ -82,6 +82,35 @@ impl<'a> CodeGeneratorForFunction<'a> {
 
     pub fn run_on_node(&mut self, node: &Node) -> cilk::value::Value {
         match node {
+            Node::IfElse(cond, then_, else_) => {
+                let cond = self.run_on_node(cond);
+                let then_bb = self.builder.append_basic_block();
+                let else_bb = self.builder.append_basic_block();
+                let merge_bb = if else_.is_some() {
+                    self.builder.append_basic_block()
+                } else {
+                    else_bb
+                };
+                self.builder.build_cond_br(cond, then_bb, else_bb);
+                self.builder.set_insert_point(then_bb);
+                for node in then_ {
+                    self.run_on_node(node);
+                }
+                if !self.builder.is_last_inst_terminator() {
+                    self.builder.build_br(merge_bb);
+                }
+                if let Some(else_) = else_ {
+                    self.builder.set_insert_point(else_bb);
+                    for node in else_ {
+                        self.run_on_node(node);
+                    }
+                    if !self.builder.is_last_inst_terminator() {
+                        self.builder.build_br(merge_bb);
+                    }
+                }
+                self.builder.set_insert_point(merge_bb);
+                cilk::value::Value::None
+            }
             Node::Return(e) => {
                 let e = self.run_on_node(e);
                 self.builder.build_ret(e)

@@ -240,6 +240,15 @@ impl<'a> Builder<'a> {
         inst
     }
 
+    pub fn is_last_inst_terminator(&self) -> bool {
+        let bb = self.function_ref().basic_block_ref(self.cur_bb.unwrap());
+        bb.iseq_ref().last().map_or(false, |i| {
+            self.function_ref().inst_table[i.as_instruction().id]
+                .opcode
+                .is_terminator()
+        })
+    }
+
     // Utils
 
     fn create_inst_value(&mut self, opcode: Opcode, operands: Vec<Operand>, ret_ty: Type) -> Value {
