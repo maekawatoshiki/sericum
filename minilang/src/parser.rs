@@ -5,10 +5,10 @@ pub struct Module {
 
 #[derive(Debug)]
 pub struct Function {
-    name: String,
-    params: Vec<(String, String)>, // (name, type)
-    ret_ty: String,
-    body: Vec<Expr>,
+    pub name: String,
+    pub params: Vec<(String, String)>, // (name, type)
+    pub ret_ty: String,
+    pub body: Vec<Expr>,
 }
 
 #[derive(Debug)]
