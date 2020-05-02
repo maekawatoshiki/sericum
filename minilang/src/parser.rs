@@ -1,4 +1,16 @@
-/// The AST node for expressions.
+#[derive(Debug)]
+pub struct Module {
+    pub functions: Vec<Function>,
+}
+
+#[derive(Debug)]
+pub struct Function {
+    name: String,
+    params: Vec<(String, String)>, // (name, type)
+    ret_ty: String,
+    body: Vec<Expr>,
+}
+
 #[derive(Debug)]
 pub enum Expr {
     Literal(String),
@@ -22,15 +34,18 @@ pub enum Expr {
 }
 
 peg::parser!(pub grammar parser() for str {
-    pub rule function() -> (String, Vec<(String, String)>, String, Vec<Expr>)
+    pub rule module() -> Module
+        = functions:((f:function() _ { f })*)  { Module { functions } }
+
+    pub rule function() -> Function // (String, Vec<(String, String)>, String, Vec<Expr>)
         = [' ' | '\t' | '\n']* "function" _ name:identifier() _
         "(" params:((_ i:identifier() _ ":" _ t:types() _ {(i, t)}) ** ",") ")" _
         ":" _
         ret_ty:types() _
         "{" _
-        stmts:statements()
+        body:statements()
         _ "}" _
-        { (name, params, ret_ty, stmts) }
+        { Function { name, params, ret_ty, body } }
 
     rule statements() -> Vec<Expr>
         = s:((s:statement() _ {s})*) { s }
