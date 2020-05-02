@@ -120,6 +120,24 @@ impl<'a> CodeGeneratorForFunction<'a> {
                 self.builder.set_insert_point(merge_bb);
                 cilk::value::Value::None
             }
+            Node::WhileLoop(cond, body) => {
+                let header_bb = self.builder.append_basic_block();
+                let body_bb = self.builder.append_basic_block();
+                let post_bb = self.builder.append_basic_block();
+                self.builder.build_br(header_bb);
+                self.builder.set_insert_point(header_bb);
+                let cond = self.run_on_node(cond);
+                self.builder.build_cond_br(cond, body_bb, post_bb);
+                self.builder.set_insert_point(body_bb);
+                for node in body {
+                    self.run_on_node(node);
+                }
+                if !self.builder.is_last_inst_terminator() {
+                    self.builder.build_br(header_bb);
+                }
+                self.builder.set_insert_point(post_bb);
+                cilk::value::Value::None
+            }
             Node::Return(e) => {
                 let e = self.run_on_node(e);
                 self.builder.build_ret(e)

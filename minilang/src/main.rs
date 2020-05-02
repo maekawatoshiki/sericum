@@ -5,9 +5,10 @@ mod parser;
 fn main() {
     let input = r#"
 function main(a: i32): i32 {
-    var i: i32;
-    i = a + 1;
-    return i;
+    var i: i32; i = 1;
+    var total: i32; total = 0;
+    while i <= a { total = total + i; i = i + 1; }
+    return total;
 }
 "#;
     let mut codegen = codegen::CodeGenerator::new();
@@ -19,7 +20,7 @@ function main(a: i32): i32 {
         "Result: {:?}",
         jit.run(
             func,
-            vec![cilk::codegen::x64::exec::jit::GenericValue::Int32(1)],
+            vec![cilk::codegen::x64::exec::jit::GenericValue::Int32(10)],
         )
     );
 }
