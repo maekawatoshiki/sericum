@@ -143,8 +143,8 @@ peg::parser!(pub grammar parser() for str {
     }
 
     rule primary(assign: bool) -> Node = precedence! {
-        "(" _ a:expression(assign) _ ")" { a }
-        a:@ _ "[" _ b:expression(assign) "]" { Node::Index(Box::new(a), Box::new(b)) }
+        "(" _ a:expression(false) _ ")" { a }
+        a:@ _ "[" _ b:expression(false) "]" { Node::Index(Box::new(a), Box::new(b)) }
         a:(@) _ "." _ b:@ { Node::Dot(Box::new(a), Box::new(b)) }
         "*" _ a:(@) { Node::Load(Box::new(a)) }
         "&" _ a:(@) { Node::Addr(Box::new(a)) }
