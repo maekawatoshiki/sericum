@@ -15,6 +15,7 @@ pub struct Function {
 #[derive(Debug)]
 pub enum Node {
     Number(i32),
+    FPNumber(f64),
     Identifier(String),
     VarDecl(String, Type), // name, type
     Eq(Box<Node>, Box<Node>),
@@ -46,6 +47,7 @@ pub enum Type {
     Int1,
     Int32,
     Int64,
+    F64,
     Pointer(Box<Type>),
     Array(usize, Box<Type>),
     Struct(String),
@@ -160,7 +162,8 @@ peg::parser!(pub grammar parser() for str {
         / expected!("identifier")
 
     rule number() -> Node
-        = n:$(['0'..='9']+) { Node::Number(n.parse().unwrap()) }
+        = n1:$(['0'..='9']+) _ "." _ n2:$(['0'..='9']+) { Node::FPNumber(format!("{}.{}", n1, n2).parse().unwrap()) }
+        / n:$(['0'..='9']+) { Node::Number(n.parse().unwrap()) }
 
     rule number_usize() -> usize
         = n:$(['0'..='9']+) { n.parse().unwrap() }
@@ -168,6 +171,7 @@ peg::parser!(pub grammar parser() for str {
     rule types() -> Type
         = "i32" { Type::Int32 }
         / "i64" { Type::Int64 }
+        / "f64" { Type::F64 }
         / "void" { Type::Void }
         / "struct" _ name:identifier() { Type::Struct(name) }
         / "*" _ t:types() { Type::Pointer(Box::new(t)) }

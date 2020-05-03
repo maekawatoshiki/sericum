@@ -196,10 +196,28 @@ impl<'a> CodeGeneratorForFunction<'a> {
                 let (e, _) = self.run_on_node(e);
                 (self.builder.build_ret(e), parser::Type::Void)
             }
-            Node::Eq(lhs, rhs)
-            | Node::Lt(lhs, rhs)
-            | Node::Le(lhs, rhs)
-            | Node::Add(lhs, rhs)
+            Node::Eq(lhs, rhs) | Node::Lt(lhs, rhs) | Node::Le(lhs, rhs) => {
+                let (lhs, ty) = self.run_on_node(lhs);
+                let (rhs, _) = self.run_on_node(rhs);
+                if ty.is_integer() {
+                    let cmp = match node {
+                        Node::Eq(_, _) => cilk::opcode::ICmpKind::Eq,
+                        Node::Lt(_, _) => cilk::opcode::ICmpKind::Lt,
+                        Node::Le(_, _) => cilk::opcode::ICmpKind::Le,
+                        _ => unreachable!(),
+                    };
+                    (self.builder.build_icmp(cmp, lhs, rhs), parser::Type::Int1)
+                } else {
+                    let cmp = match node {
+                        Node::Eq(_, _) => cilk::opcode::FCmpKind::UEq,
+                        Node::Lt(_, _) => cilk::opcode::FCmpKind::ULt,
+                        Node::Le(_, _) => cilk::opcode::FCmpKind::ULe,
+                        _ => unreachable!(),
+                    };
+                    (self.builder.build_fcmp(cmp, lhs, rhs), parser::Type::Int1)
+                }
+            }
+            Node::Add(lhs, rhs)
             | Node::Sub(lhs, rhs)
             | Node::Mul(lhs, rhs)
             | Node::Div(lhs, rhs)
@@ -207,21 +225,6 @@ impl<'a> CodeGeneratorForFunction<'a> {
                 let (lhs, ty) = self.run_on_node(lhs);
                 let (rhs, _) = self.run_on_node(rhs);
                 match node {
-                    Node::Eq(_, _) => (
-                        self.builder
-                            .build_icmp(cilk::opcode::ICmpKind::Eq, lhs, rhs),
-                        parser::Type::Int1,
-                    ),
-                    Node::Lt(_, _) => (
-                        self.builder
-                            .build_icmp(cilk::opcode::ICmpKind::Lt, lhs, rhs),
-                        parser::Type::Int1,
-                    ),
-                    Node::Le(_, _) => (
-                        self.builder
-                            .build_icmp(cilk::opcode::ICmpKind::Le, lhs, rhs),
-                        parser::Type::Int1,
-                    ),
                     Node::Add(_, _) => (self.builder.build_add(lhs, rhs), ty),
                     Node::Sub(_, _) => (self.builder.build_sub(lhs, rhs), ty),
                     Node::Mul(_, _) => (self.builder.build_mul(lhs, rhs), ty),
@@ -308,6 +311,7 @@ impl<'a> CodeGeneratorForFunction<'a> {
                 (gep, parser::Type::Pointer(Box::new(ty)))
             }
             Node::Number(i) => (cilk::value::Value::new_imm_int32(*i), parser::Type::Int32),
+            Node::FPNumber(f) => (cilk::value::Value::new_imm_f64(*f), parser::Type::F64),
         }
     }
 
@@ -340,6 +344,7 @@ impl parser::Type {
             parser::Type::Int1 => cilk::types::Type::Int1,
             parser::Type::Int32 => cilk::types::Type::Int32,
             parser::Type::Int64 => cilk::types::Type::Int64,
+            parser::Type::F64 => cilk::types::Type::F64,
             parser::Type::Struct(name) => types1.records.get(name.as_str()).unwrap().0,
             parser::Type::Pointer(inner) => {
                 let inner = inner.into_cilk_type(types1, types2);
@@ -350,6 +355,10 @@ impl parser::Type {
                 types2.new_array_ty(inner, *len)
             }
         }
+    }
+
+    pub fn is_integer(&self) -> bool {
+        matches!(self, Self::Int32 | Self::Int64 | Self::Int1)
     }
 
     pub fn get_elem_ty(&self) -> parser::Type {
