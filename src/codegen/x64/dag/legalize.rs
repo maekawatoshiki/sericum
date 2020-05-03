@@ -47,6 +47,7 @@ impl Legalize {
             NodeKind::IR(IRNodeKind::Load) => self.run_on_node_load(tys, heap, node),
             NodeKind::IR(IRNodeKind::Store) => self.run_on_node_store(tys, heap, node),
             NodeKind::IR(IRNodeKind::Add) => self.run_on_node_add(tys, heap, node),
+            NodeKind::IR(IRNodeKind::Mul) => self.run_on_node_mul(tys, heap, node),
             NodeKind::IR(IRNodeKind::Sext) => self.run_on_node_sext(tys, heap, node),
             NodeKind::IR(IRNodeKind::Brcc) => self.run_on_node_brcc(tys, heap, node),
             _ => {
@@ -190,6 +191,22 @@ impl Legalize {
                     node.ty.clone(),
                 ));
             }
+        }
+
+        self.run_on_node_operand(tys, heap, node);
+        node
+    }
+
+    fn run_on_node_mul(
+        &mut self,
+        tys: &Types,
+        heap: &mut DAGHeap,
+        node: Raw<DAGNode>,
+    ) -> Raw<DAGNode> {
+        let mut lhs = node.operand[0];
+        let mut rhs = node.operand[1];
+        if lhs.is_constant() && rhs.is_maybe_register() {
+            ::std::mem::swap(&mut *lhs, &mut *rhs);
         }
 
         self.run_on_node_operand(tys, heap, node);

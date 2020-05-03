@@ -241,6 +241,8 @@ impl JITCompiler {
                     MachineOpcode::IMULrr32 => self.compile_imul_rr32(inst),
                     MachineOpcode::IMULrri32 => self.compile_imul_rri32(inst),
                     MachineOpcode::IMULrr64i32 => self.compile_imul_rr64i32(inst),
+                    MachineOpcode::MULSDrr => self.compile_mulsd_rr(inst),
+                    MachineOpcode::DIVSDrr => self.compile_divsd_rr(inst),
                     MachineOpcode::IDIV => self.compile_idiv(&frame_objects, inst),
                     MachineOpcode::CDQ => self.compile_cdq(&frame_objects, inst),
                     MachineOpcode::CALL => self.compile_call(module, &frame_objects, inst),
@@ -843,6 +845,18 @@ impl JITCompiler {
         let r1 = phys_reg_to_dynasm_reg(inst.operand[0].as_register().get_reg().unwrap());
         let i2 = inst.operand[1].as_constant().as_i32();
         dynasm!(self.asm; imul Rq(r0), Rq(r1), i2);
+    }
+
+    fn compile_mulsd_rr(&mut self, inst: &MachineInst) {
+        let r0 = phys_reg_to_dynasm_reg(inst.def[0].get_reg().unwrap());
+        let r1 = phys_reg_to_dynasm_reg(inst.operand[1].as_register().get_reg().unwrap());
+        dynasm!(self.asm; mulsd Rx(r0), Rx(r1));
+    }
+
+    fn compile_divsd_rr(&mut self, inst: &MachineInst) {
+        let r0 = phys_reg_to_dynasm_reg(inst.def[0].get_reg().unwrap());
+        let r1 = phys_reg_to_dynasm_reg(inst.operand[1].as_register().get_reg().unwrap());
+        dynasm!(self.asm; divsd Rx(r0), Rx(r1));
     }
 
     fn compile_cdq(&mut self, _fo: &FrameObjectsInfo, _inst: &MachineInst) {

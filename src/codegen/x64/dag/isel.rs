@@ -90,7 +90,32 @@ impl MISelector {
                     GR32  b => (mi.IMULrr32  a, b)
                     imm32 b => (mi.IMULrri32 a, b) }
                 GR64 a {
-                    imm32 b => (mi.IMULrr64i32 a, b) } }
+                    imm32 b => (mi.IMULrr64i32 a, b) }
+                XMM a {
+                    imm_f64 b => {
+                        let n1 = heap.alloc(DAGNode::new(
+                                NodeKind::MI(MINodeKind::MOVSDrm64), vec![b], Type::F64));
+                        let a = self.run_on_node(tys, heap, a);
+                        let n2 = heap.alloc(DAGNode::new(NodeKind::MI(MINodeKind::MULSDrr),
+                                vec![a, n1], Type::F64));
+                        n2
+                    }
+                    XMM    b => (mi.MULSDrr a, b)
+                }
+            }
+            (ir.Div a, b) {
+                XMM a {
+                    imm_f64 b => {
+                        let n1 = heap.alloc(DAGNode::new(
+                                NodeKind::MI(MINodeKind::MOVSDrm64), vec![b], Type::F64));
+                        let a = self.run_on_node(tys, heap, a);
+                        let n2 = heap.alloc(DAGNode::new(NodeKind::MI(MINodeKind::DIVSDrr),
+                                vec![a, n1], Type::F64));
+                        n2
+                    }
+                    XMM    b => (mi.DIVSDrr a, b)
+                }
+            }
             (ir.Load a) {
                 (ir.FIAddr b) a {
                     f64mem b => (mi.MOVSDrm [BaseFi %rbp, b])

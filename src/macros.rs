@@ -145,6 +145,12 @@ macro_rules! cilk_expr {
     let $x = $builder.build_mul(val1, val2);
     cilk_expr!($builder; $bb_map; $( $remain )*);
 };
+($builder:expr; $bb_map:expr; $x:ident = div ($($val1:tt)*), ($($val2:tt)*); $($remain:tt)*) => {
+    let val1 = cilk_value!($builder; $( $val1 )*);
+    let val2 = cilk_value!($builder; $( $val2 )*);
+    let $x = $builder.build_div(val1, val2);
+    cilk_expr!($builder; $bb_map; $( $remain )*);
+};
 ($builder:expr; $bb_map:expr; $x:ident = rem ($($val1:tt)*), ($($val2:tt)*); $($remain:tt)*) => {
     let val1 = cilk_value!($builder; $( $val1 )*);
     let val2 = cilk_value!($builder; $( $val2 )*);

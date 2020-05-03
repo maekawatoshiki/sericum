@@ -911,3 +911,25 @@ fn float3() {
     let res = jit.run(func, vec![]);
     assert_eq!(res, exec::jit::GenericValue::F64(5.57));
 }
+
+#[test]
+fn float4() {
+    let mut m = module::Module::new("cilk");
+
+    let _ = cilk_ir!(m; define [f64] func [] {
+        entry:
+            a = alloca f64;
+            store (f64 1.2), (%a);
+            la = load (%a);
+            b = mul (%la), (f64 5.0);
+            c = mul (%b), (%la);
+            d = div (%c), (f64 2.5);
+            e = div (%d), (f64 1.2);
+            ret (%e);
+    });
+
+    let mut jit = exec::jit::JITExecutor::new(&m);
+    let func = jit.find_function_by_name("func").unwrap();
+    let res = jit.run(func, vec![]);
+    assert_eq!(res, exec::jit::GenericValue::F64(2.4));
+}
