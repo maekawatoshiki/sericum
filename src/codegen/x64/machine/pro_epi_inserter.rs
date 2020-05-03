@@ -175,9 +175,45 @@ impl<'a> CopyArgs<'a> {
             match ty {
                 Type::Int32 => self.copy_int(ty, i, 32),
                 Type::Int64 | Type::Pointer(_) => self.copy_int(ty, i, 64),
+                Type::F64 => self.copy_f64(i),
                 _ => unimplemented!(),
             }
         }
+    }
+
+    fn copy_f64(&mut self, i: usize) {
+        let ret_reg = XMM::XMM0.as_phys_reg();
+        let dst = FrameIndexInfo::new(Type::F64, FrameIndexKind::Arg(i));
+        let src = match RegisterClassKind::XMM.get_nth_arg_reg(i) {
+            Some(arg_reg) => MachineOperand::phys_reg(arg_reg),
+            None => {
+                let ax = MachineRegister::phys_reg(ret_reg);
+                let inst = MachineInst::new_simple(
+                    MachineOpcode::MOVSDrm,
+                    vec![MachineOperand::Mem(MachineMemOperand::BaseOff(
+                        MachineRegister::phys_reg(GR64::RBP),
+                        self.offset,
+                    ))],
+                    self.builder.get_cur_bb().unwrap(),
+                )
+                .with_def(vec![ax.clone()]);
+                self.builder.insert(inst);
+                self.offset += 8;
+                MachineOperand::Register(ax)
+            }
+        };
+        let inst = MachineInst::new_simple(
+            MachineOpcode::MOVSDmr,
+            vec![
+                MachineOperand::Mem(MachineMemOperand::BaseFi(
+                    MachineRegister::phys_reg(GR64::RBP),
+                    dst,
+                )),
+                src,
+            ],
+            self.builder.get_cur_bb().unwrap(),
+        );
+        self.builder.insert(inst)
     }
 
     fn copy_int(&mut self, ty: Type, i: usize, bit: usize) {

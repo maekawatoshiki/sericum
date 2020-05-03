@@ -431,6 +431,20 @@ impl<'a> ConvertToDAG<'a> {
         let mut ty = ptr.get_type(self.module);
 
         for idx in indices {
+            // TODO: we need better way
+            let struct_sz = if matches!(ty, Type::Struct(_)) {
+                let mut total = 0;
+                for i in 0..idx.as_imm().as_int32() {
+                    total += self
+                        .types
+                        .get_element_ty(ty, Some(&Value::new_imm_int32(i)))
+                        .unwrap()
+                        .size_in_byte(&self.types) as i32;
+                }
+                Some(total)
+            } else {
+                None
+            };
             ty = self.types.get_element_ty(ty, Some(idx)).unwrap();
 
             let idx = self.get_dag_id_from_value(idx);
@@ -439,7 +453,7 @@ impl<'a> ConvertToDAG<'a> {
                 NodeKind::Operand(OperandNodeKind::Constant(ConstantKind::Int32(i))) => {
                     heap.alloc(DAGNode::new(
                         NodeKind::Operand(OperandNodeKind::Constant(ConstantKind::Int32(
-                            i * ty.size_in_byte(&self.types) as i32,
+                            struct_sz.unwrap_or(i * ty.size_in_byte(&self.types) as i32),
                         ))),
                         vec![],
                         Type::Int32,

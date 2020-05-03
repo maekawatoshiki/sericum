@@ -66,7 +66,7 @@ impl JITExecutor {
             .run_on_module(&mut machine_module);
         machine::replace_data::ConstDataReplacer::new().run_on_module(&mut machine_module);
         machine::replace_copy::ReplaceCopyWithProperMInst::new().run_on_module(&mut machine_module);
-        debug!(println!("{:?}", machine_module));
+        // debug!(println!("{:?}", machine_module));
 
         // use crate::codegen::x64::asm::print::MachineAsmPrinter;
         // let mut printer = MachineAsmPrinter::new();
@@ -576,6 +576,10 @@ impl JITCompiler {
                 let m2 = fi.idx;
                 dynasm!(self.asm; movsd Rx(r0), [Rq(r1) - fo.offset(m2).unwrap()]);
             }
+            MachineOperand::Mem(MachineMemOperand::Base(base)) => {
+                let r1 = phys_reg_to_dynasm_reg(base.get_reg().unwrap());
+                dynasm!(self.asm; movsd Rx(r0), [Rq(r1)]);
+            }
             _ => unimplemented!(),
         }
     }
@@ -587,6 +591,11 @@ impl JITCompiler {
                 let m1 = fo.offset(fi.idx).unwrap();
                 let r2 = phys_reg_to_dynasm_reg(inst.operand[1].as_register().get_reg().unwrap());
                 dynasm!(self.asm; movsd [Rq(r0) - m1], Rx(r2));
+            }
+            MachineOperand::Mem(MachineMemOperand::Base(base)) => {
+                let r0 = phys_reg_to_dynasm_reg(base.get_reg().unwrap());
+                let r1 = phys_reg_to_dynasm_reg(inst.operand[1].as_register().get_reg().unwrap());
+                dynasm!(self.asm; movsd [Rq(r0)], Rx(r1));
             }
             _ => unimplemented!(),
         }

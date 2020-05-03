@@ -120,8 +120,25 @@ impl MISelector {
                 (ir.FIAddr b) a {
                     f64mem b => (mi.MOVSDrm [BaseFi %rbp, b])
                     mem32  b => (mi.MOVrm32 [BaseFi %rbp, b])
-                    mem64  b => (mi.MOVrm64 [BaseFi %rbp, b]) }
-                GR64  a => (mi.MOVrm32 [Base a])
+                    mem64  b => (mi.MOVrm64 [BaseFi %rbp, b])
+                }
+                // a is pointer
+                GR64  a => {
+                    let a = self.run_on_node(tys, heap, a);
+                    let ty = tys.get_element_ty(a.ty, None).unwrap();
+                    let mem = heap.alloc(DAGNode::new_mem(MemNodeKind::Base, vec![a]));
+                    match ty {
+                        Type::Int32 => heap.alloc(DAGNode::new(NodeKind::MI(MINodeKind::MOVrm32),
+                                vec![mem], Type::Int32)),
+                        Type::Int64 | Type::Pointer(_) | Type::Array(_) =>
+                            heap.alloc(DAGNode::new(NodeKind::MI(MINodeKind::MOVrm64),
+                                vec![mem], node.ty)),
+                        Type::F64 => heap.alloc(DAGNode::new(NodeKind::MI(MINodeKind::MOVSDrm),
+                                vec![mem], Type::F64)),
+                        _ => unimplemented!()
+                    }
+                }
+                    // (mi.MOVrm32 [Base a]) TODO
             }
             (ir.Store a, b) {
                 (ir.FIAddr c) a {
@@ -143,7 +160,18 @@ impl MISelector {
                 GR64   a {
                     imm32 b => (mi.MOVmi32 [Base a], b)
                     GR32  b => (mi.MOVmr32 [Base a], b)
-                    GR64  b => (mi.MOVmr64 [Base a], b) }
+                    GR64  b => (mi.MOVmr64 [Base a], b)
+                    imm_f64 b => {
+                        let n1 = heap.alloc(DAGNode::new(
+                                NodeKind::MI(MINodeKind::MOVSDrm64), vec![b], Type::F64));
+                        let a = self.run_on_node(tys, heap, a);
+                        let mem = heap.alloc(DAGNode::new_mem(MemNodeKind::Base, vec![a]));
+                        let n2 = heap.alloc(DAGNode::new(NodeKind::MI(MINodeKind::MOVSDmr),
+                                vec![mem, n1], Type::Void));
+                        n2
+                    }
+                    XMM    b => (mi.MOVSDmr [Base a], b)
+                }
             }
             (ir.FIAddr a) {
                 mem a => (mi.LEAr64m [BaseFi %rbp, a])

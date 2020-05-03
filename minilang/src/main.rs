@@ -56,13 +56,21 @@ fn main() {
     // }
     // "#;
     let input = r#"
-function main(): i32 {
-    var f: f64;
-    f = 11.2;
-    if f < 2.4 {
-        return 1;
-    }
+struct A {
+    b: f64,
+    c: i32
+}
+function func(x: *f64): i32 {
+    *x = 1.2;
     return 0;
+}
+function main(): f64 {
+    var a: struct A;
+    var f: f64;
+    a.b = 2.3;
+    a.c = 2;
+    func(&f);
+    return a.b;
 }
     "#;
     let mut codegen = codegen::CodeGenerator::new();
@@ -70,5 +78,5 @@ function main(): i32 {
 
     let mut jit = cilk::codegen::x64::exec::jit::JITExecutor::new(&codegen.module);
     let func = jit.find_function_by_name("main").unwrap();
-    println!("Result: {:?}", jit.run(func, vec![],));
+    println!("Result: {:?}", jit.run(func, vec![]));
 }
