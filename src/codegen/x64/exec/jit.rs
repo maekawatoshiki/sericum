@@ -66,6 +66,7 @@ impl JITExecutor {
             .run_on_module(&mut machine_module);
         machine::replace_data::ConstDataReplacer::new().run_on_module(&mut machine_module);
         machine::replace_copy::ReplaceCopyWithProperMInst::new().run_on_module(&mut machine_module);
+        debug!(println!("{:?}", machine_module));
 
         // use crate::codegen::x64::asm::print::MachineAsmPrinter;
         // let mut printer = MachineAsmPrinter::new();
@@ -249,9 +250,14 @@ impl JITCompiler {
                     MachineOpcode::Copy => self.compile_copy(inst),
                     MachineOpcode::CMPri => self.compile_cmp_ri(inst),
                     MachineOpcode::CMPrr => self.compile_cmp_rr(inst),
+                    MachineOpcode::UCOMISDrr => self.compile_ucomisd_rr(inst),
                     MachineOpcode::JE => self.compile_je(inst),
+                    MachineOpcode::JBE => self.compile_jbe(inst),
+                    MachineOpcode::JB => self.compile_jb(inst),
                     MachineOpcode::JLE => self.compile_jle(inst),
                     MachineOpcode::JL => self.compile_jl(inst),
+                    MachineOpcode::JAE => self.compile_jae(inst),
+                    MachineOpcode::JA => self.compile_ja(inst),
                     MachineOpcode::JG => self.compile_jg(inst),
                     MachineOpcode::JGE => self.compile_jge(inst),
                     MachineOpcode::JMP => self.compile_jmp(inst),
@@ -691,6 +697,12 @@ impl JITCompiler {
         }
     }
 
+    fn compile_ucomisd_rr(&mut self, inst: &MachineInst) {
+        let r0 = phys_reg_to_dynasm_reg(inst.operand[0].as_register().get_reg().unwrap());
+        let r1 = phys_reg_to_dynasm_reg(inst.operand[1].as_register().get_reg().unwrap());
+        dynasm!(self.asm; ucomisd Rx(r0), Rx(r1));
+    }
+
     fn compile_je(&mut self, inst: &MachineInst) {
         let l = self.get_label(inst.operand[0].as_basic_block());
         dynasm!(self.asm; je => l);
@@ -706,6 +718,16 @@ impl JITCompiler {
         dynasm!(self.asm; jl => l);
     }
 
+    fn compile_jbe(&mut self, inst: &MachineInst) {
+        let l = self.get_label(inst.operand[0].as_basic_block());
+        dynasm!(self.asm; jne => l);
+    }
+
+    fn compile_jb(&mut self, inst: &MachineInst) {
+        let l = self.get_label(inst.operand[0].as_basic_block());
+        dynasm!(self.asm; jb => l);
+    }
+
     fn compile_jg(&mut self, inst: &MachineInst) {
         let l = self.get_label(inst.operand[0].as_basic_block());
         dynasm!(self.asm; jg => l);
@@ -714,6 +736,16 @@ impl JITCompiler {
     fn compile_jge(&mut self, inst: &MachineInst) {
         let l = self.get_label(inst.operand[0].as_basic_block());
         dynasm!(self.asm; jge => l);
+    }
+
+    fn compile_ja(&mut self, inst: &MachineInst) {
+        let l = self.get_label(inst.operand[0].as_basic_block());
+        dynasm!(self.asm; ja => l);
+    }
+
+    fn compile_jae(&mut self, inst: &MachineInst) {
+        let l = self.get_label(inst.operand[0].as_basic_block());
+        dynasm!(self.asm; jae => l);
     }
 
     fn compile_movsxd_r64m32(&mut self, fo: &FrameObjectsInfo, inst: &MachineInst) {

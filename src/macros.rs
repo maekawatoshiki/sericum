@@ -99,6 +99,19 @@ macro_rules! icmp_kind {
 }
 
 #[macro_export]
+macro_rules! fcmp_kind {
+    (ule) => {
+        opcode::FCmpKind::ULe
+    };
+    (ueq) => {
+        opcode::FCmpKind::UEq
+    };
+    (ult) => {
+        opcode::FCmpKind::ULt
+    };
+}
+
+#[macro_export]
 macro_rules! cilk_expr {
 ($builder:expr; $bb_map:expr; $label:ident : $($remain:tt)*) => {
     let bb = *$bb_map.entry(stringify!($label)).or_insert_with(|| $builder.append_basic_block());
@@ -183,30 +196,36 @@ macro_rules! cilk_expr {
         let args = vec![ $( cilk_value!($builder; $( $arg )*) ),* ];
         let $x = $builder.build_call(value::Value::Function(value::FunctionValue { func_id: $id }), args);
         cilk_expr!($builder; $bb_map; $( $remain )*);
-    };
-    ($builder:expr; $bb_map:expr; $x:ident = icmp $kind:ident ($($val1:tt)*), ($($val2:tt)*); $($remain:tt)*) => {
-        let val1 = cilk_value!($builder; $( $val1 )*);
-        let val2 = cilk_value!($builder; $( $val2 )*);
-        let $x = $builder.build_icmp(icmp_kind!($kind), val1, val2);
-        cilk_expr!($builder; $bb_map; $( $remain )*);
-    };
-    ($builder:expr; $bb_map:expr; br ($($cond:tt)*) $l1:ident, $l2:ident; $($remain:tt)*) => {
-        let bb1 = *$bb_map.entry(stringify!($l1)).or_insert_with(|| $builder.append_basic_block());
-        let bb2 = *$bb_map.entry(stringify!($l2)).or_insert_with(|| $builder.append_basic_block());
-        let cond = cilk_value!($builder; $( $cond )*);
-        $builder.build_cond_br(cond, bb1, bb2);
-        cilk_expr!($builder; $bb_map; $( $remain )*);
-    };
-    ($builder:expr; $bb_map:expr; br $label:ident; $($remain:tt)*) => {
-        let bb = *$bb_map.entry(stringify!($label)).or_insert_with(|| $builder.append_basic_block());
-        $builder.build_br(bb);
-        cilk_expr!($builder; $bb_map; $( $remain )*);
-    };
-    ($builder:expr; $bb_map:expr; ret ($($val:tt)*) ; $($remain:tt)*) => {
-        let val = cilk_value!($builder; $( $val )*);
-        $builder.build_ret(val);
-        cilk_expr!($builder; $bb_map; $( $remain )*);
-    };
+};
+($builder:expr; $bb_map:expr; $x:ident = icmp $kind:ident ($($val1:tt)*), ($($val2:tt)*); $($remain:tt)*) => {
+    let val1 = cilk_value!($builder; $( $val1 )*);
+    let val2 = cilk_value!($builder; $( $val2 )*);
+    let $x = $builder.build_icmp(icmp_kind!($kind), val1, val2);
+    cilk_expr!($builder; $bb_map; $( $remain )*);
+};
+($builder:expr; $bb_map:expr; $x:ident = fcmp $kind:ident ($($val1:tt)*), ($($val2:tt)*); $($remain:tt)*) => {
+    let val1 = cilk_value!($builder; $( $val1 )*);
+    let val2 = cilk_value!($builder; $( $val2 )*);
+    let $x = $builder.build_fcmp(fcmp_kind!($kind), val1, val2);
+    cilk_expr!($builder; $bb_map; $( $remain )*);
+};
+($builder:expr; $bb_map:expr; br ($($cond:tt)*) $l1:ident, $l2:ident; $($remain:tt)*) => {
+    let bb1 = *$bb_map.entry(stringify!($l1)).or_insert_with(|| $builder.append_basic_block());
+    let bb2 = *$bb_map.entry(stringify!($l2)).or_insert_with(|| $builder.append_basic_block());
+    let cond = cilk_value!($builder; $( $cond )*);
+    $builder.build_cond_br(cond, bb1, bb2);
+    cilk_expr!($builder; $bb_map; $( $remain )*);
+};
+($builder:expr; $bb_map:expr; br $label:ident; $($remain:tt)*) => {
+    let bb = *$bb_map.entry(stringify!($label)).or_insert_with(|| $builder.append_basic_block());
+    $builder.build_br(bb);
+    cilk_expr!($builder; $bb_map; $( $remain )*);
+};
+($builder:expr; $bb_map:expr; ret ($($val:tt)*) ; $($remain:tt)*) => {
+    let val = cilk_value!($builder; $( $val )*);
+    $builder.build_ret(val);
+    cilk_expr!($builder; $bb_map; $( $remain )*);
+};
 
     ($builder:expr; $bb_map:expr; ) => {{}};
 }

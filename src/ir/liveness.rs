@@ -58,9 +58,10 @@ impl<'a> IRLivenessAnalyzer<'a> {
     pub fn visit_operands(&mut self, f: &Function, cur_bb: BasicBlockId, operands: &[Operand]) {
         for operand in operands {
             match operand {
-                Operand::BasicBlock(_) => {}
-                Operand::Type(_) => {}
-                Operand::ICmpKind(_) => {}
+                Operand::BasicBlock(_)
+                | Operand::Type(_)
+                | Operand::ICmpKind(_)
+                | Operand::FCmpKind(_) => {}
                 Operand::Value(v) => {
                     some_then!(id, v.get_inst_id(), self.propagate(f, cur_bb, id));
                 }

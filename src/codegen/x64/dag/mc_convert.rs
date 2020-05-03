@@ -320,6 +320,32 @@ impl<'a> ConversionInfo<'a> {
                         CondKind::Lt => MachineOpcode::JL,
                         CondKind::Ge => MachineOpcode::JGE,
                         CondKind::Gt => MachineOpcode::JG,
+                        _ => unreachable!(),
+                    },
+                    vec![MachineOperand::Branch(
+                        self.get_machine_bb(bb!(node.operand[3])),
+                    )],
+                    self.cur_bb,
+                )))
+            }
+            NodeKind::IR(IRNodeKind::FPBrcc) => {
+                let op0 = self.normal_operand(node.operand[1]);
+                let op1 = self.normal_operand(node.operand[2]);
+
+                self.push_inst(MachineInst::new_simple(
+                    MachineOpcode::UCOMISDrr,
+                    vec![op0, op1],
+                    self.cur_bb,
+                ));
+
+                Some(self.push_inst(MachineInst::new_simple(
+                    match cond_kind!(node.operand[0]) {
+                        CondKind::UEq => MachineOpcode::JE,
+                        CondKind::ULe => MachineOpcode::JBE,
+                        CondKind::ULt => MachineOpcode::JB,
+                        CondKind::UGe => MachineOpcode::JAE,
+                        CondKind::UGt => MachineOpcode::JA,
+                        _ => unreachable!(),
                     },
                     vec![MachineOperand::Branch(
                         self.get_machine_bb(bb!(node.operand[3])),

@@ -30,6 +30,7 @@ pub enum Opcode {
     Div,
     Rem,
     ICmp,
+    FCmp,
     Br,
     CondBr,
     Phi,
@@ -43,6 +44,7 @@ pub enum Operand {
     Value(Value),
     BasicBlock(BasicBlockId),
     ICmpKind(ICmpKind),
+    FCmpKind(FCmpKind),
 }
 
 #[derive(Clone, Debug, Copy, PartialEq)]
@@ -50,6 +52,14 @@ pub enum ICmpKind {
     Eq,
     Le,
     Lt,
+    // Ne,
+}
+
+#[derive(Clone, Debug, Copy, PartialEq)]
+pub enum FCmpKind {
+    UEq,
+    ULe,
+    ULt,
     // Ne,
 }
 
@@ -227,6 +237,7 @@ impl Opcode {
             Opcode::Div => "div",
             Opcode::Rem => "rem",
             Opcode::ICmp => "icmp",
+            Opcode::FCmp => "fcmp",
             Opcode::Br => "br",
             Opcode::CondBr => "br",
             Opcode::Phi => "phi",
@@ -246,6 +257,7 @@ impl Operand {
         match self {
             Self::BasicBlock(id) => format!("%label.{}", id.index()),
             Self::ICmpKind(kind) => kind.as_str().to_owned(),
+            Self::FCmpKind(kind) => kind.as_str().to_owned(),
             Self::Type(ty) => parent.types.to_string(*ty),
             Self::Value(v) => v.to_string(parent, false),
         }
@@ -260,6 +272,12 @@ impl Operand {
     pub fn as_icmp_kind(&self) -> &ICmpKind {
         match self {
             Self::ICmpKind(kind) => kind,
+            _ => panic!(),
+        }
+    }
+    pub fn as_fcmp_kind(&self) -> &FCmpKind {
+        match self {
+            Self::FCmpKind(kind) => kind,
             _ => panic!(),
         }
     }
@@ -298,6 +316,16 @@ impl ICmpKind {
             ICmpKind::Eq => "eq",
             ICmpKind::Lt => "lt",
             ICmpKind::Le => "le",
+        }
+    }
+}
+
+impl FCmpKind {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            FCmpKind::UEq => "ueq",
+            FCmpKind::ULt => "ult",
+            FCmpKind::ULe => "ule",
         }
     }
 }

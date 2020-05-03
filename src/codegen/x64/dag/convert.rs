@@ -350,6 +350,30 @@ impl<'a> ConvertToDAG<'a> {
                         self.inst_id_node_id.insert(inst_id, id);
                     }
                 }
+                Opcode::FCmp => {
+                    let c = *inst.operands[0].as_fcmp_kind();
+                    let v1 = self.get_dag_id_from_value(inst.operands[1].as_value());
+                    let v2 = self.get_dag_id_from_value(inst.operands[2].as_value());
+                    let cond = self.alloc_node(DAGNode::new(
+                        NodeKind::Operand(OperandNodeKind::CondKind((c).into())),
+                        vec![],
+                        Type::Void,
+                    ));
+                    let id = self.alloc_node_as_necessary(
+                        inst_id,
+                        DAGNode::new(
+                            NodeKind::IR(IRNodeKind::FCmp),
+                            vec![cond, v1, v2],
+                            inst.ty.clone(),
+                        ),
+                    );
+                    if bb.liveness.borrow().live_out.contains(&inst_id) {
+                        let copy_from_reg = self.make_chain_with_copying(id);
+                        self.inst_id_node_id.insert(inst_id, copy_from_reg);
+                    } else {
+                        self.inst_id_node_id.insert(inst_id, id);
+                    }
+                }
                 Opcode::Phi => {
                     let mut operands = vec![];
                     for i in (0..inst.operands.len()).step_by(2) {

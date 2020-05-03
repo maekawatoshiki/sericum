@@ -118,6 +118,11 @@ impl Combine {
                 vec![cond.operand[0], cond.operand[1], cond.operand[2], br],
                 Type::Void,
             )),
+            NodeKind::IR(IRNodeKind::FCmp) => heap.alloc(DAGNode::new(
+                NodeKind::IR(IRNodeKind::FPBrcc),
+                vec![cond.operand[0], cond.operand[1], cond.operand[2], br],
+                Type::Void,
+            )),
             _ => node,
         }
     }

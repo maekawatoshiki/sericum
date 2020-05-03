@@ -56,9 +56,11 @@ pub enum IRNodeKind {
     Setcc,
     BrCond,
     Brcc,
+    FPBrcc,
     Br,
     Ret,
     Sext,
+    FCmp,
 
     FIAddr,
 
@@ -85,6 +87,11 @@ pub enum CondKind {
     Lt,
     Ge,
     Gt,
+    UEq,
+    ULe,
+    ULt,
+    UGe,
+    UGt,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -112,11 +119,23 @@ impl Into<CondKind> for ICmpKind {
     }
 }
 
+impl Into<CondKind> for FCmpKind {
+    fn into(self) -> CondKind {
+        match self {
+            FCmpKind::UEq => CondKind::UEq,
+            FCmpKind::ULe => CondKind::ULe,
+            FCmpKind::ULt => CondKind::ULt,
+        }
+    }
+}
+
 impl CondKind {
     pub fn flip(self) -> CondKind {
         match self {
             Self::Le => Self::Ge,
             Self::Lt => Self::Gt,
+            Self::ULe => Self::UGe,
+            Self::ULt => Self::UGt,
             e => e,
         }
     }

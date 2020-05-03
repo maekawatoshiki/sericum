@@ -181,6 +181,20 @@ impl<'a> Builder<'a> {
         inst
     }
 
+    pub fn build_fcmp(&mut self, kind: FCmpKind, v1: Value, v2: Value) -> Value {
+        let inst = self.create_inst_value(
+            Opcode::FCmp,
+            vec![
+                Operand::FCmpKind(kind),
+                Operand::Value(v1),
+                Operand::Value(v2),
+            ],
+            Type::Int1,
+        );
+        self.append_inst_to_cur_bb(inst);
+        inst
+    }
+
     pub fn build_br(&mut self, dst_id: BasicBlockId) -> Value {
         let inst =
             self.create_inst_value(Opcode::Br, vec![Operand::BasicBlock(dst_id)], Type::Void);
