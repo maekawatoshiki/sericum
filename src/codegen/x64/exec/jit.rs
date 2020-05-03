@@ -108,6 +108,7 @@ impl JITCompiler {
                     cilk_memset_p0i32_i32_ as u64,
                     cilk_println_i32_ as _,
                     cilk_printch_i32_ as _,
+                    cilk_println_f64_ as _,
                 ];
                 assert!(
                     internal_names.len() == internals.len(),
@@ -1020,6 +1021,12 @@ impl From<MachineFunctionId> for LabelKey {
 #[no_mangle]
 pub extern "C" fn cilk_println_i32_(i: i32) {
     println!("{}", i);
+}
+
+// Internal function cilk.println.f64
+#[no_mangle]
+pub extern "C" fn cilk_println_f64_(f: f64) {
+    println!("{}", f);
 }
 
 // EXPERIMENTAL Internal function cilk.printch.i32

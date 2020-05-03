@@ -389,6 +389,13 @@ impl<'a> ConversionInfo<'a> {
     fn move2reg(&self, r: MachineRegister, src: MachineOperand) -> MachineInst {
         match src {
             MachineOperand::Branch(_) => unimplemented!(),
+            MachineOperand::Constant(MachineConstant::F64(f)) => MachineInst::new_simple(
+                // TODO
+                MachineOpcode::MOVSDrm64,
+                vec![MachineOperand::Constant(MachineConstant::F64(f))],
+                self.cur_bb,
+            )
+            .with_def(vec![r]),
             MachineOperand::Constant(_) | MachineOperand::Register(_) => {
                 MachineInst::new_simple(mov_rx(self.types, &src).unwrap(), vec![src], self.cur_bb)
                     .with_def(vec![r])

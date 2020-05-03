@@ -72,7 +72,7 @@ impl Legalize {
         heap: &mut DAGHeap,
         node: Raw<DAGNode>,
     ) -> Raw<DAGNode> {
-        if node.operand[0].kind == NodeKind::IR(IRNodeKind::Add) {
+        if matches!(node.ty, Type::Int32) && node.operand[0].kind == NodeKind::IR(IRNodeKind::Add) {
             let add = node.operand[0];
             let op0 = self.run_on_node(tys, heap, add.operand[0]);
             let op1 = self.run_on_node(tys, heap, add.operand[1]);

@@ -56,21 +56,48 @@ fn main() {
     // }
     // "#;
     let input = r#"
-struct A {
-    b: f64,
-    c: i32
-}
-function func(x: *f64): i32 {
-    *x = 1.2;
+function m(c_x: f64, c_y: f64, n: i32): i32 {
+    var x_n: f64; x_n = 0.0;
+    var y_n: f64; y_n = 0.0;
+    var x_n_1: f64; var y_n_1: f64;
+    var i: i32;
+    i = 0;
+    while i < n {
+        x_n_1 = c_x + x_n*x_n - y_n*y_n;
+        y_n_1 = x_n * y_n * 2.0 + c_y;
+        if 4.0 < x_n_1*x_n_1 + y_n_1*y_n_1 {
+            return n;
+        } else {
+            x_n = x_n_1;
+            y_n = y_n_1;
+        }
+        i = i + 1;
+    }
     return 0;
 }
-function main(): f64 {
-    var a: struct A;
-    var f: f64;
-    a.b = 2.3;
-    a.c = 2;
-    func(&f);
-    return a.b;
+function main(): i32 {
+    var x_max: f64; x_max = 1.0;
+    var x_min: f64; x_min = 0.0 - 2.0;
+    var y_max: f64; y_max = 1.0; 
+    var y_min: f64; y_min = 0.0 - 1.0;
+    var dx: f64; dx = 0.05;
+    var dy: f64; dy = 0.05;
+    var y: f64; var x: f64;
+    y = y_max;
+    while y_min < y {
+        x = x_min;
+        while x < x_max {
+            if m(x, y, 300) == 0 {
+                printch_i32(65);
+            } else {
+                printch_i32(32);
+            }
+            x = x + dx;
+        }
+        printch_i32(10);
+        y = y - dy;
+    }
+    return 0;
 }
     "#;
     let mut codegen = codegen::CodeGenerator::new();
