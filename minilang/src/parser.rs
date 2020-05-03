@@ -37,14 +37,20 @@ pub enum Node {
     WhileLoop(Box<Node>, Vec<Node>),
     Call(String, Vec<Node>),
     Return(Box<Node>),
+    Dot2(Box<Node>, Box<Node>),
+    Index2(Box<Node>, Box<Node>),
+    Assign2(Box<Node>, Box<Node>),
+    Load(Box<Node>),
     // GlobalDataAddr(String),
 }
 
 #[derive(Debug, Clone)]
 pub enum Type {
     Void,
+    Int1,
     Int32,
     Int64,
+    Pointer(Box<Type>),
     Array(usize, Box<Type>),
     Struct(String),
 }
@@ -118,9 +124,11 @@ peg::parser!(pub grammar parser() for str {
         { Node::WhileLoop(Box::new(e), loop_body) }
 
     rule assignment() -> Node
-        = i:identifier() _ "=" _ e:expression() _ ";" {Node::Assign(i, Box::new(e))}
-        / i:index() _ "=" _ e:expression() _ ";" { Node::AssignIndex(i.0, i.1, Box::new(e))}
-        / i:dot() _ "=" _ e:expression() _ ";" { Node::AssignDot(i.0, i.1, Box::new(e))}
+        = p:primary() _ "=" _ e:expression() _ ";" {Node::Assign2(Box::new(p), Box::new(e))}
+        // / i:index() _ "=" _ e:expression() _ ";" { Node::AssignIndex(i.0, i.1, Box::new(e))}
+        // / i:dot() _ "=" _ e:expression() _ ";" { Node::AssignDot(i.0, i.1, Box::new(e))}
+
+
 
     rule binary_op() -> Node = precedence!{
         a:@ _ "==" _ b:(@) { Node::Eq(Box::new(a), Box::new(b)) }
@@ -137,11 +145,18 @@ peg::parser!(pub grammar parser() for str {
         a:@ _ "/" _ b:(@) { Node::Div(Box::new(a), Box::new(b)) }
         a:@ _ "%" _ b:(@) { Node::Rem(Box::new(a), Box::new(b)) }
         --
-        i:index() { Node::Index(i.0, i.1) }
-        i:dot() { Node::Dot(i.0, i.1) }
+        // i:index() { Node::Index(i.0, i.1) }
+        // i:dot() { Node::Dot(i.0, i.1) }
         i:identifier() _ "(" args:((_ e:expression() _ {e}) ** ",") ")" { Node::Call(i, args) }
-        i:identifier() { Node::Identifier(i) }
+        p:primary() { Node::Load(Box::new(p)) }
         l:literal() { l }
+    }
+
+    rule primary() -> Node = precedence! {
+        a:@ _ "[" _ b:expression() "]" { Node::Index2(Box::new(a), Box::new(b)) }
+        a:(@) _ "." _ b:@ { Node::Dot2(Box::new(a), Box::new(b)) }
+        --
+        i:identifier() { Node::Identifier(i) }
     }
 
     rule index() -> (String, Vec<Node>)

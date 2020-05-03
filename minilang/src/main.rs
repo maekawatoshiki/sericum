@@ -42,14 +42,15 @@ fn main() {
     // }
     // "#;
     let input = r#"
-    struct Point {
-        x: i32,
-        y: i32
+    struct A {
+        first: [8][8] i32,
+        second: i32
     }
     function main(): i32 {
-        var p: struct Point;
-        p.x = 2; p.y = 3;
-        return p.x + p.y;
+        var a: struct A;
+        a.first[1][2] = 3;
+        a.second = 2;
+        return a.second + a.first[1][2];
     }
     "#;
     let mut codegen = codegen::CodeGenerator::new();

@@ -4,32 +4,43 @@ use std::collections::HashMap;
 
 pub struct CodeGenerator {
     pub module: cilk::module::Module,
-    record_types: HashMap<String, (cilk::types::Type, HashMap<String, usize>)>,
+    types: Types,
 }
 
 pub struct CodeGeneratorForFunction<'a> {
     builder: cilk::builder::Builder<'a>,
-    record_types: &'a HashMap<String, (cilk::types::Type, HashMap<String, usize>)>,
+    types: &'a Types,
     func: &'a parser::Function,
     vars: Vec<HashMap<String, (bool, parser::Type, cilk::value::Value)>>, // name, (is_arg, ty, val)
+}
+
+pub struct Types {
+    records: HashMap<String, (cilk::types::Type, HashMap<String, (usize, parser::Type)>)>,
+    functions: HashMap<cilk::function::FunctionId, (parser::Type, Vec<parser::Type>)>,
 }
 
 impl CodeGenerator {
     pub fn new() -> Self {
         Self {
             module: cilk::module::Module::new("minilang"),
-            record_types: HashMap::new(),
+            types: Types {
+                records: HashMap::new(),
+                functions: HashMap::new(),
+            },
         }
     }
 
     pub fn run(&mut self, input: &str) {
         println!("input:\n{}", input);
         let module = parser::parser::module(input).expect("parse failed");
-        self.module.create_function(
+        let id = self.module.create_function(
             "cilk.println.i32",
             cilk::types::Type::Void,
             vec![cilk::types::Type::Int32],
         );
+        self.types
+            .functions
+            .insert(id, (parser::Type::Void, vec![parser::Type::Int32]));
         self.run_on_module(module);
     }
 
@@ -40,15 +51,16 @@ impl CodeGenerator {
         for (name, decls) in &module.structs {
             let decls_ = decls
                 .iter()
-                .map(|(_, ty)| ty.into_cilk_type(&self.record_types, &mut self.module.types))
+                .map(|(_, ty)| ty.into_cilk_type(&self.types, &mut self.module.types))
                 .collect();
-            let name2idx: HashMap<String, usize> = decls
+            let name2idx: HashMap<String, (usize, parser::Type)> = decls
                 .iter()
                 .enumerate()
-                .map(|(i, (name, _))| (name.clone(), i))
+                .map(|(i, (name, ty))| (name.clone(), (i, ty.clone())))
                 .collect();
             let struct_ty = self.module.types.new_struct_ty(decls_);
-            self.record_types
+            self.types
+                .records
                 .insert(name.clone(), (struct_ty, name2idx));
         }
 
@@ -57,22 +69,31 @@ impl CodeGenerator {
         for func in &module.functions {
             let ret_ty = func
                 .ret_ty
-                .into_cilk_type(&self.record_types, &mut self.module.types);
+                .into_cilk_type(&self.types, &mut self.module.types);
             let params_ty = func
                 .params
                 .iter()
-                .map(|(_name, ty)| ty.into_cilk_type(&self.record_types, &mut self.module.types))
+                .map(|(_name, ty)| ty.into_cilk_type(&self.types, &mut self.module.types))
                 .collect::<Vec<cilk::types::Type>>();
-            worklist.push((
-                self.module
-                    .create_function(func.name.as_str(), ret_ty, params_ty),
-                func,
-            ));
+            let func_id = self
+                .module
+                .create_function(func.name.as_str(), ret_ty, params_ty);
+            self.types.functions.insert(
+                func_id,
+                (
+                    func.ret_ty.clone(),
+                    func.params
+                        .iter()
+                        .map(|(_, ty)| ty.clone())
+                        .collect::<Vec<parser::Type>>(),
+                ),
+            );
+            worklist.push((func_id, func));
         }
 
         // Actaully generate function
         for (func_id, func) in worklist {
-            CodeGeneratorForFunction::new(&mut self.module, &self.record_types, func_id, func).run()
+            CodeGeneratorForFunction::new(&mut self.module, &self.types, func_id, func).run()
         }
     }
 }
@@ -80,13 +101,13 @@ impl CodeGenerator {
 impl<'a> CodeGeneratorForFunction<'a> {
     pub fn new(
         module: &'a mut cilk::module::Module,
-        record_types: &'a HashMap<String, (cilk::types::Type, HashMap<String, usize>)>,
+        types: &'a Types,
         func_id: cilk::function::FunctionId,
         func: &'a parser::Function,
     ) -> Self {
         Self {
             builder: cilk::builder::Builder::new(module, func_id),
-            record_types,
+            types,
             func,
             vars: vec![HashMap::new()],
         }
@@ -106,48 +127,31 @@ impl<'a> CodeGeneratorForFunction<'a> {
         }
     }
 
-    pub fn run_on_node(&mut self, node: &Node) -> cilk::value::Value {
+    pub fn run_on_node(&mut self, node: &Node) -> (cilk::value::Value, parser::Type) {
         match node {
             Node::VarDecl(name, ty) => {
-                let ty_ = ty.into_cilk_type(&self.record_types, &mut self.builder.module.types);
+                let ty_ = ty.into_cilk_type(&self.types, &mut self.builder.module.types);
                 let alloca = self.builder.build_alloca(ty_);
-                self.create_var(name.clone(), false, ty.clone(), alloca);
-                alloca
+                self.create_var(
+                    name.clone(),
+                    false,
+                    parser::Type::Pointer(Box::new(ty.clone())),
+                    alloca,
+                );
+                (cilk::value::Value::None, parser::Type::Void)
+            }
+            Node::Assign2(dst, src) => {
+                let (dst, _) = self.run_on_node(dst);
+                let (src, _) = self.run_on_node(src);
+                (self.builder.build_store(src, dst), parser::Type::Void)
             }
             Node::Assign(dst, src) => {
                 let (_, _, dst) = *self.lookup_var(dst).expect("variable not found");
-                let src = self.run_on_node(src);
-                self.builder.build_store(src, dst)
-            }
-            Node::AssignIndex(base, indices, src) => {
-                let (_, _, base) = *self.lookup_var(base).expect("variable not found");
-                let mut indices: Vec<cilk::value::Value> =
-                    indices.iter().map(|i| self.run_on_node(i)).collect();
-                indices.insert(0, cilk::value::Value::new_imm_int32(0));
-                let gep = self.builder.build_gep(base, indices);
-                let src = self.run_on_node(src);
-                self.builder.build_store(src, gep)
-            }
-            Node::AssignDot(base, fields, src) => {
-                let (base, fields) = {
-                    let (_, base_ty, base) = self.lookup_var(base).expect("variable not found");
-                    let mut fields: Vec<cilk::value::Value> = fields
-                        .iter()
-                        .map(|name| {
-                            cilk::value::Value::new_imm_int32(
-                                base_ty.member_index(name.as_str(), &self.record_types) as i32,
-                            )
-                        })
-                        .collect();
-                    fields.insert(0, cilk::value::Value::new_imm_int32(0));
-                    (*base, fields)
-                };
-                let gep = self.builder.build_gep(base, fields);
-                let src = self.run_on_node(src);
-                self.builder.build_store(src, gep)
+                let (src, _) = self.run_on_node(src);
+                (self.builder.build_store(src, dst), parser::Type::Void)
             }
             Node::IfElse(cond, then_, else_) => {
-                let cond = self.run_on_node(cond);
+                let (cond, _) = self.run_on_node(cond);
                 let then_bb = self.builder.append_basic_block();
                 let else_bb = self.builder.append_basic_block();
                 let merge_bb = if else_.is_some() {
@@ -173,7 +177,7 @@ impl<'a> CodeGeneratorForFunction<'a> {
                     }
                 }
                 self.builder.set_insert_point(merge_bb);
-                cilk::value::Value::None
+                (cilk::value::Value::None, parser::Type::Void)
             }
             Node::WhileLoop(cond, body) => {
                 let header_bb = self.builder.append_basic_block();
@@ -181,7 +185,7 @@ impl<'a> CodeGeneratorForFunction<'a> {
                 let post_bb = self.builder.append_basic_block();
                 self.builder.build_br(header_bb);
                 self.builder.set_insert_point(header_bb);
-                let cond = self.run_on_node(cond);
+                let (cond, _) = self.run_on_node(cond);
                 self.builder.build_cond_br(cond, body_bb, post_bb);
                 self.builder.set_insert_point(body_bb);
                 for node in body {
@@ -191,11 +195,11 @@ impl<'a> CodeGeneratorForFunction<'a> {
                     self.builder.build_br(header_bb);
                 }
                 self.builder.set_insert_point(post_bb);
-                cilk::value::Value::None
+                (cilk::value::Value::None, parser::Type::Void)
             }
             Node::Return(e) => {
-                let e = self.run_on_node(e);
-                self.builder.build_ret(e)
+                let (e, _) = self.run_on_node(e);
+                (self.builder.build_ret(e), parser::Type::Void)
             }
             Node::Eq(lhs, rhs)
             | Node::Lt(lhs, rhs)
@@ -205,23 +209,29 @@ impl<'a> CodeGeneratorForFunction<'a> {
             | Node::Mul(lhs, rhs)
             | Node::Div(lhs, rhs)
             | Node::Rem(lhs, rhs) => {
-                let lhs = self.run_on_node(lhs);
-                let rhs = self.run_on_node(rhs);
+                let (lhs, ty) = self.run_on_node(lhs);
+                let (rhs, _) = self.run_on_node(rhs);
                 match node {
-                    Node::Eq(_, _) => self
-                        .builder
-                        .build_icmp(cilk::opcode::ICmpKind::Eq, lhs, rhs),
-                    Node::Lt(_, _) => self
-                        .builder
-                        .build_icmp(cilk::opcode::ICmpKind::Lt, lhs, rhs),
-                    Node::Le(_, _) => self
-                        .builder
-                        .build_icmp(cilk::opcode::ICmpKind::Le, lhs, rhs),
-                    Node::Add(_, _) => self.builder.build_add(lhs, rhs),
-                    Node::Sub(_, _) => self.builder.build_sub(lhs, rhs),
-                    Node::Mul(_, _) => self.builder.build_mul(lhs, rhs),
-                    Node::Div(_, _) => self.builder.build_div(lhs, rhs),
-                    Node::Rem(_, _) => self.builder.build_rem(lhs, rhs),
+                    Node::Eq(_, _) => (
+                        self.builder
+                            .build_icmp(cilk::opcode::ICmpKind::Eq, lhs, rhs),
+                        parser::Type::Int1,
+                    ),
+                    Node::Lt(_, _) => (
+                        self.builder
+                            .build_icmp(cilk::opcode::ICmpKind::Lt, lhs, rhs),
+                        parser::Type::Int1,
+                    ),
+                    Node::Le(_, _) => (
+                        self.builder
+                            .build_icmp(cilk::opcode::ICmpKind::Le, lhs, rhs),
+                        parser::Type::Int1,
+                    ),
+                    Node::Add(_, _) => (self.builder.build_add(lhs, rhs), ty),
+                    Node::Sub(_, _) => (self.builder.build_sub(lhs, rhs), ty),
+                    Node::Mul(_, _) => (self.builder.build_mul(lhs, rhs), ty),
+                    Node::Div(_, _) => (self.builder.build_div(lhs, rhs), ty),
+                    Node::Rem(_, _) => (self.builder.build_rem(lhs, rhs), ty),
                     _ => unreachable!(),
                 }
             }
@@ -232,50 +242,89 @@ impl<'a> CodeGeneratorForFunction<'a> {
                 };
                 let func_id = self.builder.module.find_function(name).unwrap();
                 let args: Vec<cilk::value::Value> =
-                    args.iter().map(|i| self.run_on_node(i)).collect();
-                self.builder.build_call(
-                    cilk::value::Value::new_func(cilk::value::FunctionValue { func_id }),
-                    args,
+                    args.iter().map(|i| self.run_on_node(i).0).collect();
+                let ret_ty = self.types.functions.get(&func_id).unwrap().0.clone();
+                (
+                    self.builder.build_call(
+                        cilk::value::Value::new_func(cilk::value::FunctionValue { func_id }),
+                        args,
+                    ),
+                    ret_ty,
                 )
             }
             Node::Identifier(name) => {
-                let (is_arg, _, v) = *self.lookup_var(name.as_str()).expect("variable not found");
-                if is_arg {
-                    v
-                } else {
-                    self.builder.build_load(v)
+                let (_is_arg, ty, v) = self
+                    .lookup_var(name.as_str())
+                    .expect("variable not found")
+                    .clone();
+                (v, ty)
+            }
+            Node::Load(from) => match &**from {
+                Node::Identifier(name) => {
+                    let (is_arg, ty, v) = self
+                        .lookup_var(name.as_str())
+                        .expect("variable not found")
+                        .clone();
+                    if is_arg {
+                        (v, ty)
+                    } else {
+                        (self.builder.build_load(v), ty.get_elem_ty())
+                    }
                 }
-            }
-            Node::Index(base, indices) => {
-                let (_, _, base) = *self.lookup_var(base).expect("variable not found");
-                let mut indices: Vec<cilk::value::Value> =
-                    indices.iter().map(|i| self.run_on_node(i)).collect();
-                indices.insert(0, cilk::value::Value::new_imm_int32(0));
+                from => {
+                    let (from, ty) = self.run_on_node(&from);
+                    (self.builder.build_load(from), ty.get_elem_ty())
+                }
+            },
+            Node::Index2(base, idx) => {
+                let (base, ty) = self.run_on_node(base);
+                let indices = vec![
+                    cilk::value::Value::new_imm_int32(0),
+                    self.run_on_node(idx).0,
+                ];
                 let gep = self.builder.build_gep(base, indices);
-                self.builder.build_load(gep)
+                (
+                    gep,
+                    parser::Type::Pointer(Box::new(ty.get_elem_ty().get_elem_ty())),
+                )
             }
-            Node::Dot(base, fields) => {
-                let (base, fields) = {
-                    let (_, base_ty, base) = self.lookup_var(base).expect("variable not found");
-                    let mut fields: Vec<cilk::value::Value> = fields
-                        .iter()
-                        .map(|name| {
-                            cilk::value::Value::new_imm_int32(
-                                base_ty.member_index(name.as_str(), &self.record_types) as i32,
-                            )
-                        })
-                        .collect();
-                    fields.insert(0, cilk::value::Value::new_imm_int32(0));
-                    (*base, fields)
-                };
-                let gep = self.builder.build_gep(base, fields);
-                self.builder.build_load(gep)
+            // Node::Index(base, indices) => {
+            //     let (_, _, base) = *self.lookup_var(base).expect("variable not found");
+            //     let mut indices: Vec<cilk::value::Value> =
+            //         indices.iter().map(|i| self.run_on_node(i)).collect();
+            //     indices.insert(0, cilk::value::Value::new_imm_int32(0));
+            //     let gep = self.builder.build_gep(base, indices);
+            //     self.builder.build_load(gep)
+            // }
+            Node::Dot2(base, field) => {
+                let (base, base_ty) = self.run_on_node(base);
+                // let a = cilk::value::Value::new_imm_int32({
+                let (idx, ty) = base_ty
+                    .get_elem_ty()
+                    .get_record_member(
+                        {
+                            let name = match &**field {
+                                Node::Identifier(name) => name,
+                                _ => unreachable!(),
+                            };
+                            name.as_str()
+                        },
+                        &self.types,
+                    )
+                    .clone();
+                let indices = vec![
+                    cilk::value::Value::new_imm_int32(0),
+                    cilk::value::Value::new_imm_int32(idx as i32),
+                ];
+                let gep = self.builder.build_gep(base, indices);
+                (gep, parser::Type::Pointer(Box::new(ty)))
             }
-            Node::Number(i) => cilk::value::Value::new_imm_int32(*i),
+            Node::Number(i) => (cilk::value::Value::new_imm_int32(*i), parser::Type::Int32),
+            _ => unreachable!(),
         }
     }
 
-    pub fn create_var(
+    fn create_var(
         &mut self,
         name: String,
         is_arg: bool,
@@ -288,7 +337,7 @@ impl<'a> CodeGeneratorForFunction<'a> {
             .insert(name, (is_arg, ty, value));
     }
 
-    pub fn lookup_var(&self, name: &str) -> Option<&(bool, parser::Type, cilk::value::Value)> {
+    fn lookup_var(&self, name: &str) -> Option<&(bool, parser::Type, cilk::value::Value)> {
         self.vars.last().unwrap().get(name)
     }
 }
@@ -296,28 +345,37 @@ impl<'a> CodeGeneratorForFunction<'a> {
 impl parser::Type {
     pub fn into_cilk_type(
         &self,
-        record_types: &HashMap<String, (cilk::types::Type, HashMap<String, usize>)>,
-        types: &mut cilk::types::Types,
+        types1: &Types,
+        types2: &mut cilk::types::Types,
     ) -> cilk::types::Type {
         match self {
             parser::Type::Void => cilk::types::Type::Void,
+            parser::Type::Int1 => cilk::types::Type::Int1,
             parser::Type::Int32 => cilk::types::Type::Int32,
             parser::Type::Int64 => cilk::types::Type::Int64,
-            parser::Type::Struct(name) => record_types.get(name.as_str()).unwrap().0,
+            parser::Type::Struct(name) => types1.records.get(name.as_str()).unwrap().0,
+            parser::Type::Pointer(inner) => {
+                let inner = inner.into_cilk_type(types1, types2);
+                types2.new_pointer_ty(inner)
+            }
             parser::Type::Array(len, inner) => {
-                let inner = inner.into_cilk_type(record_types, types);
-                types.new_array_ty(inner, *len)
+                let inner = inner.into_cilk_type(types1, types2);
+                types2.new_array_ty(inner, *len)
             }
         }
     }
 
-    pub fn member_index(
-        &self,
-        name: &str,
-        record_types: &HashMap<String, (cilk::types::Type, HashMap<String, usize>)>,
-    ) -> usize {
+    pub fn get_elem_ty(&self) -> parser::Type {
         match self {
-            parser::Type::Struct(s_name) => *record_types
+            parser::Type::Array(_, e) | parser::Type::Pointer(e) => (**e).clone(),
+            _ => panic!(),
+        }
+    }
+
+    pub fn get_record_member<'a>(&self, name: &str, types: &'a Types) -> &'a (usize, parser::Type) {
+        match self {
+            parser::Type::Struct(s_name) => types
+                .records
                 .get(s_name.as_str())
                 .unwrap()
                 .1
