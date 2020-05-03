@@ -140,13 +140,8 @@ impl<'a> CodeGeneratorForFunction<'a> {
                 );
                 (cilk::value::Value::None, parser::Type::Void)
             }
-            Node::Assign2(dst, src) => {
-                let (dst, _) = self.run_on_node(dst);
-                let (src, _) = self.run_on_node(src);
-                (self.builder.build_store(src, dst), parser::Type::Void)
-            }
             Node::Assign(dst, src) => {
-                let (_, _, dst) = *self.lookup_var(dst).expect("variable not found");
+                let (dst, _) = self.run_on_node(dst);
                 let (src, _) = self.run_on_node(src);
                 (self.builder.build_store(src, dst), parser::Type::Void)
             }
@@ -271,12 +266,14 @@ impl<'a> CodeGeneratorForFunction<'a> {
                         (self.builder.build_load(v), ty.get_elem_ty())
                     }
                 }
+                Node::Addr(e) => self.run_on_node(e),
                 from => {
                     let (from, ty) = self.run_on_node(&from);
                     (self.builder.build_load(from), ty.get_elem_ty())
                 }
             },
-            Node::Index2(base, idx) => {
+            Node::Addr(e) => self.run_on_node(e),
+            Node::Index(base, idx) => {
                 let (base, ty) = self.run_on_node(base);
                 let indices = vec![
                     cilk::value::Value::new_imm_int32(0),
@@ -288,17 +285,8 @@ impl<'a> CodeGeneratorForFunction<'a> {
                     parser::Type::Pointer(Box::new(ty.get_elem_ty().get_elem_ty())),
                 )
             }
-            // Node::Index(base, indices) => {
-            //     let (_, _, base) = *self.lookup_var(base).expect("variable not found");
-            //     let mut indices: Vec<cilk::value::Value> =
-            //         indices.iter().map(|i| self.run_on_node(i)).collect();
-            //     indices.insert(0, cilk::value::Value::new_imm_int32(0));
-            //     let gep = self.builder.build_gep(base, indices);
-            //     self.builder.build_load(gep)
-            // }
-            Node::Dot2(base, field) => {
+            Node::Dot(base, field) => {
                 let (base, base_ty) = self.run_on_node(base);
-                // let a = cilk::value::Value::new_imm_int32({
                 let (idx, ty) = base_ty
                     .get_elem_ty()
                     .get_record_member(
@@ -320,7 +308,6 @@ impl<'a> CodeGeneratorForFunction<'a> {
                 (gep, parser::Type::Pointer(Box::new(ty)))
             }
             Node::Number(i) => (cilk::value::Value::new_imm_int32(*i), parser::Type::Int32),
-            _ => unreachable!(),
         }
     }
 

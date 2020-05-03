@@ -17,9 +17,6 @@ pub enum Node {
     Number(i32),
     Identifier(String),
     VarDecl(String, Type), // name, type
-    Assign(String, Box<Node>),
-    AssignIndex(String, Vec<Node>, Box<Node>),
-    AssignDot(String, Vec<String>, Box<Node>),
     Eq(Box<Node>, Box<Node>),
     // Ne(Box<Node>, Box<Node>),
     Lt(Box<Node>, Box<Node>),
@@ -31,16 +28,15 @@ pub enum Node {
     Mul(Box<Node>, Box<Node>),
     Div(Box<Node>, Box<Node>),
     Rem(Box<Node>, Box<Node>),
-    Index(String, Vec<Node>),
-    Dot(String, Vec<String>),
     IfElse(Box<Node>, Vec<Node>, Option<Vec<Node>>),
     WhileLoop(Box<Node>, Vec<Node>),
     Call(String, Vec<Node>),
     Return(Box<Node>),
-    Dot2(Box<Node>, Box<Node>),
-    Index2(Box<Node>, Box<Node>),
-    Assign2(Box<Node>, Box<Node>),
+    Dot(Box<Node>, Box<Node>),
+    Index(Box<Node>, Box<Node>),
+    Assign(Box<Node>, Box<Node>),
     Load(Box<Node>),
+    Addr(Box<Node>),
     // GlobalDataAddr(String),
 }
 
@@ -104,33 +100,29 @@ peg::parser!(pub grammar parser() for str {
         / while_loop()
         / return_stmt()
         / assignment()
-        / e:expression() _ ";" { e }
+        / e:expression(false) _ ";" { e }
 
-    rule expression() -> Node
-        = binary_op()
+    rule expression(assign: bool) -> Node
+        = binary_op(assign)
 
     rule var_decl() -> Node
          = "var" _ name:identifier() _ ":" _ ty:types() _ ";" { Node::VarDecl(name, ty) }
 
     rule if_else() -> Node
-        = "if" _ e:expression() _ "{" _
+        = "if" _ e:expression(false) _ "{" _
         then_body:statements() _ "}" _
         else_body:("else" _ "{" _ e:statements() _ "}" { e })?
         { Node::IfElse(Box::new(e), then_body, else_body) }
 
     rule while_loop() -> Node
-        = "while" _ e:expression() _ "{" _
+        = "while" _ e:expression(false) _ "{" _
         loop_body:statements() _ "}"
         { Node::WhileLoop(Box::new(e), loop_body) }
 
     rule assignment() -> Node
-        = p:primary() _ "=" _ e:expression() _ ";" {Node::Assign2(Box::new(p), Box::new(e))}
-        // / i:index() _ "=" _ e:expression() _ ";" { Node::AssignIndex(i.0, i.1, Box::new(e))}
-        // / i:dot() _ "=" _ e:expression() _ ";" { Node::AssignDot(i.0, i.1, Box::new(e))}
+        = p:primary(true) _ "=" _ e:expression(false) _ ";" {Node::Assign(Box::new(p), Box::new(e))}
 
-
-
-    rule binary_op() -> Node = precedence!{
+    rule binary_op(assign:bool) -> Node = precedence!{
         a:@ _ "==" _ b:(@) { Node::Eq(Box::new(a), Box::new(b)) }
         // a:@ _ "!=" _ b:(@) { Node::Ne(Box::new(a), Box::new(b)) }
         a:@ _ "<"  _ b:(@) { Node::Lt(Box::new(a), Box::new(b)) }
@@ -145,28 +137,23 @@ peg::parser!(pub grammar parser() for str {
         a:@ _ "/" _ b:(@) { Node::Div(Box::new(a), Box::new(b)) }
         a:@ _ "%" _ b:(@) { Node::Rem(Box::new(a), Box::new(b)) }
         --
-        // i:index() { Node::Index(i.0, i.1) }
-        // i:dot() { Node::Dot(i.0, i.1) }
-        i:identifier() _ "(" args:((_ e:expression() _ {e}) ** ",") ")" { Node::Call(i, args) }
-        p:primary() { Node::Load(Box::new(p)) }
+        i:identifier() _ "(" args:((_ e:expression(assign) _ {e}) ** ",") ")" { Node::Call(i, args) }
+        p:primary(assign) { if assign { p } else { Node::Load(Box::new(p)) } }
         l:literal() { l }
     }
 
-    rule primary() -> Node = precedence! {
-        a:@ _ "[" _ b:expression() "]" { Node::Index2(Box::new(a), Box::new(b)) }
-        a:(@) _ "." _ b:@ { Node::Dot2(Box::new(a), Box::new(b)) }
+    rule primary(assign: bool) -> Node = precedence! {
+        "(" _ a:expression(assign) _ ")" { a }
+        a:@ _ "[" _ b:expression(assign) "]" { Node::Index(Box::new(a), Box::new(b)) }
+        a:(@) _ "." _ b:@ { Node::Dot(Box::new(a), Box::new(b)) }
+        "*" _ a:(@) { Node::Load(Box::new(a)) }
+        "&" _ a:(@) { Node::Addr(Box::new(a)) }
         --
         i:identifier() { Node::Identifier(i) }
     }
 
-    rule index() -> (String, Vec<Node>)
-        = i:identifier() _ "[" indices:((_ e:expression() _ {e}) ** ",") "]" { (i, indices) }
-
-    rule dot() -> (String, Vec<String>)
-        = i:identifier() _ "." fields:((_ e:identifier() _ {e}) ** ".") { (i, fields) }
-
     rule return_stmt() -> Node
-        = "return" _ e:expression() _ ";" { Node::Return(Box::new(e)) }
+        = "return" _ e:expression(false) _ ";" { Node::Return(Box::new(e)) }
 
     rule identifier() -> String
         = quiet!{ n:$(['a'..='z' | 'A'..='Z' | '_']['a'..='z' | 'A'..='Z' | '0'..='9' | '_']*) { n.to_owned() } }
@@ -184,6 +171,7 @@ peg::parser!(pub grammar parser() for str {
         / "i64" { Type::Int64 }
         / "void" { Type::Void }
         / "struct" _ name:identifier() { Type::Struct(name) }
+        / "*" _ t:types() { Type::Pointer(Box::new(t)) }
         / "[" _ s:number_usize() _ "]" _ t:types() { Type::Array(s, Box::new(t)) }
 
     rule _() =  quiet!{[' ' | '\t' | '\n']*}
