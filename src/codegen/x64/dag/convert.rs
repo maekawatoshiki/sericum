@@ -251,6 +251,8 @@ impl<'a> ConvertToDAG<'a> {
                     } else {
                         if inst.ty == Type::Void {
                             make_chain!(id);
+                        } else if inst.users.borrow().len() == 0 {
+                            make_chain!(id);
                         }
                         self.inst_id_node_id.insert(inst_id, id);
                     }

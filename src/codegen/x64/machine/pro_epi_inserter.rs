@@ -94,7 +94,7 @@ impl PrologueEpilogueInserter {
         builder.insert(mov_rbp_rsp);
 
         // sub rsp, adjust
-        let adjust = roundup(finfo.total_size() + /*push rbp=*/8 + down, 16) - /*push rbp=*/8;
+        let adjust = roundup(finfo.total_size() + down, 16);
         let sub_rsp = MachineInst::new_simple(
             MachineOpcode::SUBr64i32,
             vec![

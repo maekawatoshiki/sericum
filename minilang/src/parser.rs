@@ -139,7 +139,7 @@ peg::parser!(pub grammar parser() for str {
         --
         i:identifier() _ "(" args:((_ e:expression(assign) _ {e}) ** ",") ")" { Node::Call(i, args) }
         p:primary(assign) { if assign { p } else { Node::Load(Box::new(p)) } }
-        l:literal() { l }
+        l:number() { l }
     }
 
     rule primary(assign: bool) -> Node = precedence! {
@@ -159,9 +159,8 @@ peg::parser!(pub grammar parser() for str {
         = quiet!{ n:$(['a'..='z' | 'A'..='Z' | '_']['a'..='z' | 'A'..='Z' | '0'..='9' | '_']*) { n.to_owned() } }
         / expected!("identifier")
 
-    rule literal() -> Node
+    rule number() -> Node
         = n:$(['0'..='9']+) { Node::Number(n.parse().unwrap()) }
-        // / "&" i:identifier() { Node::GlobalDataAddr(i) }
 
     rule number_usize() -> usize
         = n:$(['0'..='9']+) { n.parse().unwrap() }

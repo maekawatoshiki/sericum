@@ -649,7 +649,7 @@ fibo:
 .L0:
   push rbp
   mov rbp, rsp
-  sub rsp, 8
+  sub rsp, 16
   mov dword ptr [rbp - 4], edi
   mov eax, dword ptr [rbp - 4]
   cmp eax, 2
@@ -680,7 +680,7 @@ main:
 .L3:
   push rbp
   mov rbp, rsp
-  sub rsp, 8
+  sub rsp, 0
   mov edi, 10
   call fibo
   mov rsp, rbp

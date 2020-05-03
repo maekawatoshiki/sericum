@@ -141,7 +141,9 @@ impl JITCompiler {
         }
 
         dynasm!(self.asm
+                ; sub rsp, 8
                 ; call =>f_entry
+                ; add rsp, 8
                 ; ret);
 
         self.asm.commit();

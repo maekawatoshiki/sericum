@@ -46,15 +46,13 @@ fn main() {
         first: [8][8] i32,
         second: i32
     }
-    function f(a:* struct A): i32 {
-        (*a).second = 2;
+    function f(): i32 {
+        println_i32(2);
         return  0;
     }
     function main(): i32 {
-        var a: struct A;
-        a.second = 3;
-        f(&a);
-        return a.second;
+        f();
+        return 0;
     }
     "#;
     let mut codegen = codegen::CodeGenerator::new();
