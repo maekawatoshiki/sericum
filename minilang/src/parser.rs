@@ -125,27 +125,27 @@ peg::parser!(pub grammar parser() for str {
         = p:primary(true) _ "=" _ e:expression(false) _ ";" {Node::Assign(Box::new(p), Box::new(e))}
 
     rule binary_op(assign:bool) -> Node = precedence!{
-        a:@ _ "==" _ b:(@) { Node::Eq(Box::new(a), Box::new(b)) }
+        a:(@) _ "==" _ b:@ { Node::Eq(Box::new(a), Box::new(b)) }
         // a:@ _ "!=" _ b:(@) { Node::Ne(Box::new(a), Box::new(b)) }
-        a:@ _ "<"  _ b:(@) { Node::Lt(Box::new(a), Box::new(b)) }
-        a:@ _ "<=" _ b:(@) { Node::Le(Box::new(a), Box::new(b)) }
+        a:(@) _ "<"  _ b:@ { Node::Lt(Box::new(a), Box::new(b)) }
+        a:(@) _ "<=" _ b:@ { Node::Le(Box::new(a), Box::new(b)) }
         // a:@ _ ">"  _ b:(@) { Node::Gt(Box::new(a), Box::new(b)) }
         // a:@ _ ">=" _ b:(@) { Node::Ge(Box::new(a), Box::new(b)) }
         --
-        a:@ _ "+" _ b:(@) { Node::Add(Box::new(a), Box::new(b)) }
-        a:@ _ "-" _ b:(@) { Node::Sub(Box::new(a), Box::new(b)) }
+        a:(@) _ "+" _ b:@ { Node::Add(Box::new(a), Box::new(b)) }
+        a:(@) _ "-" _ b:@ { Node::Sub(Box::new(a), Box::new(b)) }
         --
-        a:@ _ "*" _ b:(@) { Node::Mul(Box::new(a), Box::new(b)) }
-        a:@ _ "/" _ b:(@) { Node::Div(Box::new(a), Box::new(b)) }
-        a:@ _ "%" _ b:(@) { Node::Rem(Box::new(a), Box::new(b)) }
+        a:(@) _ "*" _ b:@ { Node::Mul(Box::new(a), Box::new(b)) }
+        a:(@) _ "/" _ b:@ { Node::Div(Box::new(a), Box::new(b)) }
+        a:(@) _ "%" _ b:@ { Node::Rem(Box::new(a), Box::new(b)) }
         --
         i:identifier() _ "(" args:((_ e:expression(assign) _ {e}) ** ",") ")" { Node::Call(i, args) }
+        "(" _ a:expression(false) _ ")" { a }
         p:primary(assign) { if assign { p } else { Node::Load(Box::new(p)) } }
         l:number() { l }
     }
 
     rule primary(assign: bool) -> Node = precedence! {
-        "(" _ a:expression(false) _ ")" { a }
         a:@ _ "[" _ b:expression(false) "]" { Node::Index(Box::new(a), Box::new(b)) }
         a:(@) _ "." _ b:@ { Node::Dot(Box::new(a), Box::new(b)) }
         "*" _ a:(@) { Node::Load(Box::new(a)) }
