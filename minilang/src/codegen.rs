@@ -57,6 +57,30 @@ impl CodeGenerator {
         self.types
             .functions
             .insert(id, (parser::Type::Void, vec![parser::Type::F64]));
+        let id = self.module.create_function(
+            "cilk.sin.f64",
+            cilk::types::Type::F64,
+            vec![cilk::types::Type::F64],
+        );
+        self.types
+            .functions
+            .insert(id, (parser::Type::F64, vec![parser::Type::F64]));
+        let id = self.module.create_function(
+            "cilk.cos.f64",
+            cilk::types::Type::F64,
+            vec![cilk::types::Type::F64],
+        );
+        self.types
+            .functions
+            .insert(id, (parser::Type::F64, vec![parser::Type::F64]));
+        let id = self.module.create_function(
+            "cilk.sqrt.f64",
+            cilk::types::Type::F64,
+            vec![cilk::types::Type::F64],
+        );
+        self.types
+            .functions
+            .insert(id, (parser::Type::F64, vec![parser::Type::F64]));
 
         self.run_on_module(module);
     }
@@ -255,6 +279,9 @@ impl<'a> CodeGeneratorForFunction<'a> {
                     "println_i32" => "cilk.println.i32",
                     "printch_i32" => "cilk.printch.i32",
                     "println_f64" => "cilk.println.f64",
+                    "sin" => "cilk.sin.f64",
+                    "cos" => "cilk.cos.f64",
+                    "sqrt" => "cilk.sqrt.f64",
                     name => name,
                 };
                 let func_id = self.builder.module.find_function(name).unwrap();

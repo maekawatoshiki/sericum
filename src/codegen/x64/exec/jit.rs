@@ -109,6 +109,9 @@ impl JITCompiler {
                     cilk_println_i32_ as _,
                     cilk_printch_i32_ as _,
                     cilk_println_f64_ as _,
+                    cilk_sin_f64_ as _,
+                    cilk_cos_f64_ as _,
+                    cilk_sqrt_f64_ as _,
                 ];
                 assert!(
                     internal_names.len() == internals.len(),
@@ -1033,6 +1036,24 @@ pub extern "C" fn cilk_println_f64_(f: f64) {
 #[no_mangle]
 pub extern "C" fn cilk_printch_i32_(ch: i32) {
     print!("{}", ch as u8 as char);
+}
+
+// EXPERIMENTAL Internal function cilk.sin.f64
+#[no_mangle]
+pub extern "C" fn cilk_sin_f64_(x: f64) -> f64 {
+    x.sin()
+}
+
+// EXPERIMENTAL Internal function cilk.cos.f64
+#[no_mangle]
+pub extern "C" fn cilk_cos_f64_(x: f64) -> f64 {
+    x.cos()
+}
+
+// EXPERIMENTAL Internal function cilk.sqrt.f64
+#[no_mangle]
+pub extern "C" fn cilk_sqrt_f64_(x: f64) -> f64 {
+    x.sqrt()
 }
 
 // EXPERIMENTAL Internal function cilk.memset.p0i32.i32

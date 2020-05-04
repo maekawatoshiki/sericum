@@ -105,7 +105,7 @@ impl Value {
     const_op!(const_add, +);
     const_op!(const_sub, -);
     const_op!(const_mul, *);
-    const_op!(int_only const_div, /);
+    const_op!(const_div, /);
     const_op!(int_only const_rem, %);
 
     // Utils

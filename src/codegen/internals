@@ -1,1 +1,9 @@
-["cilk.memset.p0i32.i32", "cilk.println.i32", "cilk.printch.i32", "cilk.println.f64"]
+[
+  "cilk.memset.p0i32.i32", 
+  "cilk.println.i32", 
+  "cilk.printch.i32", 
+  "cilk.println.f64",
+  "cilk.sin.f64",
+  "cilk.cos.f64",
+  "cilk.sqrt.f64"
+]
