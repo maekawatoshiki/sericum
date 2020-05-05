@@ -343,7 +343,10 @@ impl MachineOpcode {
     pub fn is_copy_like(&self) -> bool {
         matches!(
             self,
-            MachineOpcode::MOVrr32 | MachineOpcode::MOVrr64 | MachineOpcode::Copy
+            MachineOpcode::MOVrr32
+                | MachineOpcode::MOVrr64
+                | MachineOpcode::Copy
+                | MachineOpcode::MOVSDrr
         )
     }
 
@@ -357,6 +360,10 @@ impl MachineOpcode {
                 | MachineOpcode::JE
                 | MachineOpcode::JL
                 | MachineOpcode::JLE
+                | MachineOpcode::JA
+                | MachineOpcode::JAE
+                | MachineOpcode::JBE
+                | MachineOpcode::JB
         )
     }
 }

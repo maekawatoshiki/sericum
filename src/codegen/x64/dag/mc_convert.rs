@@ -417,8 +417,12 @@ impl<'a> ConversionInfo<'a> {
         let mut arg_regs = vec![MachineRegister::phys_reg(GR64::RSP)]; // call uses RSP
         let mut off = 0;
 
-        for (i, operand) in node.operand[1..].iter().enumerate() {
-            let arg = self.normal_operand(*operand);
+        let mut args = vec![];
+        for operand in &node.operand[1..] {
+            args.push(self.normal_operand(*operand));
+        }
+
+        for (i, arg) in args.into_iter().enumerate() {
             let ty = arg.get_type().unwrap();
 
             if !matches!(
@@ -467,7 +471,11 @@ impl<'a> ConversionInfo<'a> {
         );
 
         let callee = self.normal_operand(node.operand[0]);
-        let ret_reg = MachineRegister::phys_reg(GR32::EAX); // TODO: Support other types than i32
+        let ret_reg = MachineRegister::phys_reg(
+            ty2rc(&node.ty)
+                .unwrap_or(RegisterClassKind::GR32)
+                .return_value_register(),
+        );
         let call_inst = self.push_inst(
             MachineInst::new_simple(MachineOpcode::CALL, vec![callee], self.cur_bb)
                 .with_imp_uses(arg_regs)
@@ -584,7 +592,7 @@ pub fn mov_rx(tys: &Types, x: &MachineOperand) -> Option<MachineOpcode> {
     // TODO: special handling for float
     if x.get_type().unwrap() == Type::F64 {
         return match x {
-            MachineOperand::Mem(_) => Some(MachineOpcode::MOVSDrm64),
+            MachineOperand::FrameIndex(_) | MachineOperand::Mem(_) => Some(MachineOpcode::MOVSDrm),
             MachineOperand::Register(_) => Some(MachineOpcode::MOVSDrr),
             _ => None,
         };
@@ -614,6 +622,13 @@ pub fn mov_rx(tys: &Types, x: &MachineOperand) -> Option<MachineOpcode> {
 }
 
 pub fn mov_mx(x: &MachineOperand) -> Option<MachineOpcode> {
+    if x.get_type().unwrap() == Type::F64 {
+        return match x {
+            MachineOperand::Register(_) => Some(MachineOpcode::MOVSDmr),
+            _ => None,
+        };
+    }
+
     let mov32mx = [MachineOpcode::MOVmr32, MachineOpcode::MOVmi32];
     let mov64mx = [MachineOpcode::MOVmr64, MachineOpcode::MOVmi64];
     // let mov64rx = [

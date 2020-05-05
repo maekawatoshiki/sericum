@@ -42,6 +42,14 @@ impl CodeGenerator {
             .functions
             .insert(id, (parser::Type::Void, vec![parser::Type::Int32]));
         let id = self.module.create_function(
+            "cilk.print.i32",
+            cilk::types::Type::Void,
+            vec![cilk::types::Type::Int32],
+        );
+        self.types
+            .functions
+            .insert(id, (parser::Type::Void, vec![parser::Type::Int32]));
+        let id = self.module.create_function(
             "cilk.printch.i32",
             cilk::types::Type::Void,
             vec![cilk::types::Type::Int32],
@@ -51,6 +59,14 @@ impl CodeGenerator {
             .insert(id, (parser::Type::Void, vec![parser::Type::Int32]));
         let id = self.module.create_function(
             "cilk.println.f64",
+            cilk::types::Type::Void,
+            vec![cilk::types::Type::F64],
+        );
+        self.types
+            .functions
+            .insert(id, (parser::Type::Void, vec![parser::Type::F64]));
+        let id = self.module.create_function(
+            "cilk.print.f64",
             cilk::types::Type::Void,
             vec![cilk::types::Type::F64],
         );
@@ -81,6 +97,49 @@ impl CodeGenerator {
         self.types
             .functions
             .insert(id, (parser::Type::F64, vec![parser::Type::F64]));
+        let id = self.module.create_function(
+            "cilk.floor.f64",
+            cilk::types::Type::F64,
+            vec![cilk::types::Type::F64],
+        );
+        self.types
+            .functions
+            .insert(id, (parser::Type::F64, vec![parser::Type::F64]));
+        let id = self.module.create_function(
+            "cilk.fabs.f64",
+            cilk::types::Type::F64,
+            vec![cilk::types::Type::F64],
+        );
+        self.types
+            .functions
+            .insert(id, (parser::Type::F64, vec![parser::Type::F64]));
+        let id = self.module.create_function(
+            "cilk.i32_to_f64.i32",
+            cilk::types::Type::F64,
+            vec![cilk::types::Type::Int32],
+        );
+        self.types
+            .functions
+            .insert(id, (parser::Type::F64, vec![parser::Type::Int32]));
+        let id = self.module.create_function(
+            "cilk.f64_to_i32.f64",
+            cilk::types::Type::Int32,
+            vec![cilk::types::Type::F64],
+        );
+        self.types
+            .functions
+            .insert(id, (parser::Type::Int32, vec![parser::Type::F64]));
+        let ptr_i64 = self.module.types.new_pointer_ty(cilk::types::Type::Int64);
+        let id =
+            self.module
+                .create_function("cilk.malloc.i32", ptr_i64, vec![cilk::types::Type::Int32]);
+        self.types.functions.insert(
+            id,
+            (
+                parser::Type::Pointer(Box::new(parser::Type::Int64)),
+                vec![parser::Type::Int32],
+            ),
+        );
 
         self.run_on_module(module);
     }
@@ -277,11 +336,18 @@ impl<'a> CodeGeneratorForFunction<'a> {
             Node::Call(name, args) => {
                 let name = match name.as_str() {
                     "println_i32" => "cilk.println.i32",
+                    "print_i32" => "cilk.print.i32",
                     "printch_i32" => "cilk.printch.i32",
                     "println_f64" => "cilk.println.f64",
+                    "print_f64" => "cilk.print.f64",
                     "sin" => "cilk.sin.f64",
                     "cos" => "cilk.cos.f64",
                     "sqrt" => "cilk.sqrt.f64",
+                    "floor" => "cilk.floor.f64",
+                    "fabs" => "cilk.fabs.f64",
+                    "i32_to_f64" => "cilk.i32_to_f64.i32",
+                    "f64_to_i32" => "cilk.f64_to_i32.f64",
+                    "malloc" => "cilk.malloc.i32",
                     name => name,
                 };
                 let func_id = self.builder.module.find_function(name).unwrap();

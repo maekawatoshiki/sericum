@@ -40,24 +40,27 @@ pub fn coalesce_function(matrix: &mut LiveRegMatrix, f: &mut MachineFunction) {
         }
 
         // p_dst = Copy v_src. v_src uses & defs may be replaced with p_dst
-        if copy_dst.is_phys_reg() && copy_src.is_vreg() {
-            let can_eliminate_copy =
-                !matrix.interferes(copy_src.get_vreg(), copy_dst.get_reg().unwrap()) && {
-                    let l = &f.body.basic_blocks.arena[copy.parent].liveness_ref();
-                    !l.live_in.contains(&copy_src.get_vreg())
-                        && !l.live_out.contains(&copy_src.get_vreg())
-                };
-            if !can_eliminate_copy {
-                continue;
-            }
-
-            replace_regs(f, copy.parent, copy_src, copy_dst);
-
-            matrix.merge_regs(copy_dst.get_reg().unwrap(), copy_src.get_vreg());
-            removal_list.insert(copy_id);
-            worklist.push_back(copy_id);
-            continue;
-        }
+        // TODO: SOMEHOW THE FOLLOWING CODE DOESN'T WORK
+        // if copy_dst.is_phys_reg() && copy_src.is_vreg() {
+        //     println!("{:?} {:?}", copy_src, copy_src.info_ref().defs);
+        // 
+        //     let can_eliminate_copy =
+        //         !matrix.interferes(copy_src.get_vreg(), copy_dst.get_reg().unwrap()) && {
+        //             let l = &f.body.basic_blocks.arena[copy.parent].liveness_ref();
+        //             !l.live_in.contains(&copy_src.get_vreg())
+        //                 && !l.live_out.contains(&copy_src.get_vreg())
+        //         };
+        //     if !can_eliminate_copy {
+        //         continue;
+        //     }
+        // 
+        //     replace_regs(f, copy.parent, copy_src, copy_dst);
+        // 
+        //     matrix.merge_regs(copy_dst.get_reg().unwrap(), copy_src.get_vreg());
+        //     removal_list.insert(copy_id);
+        //     worklist.push_back(copy_id);
+        //     continue;
+        // }
 
         // v_dst = Copy p_src. v_dst uses & defs may be replaced with p_src
         if copy_dst.is_vreg() && copy_src.is_phys_reg() {

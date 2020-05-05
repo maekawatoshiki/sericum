@@ -71,6 +71,15 @@ impl MISelector {
                 GR32 a {
                     GR32  b => (mi.SUBrr32   a, b)
                     imm32 b => (mi.SUBri32   a, b) }
+                imm32 a {
+                    GR32 b => {
+                        let n1 = heap.alloc(DAGNode::new(
+                                NodeKind::MI(MINodeKind::MOVri32), vec![a], Type::Int32));
+                        let b = self.run_on_node(tys, heap, b);
+                        heap.alloc(DAGNode::new(NodeKind::MI(MINodeKind::SUBrr32),
+                                vec![n1, b], Type::Int32))
+                    }
+                }
                 GR64 a {
                     imm32 b => (mi.SUBr64i32 a, b) }
                 XMM  a {
@@ -83,6 +92,16 @@ impl MISelector {
                         n2
                     }
                     XMM    b => (mi.SUBSDrr a, b)
+                }
+                imm_f64 a {
+                    XMM b => {
+                        let n1 = heap.alloc(DAGNode::new(
+                                NodeKind::MI(MINodeKind::MOVSDrm64), vec![a], Type::F64));
+                        let b = self.run_on_node(tys, heap, b);
+                        let n2 = heap.alloc(DAGNode::new(NodeKind::MI(MINodeKind::SUBSDrr),
+                                vec![n1, b], Type::F64));
+                        n2
+                    }
                 }
             }
             (ir.Mul a, b) {
@@ -114,6 +133,16 @@ impl MISelector {
                         n2
                     }
                     XMM    b => (mi.DIVSDrr a, b)
+                }
+                imm_f64 a {
+                    XMM b => {
+                        let n1 = heap.alloc(DAGNode::new(
+                                NodeKind::MI(MINodeKind::MOVSDrm64), vec![a], Type::F64));
+                        let b = self.run_on_node(tys, heap, b);
+                        let n2 = heap.alloc(DAGNode::new(NodeKind::MI(MINodeKind::DIVSDrr),
+                                vec![n1, b], Type::F64));
+                        n2
+                    }
                 }
             }
             (ir.Load a) {

@@ -116,6 +116,13 @@ impl LiveRegMatrix {
         }
     }
 
+    pub fn interferes_phys_with_range(&self, reg: PhysReg, range: LiveRange) -> bool {
+        match self.phys_reg_range.get(reg.into()) {
+            Some(range2) => range.interferes(range2),
+            None => false,
+        }
+    }
+
     pub fn collect_interfering_vregs(&self, vreg: VirtReg) -> Vec<VirtReg> {
         let mut interferings = vec![];
         let i = self.virt_reg_interval.get(&vreg).unwrap();

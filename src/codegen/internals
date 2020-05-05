@@ -1,9 +1,16 @@
 [
   "cilk.memset.p0i32.i32", 
   "cilk.println.i32", 
+  "cilk.print.i32",
   "cilk.printch.i32", 
   "cilk.println.f64",
+  "cilk.print.f64",
   "cilk.sin.f64",
   "cilk.cos.f64",
-  "cilk.sqrt.f64"
+  "cilk.sqrt.f64",
+  "cilk.floor.f64",
+  "cilk.fabs.f64",
+  "cilk.i32_to_f64.i32",
+  "cilk.f64_to_i32.f64",
+  "cilk.malloc.i32"
 ]

@@ -48,6 +48,7 @@ impl RegisterAllocator {
 
         // debug!(println!("after coalesing {:?}", cur_func));
 
+        // TODO: preserve_phys_reg_uses_across_call
         self.preserve_vreg_uses_across_call(tys, cur_func, &mut matrix);
 
         self.queue = matrix.collect_virt_regs().into_iter().collect();
