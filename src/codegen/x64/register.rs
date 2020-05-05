@@ -1,11 +1,13 @@
-use super::machine::inst::*;
+use super::machine::inst::{MachineInstId, RegisterBase};
 use crate::ir::types::*;
 use bitvec::vec::BitVec;
+use id_arena::{Arena, Id};
 use rustc_hash::FxHashSet;
 use std::{
     cell::RefCell,
     fmt,
     ops::{BitAnd, BitOr, BitOrAssign},
+    ops::{Index, IndexMut},
     rc::Rc,
 };
 
@@ -14,6 +16,34 @@ pub struct PhysReg(pub usize);
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
 pub struct VirtReg(pub usize);
+
+#[derive(Copy, Clone, PartialEq, Eq, Hash)]
+pub struct RegisterId {
+    pub id: Id<RegisterInfo>,
+    pub kind: VirtOrPhys,
+}
+
+#[derive(Clone, Debug)]
+pub struct RegisterInfo {
+    pub virt_reg: VirtReg,
+    pub phys_reg: Option<PhysReg>,
+    pub reg_class: RegisterClassKind,
+    pub tied: Option<RegisterId>,
+    pub uses: FxHashSet<MachineInstId>,
+    pub defs: FxHashSet<MachineInstId>,
+}
+
+#[derive(Copy, Clone, PartialEq, Eq, Hash)]
+pub enum VirtOrPhys {
+    Virt(VirtReg),
+    Phys(PhysReg),
+}
+
+#[derive(Clone)]
+pub struct RegistersInfo {
+    cur_virt_reg: usize,
+    arena: Arena<RegisterInfo>,
+}
 
 #[derive(Debug, Clone)]
 pub struct VirtRegGen {
@@ -648,6 +678,51 @@ impl VirtReg {
     }
 }
 
+impl RegistersInfo {
+    pub fn new() -> Self {
+        Self {
+            arena: Arena::new(),
+            cur_virt_reg: 0,
+        }
+    }
+
+    pub fn new_virt_reg(&mut self, reg_class: RegisterClassKind) -> RegisterId {
+        let virt_reg = self.gen_virt_reg();
+        let id = self.arena.alloc(RegisterInfo {
+            virt_reg,
+            phys_reg: None,
+            reg_class,
+            tied: None,
+            uses: FxHashSet::default(),
+            defs: FxHashSet::default(),
+        });
+        RegisterId {
+            id,
+            kind: VirtOrPhys::Virt(virt_reg),
+        }
+    }
+
+    fn gen_virt_reg(&mut self) -> VirtReg {
+        let n = self.cur_virt_reg;
+        self.cur_virt_reg += 1;
+        VirtReg(n)
+    }
+}
+
+impl Index<RegisterId> for RegistersInfo {
+    type Output = RegisterInfo;
+
+    fn index(&self, idx: RegisterId) -> &Self::Output {
+        &self.arena[idx.id]
+    }
+}
+
+impl IndexMut<RegisterId> for RegistersInfo {
+    fn index_mut(&mut self, idx: RegisterId) -> &mut Self::Output {
+        &mut self.arena[idx.id]
+    }
+}
+
 pub fn str2reg(s: &str) -> Option<PhysReg> {
     Some(match s.to_ascii_lowercase().as_str() {
         "eax" => GR32::EAX.as_phys_reg(),
@@ -711,5 +786,24 @@ impl fmt::Debug for PhysReg {
 impl fmt::Debug for VirtReg {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "%vreg{}", self.retrieve())
+    }
+}
+
+impl fmt::Debug for VirtOrPhys {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Phys(p) => p.fmt(f),
+            Self::Virt(v) => v.fmt(f),
+        }
+    }
+}
+
+impl fmt::Debug for RegisterId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self.kind {
+            VirtOrPhys::Phys(p) => p.fmt(f)?,
+            VirtOrPhys::Virt(v) => v.fmt(f)?,
+        }
+        write!(f, ":{}", self.id.index())
     }
 }
