@@ -29,11 +29,17 @@ impl Legalize {
     fn run_on_function(&mut self, tys: &Types, func: &mut DAGFunction) {
         for bb_id in &func.dag_basic_blocks {
             let bb = &func.dag_basic_block_arena[*bb_id];
-            self.run_on_node(tys, &mut func.dag_heap, bb.entry.unwrap());
+            self.run_on_node(tys, &func.regs_info, &mut func.dag_heap, bb.entry.unwrap());
         }
     }
 
-    fn run_on_node(&mut self, tys: &Types, heap: &mut DAGHeap, node: Raw<DAGNode>) -> Raw<DAGNode> {
+    fn run_on_node(
+        &mut self,
+        tys: &Types,
+        regs_info: &RegistersInfo,
+        heap: &mut DAGHeap,
+        node: Raw<DAGNode>,
+    ) -> Raw<DAGNode> {
         if !node.may_contain_children() {
             return node;
         }
@@ -44,15 +50,15 @@ impl Legalize {
 
         // TODO: auto-generate the following code by macro
         let mut selected = match node.kind {
-            NodeKind::IR(IRNodeKind::Load) => self.run_on_node_load(tys, heap, node),
-            NodeKind::IR(IRNodeKind::Store) => self.run_on_node_store(tys, heap, node),
-            NodeKind::IR(IRNodeKind::Add) => self.run_on_node_add(tys, heap, node),
-            NodeKind::IR(IRNodeKind::Mul) => self.run_on_node_mul(tys, heap, node),
-            NodeKind::IR(IRNodeKind::Sext) => self.run_on_node_sext(tys, heap, node),
-            NodeKind::IR(IRNodeKind::Brcc) => self.run_on_node_brcc(tys, heap, node),
-            NodeKind::IR(IRNodeKind::FPBrcc) => self.run_on_node_fpbrcc(tys, heap, node),
+            NodeKind::IR(IRNodeKind::Load) => self.run_on_node_load(tys, regs_info, heap, node),
+            NodeKind::IR(IRNodeKind::Store) => self.run_on_node_store(tys, regs_info, heap, node),
+            NodeKind::IR(IRNodeKind::Add) => self.run_on_node_add(tys, regs_info, heap, node),
+            NodeKind::IR(IRNodeKind::Mul) => self.run_on_node_mul(tys, regs_info, heap, node),
+            NodeKind::IR(IRNodeKind::Sext) => self.run_on_node_sext(tys, regs_info, heap, node),
+            NodeKind::IR(IRNodeKind::Brcc) => self.run_on_node_brcc(tys, regs_info, heap, node),
+            NodeKind::IR(IRNodeKind::FPBrcc) => self.run_on_node_fpbrcc(tys, regs_info, heap, node),
             _ => {
-                self.run_on_node_operand(tys, heap, node);
+                self.run_on_node_operand(tys, regs_info, heap, node);
                 node
             }
         };
@@ -60,7 +66,7 @@ impl Legalize {
         self.selected.insert(node, selected);
 
         if let Some(next) = node.next {
-            selected.next = Some(self.run_on_node(tys, heap, next));
+            selected.next = Some(self.run_on_node(tys, regs_info, heap, next));
         }
 
         selected
@@ -69,14 +75,15 @@ impl Legalize {
     fn run_on_node_load(
         &mut self,
         tys: &Types,
+        regs_info: &RegistersInfo,
         heap: &mut DAGHeap,
         node: Raw<DAGNode>,
     ) -> Raw<DAGNode> {
         if matches!(node.ty, Type::Int32) && node.operand[0].kind == NodeKind::IR(IRNodeKind::Add) {
             let add = node.operand[0];
-            let op0 = self.run_on_node(tys, heap, add.operand[0]);
-            let op1 = self.run_on_node(tys, heap, add.operand[1]);
-            let rbp = heap.alloc_phys_reg(GR64::RBP);
+            let op0 = self.run_on_node(tys, regs_info, heap, add.operand[0]);
+            let op1 = self.run_on_node(tys, regs_info, heap, add.operand[1]);
+            let rbp = heap.alloc_phys_reg(regs_info, GR64::RBP);
 
             if op0.kind == NodeKind::IR(IRNodeKind::FIAddr) && op1.is_constant() {
                 let mem = heap.alloc(DAGNode::new_mem(
@@ -94,7 +101,7 @@ impl Legalize {
                 && op1.kind == NodeKind::IR(IRNodeKind::Mul)
                 && op1.operand[1].is_constant()
             {
-                let op1_op0 = self.run_on_node(tys, heap, op1.operand[0]);
+                let op1_op0 = self.run_on_node(tys, regs_info, heap, op1.operand[0]);
                 let op1_op1 = op1.operand[1];
                 let mem = heap.alloc(DAGNode::new_mem(
                     MemNodeKind::BaseFiAlignOff,
@@ -111,7 +118,7 @@ impl Legalize {
                 && op1.kind == NodeKind::IR(IRNodeKind::Mul)
                 && op1.operand[1].is_constant()
             {
-                let op1_op0 = self.run_on_node(tys, heap, op1.operand[0]);
+                let op1_op0 = self.run_on_node(tys, regs_info, heap, op1.operand[0]);
                 let op1_op1 = op1.operand[1];
                 let mem = heap.alloc(DAGNode::new_mem(
                     MemNodeKind::BaseAlignOff,
@@ -125,13 +132,14 @@ impl Legalize {
             }
         }
 
-        self.run_on_node_operand(tys, heap, node);
+        self.run_on_node_operand(tys, regs_info, heap, node);
         node
     }
 
     fn run_on_node_store(
         &mut self,
         tys: &Types,
+        regs_info: &RegistersInfo,
         heap: &mut DAGHeap,
         mut node: Raw<DAGNode>,
     ) -> Raw<DAGNode> {
@@ -157,12 +165,13 @@ impl Legalize {
     fn run_on_node_add(
         &mut self,
         tys: &Types,
+        regs_info: &RegistersInfo,
         heap: &mut DAGHeap,
         node: Raw<DAGNode>,
     ) -> Raw<DAGNode> {
         if node.operand[0].kind == NodeKind::IR(IRNodeKind::FIAddr) {
             let op0 = node.operand[0].operand[0];
-            let rbp = heap.alloc_phys_reg(GR64::RBP);
+            let rbp = heap.alloc_phys_reg(regs_info, GR64::RBP);
             let one = heap.alloc(DAGNode::new(
                 NodeKind::Operand(OperandNodeKind::Constant(ConstantKind::Int32(1))),
                 vec![],
@@ -170,7 +179,7 @@ impl Legalize {
             ));
 
             if node.operand[1].is_maybe_register() {
-                let op1 = self.run_on_node(tys, heap, node.operand[1]);
+                let op1 = self.run_on_node(tys, regs_info, heap, node.operand[1]);
                 let mem = heap.alloc(DAGNode::new_mem(
                     MemNodeKind::BaseFiAlignOff,
                     vec![rbp, op0, one, op1],
@@ -194,13 +203,14 @@ impl Legalize {
             }
         }
 
-        self.run_on_node_operand(tys, heap, node);
+        self.run_on_node_operand(tys, regs_info, heap, node);
         node
     }
 
     fn run_on_node_mul(
         &mut self,
         tys: &Types,
+        regs_info: &RegistersInfo,
         heap: &mut DAGHeap,
         node: Raw<DAGNode>,
     ) -> Raw<DAGNode> {
@@ -210,13 +220,14 @@ impl Legalize {
             ::std::mem::swap(&mut *lhs, &mut *rhs);
         }
 
-        self.run_on_node_operand(tys, heap, node);
+        self.run_on_node_operand(tys, regs_info, heap, node);
         node
     }
 
     fn run_on_node_sext(
         &mut self,
         tys: &Types,
+        regs_info: &RegistersInfo,
         heap: &mut DAGHeap,
         node: Raw<DAGNode>,
     ) -> Raw<DAGNode> {
@@ -235,17 +246,18 @@ impl Legalize {
         if node.ty == Type::Int64 && node.operand[0].ty == Type::Int32
         // && node.operand[0].operand[0].kind == NodeKind::IR(IRNodeKind::FIAddr)
         {
-            return self.run_on_node(tys, heap, node.operand[0]);
+            return self.run_on_node(tys, regs_info, heap, node.operand[0]);
             // return node
         }
 
-        self.run_on_node_operand(tys, heap, node);
+        self.run_on_node_operand(tys, regs_info, heap, node);
         node
     }
 
     fn run_on_node_brcc(
         &mut self,
         tys: &Types,
+        regs_info: &RegistersInfo,
         heap: &mut DAGHeap,
         node: Raw<DAGNode>,
     ) -> Raw<DAGNode> {
@@ -259,13 +271,14 @@ impl Legalize {
                 *kind = kind.flip();
             }
         }
-        self.run_on_node_operand(tys, heap, node);
+        self.run_on_node_operand(tys, regs_info, heap, node);
         node
     }
 
     fn run_on_node_fpbrcc(
         &mut self,
         tys: &Types,
+        regs_info: &RegistersInfo,
         heap: &mut DAGHeap,
         node: Raw<DAGNode>,
     ) -> Raw<DAGNode> {
@@ -283,7 +296,7 @@ impl Legalize {
 
         // now: lhs=register, rhs=const|register
         if lhs.is_maybe_register() && rhs.is_constant() {
-            let lhs = self.run_on_node(tys, heap, lhs);
+            let lhs = self.run_on_node(tys, regs_info, heap, lhs);
             let rhs = heap.alloc(DAGNode::new(
                 NodeKind::MI(MINodeKind::MOVSDrm64),
                 vec![rhs],
@@ -296,15 +309,21 @@ impl Legalize {
             ));
         }
 
-        self.run_on_node_operand(tys, heap, node);
+        self.run_on_node_operand(tys, regs_info, heap, node);
         node
     }
 
-    fn run_on_node_operand(&mut self, tys: &Types, heap: &mut DAGHeap, mut node: Raw<DAGNode>) {
+    fn run_on_node_operand(
+        &mut self,
+        tys: &Types,
+        regs_info: &RegistersInfo,
+        heap: &mut DAGHeap,
+        mut node: Raw<DAGNode>,
+    ) {
         node.operand = node
             .operand
             .iter()
-            .map(|op| self.run_on_node(tys, heap, *op))
+            .map(|op| self.run_on_node(tys, regs_info, heap, *op))
             .collect()
     }
 }

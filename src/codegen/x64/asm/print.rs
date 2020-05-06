@@ -5,6 +5,7 @@ use super::super::machine::{
     inst::*,
     module::MachineModule,
 };
+use super::super::register::RegistersInfo;
 use crate::ir::types::{TypeSize, Types};
 
 pub struct MachineAsmPrinter {
@@ -48,7 +49,7 @@ impl MachineAsmPrinter {
         for (id, _, inst_iter) in f.body.mbb_iter() {
             self.output
                 .push_str(format!("{}:\n", self.bb_id_to_label_id(&id)).as_str());
-            self.run_on_basic_block(tys, inst_iter, fo);
+            self.run_on_basic_block(tys, &f.regs_info, inst_iter, fo);
         }
         self.cur_bb_id_base += f.body.basic_blocks.order.len();
     }
@@ -56,15 +57,22 @@ impl MachineAsmPrinter {
     fn run_on_basic_block<'a>(
         &mut self,
         tys: &Types,
+        regs_info: &RegistersInfo,
         inst_iter: InstIter<'a>,
         fo: &FrameObjectsInfo,
     ) {
         for (_, inst) in inst_iter {
-            self.run_on_inst(tys, inst, fo);
+            self.run_on_inst(tys, regs_info, inst, fo);
         }
     }
 
-    fn run_on_inst(&mut self, tys: &Types, inst: &MachineInst, fo: &FrameObjectsInfo) {
+    fn run_on_inst(
+        &mut self,
+        tys: &Types,
+        regs_info: &RegistersInfo,
+        inst: &MachineInst,
+        fo: &FrameObjectsInfo,
+    ) {
         self.output.push_str("  ");
 
         match inst.opcode {
@@ -76,7 +84,7 @@ impl MachineAsmPrinter {
             | MachineOpcode::MOVri64 => self.run_on_inst_mov_rx(inst),
             MachineOpcode::MOVrm32 | MachineOpcode::MOVrm64 => self.run_on_inst_mov_rm(inst, fo),
             MachineOpcode::MOVmr32 | MachineOpcode::MOVmi32 => {
-                self.run_on_inst_mov_mx(tys, inst, fo)
+                self.run_on_inst_mov_mx(tys, regs_info, inst, fo)
             }
             MachineOpcode::LEAr64m => self.run_on_inst_lea_rm(inst, fo),
             MachineOpcode::ADDrr32 | MachineOpcode::ADDri32 | MachineOpcode::ADDr64i32 => {
@@ -111,20 +119,26 @@ impl MachineAsmPrinter {
     fn run_on_inst_mov_rx(&mut self, i: &MachineInst) {
         self.output.push_str("mov ");
         self.output
-            .push_str(format!("{}, ", i.def[0].get_reg().unwrap().name()).as_str());
+            .push_str(format!("{}, ", i.def[0].as_phys_reg().name()).as_str());
         self.run_on_operand(&i.operand[0]);
     }
 
     fn run_on_inst_mov_rm(&mut self, i: &MachineInst, fo: &FrameObjectsInfo) {
-        let word = byte2word(i.def[0].get_reg_class().size_in_byte());
+        let word = byte2word(i.def[0].as_phys_reg().reg_class().size_in_byte());
         self.output.push_str("mov ");
         self.output
-            .push_str(format!("{}, ", i.def[0].get_reg().unwrap().name()).as_str());
+            .push_str(format!("{}, ", i.def[0].as_phys_reg().name()).as_str());
         self.run_on_mem_operand(&i.operand[0], fo, word);
     }
 
-    fn run_on_inst_mov_mx(&mut self, tys: &Types, i: &MachineInst, fo: &FrameObjectsInfo) {
-        let word = byte2word(i.operand[1].get_type().unwrap().size_in_byte(tys));
+    fn run_on_inst_mov_mx(
+        &mut self,
+        tys: &Types,
+        regs_info: &RegistersInfo,
+        i: &MachineInst,
+        fo: &FrameObjectsInfo,
+    ) {
+        let word = byte2word(i.operand[1].get_type(regs_info).unwrap().size_in_byte(tys));
         self.output.push_str("mov ");
         self.run_on_mem_operand(&i.operand[0], fo, word);
         self.output.push_str(", ");
@@ -134,7 +148,7 @@ impl MachineAsmPrinter {
     fn run_on_inst_lea_rm(&mut self, i: &MachineInst, fo: &FrameObjectsInfo) {
         self.output.push_str("lea ");
         self.output
-            .push_str(format!("{}, ", i.def[0].get_reg().unwrap().name()).as_str());
+            .push_str(format!("{}, ", i.def[0].as_phys_reg().name()).as_str());
 
         // out = lea rbp, fi, none, none
         if i.operand[0].is_register() // must be rbp
@@ -167,7 +181,7 @@ impl MachineAsmPrinter {
         {
             let offset = fo.offset(i.operand[1].as_frame_index().idx).unwrap();
             let align = i.operand[2].as_constant().as_i32();
-            let reg = i.operand[3].as_register().get_reg().unwrap();
+            let reg = i.operand[3].as_register().as_phys_reg();
             self.output
                 .push_str(format!("[rbp + {}*{} - {}]", align, reg.name(), offset).as_str());
         }
@@ -178,9 +192,9 @@ impl MachineAsmPrinter {
             && i.operand[2].is_const_i32()
             && i.operand[3].is_register()
         {
-            let base = i.operand[0].as_register().get_reg().unwrap();
+            let base = i.operand[0].as_register().as_phys_reg();
             let align = i.operand[2].as_constant().as_i32();
-            let reg = i.operand[3].as_register().get_reg().unwrap();
+            let reg = i.operand[3].as_register().as_phys_reg();
             self.output
                 .push_str(format!("[{} + {}*{}]", base.name(), align, reg.name()).as_str());
         }
@@ -191,7 +205,7 @@ impl MachineAsmPrinter {
             && i.operand[2].is_none()
             && i.operand[3].is_none()
         {
-            let base = i.operand[0].as_register().get_reg().unwrap();
+            let base = i.operand[0].as_register().as_phys_reg();
             self.output.push_str(format!("[{}]", base.name()).as_str());
         }
     }
@@ -199,22 +213,22 @@ impl MachineAsmPrinter {
     fn run_on_mem_operand(&mut self, op: &MachineOperand, fo: &FrameObjectsInfo, word: &str) {
         match op {
             MachineOperand::Mem(MachineMemOperand::BaseFi(base, fi)) => {
-                let base = base.get_reg().unwrap();
+                let base = base.as_phys_reg();
                 let offset = fo.offset(fi.idx).unwrap();
                 self.output
                     .push_str(format!("{} ptr [{} - {}]", word, base.name(), offset).as_str());
             }
             MachineOperand::Mem(MachineMemOperand::BaseAlignOff(base, align, off)) => {
-                let base = base.get_reg().unwrap();
-                let reg = off.get_reg().unwrap();
+                let base = base.as_phys_reg();
+                let reg = off.as_phys_reg();
                 self.output.push_str(
                     format!("{} ptr [{} + {}*{}]", word, base.name(), align, reg.name()).as_str(),
                 );
             }
             MachineOperand::Mem(MachineMemOperand::BaseFiAlignOff(base, fi, align, off)) => {
                 let offset = fo.offset(fi.idx).unwrap();
-                let base = base.get_reg().unwrap();
-                let reg = off.get_reg().unwrap();
+                let base = base.as_phys_reg();
+                let reg = off.as_phys_reg();
                 self.output.push_str(
                     format!(
                         "{} ptr [{} + {}*{} - {}]",
@@ -228,7 +242,7 @@ impl MachineAsmPrinter {
                 );
             }
             MachineOperand::Mem(MachineMemOperand::BaseFiOff(base, fi, off)) => {
-                let base = base.get_reg().unwrap();
+                let base = base.as_phys_reg();
                 let off1 = fo.offset(fi.idx).unwrap();
                 let off2 = *off;
                 assert!(off1 >= off2);
@@ -237,12 +251,12 @@ impl MachineAsmPrinter {
                     .push_str(format!("{} ptr [{} - {}]", word, base.name(), offset).as_str());
             }
             MachineOperand::Mem(MachineMemOperand::Base(base)) => {
-                let base = base.get_reg().unwrap();
+                let base = base.as_phys_reg();
                 self.output
                     .push_str(format!("{} ptr [{}]", word, base.name()).as_str());
             }
             MachineOperand::Mem(MachineMemOperand::BaseOff(base, off)) => {
-                let base = base.get_reg().unwrap();
+                let base = base.as_phys_reg();
                 self.output
                     .push_str(format!("{} ptr [{} + {}]", word, base.name(), off).as_str());
             }
@@ -267,14 +281,14 @@ impl MachineAsmPrinter {
     fn run_on_inst_imul_rr(&mut self, i: &MachineInst) {
         self.output.push_str("imul ");
         self.output
-            .push_str(format!("{}, ", i.def[0].get_reg().unwrap().name()).as_str());
+            .push_str(format!("{}, ", i.def[0].as_phys_reg().name()).as_str());
         self.run_on_operand(&i.operand[0]);
     }
 
     fn run_on_inst_imul_rri(&mut self, i: &MachineInst) {
         self.output.push_str("imul ");
         self.output
-            .push_str(format!("{}, ", i.def[0].get_reg().unwrap().name()).as_str());
+            .push_str(format!("{}, ", i.def[0].as_phys_reg().name()).as_str());
         self.run_on_operand(&i.operand[0]);
         self.output.push_str(", ");
         self.run_on_operand(&i.operand[1]);
@@ -341,7 +355,7 @@ impl MachineAsmPrinter {
             MachineOperand::Constant(MachineConstant::Int32(i)) => {
                 self.output.push_str(format!("{}", i).as_str())
             }
-            MachineOperand::Register(r) => self.output.push_str(r.get_reg().unwrap().name()),
+            MachineOperand::Register(r) => self.output.push_str(r.as_phys_reg().name()),
             MachineOperand::Mem(MachineMemOperand::Address(AddressKind::FunctionName(name))) => {
                 self.output.push_str(name.as_str())
             }

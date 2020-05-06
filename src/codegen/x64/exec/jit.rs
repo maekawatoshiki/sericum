@@ -13,7 +13,7 @@ use rustc_hash::FxHashMap;
 #[rustfmt::skip]
 macro_rules! register {
     ($reg:expr) => {{
-        phys_reg_to_dynasm_reg($reg.get_reg().unwrap())
+        phys_reg_to_dynasm_reg($reg.as_phys_reg())
     }};
 }
 
@@ -258,7 +258,7 @@ impl JITCompiler {
                     MachineOpcode::IDIV => self.compile_idiv(&frame_objects, inst),
                     MachineOpcode::CDQ => self.compile_cdq(&frame_objects, inst),
                     MachineOpcode::CALL => self.compile_call(module, &frame_objects, inst),
-                    MachineOpcode::Copy => self.compile_copy(inst),
+                    // MachineOpcode::Copy => self.compile_copy(inst),
                     MachineOpcode::CMPri => self.compile_cmp_ri(inst),
                     MachineOpcode::CMPrr => self.compile_cmp_rr(inst),
                     MachineOpcode::UCOMISDrr => self.compile_ucomisd_rr(inst),
@@ -280,44 +280,44 @@ impl JITCompiler {
     }
 
     fn compile_mov_rm32(&mut self, fo: &FrameObjectsInfo, inst: &MachineInst) {
-        let r0 = phys_reg_to_dynasm_reg(inst.def[0].get_reg().unwrap());
+        let r0 = phys_reg_to_dynasm_reg(inst.def[0].as_phys_reg());
         match &inst.operand[0] {
             MachineOperand::Mem(MachineMemOperand::BaseFi(base, fi)) => {
-                let r1 = phys_reg_to_dynasm_reg(base.get_reg().unwrap());
+                let r1 = phys_reg_to_dynasm_reg(base.as_phys_reg());
                 let m2 = fi.idx;
                 dynasm!(self.asm; mov Rd(r0), DWORD [Rq(r1) - fo.offset(m2).unwrap()]);
             }
             MachineOperand::Mem(MachineMemOperand::BaseAlignOff(base, align, off)) => {
-                let r1 = phys_reg_to_dynasm_reg(base.get_reg().unwrap());
+                let r1 = phys_reg_to_dynasm_reg(base.as_phys_reg());
                 let i2 = align;
-                let r3 = phys_reg_to_dynasm_reg(off.get_reg().unwrap());
+                let r3 = phys_reg_to_dynasm_reg(off.as_phys_reg());
                 match i2 {
                     4 => dynasm!(self.asm; mov Rd(r0), DWORD [Rq(r1) + 4*Rq(r3)]),
                     _ => unimplemented!(),
                 }
             }
             MachineOperand::Mem(MachineMemOperand::BaseFiAlignOff(base, fi, align, off)) => {
-                let r1 = phys_reg_to_dynasm_reg(base.get_reg().unwrap());
+                let r1 = phys_reg_to_dynasm_reg(base.as_phys_reg());
                 let m2 = fo.offset(fi.idx).unwrap();
                 let i3 = align;
-                let r4 = phys_reg_to_dynasm_reg(off.get_reg().unwrap());
+                let r4 = phys_reg_to_dynasm_reg(off.as_phys_reg());
                 match i3 {
                     4 => dynasm!(self.asm; mov Rd(r0), DWORD [Rq(r1) - m2 + 4*Rq(r4)]),
                     _ => unimplemented!(),
                 }
             }
             MachineOperand::Mem(MachineMemOperand::BaseFiOff(base, fi, off)) => {
-                let r1 = phys_reg_to_dynasm_reg(base.get_reg().unwrap());
+                let r1 = phys_reg_to_dynasm_reg(base.as_phys_reg());
                 let m2 = fo.offset(fi.idx).unwrap();
                 let i3 = off;
                 dynasm!(self.asm; mov Rd(r0), DWORD [Rq(r1) - m2 + i3]);
             }
             MachineOperand::Mem(MachineMemOperand::Base(base)) => {
-                let r1 = phys_reg_to_dynasm_reg(base.get_reg().unwrap());
+                let r1 = phys_reg_to_dynasm_reg(base.as_phys_reg());
                 dynasm!(self.asm; mov Rd(r0), DWORD [Rq(r1)]);
             }
             MachineOperand::Mem(MachineMemOperand::BaseOff(base, off)) => {
-                let r1 = phys_reg_to_dynasm_reg(base.get_reg().unwrap());
+                let r1 = phys_reg_to_dynasm_reg(base.as_phys_reg());
                 let i2 = *off;
                 dynasm!(self.asm; mov Rd(r0), DWORD [Rq(r1) + i2]);
             }
@@ -326,44 +326,44 @@ impl JITCompiler {
     }
 
     fn compile_mov_rm64(&mut self, fo: &FrameObjectsInfo, inst: &MachineInst) {
-        let r0 = phys_reg_to_dynasm_reg(inst.def[0].get_reg().unwrap());
+        let r0 = phys_reg_to_dynasm_reg(inst.def[0].as_phys_reg());
         match &inst.operand[0] {
             MachineOperand::Mem(MachineMemOperand::BaseFi(base, fi)) => {
-                let r1 = phys_reg_to_dynasm_reg(base.get_reg().unwrap());
+                let r1 = phys_reg_to_dynasm_reg(base.as_phys_reg());
                 let m2 = fi.idx;
                 dynasm!(self.asm; mov Rq(r0), QWORD [Rq(r1) - fo.offset(m2).unwrap()]);
             }
             MachineOperand::Mem(MachineMemOperand::BaseAlignOff(base, align, off)) => {
-                let r1 = phys_reg_to_dynasm_reg(base.get_reg().unwrap());
+                let r1 = phys_reg_to_dynasm_reg(base.as_phys_reg());
                 let i2 = align;
-                let r3 = phys_reg_to_dynasm_reg(off.get_reg().unwrap());
+                let r3 = phys_reg_to_dynasm_reg(off.as_phys_reg());
                 match i2 {
                     4 => dynasm!(self.asm; mov Rq(r0), QWORD [Rq(r1) + 4*Rq(r3)]),
                     _ => unimplemented!(),
                 }
             }
             MachineOperand::Mem(MachineMemOperand::BaseFiAlignOff(base, fi, align, off)) => {
-                let r1 = phys_reg_to_dynasm_reg(base.get_reg().unwrap());
+                let r1 = phys_reg_to_dynasm_reg(base.as_phys_reg());
                 let m2 = fo.offset(fi.idx).unwrap();
                 let i3 = align;
-                let r4 = phys_reg_to_dynasm_reg(off.get_reg().unwrap());
+                let r4 = phys_reg_to_dynasm_reg(off.as_phys_reg());
                 match i3 {
                     4 => dynasm!(self.asm; mov Rq(r0), QWORD [Rq(r1) - m2 + 4*Rq(r4)]),
                     _ => unimplemented!(),
                 }
             }
             MachineOperand::Mem(MachineMemOperand::BaseFiOff(base, fi, off)) => {
-                let r1 = phys_reg_to_dynasm_reg(base.get_reg().unwrap());
+                let r1 = phys_reg_to_dynasm_reg(base.as_phys_reg());
                 let m2 = fo.offset(fi.idx).unwrap();
                 let i3 = off;
                 dynasm!(self.asm; mov Rq(r0), QWORD [Rq(r1) - m2 + i3]);
             }
             MachineOperand::Mem(MachineMemOperand::Base(base)) => {
-                let r1 = phys_reg_to_dynasm_reg(base.get_reg().unwrap());
+                let r1 = phys_reg_to_dynasm_reg(base.as_phys_reg());
                 dynasm!(self.asm; mov Rq(r0), QWORD [Rq(r1)]);
             }
             MachineOperand::Mem(MachineMemOperand::BaseOff(base, off)) => {
-                let r1 = phys_reg_to_dynasm_reg(base.get_reg().unwrap());
+                let r1 = phys_reg_to_dynasm_reg(base.as_phys_reg());
                 let i2 = *off;
                 dynasm!(self.asm; mov Rq(r0), QWORD [Rq(r1) + i2]);
             }
@@ -374,48 +374,48 @@ impl JITCompiler {
     fn compile_mov_mr32(&mut self, fo: &FrameObjectsInfo, inst: &MachineInst) {
         match &inst.operand[0] {
             MachineOperand::Mem(MachineMemOperand::BaseFi(base, fi)) => {
-                let r0 = phys_reg_to_dynasm_reg(base.get_reg().unwrap());
+                let r0 = phys_reg_to_dynasm_reg(base.as_phys_reg());
                 let m1 = fo.offset(fi.idx).unwrap();
-                let r2 = phys_reg_to_dynasm_reg(inst.operand[1].as_register().get_reg().unwrap());
+                let r2 = phys_reg_to_dynasm_reg(inst.operand[1].as_register().as_phys_reg());
                 dynasm!(self.asm; mov DWORD [Rq(r0) - m1], Rd(r2));
             }
             MachineOperand::Mem(MachineMemOperand::BaseAlignOff(base, align, off)) => {
-                let r0 = phys_reg_to_dynasm_reg(base.get_reg().unwrap());
+                let r0 = phys_reg_to_dynasm_reg(base.as_phys_reg());
                 let i1 = align;
-                let r2 = phys_reg_to_dynasm_reg(off.get_reg().unwrap());
-                let r3 = phys_reg_to_dynasm_reg(inst.operand[1].as_register().get_reg().unwrap());
+                let r2 = phys_reg_to_dynasm_reg(off.as_phys_reg());
+                let r3 = phys_reg_to_dynasm_reg(inst.operand[1].as_register().as_phys_reg());
                 match i1 {
                     4 => dynasm!(self.asm; mov DWORD [Rq(r0) + 4*Rq(r2)], Rd(r3)),
                     _ => unimplemented!(),
                 }
             }
             MachineOperand::Mem(MachineMemOperand::BaseFiAlignOff(base, fi, align, off)) => {
-                let r0 = phys_reg_to_dynasm_reg(base.get_reg().unwrap());
+                let r0 = phys_reg_to_dynasm_reg(base.as_phys_reg());
                 let m1 = fo.offset(fi.idx).unwrap();
                 let i2 = align;
-                let r3 = phys_reg_to_dynasm_reg(off.get_reg().unwrap());
-                let r4 = phys_reg_to_dynasm_reg(inst.operand[1].as_register().get_reg().unwrap());
+                let r3 = phys_reg_to_dynasm_reg(off.as_phys_reg());
+                let r4 = phys_reg_to_dynasm_reg(inst.operand[1].as_register().as_phys_reg());
                 match i2 {
                     4 => dynasm!(self.asm; mov DWORD [Rq(r0) - m1 + 4*Rq(r3)], Rd(r4)),
                     _ => unimplemented!(),
                 }
             }
             MachineOperand::Mem(MachineMemOperand::BaseFiOff(base, fi, off)) => {
-                let r0 = phys_reg_to_dynasm_reg(base.get_reg().unwrap());
+                let r0 = phys_reg_to_dynasm_reg(base.as_phys_reg());
                 let m1 = fo.offset(fi.idx).unwrap();
                 let i2 = off;
-                let r3 = phys_reg_to_dynasm_reg(inst.operand[1].as_register().get_reg().unwrap());
+                let r3 = phys_reg_to_dynasm_reg(inst.operand[1].as_register().as_phys_reg());
                 dynasm!(self.asm; mov QWORD [Rq(r0) - m1 + i2], Rq(r3));
             }
             MachineOperand::Mem(MachineMemOperand::Base(base)) => {
-                let r0 = phys_reg_to_dynasm_reg(base.get_reg().unwrap());
-                let r1 = phys_reg_to_dynasm_reg(inst.operand[1].as_register().get_reg().unwrap());
+                let r0 = phys_reg_to_dynasm_reg(base.as_phys_reg());
+                let r1 = phys_reg_to_dynasm_reg(inst.operand[1].as_register().as_phys_reg());
                 dynasm!(self.asm; mov DWORD [Rq(r0)], Rd(r1));
             }
             MachineOperand::Mem(MachineMemOperand::BaseOff(base, off)) => {
-                let r0 = phys_reg_to_dynasm_reg(base.get_reg().unwrap());
+                let r0 = phys_reg_to_dynasm_reg(base.as_phys_reg());
                 let i1 = *off;
-                let r2 = phys_reg_to_dynasm_reg(inst.operand[1].as_register().get_reg().unwrap());
+                let r2 = phys_reg_to_dynasm_reg(inst.operand[1].as_register().as_phys_reg());
                 dynasm!(self.asm; mov DWORD [Rq(r0) + i1], Rd(r2))
             }
             e => panic!("{:?}", e),
@@ -425,15 +425,15 @@ impl JITCompiler {
     fn compile_mov_mi32(&mut self, fo: &FrameObjectsInfo, inst: &MachineInst) {
         match &inst.operand[0] {
             MachineOperand::Mem(MachineMemOperand::BaseFi(base, fi)) => {
-                let r0 = phys_reg_to_dynasm_reg(base.get_reg().unwrap());
+                let r0 = phys_reg_to_dynasm_reg(base.as_phys_reg());
                 let m1 = fo.offset(fi.idx).unwrap();
                 let i2 = inst.operand[1].as_constant().as_i32();
                 dynasm!(self.asm; mov DWORD [Rq(r0) - m1], i2);
             }
             MachineOperand::Mem(MachineMemOperand::BaseAlignOff(base, align, off)) => {
-                let r0 = phys_reg_to_dynasm_reg(base.get_reg().unwrap());
+                let r0 = phys_reg_to_dynasm_reg(base.as_phys_reg());
                 let i1 = align;
-                let r2 = phys_reg_to_dynasm_reg(off.get_reg().unwrap());
+                let r2 = phys_reg_to_dynasm_reg(off.as_phys_reg());
                 let i3 = inst.operand[1].as_constant().as_i32();
                 match i1 {
                     4 => dynasm!(self.asm; mov DWORD [Rq(r0) + 4*Rq(r2)], i3),
@@ -441,10 +441,10 @@ impl JITCompiler {
                 }
             }
             MachineOperand::Mem(MachineMemOperand::BaseFiAlignOff(base, fi, align, off)) => {
-                let r0 = phys_reg_to_dynasm_reg(base.get_reg().unwrap());
+                let r0 = phys_reg_to_dynasm_reg(base.as_phys_reg());
                 let m1 = fo.offset(fi.idx).unwrap();
                 let i2 = align;
-                let r3 = phys_reg_to_dynasm_reg(off.get_reg().unwrap());
+                let r3 = phys_reg_to_dynasm_reg(off.as_phys_reg());
                 let i4 = inst.operand[1].as_constant().as_i32();
                 match i2 {
                     4 => dynasm!(self.asm; mov DWORD [Rq(r0) - m1 + 4*Rq(r3)], i4),
@@ -452,19 +452,19 @@ impl JITCompiler {
                 }
             }
             MachineOperand::Mem(MachineMemOperand::BaseFiOff(base, fi, off)) => {
-                let r0 = phys_reg_to_dynasm_reg(base.get_reg().unwrap());
+                let r0 = phys_reg_to_dynasm_reg(base.as_phys_reg());
                 let m1 = fo.offset(fi.idx).unwrap();
                 let i2 = off;
                 let i3 = inst.operand[1].as_constant().as_i32();
                 dynasm!(self.asm; mov QWORD [Rq(r0) - m1 + i2], i3);
             }
             MachineOperand::Mem(MachineMemOperand::Base(base)) => {
-                let r0 = phys_reg_to_dynasm_reg(base.get_reg().unwrap());
+                let r0 = phys_reg_to_dynasm_reg(base.as_phys_reg());
                 let i1 = inst.operand[1].as_constant().as_i32();
                 dynasm!(self.asm; mov DWORD [Rq(r0)], i1);
             }
             MachineOperand::Mem(MachineMemOperand::BaseOff(base, off)) => {
-                let r0 = phys_reg_to_dynasm_reg(base.get_reg().unwrap());
+                let r0 = phys_reg_to_dynasm_reg(base.as_phys_reg());
                 let i1 = *off;
                 let i2 = inst.operand[1].as_constant().as_i32();
                 dynasm!(self.asm; mov DWORD [Rq(r0) + i1], i2)
@@ -479,15 +479,15 @@ impl JITCompiler {
             inst.operand[0].as_constant(),
             MachineConstant::Int32(_)
         ));
-        let r = phys_reg_to_dynasm_reg(inst.def[0].get_reg().unwrap());
+        let r = phys_reg_to_dynasm_reg(inst.def[0].as_phys_reg());
         let i = inst.operand[0].as_constant().as_i32();
         dynasm!(self.asm; mov Rd(r), i);
     }
 
     fn compile_mov_rr32(&mut self, inst: &MachineInst) {
         assert!(matches!(inst.operand[0], MachineOperand::Register(_)));
-        let r0 = phys_reg_to_dynasm_reg(inst.def[0].get_reg().unwrap());
-        let r1 = phys_reg_to_dynasm_reg(inst.operand[0].as_register().get_reg().unwrap());
+        let r0 = phys_reg_to_dynasm_reg(inst.def[0].as_phys_reg());
+        let r1 = phys_reg_to_dynasm_reg(inst.operand[0].as_register().as_phys_reg());
         self.reg_copy(RegisterClassKind::GR32, r0, r1);
     }
 
@@ -499,7 +499,7 @@ impl JITCompiler {
         //     MachineConstant::Int64(_)
         // ));
         //
-        // let r = inst.def[0].get_reg().unwrap().get() as u8;
+        // let r = inst.def[0].as_phys_reg().get() as u8;
         // let i = inst.operand[0].as_constant().as_i64();
         // dynasm!(self.asm; mov Ra(r), i);
     }
@@ -507,48 +507,48 @@ impl JITCompiler {
     fn compile_mov_mr64(&mut self, fo: &FrameObjectsInfo, inst: &MachineInst) {
         match &inst.operand[0] {
             MachineOperand::Mem(MachineMemOperand::BaseFi(base, fi)) => {
-                let r0 = phys_reg_to_dynasm_reg(base.get_reg().unwrap());
+                let r0 = phys_reg_to_dynasm_reg(base.as_phys_reg());
                 let m1 = fo.offset(fi.idx).unwrap();
-                let r2 = phys_reg_to_dynasm_reg(inst.operand[1].as_register().get_reg().unwrap());
+                let r2 = phys_reg_to_dynasm_reg(inst.operand[1].as_register().as_phys_reg());
                 dynasm!(self.asm; mov QWORD [Rq(r0) - m1], Rq(r2));
             }
             MachineOperand::Mem(MachineMemOperand::BaseAlignOff(base, align, off)) => {
-                let r0 = phys_reg_to_dynasm_reg(base.get_reg().unwrap());
+                let r0 = phys_reg_to_dynasm_reg(base.as_phys_reg());
                 let i1 = align;
-                let r2 = phys_reg_to_dynasm_reg(off.get_reg().unwrap());
-                let r3 = phys_reg_to_dynasm_reg(inst.operand[1].as_register().get_reg().unwrap());
+                let r2 = phys_reg_to_dynasm_reg(off.as_phys_reg());
+                let r3 = phys_reg_to_dynasm_reg(inst.operand[1].as_register().as_phys_reg());
                 match i1 {
                     4 => dynasm!(self.asm; mov QWORD [Rq(r0) + 4*Rq(r2)], Rq(r3)),
                     _ => unimplemented!(),
                 }
             }
             MachineOperand::Mem(MachineMemOperand::BaseFiAlignOff(base, fi, align, off)) => {
-                let r0 = phys_reg_to_dynasm_reg(base.get_reg().unwrap());
+                let r0 = phys_reg_to_dynasm_reg(base.as_phys_reg());
                 let m1 = fo.offset(fi.idx).unwrap();
                 let i2 = align;
-                let r3 = phys_reg_to_dynasm_reg(off.get_reg().unwrap());
-                let r4 = phys_reg_to_dynasm_reg(inst.operand[1].as_register().get_reg().unwrap());
+                let r3 = phys_reg_to_dynasm_reg(off.as_phys_reg());
+                let r4 = phys_reg_to_dynasm_reg(inst.operand[1].as_register().as_phys_reg());
                 match i2 {
                     4 => dynasm!(self.asm; mov QWORD [Rq(r0) - m1 + 4*Rq(r3)], Rq(r4)),
                     _ => unimplemented!(),
                 }
             }
             MachineOperand::Mem(MachineMemOperand::BaseFiOff(base, fi, off)) => {
-                let r0 = phys_reg_to_dynasm_reg(base.get_reg().unwrap());
+                let r0 = phys_reg_to_dynasm_reg(base.as_phys_reg());
                 let m1 = fo.offset(fi.idx).unwrap();
                 let i2 = off;
-                let r3 = phys_reg_to_dynasm_reg(inst.operand[1].as_register().get_reg().unwrap());
+                let r3 = phys_reg_to_dynasm_reg(inst.operand[1].as_register().as_phys_reg());
                 dynasm!(self.asm; mov QWORD [Rq(r0) - m1 + i2], Rq(r3));
             }
             MachineOperand::Mem(MachineMemOperand::Base(base)) => {
-                let r0 = phys_reg_to_dynasm_reg(base.get_reg().unwrap());
-                let r1 = phys_reg_to_dynasm_reg(inst.operand[1].as_register().get_reg().unwrap());
+                let r0 = phys_reg_to_dynasm_reg(base.as_phys_reg());
+                let r1 = phys_reg_to_dynasm_reg(inst.operand[1].as_register().as_phys_reg());
                 dynasm!(self.asm; mov QWORD [Rq(r0)], Rq(r1));
             }
             MachineOperand::Mem(MachineMemOperand::BaseOff(base, off)) => {
-                let r0 = phys_reg_to_dynasm_reg(base.get_reg().unwrap());
+                let r0 = phys_reg_to_dynasm_reg(base.as_phys_reg());
                 let i1 = *off;
-                let r2 = phys_reg_to_dynasm_reg(inst.operand[1].as_register().get_reg().unwrap());
+                let r2 = phys_reg_to_dynasm_reg(inst.operand[1].as_register().as_phys_reg());
                 dynasm!(self.asm; mov QWORD [Rq(r0) + i1], Rq(r2))
             }
             e => panic!("{:?}", e),
@@ -557,13 +557,13 @@ impl JITCompiler {
 
     fn compile_mov_rr64(&mut self, inst: &MachineInst) {
         assert!(matches!(inst.operand[0], MachineOperand::Register(_)));
-        let r0 = phys_reg_to_dynasm_reg(inst.def[0].get_reg().unwrap());
-        let r1 = phys_reg_to_dynasm_reg(inst.operand[0].as_register().get_reg().unwrap());
+        let r0 = phys_reg_to_dynasm_reg(inst.def[0].as_phys_reg());
+        let r1 = phys_reg_to_dynasm_reg(inst.operand[0].as_register().as_phys_reg());
         self.reg_copy(RegisterClassKind::GR64, r0, r1);
     }
 
     fn compile_movsd_rm64(&mut self, inst: &MachineInst) {
-        let r0 = phys_reg_to_dynasm_reg(inst.def[0].get_reg().unwrap());
+        let r0 = phys_reg_to_dynasm_reg(inst.def[0].as_phys_reg());
         match &inst.operand[0] {
             MachineOperand::Mem(MachineMemOperand::Address(AddressKind::Label(id))) => {
                 let l1 = self.get_label(*id);
@@ -574,21 +574,21 @@ impl JITCompiler {
     }
 
     fn compile_movsd_rr(&mut self, inst: &MachineInst) {
-        let r0 = phys_reg_to_dynasm_reg(inst.def[0].get_reg().unwrap());
-        let r1 = phys_reg_to_dynasm_reg(inst.operand[0].as_register().get_reg().unwrap());
+        let r0 = phys_reg_to_dynasm_reg(inst.def[0].as_phys_reg());
+        let r1 = phys_reg_to_dynasm_reg(inst.operand[0].as_register().as_phys_reg());
         dynasm!(self.asm; movsd Rx(r0), Rx(r1));
     }
 
     fn compile_movsd_rm(&mut self, fo: &FrameObjectsInfo, inst: &MachineInst) {
-        let r0 = phys_reg_to_dynasm_reg(inst.def[0].get_reg().unwrap());
+        let r0 = phys_reg_to_dynasm_reg(inst.def[0].as_phys_reg());
         match &inst.operand[0] {
             MachineOperand::Mem(MachineMemOperand::BaseFi(base, fi)) => {
-                let r1 = phys_reg_to_dynasm_reg(base.get_reg().unwrap());
+                let r1 = phys_reg_to_dynasm_reg(base.as_phys_reg());
                 let m2 = fi.idx;
                 dynasm!(self.asm; movsd Rx(r0), [Rq(r1) - fo.offset(m2).unwrap()]);
             }
             MachineOperand::Mem(MachineMemOperand::Base(base)) => {
-                let r1 = phys_reg_to_dynasm_reg(base.get_reg().unwrap());
+                let r1 = phys_reg_to_dynasm_reg(base.as_phys_reg());
                 dynasm!(self.asm; movsd Rx(r0), [Rq(r1)]);
             }
             _ => unimplemented!(),
@@ -598,14 +598,14 @@ impl JITCompiler {
     fn compile_movsd_mr(&mut self, fo: &FrameObjectsInfo, inst: &MachineInst) {
         match &inst.operand[0] {
             MachineOperand::Mem(MachineMemOperand::BaseFi(base, fi)) => {
-                let r0 = phys_reg_to_dynasm_reg(base.get_reg().unwrap());
+                let r0 = phys_reg_to_dynasm_reg(base.as_phys_reg());
                 let m1 = fo.offset(fi.idx).unwrap();
-                let r2 = phys_reg_to_dynasm_reg(inst.operand[1].as_register().get_reg().unwrap());
+                let r2 = phys_reg_to_dynasm_reg(inst.operand[1].as_register().as_phys_reg());
                 dynasm!(self.asm; movsd [Rq(r0) - m1], Rx(r2));
             }
             MachineOperand::Mem(MachineMemOperand::Base(base)) => {
-                let r0 = phys_reg_to_dynasm_reg(base.get_reg().unwrap());
-                let r1 = phys_reg_to_dynasm_reg(inst.operand[1].as_register().get_reg().unwrap());
+                let r0 = phys_reg_to_dynasm_reg(base.as_phys_reg());
+                let r1 = phys_reg_to_dynasm_reg(inst.operand[1].as_register().as_phys_reg());
                 dynasm!(self.asm; movsd [Rq(r0)], Rx(r1));
             }
             _ => unimplemented!(),
@@ -613,17 +613,17 @@ impl JITCompiler {
     }
 
     fn compile_lea_r64m(&mut self, fo: &FrameObjectsInfo, inst: &MachineInst) {
-        let r0 = phys_reg_to_dynasm_reg(inst.def[0].get_reg().unwrap());
+        let r0 = phys_reg_to_dynasm_reg(inst.def[0].as_phys_reg());
         match &inst.operand[0] {
             MachineOperand::Mem(MachineMemOperand::BaseFi(base, fi)) => {
-                let r1 = phys_reg_to_dynasm_reg(base.get_reg().unwrap());
+                let r1 = phys_reg_to_dynasm_reg(base.as_phys_reg());
                 let m2 = fi.idx;
                 dynasm!(self.asm; lea Rq(r0), [Rq(r1) - fo.offset(m2).unwrap()]);
             }
             MachineOperand::Mem(MachineMemOperand::BaseAlignOff(base, align, off)) => {
-                let r1 = phys_reg_to_dynasm_reg(base.get_reg().unwrap());
+                let r1 = phys_reg_to_dynasm_reg(base.as_phys_reg());
                 let i2 = align;
-                let r3 = phys_reg_to_dynasm_reg(off.get_reg().unwrap());
+                let r3 = phys_reg_to_dynasm_reg(off.as_phys_reg());
                 match i2 {
                     1 => dynasm!(self.asm; lea Rq(r0), [Rq(r1) + 1*Rq(r3)]),
                     4 => dynasm!(self.asm; lea Rq(r0), [Rq(r1) + 4*Rq(r3)]),
@@ -631,10 +631,10 @@ impl JITCompiler {
                 }
             }
             MachineOperand::Mem(MachineMemOperand::BaseFiAlignOff(base, fi, align, off)) => {
-                let r1 = phys_reg_to_dynasm_reg(base.get_reg().unwrap());
+                let r1 = phys_reg_to_dynasm_reg(base.as_phys_reg());
                 let m2 = fo.offset(fi.idx).unwrap();
                 let i3 = align;
-                let r4 = phys_reg_to_dynasm_reg(off.get_reg().unwrap());
+                let r4 = phys_reg_to_dynasm_reg(off.as_phys_reg());
                 match i3 {
                     1 => dynasm!(self.asm; lea Rq(r0), [Rq(r1) - m2 + 1*Rq(r4)]),
                     4 => dynasm!(self.asm; lea Rq(r0), [Rq(r1) - m2 + 4*Rq(r4)]),
@@ -642,17 +642,17 @@ impl JITCompiler {
                 }
             }
             MachineOperand::Mem(MachineMemOperand::BaseFiOff(base, fi, off)) => {
-                let r1 = phys_reg_to_dynasm_reg(base.get_reg().unwrap());
+                let r1 = phys_reg_to_dynasm_reg(base.as_phys_reg());
                 let m2 = fo.offset(fi.idx).unwrap();
                 let i3 = off;
                 dynasm!(self.asm; lea Rq(r0), [Rq(r1) - m2 + i3]);
             }
             MachineOperand::Mem(MachineMemOperand::Base(base)) => {
-                let r1 = phys_reg_to_dynasm_reg(base.get_reg().unwrap());
+                let r1 = phys_reg_to_dynasm_reg(base.as_phys_reg());
                 dynasm!(self.asm; lea Rq(r0), [Rq(r1)]);
             }
             MachineOperand::Mem(MachineMemOperand::BaseOff(base, off)) => {
-                let r1 = phys_reg_to_dynasm_reg(base.get_reg().unwrap());
+                let r1 = phys_reg_to_dynasm_reg(base.as_phys_reg());
                 let i2 = *off;
                 dynasm!(self.asm; lea Rq(r0),[Rq(r1) + i2]);
             }
@@ -676,23 +676,24 @@ impl JITCompiler {
         }
     }
 
-    fn compile_copy(&mut self, inst: &MachineInst) {
-        let rn = register!(inst);
-        let op0 = &inst.operand[0];
-        match op0 {
-            MachineOperand::Register(reg) => self.reg_copy(reg.get_reg_class(), rn, register!(reg)),
-            _ => unimplemented!(),
-        }
-    }
+    // fn compile_copy(&mut self, inst: &MachineInst) {
+    //     let rn = phys_reg_to_dynasm_reg(inst.get_reg().unwrap());
+    //     let op0 = &inst.operand[0];
+    //     match op0 {
+    //         MachineOperand::Register(reg) => {
+    //             self.reg_copy(reg.get_reg_class(), rn, register!(reg))
+    //         }
+    //         _ => unimplemented!(),
+    //     }
+    // }
 
     fn compile_cmp_ri(&mut self, inst: &MachineInst) {
         let bits = inst.operand[0]
             .as_register()
-            .get_reg()
-            .unwrap()
+            .as_phys_reg()
             .reg_class()
             .size_in_bits();
-        let r0 = phys_reg_to_dynasm_reg(inst.operand[0].as_register().get_reg().unwrap());
+        let r0 = phys_reg_to_dynasm_reg(inst.operand[0].as_register().as_phys_reg());
         let i1 = inst.operand[1].as_constant().as_i32();
         match bits {
             32 => dynasm!(self.asm; cmp Rd(r0), i1),
@@ -704,12 +705,11 @@ impl JITCompiler {
     fn compile_cmp_rr(&mut self, inst: &MachineInst) {
         let bits = inst.operand[0]
             .as_register()
-            .get_reg()
-            .unwrap()
+            .as_phys_reg()
             .reg_class()
             .size_in_bits();
-        let r0 = phys_reg_to_dynasm_reg(inst.operand[0].as_register().get_reg().unwrap());
-        let r1 = phys_reg_to_dynasm_reg(inst.operand[1].as_register().get_reg().unwrap());
+        let r0 = phys_reg_to_dynasm_reg(inst.operand[0].as_register().as_phys_reg());
+        let r1 = phys_reg_to_dynasm_reg(inst.operand[1].as_register().as_phys_reg());
         match bits {
             32 => dynasm!(self.asm; cmp Rd(r0), Rd(r1)),
             64 => dynasm!(self.asm; cmp Rq(r0), Rq(r1)),
@@ -718,8 +718,8 @@ impl JITCompiler {
     }
 
     fn compile_ucomisd_rr(&mut self, inst: &MachineInst) {
-        let r0 = phys_reg_to_dynasm_reg(inst.operand[0].as_register().get_reg().unwrap());
-        let r1 = phys_reg_to_dynasm_reg(inst.operand[1].as_register().get_reg().unwrap());
+        let r0 = phys_reg_to_dynasm_reg(inst.operand[0].as_register().as_phys_reg());
+        let r1 = phys_reg_to_dynasm_reg(inst.operand[1].as_register().as_phys_reg());
         dynasm!(self.asm; ucomisd Rx(r0), Rx(r1));
     }
 
@@ -769,7 +769,7 @@ impl JITCompiler {
     }
 
     fn compile_movsxd_r64m32(&mut self, fo: &FrameObjectsInfo, inst: &MachineInst) {
-        let r0 = phys_reg_to_dynasm_reg(inst.def[0].get_reg().unwrap());
+        let r0 = phys_reg_to_dynasm_reg(inst.def[0].as_phys_reg());
         let m1 = fo.offset(inst.operand[0].as_frame_index().idx).unwrap();
         dynasm!(self.asm; movsxd Rq(r0), [rbp - m1]);
     }
@@ -785,19 +785,15 @@ impl JITCompiler {
             .unwrap();
         let callee_entity = module.function_ref(callee_id);
         // let ret_ty = &callee_entity.ty.get_function_ty().unwrap().ret_ty;
-        let rsp_offset = 0;
 
         // rsp_offset += self.push_args(f, args);
-        self.assign_args_to_regs(&inst.operand[1..]);
+        // self.assign_args_to_regs(&inst.operand[1..]);
 
         if callee_entity.internal {
             let callee = self.internal_functions.get(&callee_entity.name).unwrap();
-            let rsp_adjust = roundup(rsp_offset as i32, 16) - rsp_offset as i32; // rsp is 16-byte aligned
             dynasm!(self.asm
-                ; sub rsp, rsp_adjust
                 ; mov rax, QWORD *callee as _
                 ; call rax
-                ; add rsp, rsp_adjust
             );
         } else {
             let f_entry = self.get_label(callee_id);
@@ -817,97 +813,97 @@ impl JITCompiler {
 
     fn compile_add_rr32(&mut self, inst: &MachineInst) {
         // inst.operand[0] must be the same as inst.def[0] (they're tied)
-        let r0 = phys_reg_to_dynasm_reg(inst.def[0].get_reg().unwrap());
-        let r1 = phys_reg_to_dynasm_reg(inst.operand[1].as_register().get_reg().unwrap());
+        let r0 = phys_reg_to_dynasm_reg(inst.def[0].as_phys_reg());
+        let r1 = phys_reg_to_dynasm_reg(inst.operand[1].as_register().as_phys_reg());
         dynasm!(self.asm; add Rd(r0), Rd(r1));
     }
 
     fn compile_add_rr64(&mut self, inst: &MachineInst) {
         // inst.operand[0] must be the same as inst.def[0] (they're tied)
-        let r0 = phys_reg_to_dynasm_reg(inst.def[0].get_reg().unwrap());
-        let r1 = phys_reg_to_dynasm_reg(inst.operand[1].as_register().get_reg().unwrap());
+        let r0 = phys_reg_to_dynasm_reg(inst.def[0].as_phys_reg());
+        let r1 = phys_reg_to_dynasm_reg(inst.operand[1].as_register().as_phys_reg());
         dynasm!(self.asm; add Rq(r0), Rq(r1));
     }
 
     fn compile_add_ri32(&mut self, inst: &MachineInst) {
         // inst.operand[0] must be the same as inst.def[0] (they're tied)
-        let r0 = phys_reg_to_dynasm_reg(inst.def[0].get_reg().unwrap());
+        let r0 = phys_reg_to_dynasm_reg(inst.def[0].as_phys_reg());
         let i1 = inst.operand[1].as_constant().as_i32();
         dynasm!(self.asm; add Rd(r0), i1);
     }
 
     fn compile_add_r64i32(&mut self, inst: &MachineInst) {
         // inst.operand[0] must be the same as inst.def[0] (they're tied)
-        let r0 = phys_reg_to_dynasm_reg(inst.def[0].get_reg().unwrap());
+        let r0 = phys_reg_to_dynasm_reg(inst.def[0].as_phys_reg());
         let i1 = inst.operand[1].as_constant().as_i32();
         dynasm!(self.asm; add Rq(r0), i1);
     }
 
     fn compile_addsd_rr(&mut self, inst: &MachineInst) {
         // inst.operand[0] must be the same as inst.def[0] (they're tied)
-        let r0 = phys_reg_to_dynasm_reg(inst.def[0].get_reg().unwrap());
-        let r1 = phys_reg_to_dynasm_reg(inst.operand[1].as_register().get_reg().unwrap());
+        let r0 = phys_reg_to_dynasm_reg(inst.def[0].as_phys_reg());
+        let r1 = phys_reg_to_dynasm_reg(inst.operand[1].as_register().as_phys_reg());
         dynasm!(self.asm; addsd Rx(r0), Rx(r1));
     }
 
     fn compile_sub_rr32(&mut self, inst: &MachineInst) {
         // inst.operand[0] must be the same as inst.def[0] (they're tied)
-        let r0 = phys_reg_to_dynasm_reg(inst.def[0].get_reg().unwrap());
-        let r1 = phys_reg_to_dynasm_reg(inst.operand[1].as_register().get_reg().unwrap());
+        let r0 = phys_reg_to_dynasm_reg(inst.def[0].as_phys_reg());
+        let r1 = phys_reg_to_dynasm_reg(inst.operand[1].as_register().as_phys_reg());
         dynasm!(self.asm; sub Rd(r0), Rd(r1));
     }
 
     fn compile_sub_ri32(&mut self, inst: &MachineInst) {
         // inst.operand[0] must be the same as inst.def[0] (they're tied)
-        let r0 = phys_reg_to_dynasm_reg(inst.def[0].get_reg().unwrap());
+        let r0 = phys_reg_to_dynasm_reg(inst.def[0].as_phys_reg());
         let i1 = inst.operand[1].as_constant().as_i32();
         dynasm!(self.asm; sub Rd(r0), i1);
     }
 
     fn compile_sub_r64i32(&mut self, inst: &MachineInst) {
         // inst.operand[0] must be the same as inst.def[0] (they're tied)
-        let r0 = phys_reg_to_dynasm_reg(inst.def[0].get_reg().unwrap());
+        let r0 = phys_reg_to_dynasm_reg(inst.def[0].as_phys_reg());
         let i1 = inst.operand[1].as_constant().as_i32();
         dynasm!(self.asm; sub Rq(r0), i1);
     }
 
     fn compile_subsd_rr(&mut self, inst: &MachineInst) {
         // inst.operand[0] must be the same as inst.def[0] (they're tied)
-        let r0 = phys_reg_to_dynasm_reg(inst.def[0].get_reg().unwrap());
-        let r1 = phys_reg_to_dynasm_reg(inst.operand[1].as_register().get_reg().unwrap());
+        let r0 = phys_reg_to_dynasm_reg(inst.def[0].as_phys_reg());
+        let r1 = phys_reg_to_dynasm_reg(inst.operand[1].as_register().as_phys_reg());
         dynasm!(self.asm; subsd Rx(r0), Rx(r1));
     }
 
     fn compile_imul_rr32(&mut self, inst: &MachineInst) {
         // inst.operand[0] must be the same as inst.def[0] (they're tied)
-        let r0 = phys_reg_to_dynasm_reg(inst.def[0].get_reg().unwrap());
-        let r1 = phys_reg_to_dynasm_reg(inst.operand[1].as_register().get_reg().unwrap());
+        let r0 = phys_reg_to_dynasm_reg(inst.def[0].as_phys_reg());
+        let r1 = phys_reg_to_dynasm_reg(inst.operand[1].as_register().as_phys_reg());
         dynasm!(self.asm; imul Rd(r0), Rd(r1))
     }
 
     fn compile_imul_rri32(&mut self, inst: &MachineInst) {
-        let r0 = phys_reg_to_dynasm_reg(inst.def[0].get_reg().unwrap());
-        let r1 = phys_reg_to_dynasm_reg(inst.operand[0].as_register().get_reg().unwrap());
+        let r0 = phys_reg_to_dynasm_reg(inst.def[0].as_phys_reg());
+        let r1 = phys_reg_to_dynasm_reg(inst.operand[0].as_register().as_phys_reg());
         let i2 = inst.operand[1].as_constant().as_i32();
         dynasm!(self.asm; imul Rd(r0), Rd(r1), i2);
     }
 
     fn compile_imul_rr64i32(&mut self, inst: &MachineInst) {
-        let r0 = phys_reg_to_dynasm_reg(inst.def[0].get_reg().unwrap());
-        let r1 = phys_reg_to_dynasm_reg(inst.operand[0].as_register().get_reg().unwrap());
+        let r0 = phys_reg_to_dynasm_reg(inst.def[0].as_phys_reg());
+        let r1 = phys_reg_to_dynasm_reg(inst.operand[0].as_register().as_phys_reg());
         let i2 = inst.operand[1].as_constant().as_i32();
         dynasm!(self.asm; imul Rq(r0), Rq(r1), i2);
     }
 
     fn compile_mulsd_rr(&mut self, inst: &MachineInst) {
-        let r0 = phys_reg_to_dynasm_reg(inst.def[0].get_reg().unwrap());
-        let r1 = phys_reg_to_dynasm_reg(inst.operand[1].as_register().get_reg().unwrap());
+        let r0 = phys_reg_to_dynasm_reg(inst.def[0].as_phys_reg());
+        let r1 = phys_reg_to_dynasm_reg(inst.operand[1].as_register().as_phys_reg());
         dynasm!(self.asm; mulsd Rx(r0), Rx(r1));
     }
 
     fn compile_divsd_rr(&mut self, inst: &MachineInst) {
-        let r0 = phys_reg_to_dynasm_reg(inst.def[0].get_reg().unwrap());
-        let r1 = phys_reg_to_dynasm_reg(inst.operand[1].as_register().get_reg().unwrap());
+        let r0 = phys_reg_to_dynasm_reg(inst.def[0].as_phys_reg());
+        let r1 = phys_reg_to_dynasm_reg(inst.operand[1].as_register().as_phys_reg());
         dynasm!(self.asm; divsd Rx(r0), Rx(r1));
     }
 
@@ -916,17 +912,11 @@ impl JITCompiler {
     }
 
     fn compile_idiv(&mut self, _fo: &FrameObjectsInfo, inst: &MachineInst) {
-        let (r, r_ty) = {
+        let r = {
             let reg = inst.operand[0].as_register();
-            (
-                phys_reg_to_dynasm_reg(reg.info_ref().reg.unwrap()),
-                &reg.info_ref().reg_class,
-            )
+            phys_reg_to_dynasm_reg(reg.as_phys_reg())
         };
-        match r_ty {
-            RegisterClassKind::GR32 => dynasm!(self.asm; idiv Rd(r)),
-            _ => unimplemented!(),
-        }
+        dynasm!(self.asm; idiv Rd(r)) // TODO: for Rq
     }
 
     fn compile_jmp(&mut self, inst: &MachineInst) {
@@ -957,23 +947,6 @@ impl JITCompiler {
             _ => unreachable!(),
         }
         dynasm!(self.asm; mov rsp, rbp; pop rbp; ret);
-    }
-
-    fn assign_args_to_regs(&mut self, args: &[MachineOperand]) {
-        for (idx, arg) in args.iter().enumerate() {
-            match arg {
-                MachineOperand::Constant(MachineConstant::Int32(i)) => {
-                    dynasm!(self.asm; mov Rd(phys_reg_to_dynasm_reg(
-                                RegisterClassKind::GR32.get_nth_arg_reg(idx).unwrap())), *i)
-                }
-                MachineOperand::Register(id) => self.reg_copy(
-                    id.get_reg_class(),
-                    phys_reg_to_dynasm_reg(id.get_reg_class().get_nth_arg_reg(idx).unwrap()),
-                    register!(id),
-                ),
-                _ => unimplemented!(),
-            }
-        }
     }
 
     // TODO: r0 and r1 should be PhysReg not u8

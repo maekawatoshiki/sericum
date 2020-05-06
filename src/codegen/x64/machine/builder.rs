@@ -40,7 +40,7 @@ impl MachineInstTrait for MachineInstId {
 
 impl MachineInstTrait for MachineInst {
     fn into_id(self, f: &mut MachineFunction) -> MachineInstId {
-        f.body.inst_arena.alloc(self)
+        f.alloc_inst(self)
     }
 }
 
@@ -106,17 +106,25 @@ impl<'a> BuilderTrait for BuilderWithLiveInfoEdit<'a> {
             // update registers' use&def list. TODO: refine code
             let inst = &self.function.body.inst_arena[inst_id];
             for def in &inst.def {
-                self.matrix.add_vreg_entity(def.clone());
-                self.matrix.add_live_interval(
-                    def.get_vreg(),
-                    LiveRange::new(vec![LiveSegment::new(pp, pp)]),
-                );
+                let def_ = &self.function.regs_info.arena_ref()[def.id];
+                if let Some(phys_reg) = def_.phys_reg {
+                    self.matrix
+                        .phys_reg_range
+                        .get_or_create(phys_reg)
+                        .add_segment(LiveSegment::new(pp, pp));
+                } else {
+                    self.matrix.add_vreg_entity(*def);
+                    self.matrix.add_live_interval(
+                        def_.virt_reg,
+                        LiveRange::new(vec![LiveSegment::new(pp, pp)]),
+                    );
+                }
             }
             for use_ in inst.collect_used_virt_regs() {
                 let end_point = self
                     .matrix
                     .virt_reg_interval
-                    .get_mut(&use_.get_vreg())
+                    .get_mut(&use_.as_virt_reg())
                     .unwrap()
                     .end_point_mut()
                     .unwrap();

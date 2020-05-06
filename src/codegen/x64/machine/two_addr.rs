@@ -30,8 +30,8 @@ impl TwoAddressConverter {
                     continue;
                 }
 
-                for (def, use_) in &mut inst.tie {
-                    tied.push((*inst_id, def.clone(), use_.clone()));
+                for (def, use_) in &inst.tie {
+                    tied.push((*inst_id, *def, *use_));
 
                     // Tied registers are assigned to one register (def register).
                     // e.g.
@@ -40,8 +40,8 @@ impl TwoAddressConverter {
                     *inst
                         .operand
                         .iter_mut()
-                        .find(|op| op.as_register() == use_)
-                        .unwrap() = MachineOperand::Register(def.clone());
+                        .find(|op| op.is_register() && op.as_register() == use_)
+                        .unwrap() = MachineOperand::Register(*def);
                 }
 
                 // Delete the map of all the tied registers because they are assigned to one
@@ -68,8 +68,8 @@ impl TwoAddressConverter {
                 .with_def(vec![def]),
             );
 
-            let inst = f.body.inst_arena.alloc(old_inst);
-            f.body.inst_arena[inst_id].set_id(inst_id);
+            let inst = f.alloc_inst(old_inst);
+            f.body.inst_arena[inst_id].set_id(&f.regs_info, inst_id);
 
             let mut builder = Builder::new(f);
             builder.set_insert_point_after_inst(inst_id).unwrap();

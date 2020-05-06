@@ -30,6 +30,8 @@ pub struct MachineFunction {
 
     /// Virtual register generator
     pub vreg_gen: VirtRegGen,
+
+    pub regs_info: RegistersInfo,
 }
 
 #[derive(Clone, Debug)]
@@ -117,7 +119,12 @@ impl MachineFunction {
             },
             local_mgr: f.local_mgr,
             vreg_gen: f.vreg_gen,
+            regs_info: f.regs_info,
         }
+    }
+
+    pub fn alloc_inst(&mut self, inst: MachineInst) -> MachineInstId {
+        self.body.inst_arena.alloc(&mut self.regs_info, inst)
     }
 
     pub fn find_inst_pos(&self, inst_id: MachineInstId) -> Option<(MachineBasicBlockId, usize)> {
@@ -190,10 +197,10 @@ impl InstructionArena {
         }
     }
 
-    pub fn alloc(&mut self, mi: MachineInst) -> Id<MachineInst> {
+    pub fn alloc(&mut self, regs_info: &RegistersInfo, mi: MachineInst) -> Id<MachineInst> {
         let mi_id = self.arena.alloc(mi);
         let mi = &mut self.arena[mi_id];
-        mi.set_id(mi_id);
+        mi.set_id(regs_info, mi_id);
         mi_id
     }
 }

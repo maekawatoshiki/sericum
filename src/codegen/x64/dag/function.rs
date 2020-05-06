@@ -29,6 +29,8 @@ pub struct DAGFunction {
 
     /// Virtual register generator
     pub vreg_gen: VirtRegGen,
+
+    pub regs_info: RegistersInfo,
 }
 
 pub struct DAGHeap {
@@ -45,6 +47,7 @@ impl DAGFunction {
         dag_basic_blocks: Vec<DAGBasicBlockId>,
         local_mgr: LocalVariables,
         vreg_gen: VirtRegGen,
+        regs_info: RegistersInfo,
     ) -> Self {
         Self {
             name: func.name.clone(),
@@ -54,6 +57,7 @@ impl DAGFunction {
             dag_heap,
             local_mgr,
             vreg_gen,
+            regs_info,
         }
     }
 
@@ -92,12 +96,16 @@ impl DAGHeap {
         self.node_none
     }
 
-    pub fn alloc_phys_reg<T: TargetRegisterTrait>(&mut self, r: T) -> Raw<DAGNode> {
+    pub fn alloc_phys_reg<T: TargetRegisterTrait>(
+        &mut self,
+        regs_info: &RegistersInfo,
+        r: T,
+    ) -> Raw<DAGNode> {
         let rn = r.as_phys_reg().retrieve();
         match self.node_regs[rn] {
             Some(node) => node,
             None => {
-                let r = self.alloc(DAGNode::new_phys_reg(r));
+                let r = self.alloc(DAGNode::new_phys_reg(regs_info, r));
                 self.node_regs[rn] = Some(r);
                 r
             }

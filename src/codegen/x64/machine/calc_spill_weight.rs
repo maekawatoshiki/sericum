@@ -15,15 +15,14 @@ impl<'a> SpillWeightCalculator<'a> {
     pub fn run(&mut self) {
         for (vreg, li) in self.matrix.virt_reg_interval.inner_mut() {
             let inst_arena = &self.func.body.inst_arena;
-            let entity = self.matrix.vreg2entity.get(vreg).unwrap();
-            let bbs_used_in = entity
-                .info_ref()
-                .uses
+            let reg_id = *self.matrix.vreg2entity.get(vreg).unwrap();
+            let uses = &self.func.regs_info.arena_ref()[reg_id.id].uses;
+            let bbs_used_in = uses
                 .iter()
                 .map(|id| inst_arena[*id].parent)
                 .collect::<FxHashSet<_>>()
                 .len();
-            let uses = entity.info_ref().uses.len();
+            let uses = uses.len();
             li.spill_weight = uses as f32 * bbs_used_in as f32;
             // println!("{:?} - {:?}", vreg, li.spill_weight);
         }

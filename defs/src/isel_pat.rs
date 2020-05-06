@@ -72,7 +72,7 @@ impl<'a> ISelPatParser<'a> {
                     #root.operand = #root
                         .operand
                         .iter()
-                        .map(|op| self.run_on_node(tys, heap, *op))
+                        .map(|op| self.run_on_node(tys, regs_info, heap, *op))
                         .collect();
                     #root
                 }) ()
@@ -177,7 +177,7 @@ impl<'a> ISelPatParser<'a> {
                 let reg = ident_tok(reg_s.as_str());
                 def_operands = quote! {
                     #def_operands
-                    let #reg = heap.alloc_phys_reg(str2reg(#reg_s).unwrap());
+                    let #reg = heap.alloc_phys_reg(regs_info, str2reg(#reg_s).unwrap());
                 };
                 operands = quote! {
                     #operands #reg,
@@ -209,7 +209,7 @@ impl<'a> ISelPatParser<'a> {
                     _ => {
                         def_operands = quote! {
                             #def_operands
-                            let #op = self.run_on_node(tys, heap, #op);
+                            let #op = self.run_on_node(tys, regs_info, heap, #op);
                         };
                         operands = quote! { #operands #op, };
                     }

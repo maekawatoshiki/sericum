@@ -23,6 +23,7 @@ pub struct ConversionInfo {
     pub bb_to_dag_bb: FxHashMap<BasicBlockId, DAGBasicBlockId>,
     pub last_chain_node: Option<Raw<DAGNode>>,
     pub vreg_gen: VirtRegGen,
+    pub regs_info: RegistersInfo,
 }
 
 impl<'a> ConvertToDAG<'a> {
@@ -90,6 +91,7 @@ impl<'a> ConvertToDAG<'a> {
             dag_bb_list,
             conv_info.local_mgr,
             conv_info.vreg_gen,
+            conv_info.regs_info,
         )
     }
 
@@ -541,11 +543,17 @@ impl<'a> ConvertToDAG<'a> {
         //     vec![node],
         //     node.ty.clone(),
         // ));
+
+        // let reg = NodeKind::Operand(OperandNodeKind::Register(
+        //     self.cur_conv_info_mut()
+        //         .vreg_gen
+        //         .gen_vreg(ty2rc(&node.ty).unwrap())
+        //         .into_ref(),
+        // ));
         let reg = NodeKind::Operand(OperandNodeKind::Register(
             self.cur_conv_info_mut()
-                .vreg_gen
-                .gen_vreg(ty2rc(&node.ty).unwrap())
-                .into_ref(),
+                .regs_info
+                .new_virt_reg(ty2rc(&node.ty).unwrap()),
         ));
         let reg = self
             .cur_conv_info_mut()
@@ -606,6 +614,7 @@ impl ConversionInfo {
             bb_to_dag_bb: FxHashMap::default(),
             last_chain_node: None,
             vreg_gen: VirtRegGen::new(),
+            regs_info: RegistersInfo::new(),
         }
     }
 

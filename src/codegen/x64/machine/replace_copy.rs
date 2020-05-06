@@ -29,7 +29,7 @@ impl ReplaceCopyWithProperMInst {
                     continue;
                 }
 
-                let mov = mov_rx(tys, &inst.operand[0]).unwrap();
+                let mov = mov_rx(tys, &f.regs_info, &inst.operand[0]).unwrap();
                 inst.opcode = mov;
             }
         }

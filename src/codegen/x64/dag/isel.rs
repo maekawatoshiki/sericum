@@ -29,13 +29,14 @@ impl MISelector {
     fn run_on_function(&mut self, tys: &Types, func: &mut DAGFunction) {
         for bb_id in &func.dag_basic_blocks {
             let bb = &func.dag_basic_block_arena[*bb_id];
-            self.run_on_node(tys, &mut func.dag_heap, bb.entry.unwrap());
+            self.run_on_node(tys, &func.regs_info, &mut func.dag_heap, bb.entry.unwrap());
         }
     }
 
     fn run_on_node(
         &mut self,
         tys: &Types,
+        regs_info: &RegistersInfo,
         heap: &mut DAGHeap,
         mut node: Raw<DAGNode>,
     ) -> Raw<DAGNode> {
@@ -59,7 +60,7 @@ impl MISelector {
                     imm_f64 b => {
                         let n1 = heap.alloc(DAGNode::new(
                                 NodeKind::MI(MINodeKind::MOVSDrm64), vec![b], Type::F64));
-                        let a = self.run_on_node(tys, heap, a);
+                        let a = self.run_on_node(tys, regs_info, heap, a);
                         let n2 = heap.alloc(DAGNode::new(NodeKind::MI(MINodeKind::ADDSDrr),
                                 vec![a, n1], Type::F64));
                         n2
@@ -75,7 +76,7 @@ impl MISelector {
                     GR32 b => {
                         let n1 = heap.alloc(DAGNode::new(
                                 NodeKind::MI(MINodeKind::MOVri32), vec![a], Type::Int32));
-                        let b = self.run_on_node(tys, heap, b);
+                        let b = self.run_on_node(tys, regs_info, heap, b);
                         heap.alloc(DAGNode::new(NodeKind::MI(MINodeKind::SUBrr32),
                                 vec![n1, b], Type::Int32))
                     }
@@ -86,7 +87,7 @@ impl MISelector {
                     imm_f64 b => {
                         let n1 = heap.alloc(DAGNode::new(
                                 NodeKind::MI(MINodeKind::MOVSDrm64), vec![b], Type::F64));
-                        let a = self.run_on_node(tys, heap, a);
+                        let a = self.run_on_node(tys, regs_info, heap, a);
                         let n2 = heap.alloc(DAGNode::new(NodeKind::MI(MINodeKind::SUBSDrr),
                                 vec![a, n1], Type::F64));
                         n2
@@ -97,7 +98,7 @@ impl MISelector {
                     XMM b => {
                         let n1 = heap.alloc(DAGNode::new(
                                 NodeKind::MI(MINodeKind::MOVSDrm64), vec![a], Type::F64));
-                        let b = self.run_on_node(tys, heap, b);
+                        let b = self.run_on_node(tys, regs_info, heap, b);
                         let n2 = heap.alloc(DAGNode::new(NodeKind::MI(MINodeKind::SUBSDrr),
                                 vec![n1, b], Type::F64));
                         n2
@@ -114,7 +115,7 @@ impl MISelector {
                     imm_f64 b => {
                         let n1 = heap.alloc(DAGNode::new(
                                 NodeKind::MI(MINodeKind::MOVSDrm64), vec![b], Type::F64));
-                        let a = self.run_on_node(tys, heap, a);
+                        let a = self.run_on_node(tys, regs_info, heap, a);
                         let n2 = heap.alloc(DAGNode::new(NodeKind::MI(MINodeKind::MULSDrr),
                                 vec![a, n1], Type::F64));
                         n2
@@ -127,7 +128,7 @@ impl MISelector {
                     imm_f64 b => {
                         let n1 = heap.alloc(DAGNode::new(
                                 NodeKind::MI(MINodeKind::MOVSDrm64), vec![b], Type::F64));
-                        let a = self.run_on_node(tys, heap, a);
+                        let a = self.run_on_node(tys, regs_info, heap, a);
                         let n2 = heap.alloc(DAGNode::new(NodeKind::MI(MINodeKind::DIVSDrr),
                                 vec![a, n1], Type::F64));
                         n2
@@ -138,7 +139,7 @@ impl MISelector {
                     XMM b => {
                         let n1 = heap.alloc(DAGNode::new(
                                 NodeKind::MI(MINodeKind::MOVSDrm64), vec![a], Type::F64));
-                        let b = self.run_on_node(tys, heap, b);
+                        let b = self.run_on_node(tys, regs_info, heap, b);
                         let n2 = heap.alloc(DAGNode::new(NodeKind::MI(MINodeKind::DIVSDrr),
                                 vec![n1, b], Type::F64));
                         n2
@@ -153,7 +154,7 @@ impl MISelector {
                 }
                 // a is pointer
                 GR64  a => {
-                    let a = self.run_on_node(tys, heap, a);
+                    let a = self.run_on_node(tys, regs_info, heap, a);
                     let ty = tys.get_element_ty(a.ty, None).unwrap();
                     let mem = heap.alloc(DAGNode::new_mem(MemNodeKind::Base, vec![a]));
                     match ty {
@@ -174,7 +175,7 @@ impl MISelector {
                     f64mem c {
                         imm_f64 b => {
                             // TODO: Refactor
-                            let rbp = heap.alloc(DAGNode::new_phys_reg(GR64::RBP));
+                            let rbp = heap.alloc(DAGNode::new_phys_reg(regs_info, GR64::RBP));
                             let n1 = heap.alloc(DAGNode::new(
                                     NodeKind::MI(MINodeKind::MOVSDrm64), vec![b], Type::F64));
                             let mem = heap.alloc(DAGNode::new_mem(MemNodeKind::BaseFi, vec![rbp, c]));
@@ -193,7 +194,7 @@ impl MISelector {
                     imm_f64 b => {
                         let n1 = heap.alloc(DAGNode::new(
                                 NodeKind::MI(MINodeKind::MOVSDrm64), vec![b], Type::F64));
-                        let a = self.run_on_node(tys, heap, a);
+                        let a = self.run_on_node(tys, regs_info, heap, a);
                         let mem = heap.alloc(DAGNode::new_mem(MemNodeKind::Base, vec![a]));
                         let n2 = heap.alloc(DAGNode::new(NodeKind::MI(MINodeKind::MOVSDmr),
                                 vec![mem, n1], Type::Void));
@@ -211,7 +212,7 @@ impl MISelector {
         self.selected.insert(node, selected);
 
         if let Some(next) = node.next {
-            selected.next = Some(self.run_on_node(tys, heap, next));
+            selected.next = Some(self.run_on_node(tys, regs_info, heap, next));
         }
 
         selected

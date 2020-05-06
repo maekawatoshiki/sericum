@@ -80,20 +80,26 @@ impl PrologueEpilogueInserter {
         // push rbp
         let push_rbp = MachineInst::new_simple(
             MachineOpcode::PUSH64,
-            vec![MachineOperand::phys_reg(GR64::RBP)],
+            vec![MachineOperand::phys_reg(
+                &builder.function.regs_info,
+                GR64::RBP,
+            )],
             builder.get_cur_bb().unwrap(),
         );
-        let push_rbp = builder.function.body.inst_arena.alloc(push_rbp);
+        let push_rbp = builder.function.alloc_inst(push_rbp);
         builder.insert(push_rbp);
 
         // mov rbp, rsp
         let mov_rbp_rsp = MachineInst::new_simple(
             MachineOpcode::MOVrr64,
-            vec![MachineOperand::phys_reg(GR64::RSP)],
+            vec![MachineOperand::phys_reg(
+                &builder.function.regs_info,
+                GR64::RSP,
+            )],
             builder.get_cur_bb().unwrap(),
         )
-        .with_def(vec![MachineRegister::phys_reg(GR64::RBP)]);
-        let mov_rbp_rsp = builder.function.body.inst_arena.alloc(mov_rbp_rsp);
+        .with_def(vec![builder.function.regs_info.get_phys_reg(GR64::RBP)]);
+        let mov_rbp_rsp = builder.function.alloc_inst(mov_rbp_rsp);
         builder.insert(mov_rbp_rsp);
 
         // sub rsp, adjust
@@ -101,13 +107,13 @@ impl PrologueEpilogueInserter {
         let sub_rsp = MachineInst::new_simple(
             MachineOpcode::SUBr64i32,
             vec![
-                MachineOperand::phys_reg(GR64::RSP),
+                MachineOperand::phys_reg(&builder.function.regs_info, GR64::RSP),
                 MachineOperand::imm_i32(adjust),
             ],
             builder.get_cur_bb().unwrap(),
         )
-        .with_def(vec![MachineRegister::phys_reg(GR64::RSP)]);
-        let sub_rsp = builder.function.body.inst_arena.alloc(sub_rsp);
+        .with_def(vec![builder.function.regs_info.get_phys_reg(GR64::RSP)]);
+        let sub_rsp = builder.function.alloc_inst(sub_rsp);
         builder.insert(sub_rsp);
 
         self.insert_arg_copy(&tys.base.borrow(), &mut builder);
@@ -137,19 +143,19 @@ impl PrologueEpilogueInserter {
             // mov rsp, rbp
             let i = MachineInst::new_simple(
                 MachineOpcode::MOVrr64,
-                vec![MachineOperand::phys_reg(GR64::RBP)],
+                vec![MachineOperand::phys_reg(&cur_func.regs_info, GR64::RBP)],
                 bb_id,
             )
-            .with_def(vec![MachineRegister::phys_reg(GR64::RSP)]);
-            iseq.push(cur_func.body.inst_arena.alloc(i));
+            .with_def(vec![cur_func.regs_info.get_phys_reg(GR64::RSP)]);
+            iseq.push(cur_func.body.inst_arena.alloc(&cur_func.regs_info, i));
 
             // pop rbp
             let i = MachineInst::new_simple(
                 MachineOpcode::POP64,
-                vec![MachineOperand::phys_reg(GR64::RBP)],
+                vec![MachineOperand::phys_reg(&cur_func.regs_info, GR64::RBP)],
                 bb_id,
             );
-            iseq.push(cur_func.body.inst_arena.alloc(i));
+            iseq.push(cur_func.body.inst_arena.alloc(&cur_func.regs_info, i));
 
             bb_iseq.push((last_inst_id, iseq));
         }
@@ -188,13 +194,13 @@ impl<'a> CopyArgs<'a> {
         let ret_reg = XMM::XMM0.as_phys_reg();
         let dst = FrameIndexInfo::new(Type::F64, FrameIndexKind::Arg(i));
         let src = match RegisterClassKind::XMM.get_nth_arg_reg(i) {
-            Some(arg_reg) => MachineOperand::phys_reg(arg_reg),
+            Some(arg_reg) => MachineOperand::phys_reg(&self.builder.function.regs_info, arg_reg),
             None => {
-                let ax = MachineRegister::phys_reg(ret_reg);
+                let ax = self.builder.function.regs_info.get_phys_reg(ret_reg);
                 let inst = MachineInst::new_simple(
                     MachineOpcode::MOVSDrm,
                     vec![MachineOperand::Mem(MachineMemOperand::BaseOff(
-                        MachineRegister::phys_reg(GR64::RBP),
+                        self.builder.function.regs_info.get_phys_reg(GR64::RBP),
                         self.offset,
                     ))],
                     self.builder.get_cur_bb().unwrap(),
@@ -209,7 +215,7 @@ impl<'a> CopyArgs<'a> {
             MachineOpcode::MOVSDmr,
             vec![
                 MachineOperand::Mem(MachineMemOperand::BaseFi(
-                    MachineRegister::phys_reg(GR64::RBP),
+                    self.builder.function.regs_info.get_phys_reg(GR64::RBP),
                     dst,
                 )),
                 src,
@@ -235,28 +241,28 @@ impl<'a> CopyArgs<'a> {
         };
         let dst = FrameIndexInfo::new(ty, FrameIndexKind::Arg(i));
         let src = match rc.get_nth_arg_reg(i) {
-            Some(arg_reg) => MachineOperand::phys_reg(arg_reg),
+            Some(arg_reg) => MachineOperand::phys_reg(&self.builder.function.regs_info, arg_reg),
             None => {
-                let ax = MachineRegister::phys_reg(ax);
+                let ax = self.builder.function.regs_info.get_phys_reg(ax);
                 let inst = MachineInst::new_simple(
                     movrm,
                     vec![MachineOperand::Mem(MachineMemOperand::BaseOff(
-                        MachineRegister::phys_reg(GR64::RBP),
+                        self.builder.function.regs_info.get_phys_reg(GR64::RBP),
                         self.offset,
                     ))],
                     self.builder.get_cur_bb().unwrap(),
                 )
-                .with_def(vec![ax.clone()]);
+                .with_def(vec![ax]);
                 self.builder.insert(inst);
                 self.offset += 8;
                 MachineOperand::Register(ax)
             }
         };
         let inst = MachineInst::new_simple(
-            mov_mx(&src).unwrap(),
+            mov_mx(&self.builder.function.regs_info, &src).unwrap(),
             vec![
                 MachineOperand::Mem(MachineMemOperand::BaseFi(
-                    MachineRegister::phys_reg(GR64::RBP),
+                    self.builder.function.regs_info.get_phys_reg(GR64::RBP),
                     dst,
                 )),
                 src,

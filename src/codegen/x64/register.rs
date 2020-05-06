@@ -4,7 +4,7 @@ use bitvec::vec::BitVec;
 use id_arena::{Arena, Id};
 use rustc_hash::FxHashSet;
 use std::{
-    cell::RefCell,
+    cell::{Ref, RefCell, RefMut},
     fmt,
     ops::{BitAnd, BitOr, BitOrAssign},
     ops::{Index, IndexMut},
@@ -41,8 +41,9 @@ pub enum VirtOrPhys {
 
 #[derive(Clone)]
 pub struct RegistersInfo {
-    cur_virt_reg: usize,
-    arena: Arena<RegisterInfo>,
+    cur_virt_reg: RefCell<usize>,
+    arena: RefCell<Arena<RegisterInfo>>,
+    phys_regs_list: Vec<RegisterId>,
 }
 
 #[derive(Debug, Clone)]
@@ -678,17 +679,131 @@ impl VirtReg {
     }
 }
 
-impl RegistersInfo {
-    pub fn new() -> Self {
-        Self {
-            arena: Arena::new(),
-            cur_virt_reg: 0,
+impl RegisterId {
+    pub fn is_virt_reg(&self) -> bool {
+        matches!(self.kind, VirtOrPhys::Virt(_))
+    }
+
+    pub fn is_phys_reg(&self) -> bool {
+        matches!(self.kind, VirtOrPhys::Phys(_))
+    }
+
+    pub fn as_phys_reg(&self) -> PhysReg {
+        match self.kind {
+            VirtOrPhys::Phys(p) => p,
+            VirtOrPhys::Virt(_) => panic!(),
         }
     }
 
-    pub fn new_virt_reg(&mut self, reg_class: RegisterClassKind) -> RegisterId {
+    pub fn as_virt_reg(&self) -> VirtReg {
+        match self.kind {
+            VirtOrPhys::Virt(v) => v,
+            VirtOrPhys::Phys(_) => panic!(),
+        }
+    }
+}
+
+impl RegisterInfo {
+    pub fn new_phys_reg<T: TargetRegisterTrait>(r: T) -> Self {
+        RegisterInfo {
+            virt_reg: VirtReg(0),
+            phys_reg: Some(r.as_phys_reg()),
+            reg_class: r.as_phys_reg().reg_class(),
+            tied: None,
+            uses: FxHashSet::default(),
+            defs: FxHashSet::default(),
+        }
+    }
+
+    pub fn add_def(&mut self, id: MachineInstId) {
+        self.defs.insert(id);
+    }
+
+    pub fn remove_def(&mut self, id: MachineInstId) {
+        self.defs.remove(&id);
+    }
+
+    pub fn add_use(&mut self, id: MachineInstId) {
+        self.uses.insert(id);
+    }
+
+    pub fn remove_use(&mut self, id: MachineInstId) {
+        self.uses.remove(&id);
+    }
+}
+
+impl RegistersInfo {
+    pub fn new() -> Self {
+        let mut arena = Arena::new();
+        let mut phys_regs_list = vec![];
+
+        fn f<T: TargetRegisterTrait>(arena: &mut Arena<RegisterInfo>, r: T) -> RegisterId {
+            let id = arena.alloc(RegisterInfo::new_phys_reg(r));
+            RegisterId {
+                id,
+                kind: VirtOrPhys::Phys(r.as_phys_reg()),
+            }
+        }
+
+        phys_regs_list.push(f(&mut arena, GR32::EAX));
+        phys_regs_list.push(f(&mut arena, GR32::ECX));
+        phys_regs_list.push(f(&mut arena, GR32::EDX));
+        phys_regs_list.push(f(&mut arena, GR32::EBX));
+        phys_regs_list.push(f(&mut arena, GR32::ESP));
+        phys_regs_list.push(f(&mut arena, GR32::EBP));
+        phys_regs_list.push(f(&mut arena, GR32::ESI));
+        phys_regs_list.push(f(&mut arena, GR32::EDI));
+        phys_regs_list.push(f(&mut arena, GR32::R8D));
+        phys_regs_list.push(f(&mut arena, GR32::R9D));
+        phys_regs_list.push(f(&mut arena, GR32::R10D));
+        phys_regs_list.push(f(&mut arena, GR32::R11D));
+        phys_regs_list.push(f(&mut arena, GR32::R12D));
+        phys_regs_list.push(f(&mut arena, GR32::R13D));
+        phys_regs_list.push(f(&mut arena, GR32::R14D));
+        phys_regs_list.push(f(&mut arena, GR32::R15D));
+        phys_regs_list.push(f(&mut arena, GR64::RAX));
+        phys_regs_list.push(f(&mut arena, GR64::RCX));
+        phys_regs_list.push(f(&mut arena, GR64::RDX));
+        phys_regs_list.push(f(&mut arena, GR64::RBX));
+        phys_regs_list.push(f(&mut arena, GR64::RSP));
+        phys_regs_list.push(f(&mut arena, GR64::RBP));
+        phys_regs_list.push(f(&mut arena, GR64::RSI));
+        phys_regs_list.push(f(&mut arena, GR64::RDI));
+        phys_regs_list.push(f(&mut arena, GR64::R8));
+        phys_regs_list.push(f(&mut arena, GR64::R9));
+        phys_regs_list.push(f(&mut arena, GR64::R10));
+        phys_regs_list.push(f(&mut arena, GR64::R11));
+        phys_regs_list.push(f(&mut arena, GR64::R12));
+        phys_regs_list.push(f(&mut arena, GR64::R13));
+        phys_regs_list.push(f(&mut arena, GR64::R14));
+        phys_regs_list.push(f(&mut arena, GR64::R15));
+        phys_regs_list.push(f(&mut arena, XMM::XMM0));
+        phys_regs_list.push(f(&mut arena, XMM::XMM1));
+        phys_regs_list.push(f(&mut arena, XMM::XMM2));
+        phys_regs_list.push(f(&mut arena, XMM::XMM3));
+        phys_regs_list.push(f(&mut arena, XMM::XMM4));
+        phys_regs_list.push(f(&mut arena, XMM::XMM5));
+        phys_regs_list.push(f(&mut arena, XMM::XMM6));
+        phys_regs_list.push(f(&mut arena, XMM::XMM7));
+        phys_regs_list.push(f(&mut arena, XMM::XMM8));
+        phys_regs_list.push(f(&mut arena, XMM::XMM9));
+        phys_regs_list.push(f(&mut arena, XMM::XMM10));
+        phys_regs_list.push(f(&mut arena, XMM::XMM11));
+        phys_regs_list.push(f(&mut arena, XMM::XMM12));
+        phys_regs_list.push(f(&mut arena, XMM::XMM13));
+        phys_regs_list.push(f(&mut arena, XMM::XMM14));
+        phys_regs_list.push(f(&mut arena, XMM::XMM15));
+
+        Self {
+            arena: RefCell::new(arena),
+            cur_virt_reg: RefCell::new(0),
+            phys_regs_list,
+        }
+    }
+
+    pub fn new_virt_reg(&self, reg_class: RegisterClassKind) -> RegisterId {
         let virt_reg = self.gen_virt_reg();
-        let id = self.arena.alloc(RegisterInfo {
+        let id = self.arena.borrow_mut().alloc(RegisterInfo {
             virt_reg,
             phys_reg: None,
             reg_class,
@@ -702,26 +817,39 @@ impl RegistersInfo {
         }
     }
 
-    fn gen_virt_reg(&mut self) -> VirtReg {
-        let n = self.cur_virt_reg;
-        self.cur_virt_reg += 1;
+    pub fn get_phys_reg<T: TargetRegisterTrait>(&self, r: T) -> RegisterId {
+        let i = r.as_phys_reg().retrieve();
+        self.phys_regs_list[i]
+    }
+
+    pub fn arena_ref_mut(&self) -> RefMut<Arena<RegisterInfo>> {
+        self.arena.borrow_mut()
+    }
+
+    pub fn arena_ref(&self) -> Ref<Arena<RegisterInfo>> {
+        self.arena.borrow()
+    }
+
+    fn gen_virt_reg(&self) -> VirtReg {
+        let n = *self.cur_virt_reg.borrow();
+        *self.cur_virt_reg.borrow_mut() += 1;
         VirtReg(n)
     }
 }
 
-impl Index<RegisterId> for RegistersInfo {
-    type Output = RegisterInfo;
-
-    fn index(&self, idx: RegisterId) -> &Self::Output {
-        &self.arena[idx.id]
-    }
-}
-
-impl IndexMut<RegisterId> for RegistersInfo {
-    fn index_mut(&mut self, idx: RegisterId) -> &mut Self::Output {
-        &mut self.arena[idx.id]
-    }
-}
+// impl Index<RegisterId> for RegistersInfo {
+//     type Output = RegisterInfo;
+//
+//     fn index(&self, idx: RegisterId) -> &Self::Output {
+//         &self.arena.borrow()[idx.id]
+//     }
+// }
+//
+// impl IndexMut<RegisterId> for RegistersInfo {
+//     fn index_mut(&mut self, idx: RegisterId) -> &mut Self::Output {
+//         &mut self.arena.borrow_mut()[idx.id]
+//     }
+// }
 
 pub fn str2reg(s: &str) -> Option<PhysReg> {
     Some(match s.to_ascii_lowercase().as_str() {
