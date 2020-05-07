@@ -199,8 +199,8 @@ impl LiveRegMatrix {
         let v2_e = self.vreg2entity.remove(&v2).unwrap();
         let v1_e = *self.vreg2entity.get(&v1).unwrap();
         let mut arena = regs_info.arena_ref_mut();
-        for use_ in arena[v2_e.id].uses.clone() {
-            arena[v1_e.id].add_use(use_)
+        for use_ in arena[v2_e].uses.clone() {
+            arena[v1_e].add_use(use_)
         }
         let v2_i = self.virt_reg_interval.remove(&v2).unwrap();
         let v1_i = self.virt_reg_interval.get_mut(&v1).unwrap();

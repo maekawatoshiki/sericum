@@ -1,7 +1,6 @@
 // TODO: much legacy code remains.
 
 use super::super::register::{PhysReg, RegisterClassKind};
-use super::roundup;
 use crate::codegen::x64::machine::{
     basic_block::*, const_data::*, frame_object::*, function::*, inst::*, module::*,
 };

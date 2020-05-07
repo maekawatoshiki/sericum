@@ -6,7 +6,7 @@ use super::super::{
 use super::{
     builder::{BuilderTrait, BuilderWithLiveInfoEdit},
     function::MachineFunction,
-    inst::{MachineInst, MachineMemOperand, MachineOperand, MachineRegister},
+    inst::{MachineInst, MachineMemOperand, MachineOperand},
     liveness::LiveRegMatrix,
 };
 use crate::ir::types::Types;
@@ -22,7 +22,7 @@ impl<'a> Spiller<'a> {
     }
 
     pub fn insert_evict(&mut self, r: RegisterId, slot: &FrameIndexInfo) {
-        let r_defs = self.func.regs_info.arena_ref()[r.id].defs.clone();
+        let r_defs = self.func.regs_info.arena_ref()[r].defs.clone();
         // If r is defined more than once, choose the later defined one.
         // e.g.
         //   %v1 = COPY %v2
@@ -61,9 +61,9 @@ impl<'a> Spiller<'a> {
         slot: &FrameIndexInfo,
     ) -> Vec<VirtReg> {
         let mut new_regs = vec![];
-        let rc = self.func.regs_info.arena_ref()[reg_id.id].reg_class;
+        let rc = self.func.regs_info.arena_ref()[reg_id].reg_class;
 
-        let uses = self.func.regs_info.arena_ref()[reg_id.id].uses.clone();
+        let uses = self.func.regs_info.arena_ref()[reg_id].uses.clone();
         for use_id in uses {
             let new_r = self.func.regs_info.new_virt_reg(rc);
             new_regs.push(new_r.as_virt_reg());
@@ -90,7 +90,7 @@ impl<'a> Spiller<'a> {
             builder.insert(load);
         }
 
-        self.func.regs_info.arena_ref_mut()[reg_id.id].uses.clear();
+        self.func.regs_info.arena_ref_mut()[reg_id].uses.clear();
 
         new_regs
     }
@@ -100,7 +100,7 @@ impl<'a> Spiller<'a> {
         let slot = self
             .func
             .local_mgr
-            .alloc(&rc2ty(self.func.regs_info.arena_ref()[reg_id.id].reg_class)); // TODO
+            .alloc(&rc2ty(self.func.regs_info.arena_ref()[reg_id].reg_class)); // TODO
 
         self.matrix
             .virt_reg_interval

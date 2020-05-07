@@ -538,18 +538,6 @@ impl<'a> ConvertToDAG<'a> {
     }
 
     fn make_chain_with_copying(&mut self, mut node: Raw<DAGNode>) -> Raw<DAGNode> {
-        // let copy_to_live_out = self.cur_conv_info_mut().dag_heap.alloc(DAGNode::new(
-        //     NodeKind::IR(IRNodeKind::CopyToLiveOut),
-        //     vec![node],
-        //     node.ty.clone(),
-        // ));
-
-        // let reg = NodeKind::Operand(OperandNodeKind::Register(
-        //     self.cur_conv_info_mut()
-        //         .vreg_gen
-        //         .gen_vreg(ty2rc(&node.ty).unwrap())
-        //         .into_ref(),
-        // ));
         let reg = NodeKind::Operand(OperandNodeKind::Register(
             self.cur_conv_info_mut()
                 .regs_info
@@ -567,12 +555,7 @@ impl<'a> ConvertToDAG<'a> {
         ));
 
         self.make_chain(a);
-        // let b = self.cur_conv_info_mut().dag_heap.alloc(DAGNode::new(
-        //     NodeKind::IR(IRNodeKind::CopyFromReg),
-        //     vec![reg],
-        //     node.ty,
-        // ));
-        *node = (*reg).clone(); //DAGNode::new(NodeKind::IR(IRNodeKind::CopyFromReg), vec![reg], node.ty);
+        *node = (*reg).clone();
 
         // copy_to_live_out
         node

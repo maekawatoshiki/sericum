@@ -208,9 +208,9 @@ impl MachineInst {
     }
 
     pub fn set_def(&mut self, regs_info: &RegistersInfo, r: RegisterId) {
-        regs_info.arena_ref_mut()[self.def[0].id].remove_def(self.id.unwrap());
+        regs_info.arena_ref_mut()[self.def[0]].remove_def(self.id.unwrap());
         self.def[0] = r;
-        regs_info.arena_ref_mut()[self.def[0].id].add_def(self.id.unwrap());
+        regs_info.arena_ref_mut()[self.def[0]].add_def(self.id.unwrap());
     }
 
     pub fn set_id(&mut self, regs_info: &RegistersInfo, id: MachineInstId) {
@@ -232,13 +232,13 @@ impl MachineInst {
             })
             .flat_map(|o| o.registers())
         {
-            let reg = &mut regs_info.arena_ref_mut()[reg.id];
+            let reg = &mut regs_info.arena_ref_mut()[*reg];
             some_then!(id, old_id, reg.remove_use(id));
             reg.add_use(id);
         }
 
         for reg in &self.imp_use {
-            let reg = &mut regs_info.arena_ref_mut()[reg.id];
+            let reg = &mut regs_info.arena_ref_mut()[*reg];
             some_then!(id, old_id, reg.remove_use(id));
             reg.add_use(id);
         }
@@ -248,13 +248,13 @@ impl MachineInst {
         let id = self.id.unwrap();
 
         for reg in &self.def {
-            let reg = &mut regs_info.arena_ref_mut()[reg.id];
+            let reg = &mut regs_info.arena_ref_mut()[*reg];
             some_then!(id, old_id, reg.remove_def(id));
             reg.add_def(id);
         }
 
         for reg in &self.imp_def {
-            let reg = &mut regs_info.arena_ref_mut()[reg.id];
+            let reg = &mut regs_info.arena_ref_mut()[*reg];
             some_then!(id, old_id, reg.remove_def(id));
             reg.add_def(id);
         }
@@ -282,9 +282,9 @@ impl MachineInst {
                 None
             })
         {
-            regs_info.arena_ref_mut()[r.id].remove_use(self.id.unwrap());
+            regs_info.arena_ref_mut()[*r].remove_use(self.id.unwrap());
             *r = to;
-            regs_info.arena_ref_mut()[r.id].add_use(self.id.unwrap());
+            regs_info.arena_ref_mut()[*r].add_use(self.id.unwrap());
         }
     }
 
@@ -657,8 +657,7 @@ impl MachineOperand {
             MachineOperand::FrameIndex(fi) => Some(fi.ty.clone()),
             MachineOperand::Mem(_) => None,
             MachineOperand::None => None, // TODO
-            // MachineOperand::Register(r) => Some(rc2ty(r.info_ref().reg_class)),
-            MachineOperand::Register(r) => Some(rc2ty(regs_info.arena_ref()[r.id].reg_class)),
+            MachineOperand::Register(r) => Some(rc2ty(regs_info.arena_ref()[*r].reg_class)),
         }
     }
 }

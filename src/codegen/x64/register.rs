@@ -42,9 +42,12 @@ pub enum VirtOrPhys {
 #[derive(Clone)]
 pub struct RegistersInfo {
     cur_virt_reg: RefCell<usize>,
-    arena: RefCell<Arena<RegisterInfo>>,
+    arena: RefCell<RegisterArena>,
     phys_regs_list: Vec<RegisterId>,
 }
+
+#[derive(Clone)]
+pub struct RegisterArena(pub Arena<RegisterInfo>);
 
 #[derive(Debug, Clone)]
 pub struct VirtRegGen {
@@ -795,7 +798,7 @@ impl RegistersInfo {
         phys_regs_list.push(f(&mut arena, XMM::XMM15));
 
         Self {
-            arena: RefCell::new(arena),
+            arena: RefCell::new(RegisterArena(arena)),
             cur_virt_reg: RefCell::new(0),
             phys_regs_list,
         }
@@ -803,7 +806,7 @@ impl RegistersInfo {
 
     pub fn new_virt_reg(&self, reg_class: RegisterClassKind) -> RegisterId {
         let virt_reg = self.gen_virt_reg();
-        let id = self.arena.borrow_mut().alloc(RegisterInfo {
+        let id = self.arena.borrow_mut().0.alloc(RegisterInfo {
             virt_reg,
             phys_reg: None,
             reg_class,
@@ -822,11 +825,11 @@ impl RegistersInfo {
         self.phys_regs_list[i]
     }
 
-    pub fn arena_ref_mut(&self) -> RefMut<Arena<RegisterInfo>> {
+    pub fn arena_ref_mut(&self) -> RefMut<RegisterArena> {
         self.arena.borrow_mut()
     }
 
-    pub fn arena_ref(&self) -> Ref<Arena<RegisterInfo>> {
+    pub fn arena_ref(&self) -> Ref<RegisterArena> {
         self.arena.borrow()
     }
 
@@ -837,19 +840,19 @@ impl RegistersInfo {
     }
 }
 
-// impl Index<RegisterId> for RegistersInfo {
-//     type Output = RegisterInfo;
-//
-//     fn index(&self, idx: RegisterId) -> &Self::Output {
-//         &self.arena.borrow()[idx.id]
-//     }
-// }
-//
-// impl IndexMut<RegisterId> for RegistersInfo {
-//     fn index_mut(&mut self, idx: RegisterId) -> &mut Self::Output {
-//         &mut self.arena.borrow_mut()[idx.id]
-//     }
-// }
+impl Index<RegisterId> for RegisterArena {
+    type Output = RegisterInfo;
+
+    fn index(&self, id: RegisterId) -> &Self::Output {
+        &self.0[id.id]
+    }
+}
+
+impl IndexMut<RegisterId> for RegisterArena {
+    fn index_mut(&mut self, id: RegisterId) -> &mut Self::Output {
+        &mut self.0[id.id]
+    }
+}
 
 pub fn str2reg(s: &str) -> Option<PhysReg> {
     Some(match s.to_ascii_lowercase().as_str() {

@@ -36,8 +36,8 @@ impl RegisterAllocator {
     }
 
     pub fn run_on_function(&mut self, tys: &Types, cur_func: &mut MachineFunction) {
-        // use crate::analysis::dom_tree::DominatorTreeConstructor;
-        // let dom_tree = DominatorTreeConstructor::new(cur_func).construct();
+        use crate::analysis::dom_tree::DominatorTreeConstructor;
+        let _dom_tree = DominatorTreeConstructor::new(cur_func).construct();
 
         let mut matrix = LivenessAnalysis::new().analyze_function(cur_func);
         calc_spill_weight(cur_func, &mut matrix);
@@ -102,11 +102,11 @@ impl RegisterAllocator {
     }
 
     fn rewrite_vregs(&mut self, cur_func: &mut MachineFunction, matrix: &LiveRegMatrix) {
-        for (id, bb) in cur_func.body.basic_blocks.id_and_block() {
+        for (_id, bb) in cur_func.body.basic_blocks.id_and_block() {
             for inst_id in &*bb.iseq_ref() {
                 let inst = &mut cur_func.body.inst_arena[*inst_id];
                 for reg in inst.collect_all_regs_mut() {
-                    let r = &mut cur_func.regs_info.arena_ref_mut()[reg.id];
+                    let r = &mut cur_func.regs_info.arena_ref_mut()[*reg];
                     if reg.is_phys_reg() {
                         bb.liveness_ref_mut().add_phys_def(reg.as_phys_reg());
                         continue;
@@ -124,26 +124,6 @@ impl RegisterAllocator {
                 }
             }
         }
-        // for (_, bb, iiter) in cur_func.body.mbb_iter() {
-        //     for (_inst_id, inst) in iiter {
-        //         for def in inst.collect_all_virt_regs_mut() {
-        //             let def = &mut cur_func.regs_info[*def];
-        //             if let Some(reg) = def.get_reg() {
-        //                 bb.liveness_ref_mut().add_phys_def(reg);
-        //                 continue;
-        //             }
-        //
-        //             let reg = matrix
-        //                 .virt_reg_interval
-        //                 .get(&def.get_vreg())
-        //                 .unwrap()
-        //                 .reg
-        //                 .unwrap();
-        //             def.set_phys_reg(reg);
-        //             bb.liveness_ref_mut().add_phys_def(reg);
-        //         }
-        //     }
-        // }
     }
 
     fn insert_inst_to_save_reg(
@@ -160,7 +140,7 @@ impl RegisterAllocator {
             occupied: &mut FxHashSet<FrameIndexKind>,
             r: RegisterId,
         ) -> FrameIndexInfo {
-            let rc = cur_func.regs_info.arena_ref()[r.id].reg_class;
+            let rc = cur_func.regs_info.arena_ref()[r].reg_class;
             for slot in &*cur_func.local_mgr.locals {
                 if occupied.contains(&slot.idx) {
                     continue;
@@ -284,17 +264,17 @@ impl<'a> AllocationOrder<'a> {
     }
 
     pub fn get_order(&self, vreg: VirtReg) -> Option<RegisterOrder> {
-        let reg = self.func.regs_info.arena_ref()[self.matrix.get_entity_by_vreg(vreg).unwrap().id]
+        let reg = self.func.regs_info.arena_ref()[*self.matrix.get_entity_by_vreg(vreg).unwrap()]
             .uses
             .iter()
             .find_map(|&use_| {
                 let inst = &self.func.body.inst_arena[use_];
                 if inst.opcode.is_copy_like() {
-                    return self.func.regs_info.arena_ref()[inst.def[0].id].phys_reg;
+                    return self.func.regs_info.arena_ref()[inst.def[0]].phys_reg;
                 }
                 None
             });
-        let mut order = self.func.regs_info.arena_ref()[self.matrix.get_entity_by_vreg(vreg)?.id]
+        let mut order = self.func.regs_info.arena_ref()[*self.matrix.get_entity_by_vreg(vreg)?]
             .reg_class
             .get_reg_order();
 

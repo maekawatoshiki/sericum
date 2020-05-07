@@ -106,7 +106,7 @@ impl<'a> BuilderTrait for BuilderWithLiveInfoEdit<'a> {
             // update registers' use&def list. TODO: refine code
             let inst = &self.function.body.inst_arena[inst_id];
             for def in &inst.def {
-                let def_ = &self.function.regs_info.arena_ref()[def.id];
+                let def_ = &self.function.regs_info.arena_ref()[*def];
                 if let Some(phys_reg) = def_.phys_reg {
                     self.matrix
                         .phys_reg_range

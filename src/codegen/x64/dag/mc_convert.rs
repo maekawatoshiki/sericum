@@ -510,7 +510,7 @@ impl<'a> ConversionInfo<'a> {
             return call_inst;
         }
 
-        let reg_class = self.cur_func.regs_info.arena_ref()[ret_reg.id].reg_class;
+        let reg_class = self.cur_func.regs_info.arena_ref()[ret_reg].reg_class;
         let copy = MachineInst::new(
             &self.cur_func.regs_info,
             MachineOpcode::Copy,
@@ -620,7 +620,7 @@ pub fn mov_rx(tys: &Types, regs_info: &RegistersInfo, x: &MachineOperand) -> Opt
         MachineOpcode::MOVrm64,
     ];
     let (bit, xidx) = match x {
-        MachineOperand::Register(r) => (regs_info.arena_ref()[r.id].reg_class.size_in_bits(), 0),
+        MachineOperand::Register(r) => (regs_info.arena_ref()[*r].reg_class.size_in_bits(), 0),
         MachineOperand::Constant(c) => (c.size_in_bits(), 1),
         MachineOperand::FrameIndex(f) => (f.ty.size_in_bits(tys), 2),
         _ => return None, // TODO: Support Address?
@@ -648,7 +648,7 @@ pub fn mov_mx(regs_info: &RegistersInfo, x: &MachineOperand) -> Option<MachineOp
     //     MachineOpcode::MOVrm64,
     // ];
     let (bit, n) = match x {
-        MachineOperand::Register(r) => (regs_info.arena_ref()[r.id].reg_class.size_in_bits(), 0),
+        MachineOperand::Register(r) => (regs_info.arena_ref()[*r].reg_class.size_in_bits(), 0),
         MachineOperand::Constant(c) => (c.size_in_bits(), 1),
         _ => return None, // TODO: Support Address?
     };

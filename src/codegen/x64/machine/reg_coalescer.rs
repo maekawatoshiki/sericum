@@ -1,5 +1,5 @@
 use super::super::register::RegisterId;
-use super::{basic_block::*, function::*, inst::*, liveness::*};
+use super::{basic_block::*, function::*, liveness::*};
 use rustc_hash::FxHashSet;
 use std::collections::VecDeque;
 
@@ -49,7 +49,7 @@ pub fn coalesce_function(matrix: &mut LiveRegMatrix, f: &mut MachineFunction) {
         //     println!(
         //         "{:?} {:?}",
         //         copy_dst,
-        //         f.regs_info.arena_ref()[copy_dst.id].defs
+        //         f.regs_info.arena_ref()[copy_dst].defs
         //     );
         //
         //     let can_eliminate_copy =
@@ -125,8 +125,8 @@ fn replace_regs(
     from: RegisterId,
     to: RegisterId,
 ) {
-    let defs = f.regs_info.arena_ref()[from.id].defs.clone();
-    let uses = f.regs_info.arena_ref()[from.id].uses.clone();
+    let defs = f.regs_info.arena_ref()[from].defs.clone();
+    let uses = f.regs_info.arena_ref()[from].uses.clone();
 
     for &def in &defs {
         f.body.inst_arena[def].set_def(&f.regs_info, to.clone());
@@ -135,10 +135,10 @@ fn replace_regs(
         f.body.inst_arena[use_].replace_operand_register(&f.regs_info, from, to);
     }
 
-    if f.regs_info.arena_ref()[from.id].defs.len() == 0 {
+    if f.regs_info.arena_ref()[from].defs.len() == 0 {
         let bb = &f.body.basic_blocks.arena[parent];
         bb.liveness_ref_mut()
             .def
-            .remove(&f.regs_info.arena_ref()[from.id].virt_reg);
+            .remove(&f.regs_info.arena_ref()[from].virt_reg);
     }
 }
