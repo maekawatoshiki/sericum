@@ -110,7 +110,7 @@ impl MachineAsmPrinter {
             MachineOpcode::JE => self.run_on_inst_je(inst),
             MachineOpcode::JLE => self.run_on_inst_jle(inst),
             MachineOpcode::JL => self.run_on_inst_jl(inst),
-            _ => {}
+            _ => panic!("{:?}", inst),
         }
 
         self.output.push('\n');

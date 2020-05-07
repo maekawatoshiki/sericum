@@ -1,5 +1,7 @@
 // use super::{module::*, opcode::*, value::*};
-use super::super::register::{PhysRegSet, TargetRegisterTrait, VirtReg};
+use super::super::register::{
+    PhysRegSet, RegisterId, TargetRegisterTrait, VirtOrPhys, CALLEE_SAVED_REGS,
+};
 use super::inst::*;
 use crate::traits::basic_block::*;
 use id_arena::*;
@@ -35,9 +37,9 @@ pub struct MachineBasicBlock {
 #[derive(Clone, Debug)]
 pub struct LivenessInfo {
     pub phys_def: PhysRegSet,
-    pub def: FxHashSet<VirtReg>,
-    pub live_in: FxHashSet<VirtReg>,
-    pub live_out: FxHashSet<VirtReg>,
+    pub def: FxHashSet<RegisterId>,
+    pub live_in: FxHashSet<RegisterId>,
+    pub live_out: FxHashSet<RegisterId>,
 }
 
 impl BasicBlockTrait for MachineBasicBlock {
@@ -130,6 +132,150 @@ impl LivenessInfo {
 
     pub fn add_phys_def<T: TargetRegisterTrait>(&mut self, r: T) {
         self.phys_def |= r.regs_sharing_same_register_file();
+    }
+
+    /// Add def.
+    /// If ``self.def`` has ``reg``'s super physical register, we do't add.
+    /// If ``self.def`` has ``reg``'s sub physical register, remove it and add ``reg``.
+    pub fn add_def(&mut self, reg: RegisterId) -> bool {
+        if reg.is_virt_reg() {
+            return self.def.insert(reg);
+        }
+
+        let p = reg.as_phys_reg();
+        let mut cur = p;
+
+        if CALLEE_SAVED_REGS.with(|regs| regs.has(p)) {
+            return false;
+        }
+
+        if self.def.contains(&reg) {
+            return false;
+        }
+
+        while let Some(sub) = cur.sub_reg() {
+            cur = sub;
+            let key = RegisterId {
+                id: reg.id,
+                kind: VirtOrPhys::Phys(cur),
+            };
+            if self.def.contains(&key) {
+                self.def.remove(&key);
+                self.def.insert(reg);
+                return false;
+            }
+        }
+
+        cur = p;
+
+        while let Some(sub) = cur.super_reg() {
+            cur = sub;
+            let key = RegisterId {
+                id: reg.id,
+                kind: VirtOrPhys::Phys(cur),
+            };
+            if self.def.contains(&key) {
+                return false;
+            }
+        }
+
+        self.def.insert(reg)
+    }
+
+    /// Add livein.
+    /// If ``self.live_in`` has ``reg``'s super physical register, we do't add.
+    /// If ``self.live_in`` has ``reg``'s sub physical register, remove it and add ``reg``.
+    pub fn add_live_in(&mut self, reg: RegisterId) -> bool {
+        if reg.is_virt_reg() {
+            return self.live_in.insert(reg);
+        }
+
+        let p = reg.as_phys_reg();
+        let mut cur = p;
+
+        if CALLEE_SAVED_REGS.with(|regs| regs.has(p)) {
+            return false;
+        }
+
+        if self.live_in.contains(&reg) {
+            return false;
+        }
+
+        while let Some(sub) = cur.sub_reg() {
+            cur = sub;
+            let key = RegisterId {
+                id: reg.id,
+                kind: VirtOrPhys::Phys(cur),
+            };
+            if self.live_in.contains(&key) {
+                self.live_in.remove(&key);
+                self.live_in.insert(reg);
+                return false;
+            }
+        }
+
+        cur = p;
+
+        while let Some(sub) = cur.super_reg() {
+            cur = sub;
+            let key = RegisterId {
+                id: reg.id,
+                kind: VirtOrPhys::Phys(cur),
+            };
+            if self.live_in.contains(&key) {
+                return false;
+            }
+        }
+
+        self.live_in.insert(reg)
+    }
+
+    /// Add liveout.
+    /// If ``self.live_out`` has ``reg``'s super physical register, we do't add.
+    /// If ``self.live_out`` has ``reg``'s sub physical register, remove it and add ``reg``.
+    pub fn add_live_out(&mut self, reg: RegisterId) -> bool {
+        if reg.is_virt_reg() {
+            return self.live_out.insert(reg);
+        }
+
+        let p = reg.as_phys_reg();
+        let mut cur = p;
+
+        if CALLEE_SAVED_REGS.with(|regs| regs.has(p)) {
+            return false;
+        }
+
+        if self.live_out.contains(&reg) {
+            return false;
+        }
+
+        while let Some(sub) = cur.sub_reg() {
+            cur = sub;
+            let key = RegisterId {
+                id: reg.id,
+                kind: VirtOrPhys::Phys(cur),
+            };
+            if self.live_out.contains(&key) {
+                self.live_out.remove(&key);
+                self.live_out.insert(reg);
+                return false;
+            }
+        }
+
+        cur = p;
+
+        while let Some(sub) = cur.super_reg() {
+            cur = sub;
+            let key = RegisterId {
+                id: reg.id,
+                kind: VirtOrPhys::Phys(cur),
+            };
+            if self.live_out.contains(&key) {
+                return false;
+            }
+        }
+
+        self.live_out.insert(reg)
     }
 
     pub fn clear(&mut self) {

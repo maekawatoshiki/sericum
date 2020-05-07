@@ -492,7 +492,7 @@ impl<'a> ConversionInfo<'a> {
                 .with_imp_def(self.cur_func.regs_info.get_phys_reg(GR64::RSP))
                 .with_def(match node.ty {
                     Type::Void => vec![],
-                    _ => vec![ret_reg.clone()],
+                    _ => vec![ret_reg],
                 }),
         );
 

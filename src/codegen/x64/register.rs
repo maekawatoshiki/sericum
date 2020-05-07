@@ -521,11 +521,18 @@ thread_local! {
     pub static CALLEE_SAVED_REGS: PhysRegSet = {
         let mut bits = PhysRegSet::new();
         let regs = to_phys![
+            // GR32::EAX,
+            // GR64::RAX,
+            GR32::EBX,
+            // GR32::ESP,
+            GR32::EBP,
+            GR32::R12D,
+            GR32::R13D,
+            GR32::R14D,
+            GR32::R15D,
             GR64::RBX,
+            // GR64::RSP,
             GR64::RBP,
-            GR64::RDI,
-            GR64::RSI,
-            GR64::RSP,
             GR64::R12,
             GR64::R13,
             GR64::R14,
@@ -533,12 +540,6 @@ thread_local! {
             XMM::XMM6,
             XMM::XMM7,
             XMM::XMM8,
-            XMM::XMM9,
-            XMM::XMM10,
-            XMM::XMM11,
-            XMM::XMM12,
-            XMM::XMM13,
-            XMM::XMM14,
             XMM::XMM15
         ];
         for reg in regs {
@@ -548,7 +549,7 @@ thread_local! {
     }
 }
 
-pub fn callee_saved_registers() -> PhysRegSet {
+pub fn callee_saved_register() -> PhysRegSet {
     CALLEE_SAVED_REGS.with(|v| v.clone())
 }
 
@@ -562,6 +563,10 @@ impl PhysRegSet {
 
     pub fn set<T: TargetRegisterTrait>(&mut self, r: T) {
         self.0.insert(r.as_phys_reg().retrieve(), true);
+    }
+
+    pub fn has<T: TargetRegisterTrait>(&self, r: T) -> bool {
+        *self.0.get(r.as_phys_reg().retrieve()).unwrap()
     }
 
     pub fn to_phys_set(&self) -> FxHashSet<PhysReg> {

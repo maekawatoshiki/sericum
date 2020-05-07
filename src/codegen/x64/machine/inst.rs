@@ -331,21 +331,19 @@ impl MachineInst {
         Some(self.def[0])
     }
 
-    pub fn collect_defined_regs(&self) -> Vec<RegisterId> {
-        let mut regs = self.def.clone();
-        regs.append(&mut self.imp_def.clone());
+    pub fn collect_defined_regs(&self) -> Vec<&RegisterId> {
+        let mut regs: Vec<&RegisterId> = self.def.iter().collect();
+        regs.extend(&mut self.imp_def.iter());
         regs
     }
 
-    pub fn collect_used_virt_regs(&self) -> Vec<RegisterId> {
+    pub fn collect_used_regs(&self) -> Vec<&RegisterId> {
         let mut regs = vec![];
         for operand in &self.operand {
-            match operand {
-                MachineOperand::Register(r) if r.is_virt_reg() => {
-                    regs.push(*r) // TODO
-                }
-                _ => {}
-            }
+            regs.append(&mut operand.registers())
+        }
+        for imp_use in &self.imp_use {
+            regs.push(imp_use)
         }
         regs
     }

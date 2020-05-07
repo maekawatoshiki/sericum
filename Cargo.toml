@@ -5,7 +5,7 @@ authors = ["uint256_t"]
 edition = "2018"
 
 [dependencies]
-rustc-hash = "1.0.1"
+rustc-hash = "1.1.0"
 id-arena = "2.2.1"
 dynasm = "0.3.2"
 dynasmrt = "0.3.1"

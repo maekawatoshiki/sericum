@@ -73,7 +73,7 @@ impl RegisterAllocator {
                 continue;
             }
 
-            let interfering = matrix.collect_interfering_vregs(vreg);
+            let interfering = matrix.collect_interfering_assigned_regs(vreg);
             let mut reg_to_spill = VirtReg(0xffffffff);
             let mut last_spill_weight = f32::MAX;
             for &vreg in &interfering {
@@ -163,14 +163,22 @@ impl RegisterAllocator {
             let bb_containing_call =
                 &cur_func.body.basic_blocks.arena[cur_func.body.inst_arena[call_inst_id].parent];
             let liveness = bb_containing_call.liveness_ref();
-            let regs_that_may_interfere = &liveness.def | &liveness.live_in;
+            let mut regs_that_may_interfere = &liveness.def | &liveness.live_in;
+            // remove registers like rbp, rsp, rax...
+            for def in cur_func.body.inst_arena[call_inst_id]
+                .collect_defined_regs()
+                .iter()
+                .filter(|def| def.is_phys_reg())
+            {
+                regs_that_may_interfere.remove(def);
+            }
+            let range = LiveRange::new(vec![LiveSegment::new(call_inst_pp, call_inst_pp)]);
             for r in &regs_that_may_interfere {
-                if matrix.interferes_with_range(
-                    *r,
-                    LiveRange::new(vec![LiveSegment::new(call_inst_pp, call_inst_pp)]),
-                ) {
-                    let r = *matrix.get_entity_by_vreg(*r).unwrap();
-                    regs_to_save.insert(r);
+                if (r.is_virt_reg() && matrix.interferes_with_range(r.as_virt_reg(), &range))
+                    || (r.is_phys_reg()
+                        && matrix.interferes_phys_with_range(r.as_phys_reg(), &range))
+                {
+                    regs_to_save.insert(*r);
                 }
             }
         }
