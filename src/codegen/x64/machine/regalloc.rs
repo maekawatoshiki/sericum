@@ -36,8 +36,11 @@ impl RegisterAllocator {
     }
 
     pub fn run_on_function(&mut self, tys: &Types, cur_func: &mut MachineFunction) {
-        use crate::analysis::dom_tree::DominatorTreeConstructor;
-        let _dom_tree = DominatorTreeConstructor::new(cur_func).construct();
+        use crate::analysis::{dom_tree::DominatorTreeConstructor, loops};
+        let dom_tree = DominatorTreeConstructor::new(cur_func).construct();
+        let loops = loops::LoopsConstructor::new(&dom_tree, &cur_func.body.basic_blocks).analyze();
+        println!("{:?}", dom_tree);
+        println!("{:?}", loops);
 
         let mut matrix = LivenessAnalysis::new().analyze_function(cur_func);
         calc_spill_weight(cur_func, &mut matrix);
@@ -158,7 +161,7 @@ impl RegisterAllocator {
         let call_inst_pp = matrix.get_program_point(call_inst_id).unwrap();
         let mut regs_to_save = FxHashSet::default();
 
-        // IMPROVED EFFICIENCY A LITTLE: any better ideas?
+        // TODO: So slow. Any better algorithms?
         {
             let bb_containing_call =
                 &cur_func.body.basic_blocks.arena[cur_func.body.inst_arena[call_inst_id].parent];

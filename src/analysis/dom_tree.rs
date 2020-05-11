@@ -7,7 +7,9 @@ use crate::traits::{
 use id_arena::Id;
 use rustc_hash::{FxHashMap, FxHashSet};
 
+#[derive(Debug)]
 pub struct DominatorTree<T: BasicBlockTrait> {
+    pub root: Option<Id<T>>,
     pub tree: FxHashMap<Id<T>, FxHashSet<Id<T>>>,
     pub level: FxHashMap<Id<T>, usize>,
 }
@@ -23,26 +25,18 @@ pub struct DominatorTreeConstructor<'a, F: FunctionTrait> {
 impl<T: BasicBlockTrait> DominatorTree<T> {
     pub fn new() -> Self {
         Self {
+            root: None,
             tree: FxHashMap::default(),
             level: FxHashMap::default(),
         }
     }
 
     pub fn dominate_bb(&self, bb0: Id<T>, bb1: Id<T>) -> bool {
-        if bb0 == bb1 {
-            return true;
-        }
-        if let Some(set) = self.tree.get(&bb0) {
-            if set.contains(&bb1) {
-                return true;
-            }
-            for &s in set {
-                if self.dominate_bb(s, bb1) {
-                    return true;
-                }
-            }
-        }
-        false
+        bb0 == bb1
+            || self.tree.get(&bb0).map_or(false, |children| {
+                children.contains(&bb1)
+                    || children.iter().any(|&child| self.dominate_bb(child, bb1))
+            })
     }
 
     pub fn get_level_of(&self, bb: Id<T>) -> usize {
@@ -114,6 +108,8 @@ impl<'a, F: FunctionTrait> DominatorTreeConstructor<'a, F> {
 
         let entry = self.func.get_basic_blocks().get_order()[0];
         leveling(&mut self.tree.level, &self.tree.tree, entry, 0);
+
+        self.tree.root = Some(entry);
 
         self.tree
     }
