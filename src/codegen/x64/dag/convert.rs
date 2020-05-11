@@ -9,6 +9,7 @@ use crate::ir::{
 use crate::util::allocator::Raw;
 use id_arena::*;
 use rustc_hash::FxHashMap;
+use std::mem;
 
 pub struct ConvertToDAG<'a> {
     pub module: &'a Module,
@@ -83,7 +84,7 @@ impl<'a> ConvertToDAG<'a> {
             dag_bb_arena[self.cur_conv_info_ref().get_dag_bb(*bb_id)].set_entry(id);
         }
 
-        let conv_info = ::std::mem::replace(&mut self.cur_conversion_info, None).unwrap();
+        let conv_info = mem::replace(&mut self.cur_conversion_info, None).unwrap();
         DAGFunction::new(
             func,
             conv_info.dag_heap,
@@ -538,7 +539,7 @@ impl<'a> ConvertToDAG<'a> {
     }
 
     fn make_chain_with_copying(&mut self, mut node: Raw<DAGNode>) -> Raw<DAGNode> {
-        let reg = NodeKind::Operand(OperandNodeKind::Register(
+        let kind = NodeKind::Operand(OperandNodeKind::Register(
             self.cur_conv_info_mut()
                 .regs_info
                 .new_virt_reg(ty2rc(&node.ty).unwrap()),
@@ -546,18 +547,17 @@ impl<'a> ConvertToDAG<'a> {
         let reg = self
             .cur_conv_info_mut()
             .dag_heap
-            .alloc(DAGNode::new(reg, vec![], node.ty));
-        let q = self.cur_conv_info_mut().dag_heap.alloc((*node).clone());
-        let a = self.cur_conv_info_mut().dag_heap.alloc(DAGNode::new(
+            .alloc(DAGNode::new(kind, vec![], node.ty));
+        let old_node = self
+            .cur_conv_info_mut()
+            .dag_heap
+            .alloc(mem::replace(&mut *node, (*reg).clone()));
+        let copy = self.cur_conv_info_mut().dag_heap.alloc(DAGNode::new(
             NodeKind::IR(IRNodeKind::CopyToReg),
-            vec![reg, q],
+            vec![reg, old_node],
             Type::Void,
         ));
-
-        self.make_chain(a);
-        *node = (*reg).clone();
-
-        // copy_to_live_out
+        self.make_chain(copy);
         node
     }
 
@@ -592,7 +592,6 @@ impl ConversionInfo {
     pub fn new() -> Self {
         ConversionInfo {
             dag_heap: DAGHeap::new(),
-            // dag_heap: Arena::new(),
             local_mgr: LocalVariables::new(),
             bb_to_dag_bb: FxHashMap::default(),
             last_chain_node: None,
