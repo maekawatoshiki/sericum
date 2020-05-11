@@ -74,7 +74,7 @@ impl<'a, BBS: BasicBlocksTrait> LoopsConstructor<'a, BBS> {
 
             if let Some(sub_loop) = sub_loop {
                 let mut sub_loop = sub_loop;
-                while let Some(parent) = self.loops.get(sub_loop).parent {
+                while let Some(parent) = self.loops.arena[sub_loop].parent {
                     sub_loop = parent;
                 }
 
@@ -82,8 +82,8 @@ impl<'a, BBS: BasicBlocksTrait> LoopsConstructor<'a, BBS> {
                     continue;
                 }
 
-                self.loops.get_mut(sub_loop).parent = Some(loop_id);
-                let pred = self.loops.get(sub_loop).header;
+                self.loops.arena[sub_loop].parent = Some(loop_id);
+                let pred = self.loops.arena[sub_loop].header;
                 for pred in self.basic_blocks.get_arena()[pred].get_preds() {
                     if self.loops.get_loop_for(*pred) != Some(sub_loop) {
                         worklist.push_back(*pred)
@@ -91,7 +91,7 @@ impl<'a, BBS: BasicBlocksTrait> LoopsConstructor<'a, BBS> {
                 }
             } else {
                 self.loops.set_loop_for(pred, loop_id);
-                if pred == self.loops.get(loop_id).header {
+                if pred == self.loops.arena[loop_id].header {
                     continue;
                 }
                 worklist.extend(self.basic_blocks.get_arena()[pred].get_preds().iter());
@@ -106,22 +106,24 @@ impl<'a, BBS: BasicBlocksTrait> LoopsConstructor<'a, BBS> {
     }
 
     fn insert_block_into_loop(&mut self, bb: Id<BBS::BB>) {
-        let mut sub_loop = match self.loops.get_loop_for(bb) {
+        let sub_loop = match self.loops.get_loop_for(bb) {
             Some(sub_loop) => sub_loop,
             None => return,
         };
 
-        if bb == self.loops.get(sub_loop).header {
-            if let Some(parent) = self.loops.get(sub_loop).parent {
-                self.loops.get_mut(parent).sub_loops.push(sub_loop);
+        let sub_loop_ = &self.loops.arena[sub_loop];
+        if bb == sub_loop_.header {
+            if let Some(parent) = sub_loop_.parent {
+                self.loops.arena[parent].sub_loops.push(sub_loop);
             } else {
                 self.loops.top_level_loops.push(sub_loop);
                 return;
             }
         }
 
-        while let Some(parent) = self.loops.get(sub_loop).parent {
-            self.loops.get_mut(parent).set.insert(bb);
+        let mut sub_loop = sub_loop;
+        while let Some(parent) = self.loops.arena[sub_loop].parent {
+            self.loops.arena[parent].set.insert(bb);
             sub_loop = parent;
         }
     }
@@ -154,14 +156,6 @@ impl<BB: BasicBlockTrait> Loops<BB> {
             sub_loops: vec![],
             set: FxHashSet::default(),
         })
-    }
-
-    pub fn get(&self, id: Id<Loop<BB>>) -> &Loop<BB> {
-        &self.arena[id]
-    }
-
-    pub fn get_mut(&mut self, id: Id<Loop<BB>>) -> &mut Loop<BB> {
-        &mut self.arena[id]
     }
 
     pub fn get_loop_for(&self, bb: Id<BB>) -> Option<Id<Loop<BB>>> {
