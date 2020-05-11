@@ -59,7 +59,7 @@ impl JITExecutor {
 
         machine::phi_elimination::PhiElimination::new().run_on_module(&mut machine_module); //
         machine::two_addr::TwoAddressConverter::new().run_on_module(&mut machine_module);
-        debug!(println!("{:?}", machine_module));
+        // debug!(println!("{:?}", machine_module));
         machine::regalloc::RegisterAllocator::new().run_on_module(&mut machine_module); //
         machine::pro_epi_inserter::PrologueEpilogueInserter::new()
             .run_on_module(&mut machine_module);
