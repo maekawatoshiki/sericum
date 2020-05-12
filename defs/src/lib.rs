@@ -22,3 +22,9 @@ pub fn define_registers(item: TokenStream) -> TokenStream {
 pub fn isel_pat(item: TokenStream) -> TokenStream {
     isel_pat::run(item)
 }
+
+#[proc_macro_error]
+#[proc_macro]
+pub fn isel_pat2(item: TokenStream) -> TokenStream {
+    isel_pat::parser_run(item)
+}

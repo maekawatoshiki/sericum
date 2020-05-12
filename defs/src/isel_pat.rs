@@ -16,11 +16,10 @@ pub fn run(item: TokenStream) -> TokenStream {
     TokenStream::from(output)
 }
 
-fn parser_run(item: TokenStream) -> TokenStream {
-    let item = TokenStream::from(quote! {});
+pub fn parser_run(item: TokenStream) -> TokenStream {
     let mut reader = TokenStreamReader::new(item.into_iter());
     let output = PatternParser::new(&mut reader).parse();
-    unimplemented!()
+    abort!(0, "{:?}", output);
 }
 
 type TS = proc_macro2::TokenStream;
@@ -29,9 +28,14 @@ type TS = proc_macro2::TokenStream;
 enum Node {
     Patterns(Vec<Node>),
     InstPattern(TS, Vec<Node>, TS, Box<Node>), // inst, operands, parent, body
-    OperandPattern(TS, TS, Box<Node>),         // operand kind, parent, body
+    OperandPattern(String, TS, Box<Node>),     // operand kind, parent, body
     Inst(TS, Vec<Node>),
-    Operand(String),
+    // Operand(String),
+    Register(String),
+    Addressing(String, Vec<Node>),
+    Ident(String),
+    User(TS),
+    None,
 }
 
 struct PatternParser<'a> {
@@ -44,35 +48,128 @@ impl<'a> PatternParser<'a> {
     }
 
     pub fn parse(&mut self) -> Node {
-        let body = self.parse_pats(0);
+        let body = self.parse_pats(true);
         body
     }
 
-    pub fn parse_pats(&mut self, depth: usize) -> Node {
+    pub fn parse_pats(&mut self, toplevel: bool) -> Node {
         let mut pats = vec![];
         while self.reader.peak().is_some() {
-            pats.push(self.parse_pat(depth));
+            pats.push(self.parse_pat(toplevel));
         }
         Node::Patterns(pats)
     }
 
-    pub fn parse_pat(&mut self, depth: usize) -> Node {
+    pub fn parse_pat(&mut self, toplevel: bool) -> Node {
         if self.reader.cur_is_group('(') {
-            return self.parse_inst_pat(depth);
+            return self.parse_inst_pat(toplevel);
         }
-        self.parse_operand_pat(depth)
-        // unimplemented!()
+        self.parse_operand_pat(toplevel)
     }
 
-    pub fn parse_inst_pat(&mut self, depth: usize) -> Node {
+    pub fn parse_inst_pat(&mut self, toplevel: bool) -> Node {
         let group = self.reader.get().unwrap();
         let mut reader = TokenStreamReader::new(group_stream(group).into_iter());
         let mut parser = PatternParser::new(&mut reader);
-        unimplemented!()
+        let inst_kind = parser.parse_inst_kind();
+        let operands = parser.parse_inst_operands();
+        let parent = if !toplevel {
+            let node = ident_tok(self.reader.get_ident().unwrap().as_str());
+            quote! { #node }
+        } else {
+            quote! { node }
+        };
+        let body = self.parse_body();
+        Node::InstPattern(inst_kind, operands, parent, Box::new(body))
     }
 
-    fn parse_operand_pat(&mut self, depth: usize) -> Node {
-        unimplemented!()
+    pub fn parse_operand_pat(&mut self, toplevel: bool) -> Node {
+        let ty = self.reader.get_ident().unwrap();
+        let parent = if !toplevel {
+            let node = ident_tok(self.reader.get_ident().unwrap().as_str());
+            quote! { #node }
+        } else {
+            quote! { node }
+        };
+        let body = self.parse_body();
+        Node::OperandPattern(ty, quote! { #parent }, Box::new(body))
+    }
+
+    pub fn parse_inst_kind(&mut self) -> TS {
+        let ir_or_mi = self.reader.get_ident().unwrap();
+        assert!(self.reader.skip_punct('.'));
+        let name = ident_tok(self.reader.get_ident().unwrap().as_str());
+        let inst = match ir_or_mi.as_str() {
+            "ir" => quote! { NodeKind::IR(IRNodeKind::#name) },
+            "mi" => quote! { NodeKind::MI(MINodeKind::#name) },
+            _ => abort!(0, "expected 'ir' or 'mi'"),
+        };
+        inst
+    }
+
+    pub fn parse_inst_operands(&mut self) -> Vec<Node> {
+        let mut operands = vec![];
+        loop {
+            if self.reader.cur_is_group('(') {
+                operands.push(self.parse_inst());
+            } else {
+                operands.push(self.parse_operand())
+            }
+            if !self.reader.skip_punct(',') {
+                break;
+            }
+        }
+        operands
+    }
+
+    pub fn parse_inst(&mut self) -> Node {
+        let group = self.reader.get().unwrap();
+        let mut reader = TokenStreamReader::new(group_stream(group).into_iter());
+        let mut parser = PatternParser::new(&mut reader);
+        let inst_kind = parser.parse_inst_kind();
+        let operands = parser.parse_inst_operands();
+        Node::Inst(inst_kind, operands)
+    }
+
+    pub fn parse_operand(&mut self) -> Node {
+        if self.reader.skip_punct('%') {
+            let reg_str = self.reader.get_ident().unwrap();
+            Node::Register(reg_str)
+        } else if self.reader.cur_is_group('[') {
+            let group = self.reader.get().unwrap();
+            let mut reader = TokenStreamReader::new(group_stream(group).into_iter());
+            let mut parser = PatternParser::new(&mut reader);
+            let addressing_name = parser.reader.get_ident().unwrap();
+            Node::Addressing(addressing_name, parser.parse_inst_operands())
+        } else {
+            let name = self.reader.get_ident().unwrap();
+            match name.as_str() {
+                "none" => Node::None,
+                _ => Node::Ident(name),
+            }
+        }
+    }
+
+    pub fn parse_body(&mut self) -> Node {
+        if self.reader.cur_is_group('{') {
+            let group = self.reader.get().unwrap();
+            let mut reader = TokenStreamReader::new(group_stream(group).into_iter());
+            let mut parser = PatternParser::new(&mut reader);
+            parser.parse_pats(false)
+        } else if self.reader.skip_punct('=') && self.reader.skip_punct('>') {
+            let group = self.reader.peak().unwrap();
+            let user_code = tok_is_group(&group, '{');
+            if user_code {
+                let body = proc_macro2::TokenStream::from(group_stream(self.reader.get().unwrap()));
+                Node::User(quote! { { #body } })
+            } else {
+                // let mut reader = TokenStreamReader::new(group_stream(group).into_iter());
+                // let mut parser = PatternParser::new(&mut reader);
+                self.parse_inst()
+            }
+        } else {
+            abort!(0, "expected ':' or '=>'")
+        }
     }
 }
 
