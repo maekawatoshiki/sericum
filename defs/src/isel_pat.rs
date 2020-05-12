@@ -12,14 +12,8 @@ use proc_quote::quote;
 
 pub fn run(item: TokenStream) -> TokenStream {
     let mut reader = TokenStreamReader::new(item.into_iter());
-    let output = ISelPatParser::new(&mut reader, &quote! { node }, quote! { node }).parse();
-    TokenStream::from(output)
-}
-
-pub fn parser_run(item: TokenStream) -> TokenStream {
-    let mut reader = TokenStreamReader::new(item.into_iter());
-    let output = PatternParser::new(&mut reader).parse();
-    abort!(0, "{:?}", output);
+    let pats = PatternParser::new(&mut reader).parse();
+    TokenStream::from(TokenStreamConstructor::new().run(pats))
 }
 
 type TS = proc_macro2::TokenStream;
@@ -41,6 +35,8 @@ enum Node {
 struct PatternParser<'a> {
     pub reader: &'a mut TokenStreamReader,
 }
+
+struct TokenStreamConstructor {}
 
 impl<'a> PatternParser<'a> {
     pub fn new(reader: &'a mut TokenStreamReader) -> Self {
@@ -163,8 +159,6 @@ impl<'a> PatternParser<'a> {
                 let body = proc_macro2::TokenStream::from(group_stream(self.reader.get().unwrap()));
                 Node::User(quote! { { #body } })
             } else {
-                // let mut reader = TokenStreamReader::new(group_stream(group).into_iter());
-                // let mut parser = PatternParser::new(&mut reader);
                 self.parse_inst()
             }
         } else {
@@ -173,148 +167,125 @@ impl<'a> PatternParser<'a> {
     }
 }
 
-struct ISelPatParser<'a> {
-    pub reader: &'a mut TokenStreamReader,
-    root: &'a proc_macro2::TokenStream,
-    parent: proc_macro2::TokenStream,
-}
+impl TokenStreamConstructor {
+    pub fn new() -> Self {
+        Self {}
+    }
 
-impl<'a> ISelPatParser<'a> {
-    pub fn new(
-        reader: &'a mut TokenStreamReader,
-        root: &'a proc_macro2::TokenStream,
-        parent: proc_macro2::TokenStream,
-    ) -> Self {
-        Self {
-            reader,
-            parent,
-            root,
+    pub fn run(&mut self, node: Node) -> TS {
+        let output = self.run_sub(node);
+        quote! {
+            (|| -> Raw<DAGNode> {
+                #output
+
+                node.operand = node
+                    .operand
+                    .iter()
+                    .map(|op| self.run_on_node(tys, regs_info, heap, *op))
+                    .collect();
+                node
+            }) ()
         }
     }
 
-    pub fn parse(&mut self) -> proc_macro2::TokenStream {
-        let body = self.parse_pats(0);
-        body
+    pub fn run_sub(&mut self, node: Node) -> TS {
+        match node {
+            Node::Patterns(pats) => self.run_on_patterns(pats),
+            Node::InstPattern(inst, operands, parent, body) => {
+                self.run_on_inst_patterns(inst, operands, parent, body)
+            }
+            Node::OperandPattern(kind, parent, body) => {
+                self.run_on_operand_pattern(kind, parent, body)
+            }
+            Node::Inst(inst, operands) => self.run_on_inst(inst, operands),
+            Node::Register(_name) => unimplemented!(),
+            Node::Addressing(_name, _operands) => unimplemented!(),
+            Node::Ident(_name) => unimplemented!(),
+            Node::User(code) => quote! { return #code },
+            Node::None => unimplemented!(),
+        }
     }
 
-    pub fn parse_pats(&mut self, depth: usize) -> proc_macro2::TokenStream {
+    fn run_on_patterns(&mut self, pats: Vec<Node>) -> TS {
         let mut output = quote! {};
-        let mut i = 0;
-        while self.reader.peak().is_some() {
-            let t = self.parse_pat(depth);
-            if i == 0 {
-                output = quote! {
-                    #output
-                    #t
-                }
-            } else {
-                output = quote! {
-                    #output
-                    #t
-                }
-            }
-            i += 1;
+        for pat in pats {
+            let ts = self.run_sub(pat);
+            output = quote! {
+                #output
+                #ts
+            };
         }
+        output
+    }
 
-        if output.is_empty() {
-            return output;
-        }
-
-        let root = &self.root;
-        if depth == 0 {
-            quote! {
-                (|| -> Raw<DAGNode> {
-                    #output
-
-                    #root.operand = #root
-                        .operand
-                        .iter()
-                        .map(|op| self.run_on_node(tys, regs_info, heap, *op))
-                        .collect();
-                    #root
-                }) ()
+    fn run_on_inst_patterns(
+        &mut self,
+        inst: TS,
+        operands: Vec<Node>,
+        parent: TS,
+        body: Box<Node>,
+    ) -> TS {
+        let body = self.run_sub(*body);
+        let mut def_operands = quote! {};
+        for (i, operand) in operands.into_iter().enumerate() {
+            match operand {
+                Node::Ident(name) => {
+                    let name = ident_tok(name.as_str());
+                    def_operands = quote! {
+                        #def_operands
+                        let #name = #parent.operand[#i];
+                    }
+                }
+                _ => unimplemented!(),
             }
-        } else {
-            output
+        }
+        quote! {
+            if #parent.kind == #inst {
+                #def_operands
+                #body
+            }
         }
     }
 
-    // e.g. (ir.INST a b)
-    pub fn parse_pat(&mut self, depth: usize) -> proc_macro2::TokenStream {
-        if self.reader.cur_is_group('(') {
-            return self.parse_inst_pat(depth);
-        }
-
-        self.parse_op_pat(depth)
-    }
-
-    pub fn parse_op_pat(&mut self, depth: usize) -> proc_macro2::TokenStream {
-        let ty = self.reader.get_ident().unwrap();
-        let node = ident_tok(self.reader.get_ident().unwrap().as_str());
-
-        let body = if self.reader.cur_is_group('{') {
-            let group = self.reader.get().unwrap();
-            let mut reader = TokenStreamReader::new(group_stream(group).into_iter());
-            let mut parser = ISelPatParser::new(&mut reader, &self.root, quote! { #node });
-            parser.parse_pats(depth + 1)
-        } else if self.reader.skip_punct('=') && self.reader.skip_punct('>') {
-            let group = self.reader.get().unwrap();
-            let one = tok_is_group(&group, '(');
-            if one {
-                let mut reader = TokenStreamReader::new(group_stream(group).into_iter());
-                let mut parser = ISelPatParser::new(&mut reader, &self.root, quote! { #node });
-                parser.parse_selected_inst_pat()
-            } else {
-                // for user own code
-                let body = proc_macro2::TokenStream::from(group_stream(group));
-                quote! {
-                    return {
-                         #body
-                    };
-                }
-            }
-        } else {
-            abort!(0, "expected ':' or '=>'")
-        };
-
-        match ty.as_str() {
+    fn run_on_operand_pattern(&mut self, kind: String, parent: TS, body: Box<Node>) -> TS {
+        let body = self.run_sub(*body);
+        match kind.as_str() {
             "imm32" => {
-                quote! { if #node.is_constant() && matches!(#node.ty, Type::Int32) { #body } }
+                quote! { if #parent.is_constant() && matches!(#parent.ty, Type::Int32) { #body } }
             }
             "imm_f64" => {
-                quote! { if #node.is_constant() && matches!(#node.ty, Type::F64) {  #body } }
+                quote! { if #parent.is_constant() && matches!(#parent.ty, Type::F64) {  #body } }
             }
             // TODO
-            "mem" => quote! { if #node.is_frame_index() {  #body } },
+            "mem" => quote! { if #parent.is_frame_index() {  #body } },
             "mem32" | "mem64" => {
-                let bits = match ty.as_str() {
+                let bits = match kind.as_str() {
                     "mem32" => 32usize,
                     "mem64" => 64usize,
                     _ => unimplemented!(),
                 };
                 quote! {
-                    if #node.is_frame_index() && #node.ty.size_in_bits(tys) == #bits {
+                    if #parent.is_frame_index() && #parent.ty.size_in_bits(tys) == #bits {
                           #body
                     }
                 }
             }
             "f64mem" => {
-                let ty = match ty.as_str() {
+                let ty = match kind.as_str() {
                     "f64mem" => quote! { Type::F64 },
                     _ => unimplemented!(),
                 };
                 quote! {
-                    if #node.is_frame_index() && matches!(#node.ty, #ty) {
+                    if #parent.is_frame_index() && matches!(#parent.ty, #ty) {
                           #body
                     }
                 }
             }
-            r => {
-                // register class
-                let r = ident_tok(r);
+            reg_class => {
+                let reg_class = ident_tok(reg_class);
                 quote! {
-                    if #node.is_maybe_register()
-                      && matches!(ty2rc(&#node.ty), Some(RegisterClassKind::#r)) {
+                    if #parent.is_maybe_register()
+                      && matches!(ty2rc(&#parent.ty), Some(RegisterClassKind::#reg_class)) {
                             #body
                     }
                 }
@@ -322,154 +293,65 @@ impl<'a> ISelPatParser<'a> {
         }
     }
 
-    pub fn parse_selected_inst_arguments_pat(
-        &mut self,
-    ) -> (proc_macro2::TokenStream, proc_macro2::TokenStream) {
-        let mut def_operands = quote! {};
-        let mut operands = quote! {};
-
-        loop {
-            if self.reader.skip_punct('%') {
-                let reg_s = self.reader.get_ident().unwrap();
-                let reg = ident_tok(reg_s.as_str());
-                def_operands = quote! {
-                    #def_operands
-                    let #reg = heap.alloc_phys_reg(regs_info, str2reg(#reg_s).unwrap());
-                };
-                operands = quote! {
-                    #operands #reg,
-                };
-            } else if self.reader.cur_is_group('[') {
-                let group = self.reader.get().unwrap();
-                let mut reader = TokenStreamReader::new(group_stream(group).into_iter());
-                let mut parser = ISelPatParser::new(&mut reader, &self.root, self.parent.clone());
-                let addressing_name = ident_tok(parser.reader.get_ident().unwrap().as_str());
-                let (defo, o) = parser.parse_selected_inst_arguments_pat();
-                def_operands = quote! {
-                    #def_operands
-                    #defo
-                    let mem__ = heap.alloc(DAGNode::new_mem( MemNodeKind::#addressing_name, vec![#o])); // TODO: Uniquify mem__
-                };
-                operands = quote! {
-                    #operands mem__,
-                };
-            } else {
-                let name = self.reader.get_ident().unwrap();
-                let op = ident_tok(name.as_str());
-                match name.as_str() {
-                    "none" => {
-                        operands = quote! {
-                            #operands
-                            heap.alloc_none(),
-                        }
-                    }
-                    _ => {
-                        def_operands = quote! {
-                            #def_operands
-                            let #op = self.run_on_node(tys, regs_info, heap, #op);
-                        };
-                        operands = quote! { #operands #op, };
-                    }
-                }
-            }
-
-            if !self.reader.skip_punct(',') {
-                break;
-            }
-        }
-
-        (def_operands, operands)
-    }
-
-    // TODO: refine code asap
-    pub fn parse_selected_inst_pat(&mut self) -> proc_macro2::TokenStream {
-        let ir_or_mi = self.reader.get_ident().unwrap();
-        assert!(self.reader.skip_punct('.'));
-        let name = ident_tok(self.reader.get_ident().unwrap().as_str());
-        let inst = match ir_or_mi.as_str() {
-            "ir" => quote! { NodeKind::IR(IRNodeKind::#name) },
-            "mi" => quote! { NodeKind::MI(MINodeKind::#name) },
-            _ => abort!(0, "expected 'ir' or 'mi'"),
-        };
-
-        let (def_operands, operands) = self.parse_selected_inst_arguments_pat();
-
-        let root = &self.root;
+    fn run_on_inst(&mut self, inst: TS, operands: Vec<Node>) -> TS {
+        let (defs, ops) = self.selected_operands(operands);
         quote! {
-            #def_operands
+            #defs
             return heap.alloc(DAGNode::new(
-                #inst,
-                vec![#operands],
-                #root.ty.clone()
-            ))
+                    #inst,
+                    vec![#ops],
+                    node.ty));
         }
     }
 
-    pub fn parse_inst_pat(&mut self, depth: usize) -> proc_macro2::TokenStream {
-        let group = self.reader.get().unwrap();
-        let mut reader = TokenStreamReader::new(group_stream(group).into_iter());
-
-        let ir_or_mi = reader.get_ident().unwrap();
-        assert!(reader.skip_punct('.'));
-        let name = ident_tok(reader.get_ident().unwrap().as_str());
-        let inst = match ir_or_mi.as_str() {
-            "ir" => quote! { NodeKind::IR(IRNodeKind::#name) },
-            "mi" => quote! { NodeKind::MI(MINodeKind::#name) },
-            _ => abort!(0, "expected 'ir' or 'mi'"),
-        };
-
-        let mut operand_names = vec![];
-        loop {
-            operand_names.push(ident_tok(reader.get_ident().unwrap().as_str()));
-            if !reader.skip_punct(',') {
-                break;
-            }
-        }
-
-        let new_parent = if depth > 0 {
-            let node = ident_tok(self.reader.get_ident().unwrap().as_str());
-            quote! { #node }
-        } else {
-            self.parent.clone()
-        };
-
-        let mut operands = quote! {};
-        for (i, op_name) in operand_names.iter().enumerate() {
-            operands = quote! {
-                #operands
-                let #op_name = #new_parent.operand[#i];
-            };
-        }
-
-        let body = if self.reader.cur_is_group('{') {
-            let group = self.reader.get().unwrap();
-            let mut reader = TokenStreamReader::new(group_stream(group).into_iter());
-            let mut parser = ISelPatParser::new(&mut reader, &self.root, new_parent.clone());
-            parser.parse_pats(depth + 1)
-        } else if self.reader.skip_punct('=') && self.reader.skip_punct('>') {
-            let group = self.reader.get().unwrap();
-            let one = tok_is_group(&group, '(');
-            if one {
-                let mut reader = TokenStreamReader::new(group_stream(group).into_iter());
-                let mut parser = ISelPatParser::new(&mut reader, &self.root, new_parent.clone());
-                parser.parse_selected_inst_pat()
-            } else {
-                // for user own code
-                let body = proc_macro2::TokenStream::from(group_stream(group));
-                quote! {
-                    { return { #body }; }
+    // def, operands
+    fn selected_operands(&mut self, operands: Vec<Node>) -> (TS, TS) {
+        let mut def_operands_ts = quote! {};
+        let mut operands_ts = quote! {};
+        for operand in operands {
+            match operand {
+                Node::Ident(name) => {
+                    let name = ident_tok(name.as_str());
+                    def_operands_ts = quote! {
+                        #def_operands_ts
+                        let #name = self.run_on_node(tys, regs_info, heap, #name);
+                    };
+                    operands_ts = quote! { #operands_ts #name, };
                 }
-            }
-        } else {
-            abort!(0, "expected ':' or '=>'")
-        };
-
-        quote! {
-            if #new_parent.kind == #inst {
-                #operands
-                #body
+                Node::Register(name) => {
+                    let name_s = name.as_str();
+                    let name = ident_tok(name.as_str());
+                    def_operands_ts = quote! {
+                        #def_operands_ts
+                        let #name = heap.alloc_phys_reg(regs_info, str2reg(#name_s).unwrap());
+                    };
+                    operands_ts = quote! {
+                        #operands_ts #name,
+                    };
+                }
+                Node::Addressing(name, operands) => {
+                    let name = ident_tok(name.as_str());
+                    let (defs, ops) = self.selected_operands(operands);
+                    def_operands_ts = quote! {
+                        #def_operands_ts
+                        #defs
+                        let mem__ = heap.alloc(DAGNode::new_mem(
+                                MemNodeKind::#name, vec![#ops])); // TODO: Uniquify mem__
+                    };
+                    operands_ts = quote! {
+                        #operands_ts mem__,
+                    }
+                }
+                Node::None => {
+                    operands_ts = quote! {
+                        #operands_ts
+                        heap.alloc_none(),
+                    };
+                }
+                _ => unimplemented!(),
             }
         }
+        (def_operands_ts, operands_ts)
     }
 }
 
