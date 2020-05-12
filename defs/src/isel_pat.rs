@@ -16,6 +16,16 @@ pub fn run(item: TokenStream) -> TokenStream {
     TokenStream::from(output)
 }
 
+type TS = proc_macro2::TokenStream;
+
+enum Node {
+    Patterns(Vec<Node>),
+    InstPattern(TS, Vec<Node>, TS, Box<Node>), // inst, operands, parent, body
+    OperandPattern(TS, TS, Box<Node>),         // operand kind, parent, body
+    Inst(TS, Vec<Node>),
+    Operand(String),
+}
+
 struct ISelPatParser<'a> {
     pub reader: &'a mut TokenStreamReader,
     root: &'a proc_macro2::TokenStream,
