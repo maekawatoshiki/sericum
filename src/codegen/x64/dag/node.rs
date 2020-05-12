@@ -361,3 +361,9 @@ impl NodeKind {
         }
     }
 }
+
+impl MINodeKind {
+    pub fn get_def_type(&self) -> Type {
+        rc2ty(self.inst_def().unwrap().defs[0].as_reg_class())
+    }
+}

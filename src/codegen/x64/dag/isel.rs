@@ -57,14 +57,7 @@ impl MISelector {
                     imm32 b => (mi.ADDr64i32 a, b)
                     GR64  b => (mi.ADDrr64   a, b) }
                 XMM a {
-                    imm_f64 b => {
-                        let n1 = heap.alloc(DAGNode::new(
-                                NodeKind::MI(MINodeKind::MOVSDrm64), vec![b], Type::F64));
-                        let a = self.run_on_node(tys, regs_info, heap, a);
-                        let n2 = heap.alloc(DAGNode::new(NodeKind::MI(MINodeKind::ADDSDrr),
-                                vec![a, n1], Type::F64));
-                        n2
-                    }
+                    imm_f64 b => (mi.ADDSDrr a, (mi.MOVSDrm64 b))
                     XMM    b => (mi.ADDSDrr a, b)
                 }
             }
@@ -73,36 +66,16 @@ impl MISelector {
                     GR32  b => (mi.SUBrr32   a, b)
                     imm32 b => (mi.SUBri32   a, b) }
                 imm32 a {
-                    GR32 b => {
-                        let n1 = heap.alloc(DAGNode::new(
-                                NodeKind::MI(MINodeKind::MOVri32), vec![a], Type::Int32));
-                        let b = self.run_on_node(tys, regs_info, heap, b);
-                        heap.alloc(DAGNode::new(NodeKind::MI(MINodeKind::SUBrr32),
-                                vec![n1, b], Type::Int32))
-                    }
+                    GR32 b => (mi.SUBrr32 (mi.MOVri32 a), b)
                 }
                 GR64 a {
                     imm32 b => (mi.SUBr64i32 a, b) }
                 XMM  a {
-                    imm_f64 b => {
-                        let n1 = heap.alloc(DAGNode::new(
-                                NodeKind::MI(MINodeKind::MOVSDrm64), vec![b], Type::F64));
-                        let a = self.run_on_node(tys, regs_info, heap, a);
-                        let n2 = heap.alloc(DAGNode::new(NodeKind::MI(MINodeKind::SUBSDrr),
-                                vec![a, n1], Type::F64));
-                        n2
-                    }
+                    imm_f64 b => (mi.SUBSDrr a, (mi.MOVSDrm64 b))
                     XMM    b => (mi.SUBSDrr a, b)
                 }
                 imm_f64 a {
-                    XMM b => {
-                        let n1 = heap.alloc(DAGNode::new(
-                                NodeKind::MI(MINodeKind::MOVSDrm64), vec![a], Type::F64));
-                        let b = self.run_on_node(tys, regs_info, heap, b);
-                        let n2 = heap.alloc(DAGNode::new(NodeKind::MI(MINodeKind::SUBSDrr),
-                                vec![n1, b], Type::F64));
-                        n2
-                    }
+                    XMM b => (mi.SUBSDrr (mi.MOVSDrm64 a), b)
                 }
             }
             (ir.Mul a, b) {
@@ -112,38 +85,17 @@ impl MISelector {
                 GR64 a {
                     imm32 b => (mi.IMULrr64i32 a, b) }
                 XMM a {
-                    imm_f64 b => {
-                        let n1 = heap.alloc(DAGNode::new(
-                                NodeKind::MI(MINodeKind::MOVSDrm64), vec![b], Type::F64));
-                        let a = self.run_on_node(tys, regs_info, heap, a);
-                        let n2 = heap.alloc(DAGNode::new(NodeKind::MI(MINodeKind::MULSDrr),
-                                vec![a, n1], Type::F64));
-                        n2
-                    }
+                    imm_f64 b => (mi.MULSDrr a, (mi.MOVSDrm64 b))
                     XMM    b => (mi.MULSDrr a, b)
                 }
             }
             (ir.Div a, b) {
                 XMM a {
-                    imm_f64 b => {
-                        let n1 = heap.alloc(DAGNode::new(
-                                NodeKind::MI(MINodeKind::MOVSDrm64), vec![b], Type::F64));
-                        let a = self.run_on_node(tys, regs_info, heap, a);
-                        let n2 = heap.alloc(DAGNode::new(NodeKind::MI(MINodeKind::DIVSDrr),
-                                vec![a, n1], Type::F64));
-                        n2
-                    }
+                    imm_f64 b => (mi.DIVSDrr a, (mi.MOVSDrm64 b))
                     XMM    b => (mi.DIVSDrr a, b)
                 }
                 imm_f64 a {
-                    XMM b => {
-                        let n1 = heap.alloc(DAGNode::new(
-                                NodeKind::MI(MINodeKind::MOVSDrm64), vec![a], Type::F64));
-                        let b = self.run_on_node(tys, regs_info, heap, b);
-                        let n2 = heap.alloc(DAGNode::new(NodeKind::MI(MINodeKind::DIVSDrr),
-                                vec![n1, b], Type::F64));
-                        n2
-                    }
+                    XMM b => (mi.DIVSDrr (mi.MOVSDrm64 a), b)
                 }
             }
             (ir.Load a) {
@@ -168,21 +120,11 @@ impl MISelector {
                         _ => unimplemented!()
                     }
                 }
-                    // (mi.MOVrm32 [Base a]) TODO
             }
             (ir.Store a, b) {
                 (ir.FIAddr c) a {
                     f64mem c {
-                        imm_f64 b => {
-                            // TODO: Refactor
-                            let rbp = heap.alloc(DAGNode::new_phys_reg(regs_info, GR64::RBP));
-                            let n1 = heap.alloc(DAGNode::new(
-                                    NodeKind::MI(MINodeKind::MOVSDrm64), vec![b], Type::F64));
-                            let mem = heap.alloc(DAGNode::new_mem(MemNodeKind::BaseFi, vec![rbp, c]));
-                            let n2 = heap.alloc(DAGNode::new(NodeKind::MI(MINodeKind::MOVSDmr),
-                                    vec![mem, n1], Type::Void));
-                            n2
-                        }
+                        imm_f64 b => (mi.MOVSDmr [BaseFi %rbp, c], (mi.MOVSDrm64 b))
                     }
                     mem32  c {
                         GR32  b => (mi.MOVmr32 [BaseFi %rbp, c], b)
@@ -191,15 +133,7 @@ impl MISelector {
                     imm32 b => (mi.MOVmi32 [Base a], b)
                     GR32  b => (mi.MOVmr32 [Base a], b)
                     GR64  b => (mi.MOVmr64 [Base a], b)
-                    imm_f64 b => {
-                        let n1 = heap.alloc(DAGNode::new(
-                                NodeKind::MI(MINodeKind::MOVSDrm64), vec![b], Type::F64));
-                        let a = self.run_on_node(tys, regs_info, heap, a);
-                        let mem = heap.alloc(DAGNode::new_mem(MemNodeKind::Base, vec![a]));
-                        let n2 = heap.alloc(DAGNode::new(NodeKind::MI(MINodeKind::MOVSDmr),
-                                vec![mem, n1], Type::Void));
-                        n2
-                    }
+                    imm_f64 b => (mi.MOVSDmr [Base a], (mi.MOVSDrm64 b))
                     XMM    b => (mi.MOVSDmr [Base a], b)
                 }
             }

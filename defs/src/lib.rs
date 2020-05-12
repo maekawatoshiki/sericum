@@ -5,6 +5,7 @@ use proc_macro::TokenStream;
 
 extern crate proc_macro_error;
 extern crate proc_quote;
+extern crate rand;
 
 use proc_macro_error::*;
 

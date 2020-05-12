@@ -332,14 +332,30 @@ impl TokenStreamConstructor {
                 Node::Addressing(name, operands) => {
                     let name = ident_tok(name.as_str());
                     let (defs, ops) = self.selected_operands(operands);
+                    let mem = ident_tok(&format!("mem_{}", unique_name()));
                     def_operands_ts = quote! {
                         #def_operands_ts
                         #defs
-                        let mem__ = heap.alloc(DAGNode::new_mem(
+                        let #mem = heap.alloc(DAGNode::new_mem(
                                 MemNodeKind::#name, vec![#ops])); // TODO: Uniquify mem__
                     };
                     operands_ts = quote! {
-                        #operands_ts mem__,
+                        #operands_ts #mem,
+                    }
+                }
+                Node::Inst(inst, operands) => {
+                    let (defs, ops) = self.selected_operands(operands);
+                    let iname = ident_tok(&format!("inst_{}", unique_name()));
+                    def_operands_ts = quote! {
+                        #def_operands_ts
+                        #defs
+                        let #iname = heap.alloc(DAGNode::new(
+                            #inst,
+                            vec![#ops],
+                            #inst.as_mi().get_def_type()));
+                    };
+                    operands_ts = quote! {
+                        #operands_ts #iname,
                     }
                 }
                 Node::None => {
@@ -357,4 +373,19 @@ impl TokenStreamConstructor {
 
 fn ident_tok(s: &str) -> Ident {
     Ident::new(s, Span::call_site())
+}
+
+fn unique_name() -> String {
+    const CHARSET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ\
+                             abcdefghijklmnopqrstuvwxyz\
+                             0123456789";
+    const LEN: usize = 16;
+    use rand::Rng;
+    let mut rng = rand::thread_rng();
+    (0..LEN)
+        .map(|_| {
+            let idx = rng.gen_range(0, CHARSET.len());
+            CHARSET[idx] as char
+        })
+        .collect()
 }

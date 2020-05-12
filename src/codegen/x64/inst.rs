@@ -470,3 +470,12 @@ impl TargetInstDef {
         self
     }
 }
+
+impl TargetRegister {
+    pub fn as_reg_class(&self) -> RegisterClassKind {
+        match self {
+            Self::RegClass(rc) => *rc,
+            _ => panic!(),
+        }
+    }
+}
