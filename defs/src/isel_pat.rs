@@ -16,14 +16,64 @@ pub fn run(item: TokenStream) -> TokenStream {
     TokenStream::from(output)
 }
 
+fn parser_run(item: TokenStream) -> TokenStream {
+    let item = TokenStream::from(quote! {});
+    let mut reader = TokenStreamReader::new(item.into_iter());
+    let output = PatternParser::new(&mut reader).parse();
+    unimplemented!()
+}
+
 type TS = proc_macro2::TokenStream;
 
+#[derive(Debug, Clone)]
 enum Node {
     Patterns(Vec<Node>),
     InstPattern(TS, Vec<Node>, TS, Box<Node>), // inst, operands, parent, body
     OperandPattern(TS, TS, Box<Node>),         // operand kind, parent, body
     Inst(TS, Vec<Node>),
     Operand(String),
+}
+
+struct PatternParser<'a> {
+    pub reader: &'a mut TokenStreamReader,
+}
+
+impl<'a> PatternParser<'a> {
+    pub fn new(reader: &'a mut TokenStreamReader) -> Self {
+        Self { reader }
+    }
+
+    pub fn parse(&mut self) -> Node {
+        let body = self.parse_pats(0);
+        body
+    }
+
+    pub fn parse_pats(&mut self, depth: usize) -> Node {
+        let mut pats = vec![];
+        while self.reader.peak().is_some() {
+            pats.push(self.parse_pat(depth));
+        }
+        Node::Patterns(pats)
+    }
+
+    pub fn parse_pat(&mut self, depth: usize) -> Node {
+        if self.reader.cur_is_group('(') {
+            return self.parse_inst_pat(depth);
+        }
+        self.parse_operand_pat(depth)
+        // unimplemented!()
+    }
+
+    pub fn parse_inst_pat(&mut self, depth: usize) -> Node {
+        let group = self.reader.get().unwrap();
+        let mut reader = TokenStreamReader::new(group_stream(group).into_iter());
+        let mut parser = PatternParser::new(&mut reader);
+        unimplemented!()
+    }
+
+    fn parse_operand_pat(&mut self, depth: usize) -> Node {
+        unimplemented!()
+    }
 }
 
 struct ISelPatParser<'a> {
