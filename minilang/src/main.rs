@@ -279,9 +279,9 @@ fn main() {
       c = Vec_dot(rs, rs) - (*s).radius * (*s).radius;
       d = b * b - c;
       t = 0.0 - b - sqrt(d);
-      if d < 0.0 { return 0; }
-      if t < 0.0002 { return 0; }
-      if (*isect).distance < t { return 0; }
+      if d <= 0.0 { return 0; }
+      if t <= 0.0001 { return 0; }
+      if (*isect).distance <= t { return 0; }
       (*isect).hit_point = Vec_add((*ray).origin, Vec_mul((*ray).dir, t));
       (*isect).normal = Vec_normalize(Vec_sub((*isect).hit_point, (*s).position));
       (*isect).color = Vec_mul((*s).color, clamp(Vec_dot(light, (*isect).normal), 0.1, 1.0));
@@ -313,8 +313,8 @@ fn main() {
       d = 0.0 - Vec_dot((*p).position, (*p).normal);
       v = Vec_dot((*ray).dir, (*p).normal);
       t = 0.0 - (Vec_dot((*ray).origin, (*p).normal) + d) / v;
-      if t < 0.0002 { return 0; }
-      if (*isect).distance < t { return 0; }
+      if t <= 0.0001 { return 0; }
+      if (*isect).distance <= t { return 0; }
       (*isect).hit_point = Vec_add((*ray).origin, Vec_mul((*ray).dir, t));
       (*isect).normal = (*p).normal;
       d2 = clamp(Vec_dot(light, (*isect).normal), 0.1, 1.0);

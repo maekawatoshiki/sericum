@@ -739,7 +739,7 @@ impl JITCompiler {
 
     fn compile_jbe(&mut self, inst: &MachineInst) {
         let l = self.get_label(inst.operand[0].as_basic_block());
-        dynasm!(self.asm; jne => l);
+        dynasm!(self.asm; jbe => l);
     }
 
     fn compile_jb(&mut self, inst: &MachineInst) {
