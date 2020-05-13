@@ -258,6 +258,7 @@ impl JITCompiler {
                     MachineOpcode::MULSDrm => self.compile_mulsd_rm(&frame_objects, inst),
                     MachineOpcode::DIVSDrr => self.compile_divsd_rr(inst),
                     MachineOpcode::DIVSDrm => self.compile_divsd_rm(&frame_objects, inst),
+                    MachineOpcode::SQRTSDrr => self.compile_sqrtsd_rr(inst),
                     MachineOpcode::IDIV => self.compile_idiv(&frame_objects, inst),
                     MachineOpcode::CDQ => self.compile_cdq(&frame_objects, inst),
                     MachineOpcode::CALL => self.compile_call(module, &frame_objects, inst),
@@ -956,6 +957,12 @@ impl JITCompiler {
             }
             _ => unimplemented!(),
         }
+    }
+
+    fn compile_sqrtsd_rr(&mut self, inst: &MachineInst) {
+        let r0 = phys_reg_to_dynasm_reg(inst.def[0].as_phys_reg());
+        let r1 = phys_reg_to_dynasm_reg(inst.operand[0].as_register().as_phys_reg());
+        dynasm!(self.asm; sqrtsd Rx(r0), Rx(r1));
     }
 
     fn compile_cdq(&mut self, _fo: &FrameObjectsInfo, _inst: &MachineInst) {

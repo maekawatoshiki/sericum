@@ -201,6 +201,14 @@ mod inst {
                 .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::XMM)])
                 .add_tie(DefOrUseReg::Def(0), DefOrUseReg::Use(0))
         };
+        pub static ref SQRTSDrr: TargetInstDef = {
+            TargetInstDef::new(TargetOpcode::SQRTSDrr)
+                .set_uses(vec![TargetOperand::Register(TargetRegister::RegClass(
+                    RegisterClassKind::XMM,
+                ))])
+                .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::XMM)])
+                // .add_tie(DefOrUseReg::Def(0), DefOrUseReg::Use(0))
+        };
         pub static ref CDQ: TargetInstDef = {
             TargetInstDef::new(TargetOpcode::CDQ)
                 .set_imp_def(vec![TargetRegister::Specific(GR32::EDX.as_phys_reg())])
@@ -389,6 +397,7 @@ pub enum TargetOpcode {
     IDIV,
     DIVSDrr,
     DIVSDrm,
+    SQRTSDrr,
     MOVrr32,
     MOVri32,
     MOVrr64,
@@ -458,6 +467,7 @@ impl TargetOpcode {
             Self::CDQ => Some(&*inst::CDQ),
             Self::DIVSDrr => Some(&*inst::DIVSDrr),
             Self::DIVSDrm => Some(&*inst::DIVSDrm),
+            Self::SQRTSDrr => Some(&*inst::SQRTSDrr),
             Self::MOVrr32 => Some(&*inst::MOVrr32),
             Self::MOVri32 => Some(&*inst::MOVri32),
             Self::MOVrm32 => Some(&*inst::MOVrm32),
