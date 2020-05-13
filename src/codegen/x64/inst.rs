@@ -85,6 +85,15 @@ mod inst {
                 .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::XMM)])
                 .add_tie(DefOrUseReg::Def(0), DefOrUseReg::Use(0))
         };
+        pub static ref ADDSDrm: TargetInstDef = {
+            TargetInstDef::new(TargetOpcode::ADDSDrm)
+                .set_uses(vec![
+                    TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::XMM)),
+                    TargetOperand::Mem,
+                ])
+                .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::XMM)])
+                .add_tie(DefOrUseReg::Def(0), DefOrUseReg::Use(0))
+        };
         pub static ref SUBrr32: TargetInstDef = {
             TargetInstDef::new(TargetOpcode::SUBrr32)
                 .set_uses(vec![
@@ -117,6 +126,15 @@ mod inst {
                 .set_uses(vec![
                     TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::XMM)),
                     TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::XMM)),
+                ])
+                .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::XMM)])
+                .add_tie(DefOrUseReg::Def(0), DefOrUseReg::Use(0))
+        };
+        pub static ref SUBSDrm: TargetInstDef = {
+            TargetInstDef::new(TargetOpcode::SUBSDrm)
+                .set_uses(vec![
+                    TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::XMM)),
+                    TargetOperand::Mem,
                 ])
                 .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::XMM)])
                 .add_tie(DefOrUseReg::Def(0), DefOrUseReg::Use(0))
@@ -156,11 +174,29 @@ mod inst {
                 .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::XMM)])
                 .add_tie(DefOrUseReg::Def(0), DefOrUseReg::Use(0))
         };
+        pub static ref MULSDrm: TargetInstDef = {
+            TargetInstDef::new(TargetOpcode::MULSDrm)
+                .set_uses(vec![
+                    TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::XMM)),
+                    TargetOperand::Mem,
+                ])
+                .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::XMM)])
+                .add_tie(DefOrUseReg::Def(0), DefOrUseReg::Use(0))
+        };
         pub static ref DIVSDrr: TargetInstDef = {
             TargetInstDef::new(TargetOpcode::DIVSDrr)
                 .set_uses(vec![
                     TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::XMM)),
                     TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::XMM)),
+                ])
+                .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::XMM)])
+                .add_tie(DefOrUseReg::Def(0), DefOrUseReg::Use(0))
+        };
+        pub static ref DIVSDrm: TargetInstDef = {
+            TargetInstDef::new(TargetOpcode::DIVSDrm)
+                .set_uses(vec![
+                    TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::XMM)),
+                    TargetOperand::Mem,
                 ])
                 .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::XMM)])
                 .add_tie(DefOrUseReg::Def(0), DefOrUseReg::Use(0))
@@ -338,17 +374,21 @@ pub enum TargetOpcode {
     ADDri32,
     ADDr64i32,
     ADDSDrr,
+    ADDSDrm,
     SUBrr32,
     SUBri32,
     SUBr64i32,
     SUBSDrr,
+    SUBSDrm,
     IMULrr32,
     IMULrri32,
     IMULrr64i32,
     MULSDrr,
+    MULSDrm,
     CDQ,
     IDIV,
     DIVSDrr,
+    DIVSDrm,
     MOVrr32,
     MOVri32,
     MOVrr64,
@@ -404,16 +444,20 @@ impl TargetOpcode {
             Self::ADDri32 => Some(&*inst::ADDri32),
             Self::ADDr64i32 => Some(&*inst::ADDr64i32),
             Self::ADDSDrr => Some(&*inst::ADDSDrr),
+            Self::ADDSDrm => Some(&*inst::ADDSDrm),
             Self::SUBrr32 => Some(&*inst::SUBrr32),
             Self::SUBri32 => Some(&*inst::SUBri32),
             Self::SUBr64i32 => Some(&*inst::SUBr64i32),
             Self::SUBSDrr => Some(&*inst::SUBSDrr),
+            Self::SUBSDrm => Some(&*inst::SUBSDrm),
             Self::IMULrr32 => Some(&*inst::IMULrr32),
             Self::IMULrri32 => Some(&*inst::IMULrri32),
             Self::IMULrr64i32 => Some(&*inst::IMULrr64i32),
             Self::MULSDrr => Some(&*inst::MULSDrr),
+            Self::MULSDrm => Some(&*inst::MULSDrm),
             Self::CDQ => Some(&*inst::CDQ),
             Self::DIVSDrr => Some(&*inst::DIVSDrr),
+            Self::DIVSDrm => Some(&*inst::DIVSDrm),
             Self::MOVrr32 => Some(&*inst::MOVrr32),
             Self::MOVri32 => Some(&*inst::MOVri32),
             Self::MOVrm32 => Some(&*inst::MOVrm32),
