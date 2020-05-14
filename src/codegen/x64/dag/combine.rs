@@ -31,7 +31,7 @@ impl Combine {
         &mut self,
         replace: &mut FxHashMap<Raw<DAGNode>, Raw<DAGNode>>,
         heap: &mut DAGHeap,
-        mut node: Raw<DAGNode>,
+        node: Raw<DAGNode>,
     ) -> Raw<DAGNode> {
         if !node.may_contain_children() {
             return node;
@@ -41,15 +41,14 @@ impl Combine {
             return *replaced;
         }
 
-        let new_operands = self.combine_operands(replace, heap, node.operand.clone());
-        node.operand = new_operands;
-
         // TODO: Macro for pattern matching?
         let mut replaced = match &node.kind {
             NodeKind::IR(IRNodeKind::Add) => self.combine_node_add(replace, heap, node),
-            NodeKind::IR(IRNodeKind::BrCond) => self.combine_node_brcond(heap, node),
-            _ => node,
+            // NodeKind::IR(IRNodeKind::Mul) => self.combine_node_mul(replace, heap, node),
+            NodeKind::IR(IRNodeKind::BrCond) => self.combine_node_brcond(replace, heap, node),
+            _ => self.combine_operands(replace, heap, node),
         };
+
         replace.insert(node, replaced);
 
         if let Some(next) = node.next {
@@ -79,7 +78,7 @@ impl Combine {
 
         // (N + 0) -> N
         if node.operand[1].is_constant() && node.operand[1].as_constant().is_null() {
-            node.operand[0].ty = node.ty.clone();
+            node.operand[0].ty = node.ty;
             return node.operand[0];
         }
 
@@ -106,24 +105,41 @@ impl Combine {
             ));
         }
 
-        node
+        self.combine_operands(replace, heap, node)
     }
 
-    fn combine_node_brcond(&mut self, heap: &mut DAGHeap, node: Raw<DAGNode>) -> Raw<DAGNode> {
+    // fn combine_node_mul(
+    //     &mut self,
+    //     replace: &mut FxHashMap<Raw<DAGNode>, Raw<DAGNode>>,
+    //     heap: &mut DAGHeap,
+    //     mut node: Raw<DAGNode>,
+    // ) -> Raw<DAGNode> {
+    // }
+
+    fn combine_node_brcond(
+        &mut self,
+        replace: &mut FxHashMap<Raw<DAGNode>, Raw<DAGNode>>,
+        heap: &mut DAGHeap,
+        node: Raw<DAGNode>,
+    ) -> Raw<DAGNode> {
         let cond = node.operand[0];
         let br = node.operand[1];
         match cond.kind {
-            NodeKind::IR(IRNodeKind::Setcc) => heap.alloc(DAGNode::new(
-                NodeKind::IR(IRNodeKind::Brcc),
-                vec![cond.operand[0], cond.operand[1], cond.operand[2], br],
-                Type::Void,
-            )),
-            NodeKind::IR(IRNodeKind::FCmp) => heap.alloc(DAGNode::new(
-                NodeKind::IR(IRNodeKind::FPBrcc),
-                vec![cond.operand[0], cond.operand[1], cond.operand[2], br],
-                Type::Void,
-            )),
-            _ => node,
+            NodeKind::IR(IRNodeKind::Setcc) | NodeKind::IR(IRNodeKind::FCmp) => {
+                let cond_kind = cond.operand[0];
+                let lhs = self.combine_node(replace, heap, cond.operand[1]);
+                let rhs = self.combine_node(replace, heap, cond.operand[2]);
+                heap.alloc(DAGNode::new(
+                    match cond.kind {
+                        NodeKind::IR(IRNodeKind::Setcc) => NodeKind::IR(IRNodeKind::Brcc),
+                        NodeKind::IR(IRNodeKind::FCmp) => NodeKind::IR(IRNodeKind::FPBrcc),
+                        _ => unreachable!(),
+                    },
+                    vec![cond_kind, lhs, rhs, br],
+                    Type::Void,
+                ))
+            }
+            _ => self.combine_operands(replace, heap, node),
         }
     }
 
@@ -131,11 +147,13 @@ impl Combine {
         &mut self,
         replace: &mut FxHashMap<Raw<DAGNode>, Raw<DAGNode>>,
         heap: &mut DAGHeap,
-        operands: Vec<Raw<DAGNode>>,
-    ) -> Vec<Raw<DAGNode>> {
-        operands
-            .into_iter()
-            .map(|op| self.combine_node(replace, heap, op))
-            .collect()
+        mut node: Raw<DAGNode>,
+    ) -> Raw<DAGNode> {
+        node.operand = node
+            .operand
+            .iter()
+            .map(|op| self.combine_node(replace, heap, *op))
+            .collect();
+        node
     }
 }

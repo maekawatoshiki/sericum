@@ -49,7 +49,7 @@ impl MISelector {
         }
 
         let mut selected = isel_pat!(
-            (ir.Call a) => {
+            (ir.Call a) => { // TODO: Refactoring
                 match &a.kind {
                     NodeKind::Operand(OperandNodeKind::Address(AddressKind::FunctionName(name))) if name == "cilk.sqrt.f64"=> {
                         let x = self.run_on_node(tys, regs_info, heap, node.operand[1]);
