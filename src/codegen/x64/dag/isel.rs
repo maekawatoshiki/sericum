@@ -127,12 +127,12 @@ impl MISelector {
                     XMM b => (mi.DIVSDrr (mi.MOVSDrm64 a), b)
                 }
             }
-            // (ir.Shl a, b) {
-            //     GR64 a {
-            //         imm8 b => (mi.SHLr64i8 a, b) }
-            //     GR32 a {
-            //         imm8 b => (mi.SHLr32i8 a, b) }
-            // }
+            (ir.Shl a, b) {
+                GR64 a {
+                    imm8 b => (mi.SHLr64i8 a, b) }
+                GR32 a {
+                    imm8 b => (mi.SHLr32i8 a, b) }
+            }
             (ir.Load a) {
                 (ir.FIAddr b) a {
                     f64mem b => (mi.MOVSDrm [BaseFi %rbp, b])
