@@ -46,6 +46,9 @@ pub enum IRNodeKind {
 
     Load,
     Store,
+    Shl,
+    AShr,
+    LShr,
     Add,
     Sub,
     Mul,
@@ -75,6 +78,7 @@ pub enum IRNodeKind {
 
 #[derive(Debug, Clone, PartialEq, Copy)]
 pub enum ConstantKind {
+    Int8(i8),
     Int32(i32),
     Int64(i64),
     F64(f64),
@@ -151,8 +155,17 @@ impl ConstantKind {
         }
     }
 
+    pub fn is_power_of_two(&self) -> Option<u32> {
+        match self {
+            ConstantKind::Int32(x) if (*x as usize).is_power_of_two() => Some(x.trailing_zeros()),
+            ConstantKind::Int64(x) if (*x as usize).is_power_of_two() => Some(x.trailing_zeros()),
+            _ => None,
+        }
+    }
+
     pub fn get_type(&self) -> Type {
         match self {
+            ConstantKind::Int8(_) => Type::Int8,
             ConstantKind::Int32(_) => Type::Int32,
             ConstantKind::Int64(_) => Type::Int64,
             ConstantKind::F64(_) => Type::F64,
@@ -161,7 +174,7 @@ impl ConstantKind {
 
     pub fn is_null(&self) -> bool {
         match self {
-            ConstantKind::Int32(0) | ConstantKind::Int64(0) => true,
+            ConstantKind::Int8(0) | ConstantKind::Int32(0) | ConstantKind::Int64(0) => true,
             ConstantKind::F64(f) if *f == 0.0 => true,
             _ => false,
         }

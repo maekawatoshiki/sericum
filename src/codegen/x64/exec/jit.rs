@@ -65,7 +65,7 @@ impl JITExecutor {
             .run_on_module(&mut machine_module);
         machine::replace_data::ConstDataReplacer::new().run_on_module(&mut machine_module);
         machine::replace_copy::ReplaceCopyWithProperMInst::new().run_on_module(&mut machine_module);
-        // debug!(println!("{:?}", machine_module));
+        debug!(println!("{:?}", machine_module));
 
         // use crate::codegen::x64::asm::print::MachineAsmPrinter;
         // let mut printer = MachineAsmPrinter::new();
@@ -261,8 +261,9 @@ impl JITCompiler {
                     MachineOpcode::SQRTSDrr => self.compile_sqrtsd_rr(inst),
                     MachineOpcode::IDIV => self.compile_idiv(&frame_objects, inst),
                     MachineOpcode::CDQ => self.compile_cdq(&frame_objects, inst),
+                    MachineOpcode::SHLr32i8 => self.compile_shl_r32i8(inst),
+                    MachineOpcode::SHLr64i8 => self.compile_shl_r64i8(inst),
                     MachineOpcode::CALL => self.compile_call(module, &frame_objects, inst),
-                    // MachineOpcode::Copy => self.compile_copy(inst),
                     MachineOpcode::CMPri => self.compile_cmp_ri(inst),
                     MachineOpcode::CMPrr => self.compile_cmp_rr(inst),
                     MachineOpcode::UCOMISDrr => self.compile_ucomisd_rr(inst),
@@ -975,6 +976,18 @@ impl JITCompiler {
             phys_reg_to_dynasm_reg(reg.as_phys_reg())
         };
         dynasm!(self.asm; idiv Rd(r)) // TODO: for Rq
+    }
+
+    fn compile_shl_r32i8(&mut self, inst: &MachineInst) {
+        let r0 = phys_reg_to_dynasm_reg(inst.def[0].as_phys_reg());
+        let i1 = inst.operand[1].as_constant().as_i8();
+        dynasm!(self.asm; shl Rd(r0), i1);
+    }
+
+    fn compile_shl_r64i8(&mut self, inst: &MachineInst) {
+        let r0 = phys_reg_to_dynasm_reg(inst.def[0].as_phys_reg());
+        let i1 = inst.operand[1].as_constant().as_i8();
+        dynasm!(self.asm; shl Rq(r0), i1);
     }
 
     fn compile_jmp(&mut self, inst: &MachineInst) {

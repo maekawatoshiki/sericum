@@ -44,7 +44,7 @@ impl Combine {
         // TODO: Macro for pattern matching?
         let mut replaced = match &node.kind {
             NodeKind::IR(IRNodeKind::Add) => self.combine_node_add(replace, heap, node),
-            // NodeKind::IR(IRNodeKind::Mul) => self.combine_node_mul(replace, heap, node),
+            NodeKind::IR(IRNodeKind::Mul) => self.combine_node_mul(replace, heap, node),
             NodeKind::IR(IRNodeKind::BrCond) => self.combine_node_brcond(replace, heap, node),
             _ => self.combine_operands(replace, heap, node),
         };
@@ -101,20 +101,48 @@ impl Combine {
             return heap.alloc(DAGNode::new(
                 NodeKind::IR(IRNodeKind::Add),
                 vec![op0, c],
-                node.ty.clone(),
+                node.ty,
             ));
         }
 
         self.combine_operands(replace, heap, node)
     }
 
-    // fn combine_node_mul(
-    //     &mut self,
-    //     replace: &mut FxHashMap<Raw<DAGNode>, Raw<DAGNode>>,
-    //     heap: &mut DAGHeap,
-    //     mut node: Raw<DAGNode>,
-    // ) -> Raw<DAGNode> {
-    // }
+    fn combine_node_mul(
+        &mut self,
+        replace: &mut FxHashMap<Raw<DAGNode>, Raw<DAGNode>>,
+        heap: &mut DAGHeap,
+        mut node: Raw<DAGNode>,
+    ) -> Raw<DAGNode> {
+        // (C * any) -> (any * C)
+        if node.operand[0].is_constant() && !node.operand[1].is_constant() {
+            node.operand.swap(0, 1);
+        }
+
+        // (N * 0) -> 0
+        if node.operand[1].is_constant() && node.operand[1].as_constant().is_null() {
+            return node.operand[1];
+        }
+
+        // (N * 2^n) -> N << n
+        // if node.operand[0].ty == Type::Int32 && node.operand[1].is_constant() {
+        //     if let Some(n) = node.operand[1].as_constant().is_power_of_two() {
+        //         let n = heap.alloc(DAGNode::new(
+        //             NodeKind::Operand(OperandNodeKind::Constant(ConstantKind::Int8(n as i8))),
+        //             vec![],
+        //             Type::Int8,
+        //         ));
+        //         let x = self.combine_node(replace, heap, node.operand[0]);
+        //         return heap.alloc(DAGNode::new(
+        //             NodeKind::IR(IRNodeKind::Shl),
+        //             vec![x, n],
+        //             node.ty,
+        //         ));
+        //     }
+        // }
+
+        self.combine_operands(replace, heap, node)
+    }
 
     fn combine_node_brcond(
         &mut self,

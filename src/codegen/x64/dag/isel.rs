@@ -49,23 +49,23 @@ impl MISelector {
         }
 
         let mut selected = isel_pat!(
-            (ir.Call a) => { // TODO: Refactoring
-                match &a.kind {
-                    NodeKind::Operand(OperandNodeKind::Address(AddressKind::FunctionName(name))) if name == "cilk.sqrt.f64"=> {
-                        let x = self.run_on_node(tys, regs_info, heap, node.operand[1]);
-                        heap.alloc(DAGNode::new(NodeKind::MI(MINodeKind::SQRTSDrr),
-                                vec![x], Type::F64))
-                    }
-                    _ => {
-                        node.operand = node
-                            .operand
-                            .iter()
-                            .map(|op| self.run_on_node(tys, regs_info, heap, *op))
-                            .collect();
-                        node
-                    }
-                }
-            }
+            // (ir.Call a) => { // TODO: Refactoring
+            //     match &a.kind {
+            //         NodeKind::Operand(OperandNodeKind::Address(AddressKind::FunctionName(name))) if name == "cilk.sqrt.f64"=> {
+            //             let x = self.run_on_node(tys, regs_info, heap, node.operand[1]);
+            //             heap.alloc(DAGNode::new(NodeKind::MI(MINodeKind::SQRTSDrr),
+            //                     vec![x], Type::F64))
+            //         }
+            //         _ => {
+            //             node.operand = node
+            //                 .operand
+            //                 .iter()
+            //                 .map(|op| self.run_on_node(tys, regs_info, heap, *op))
+            //                 .collect();
+            //             node
+            //         }
+            //     }
+            // }
             (ir.Add a, b) {
                 GR32 a {
                     GR32  b => (mi.ADDrr32   a, b)
@@ -127,6 +127,12 @@ impl MISelector {
                     XMM b => (mi.DIVSDrr (mi.MOVSDrm64 a), b)
                 }
             }
+            // (ir.Shl a, b) {
+            //     GR64 a {
+            //         imm8 b => (mi.SHLr64i8 a, b) }
+            //     GR32 a {
+            //         imm8 b => (mi.SHLr32i8 a, b) }
+            // }
             (ir.Load a) {
                 (ir.FIAddr b) a {
                     f64mem b => (mi.MOVSDrm [BaseFi %rbp, b])

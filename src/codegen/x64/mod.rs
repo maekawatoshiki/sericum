@@ -12,6 +12,7 @@ impl TypeSize for Type {
     fn size_in_byte(&self, tys: &Types) -> usize {
         match self {
             Type::Int1 => 1,
+            Type::Int8 => 1,
             Type::Int32 => 4,
             Type::Int64 => 8,
             Type::F64 => 8,

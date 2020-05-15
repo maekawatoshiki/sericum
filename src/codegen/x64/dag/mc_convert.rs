@@ -437,7 +437,7 @@ impl<'a> ConversionInfo<'a> {
 
             if !matches!(
                 ty,
-                Type::Int32 | Type::Int64 | Type::F64 | Type::Pointer(_) | Type::Array(_)
+                Type::Int8 | Type::Int32 | Type::Int64 | Type::F64 | Type::Pointer(_) | Type::Array(_)
             ) {
                 unimplemented!()
             };
@@ -524,6 +524,7 @@ impl<'a> ConversionInfo<'a> {
     fn normal_operand(&mut self, node: Raw<DAGNode>) -> MachineOperand {
         match node.kind {
             NodeKind::Operand(OperandNodeKind::Constant(c)) => match c {
+                ConstantKind::Int8(i) => MachineOperand::Constant(MachineConstant::Int8(i)),
                 ConstantKind::Int32(i) => MachineOperand::Constant(MachineConstant::Int32(i)),
                 ConstantKind::Int64(i) => MachineOperand::Constant(MachineConstant::Int64(i)),
                 ConstantKind::F64(f) => MachineOperand::Constant(MachineConstant::F64(f)),

@@ -81,6 +81,7 @@ pub enum AddressKind {
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum MachineConstant {
+    Int8(i8),
     Int32(i32),
     Int64(i64),
     F64(f64),
@@ -649,6 +650,7 @@ impl MachineOperand {
     pub fn get_type(&self, regs_info: &RegistersInfo) -> Option<Type> {
         match self {
             MachineOperand::Branch(_) => None,
+            MachineOperand::Constant(MachineConstant::Int8(_)) => Some(Type::Int8),
             MachineOperand::Constant(MachineConstant::Int32(_)) => Some(Type::Int32),
             MachineOperand::Constant(MachineConstant::Int64(_)) => Some(Type::Int64),
             MachineOperand::Constant(MachineConstant::F64(_)) => Some(Type::F64),
@@ -705,6 +707,7 @@ impl AddressKind {
 impl MachineConstant {
     pub fn size_in_byte(&self) -> usize {
         match self {
+            MachineConstant::Int8(_) => 1,
             MachineConstant::Int32(_) => 4,
             MachineConstant::Int64(_) => 8,
             MachineConstant::F64(_) => 8,
@@ -717,6 +720,13 @@ impl MachineConstant {
 }
 
 impl MachineConstant {
+    pub fn as_i8(&self) -> i8 {
+        match self {
+            Self::Int8(i) => *i,
+            _ => panic!(),
+        }
+    }
+
     pub fn as_i32(&self) -> i32 {
         match self {
             Self::Int32(i) => *i,
@@ -918,6 +928,7 @@ impl fmt::Debug for MachineInst {
 impl fmt::Debug for MachineConstant {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::Int8(x) => write!(f, "i8 {}", x),
             Self::Int32(x) => write!(f, "i32 {}", x),
             Self::Int64(x) => write!(f, "i64 {}", x),
             Self::F64(x) => write!(f, "f64 {}", x),

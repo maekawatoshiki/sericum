@@ -250,6 +250,9 @@ impl TokenStreamConstructor {
     fn run_on_operand_pattern(&mut self, kind: String, parent: TS, body: Box<Node>) -> TS {
         let body = self.run_sub(*body);
         match kind.as_str() {
+            "imm8" => {
+                quote! { if #parent.is_constant() && matches!(#parent.ty, Type::Int8) { #body } }
+            }
             "imm32" => {
                 quote! { if #parent.is_constant() && matches!(#parent.ty, Type::Int32) { #body } }
             }

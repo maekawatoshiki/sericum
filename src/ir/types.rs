@@ -28,6 +28,7 @@ pub enum NonPrimitiveType {
 pub enum Type {
     Void,
     Int1,
+    Int8,
     Int32,
     Int64,
     F64,
@@ -119,9 +120,13 @@ impl Types {
                     .as_struct()
                     .fields_ty[index.unwrap().as_imm().as_int32() as usize],
             ),
-            Type::Void | Type::Int1 | Type::Int32 | Type::Int64 | Type::F64 | Type::Function(_) => {
-                Some(ty)
-            }
+            Type::Void
+            | Type::Int1
+            | Type::Int8
+            | Type::Int32
+            | Type::Int64
+            | Type::F64
+            | Type::Function(_) => Some(ty),
         }
     }
 
@@ -131,9 +136,13 @@ impl Types {
         }
 
         match ty {
-            Type::Void | Type::Int1 | Type::Int32 | Type::Int64 | Type::F64 | Type::Function(_) => {
-                None
-            }
+            Type::Void
+            | Type::Int1
+            | Type::Int8
+            | Type::Int32
+            | Type::Int64
+            | Type::F64
+            | Type::Function(_) => None,
             Type::Pointer(id) => match indices.len() {
                 1 => Some(*self.base.borrow().non_primitive_types[id].as_pointer()),
                 _ => {
@@ -255,9 +264,13 @@ impl TypesBase {
                 self.non_primitive_types[id].as_struct().fields_ty
                     [index.unwrap().as_imm().as_int32() as usize],
             ),
-            Type::Void | Type::Int1 | Type::Int32 | Type::Int64 | Type::F64 | Type::Function(_) => {
-                Some(ty)
-            }
+            Type::Void
+            | Type::Int1
+            | Type::Int8
+            | Type::Int32
+            | Type::Int64
+            | Type::F64
+            | Type::Function(_) => Some(ty),
         }
     }
 
@@ -267,9 +280,13 @@ impl TypesBase {
         }
 
         match ty {
-            Type::Void | Type::Int1 | Type::Int32 | Type::Int64 | Type::F64 | Type::Function(_) => {
-                None
-            }
+            Type::Void
+            | Type::Int1
+            | Type::Int8
+            | Type::Int32
+            | Type::Int64
+            | Type::F64
+            | Type::Function(_) => None,
             Type::Pointer(id) => match indices.len() {
                 1 => Some(*self.non_primitive_types[id].as_pointer()),
                 _ => {
@@ -302,6 +319,7 @@ impl TypesBase {
         match ty {
             Type::Void => "void".to_string(),
             Type::Int1 => "i1".to_string(),
+            Type::Int8 => "i8".to_string(),
             Type::Int32 => "i32".to_string(),
             Type::Int64 => "i64".to_string(),
             Type::F64 => "f64".to_string(),
@@ -341,6 +359,7 @@ impl Type {
         match self {
             Type::Void => "void".to_string(),
             Type::Int1 => "i1".to_string(),
+            Type::Int8 => "i8".to_string(),
             Type::Int32 => "i32".to_string(),
             Type::Int64 => "i64".to_string(),
             Type::F64 => "f64".to_string(),

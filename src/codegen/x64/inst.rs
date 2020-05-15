@@ -201,6 +201,24 @@ mod inst {
                 .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::XMM)])
                 .add_tie(DefOrUseReg::Def(0), DefOrUseReg::Use(0))
         };
+        pub static ref SHLr32i8: TargetInstDef = {
+            TargetInstDef::new(TargetOpcode::SHLr32i8)
+                .set_uses(vec![
+                    TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR32)),
+                    TargetOperand::Immediate(TargetImmediate::I8),
+                ])
+                .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR32)])
+                .add_tie(DefOrUseReg::Def(0), DefOrUseReg::Use(0))
+        };
+        pub static ref SHLr64i8: TargetInstDef = {
+            TargetInstDef::new(TargetOpcode::SHLr64i8)
+                .set_uses(vec![
+                    TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR64)),
+                    TargetOperand::Immediate(TargetImmediate::I8),
+                ])
+                .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR64)])
+                .add_tie(DefOrUseReg::Def(0), DefOrUseReg::Use(0))
+        };
         pub static ref SQRTSDrr: TargetInstDef = {
             TargetInstDef::new(TargetOpcode::SQRTSDrr)
                 .set_uses(vec![TargetOperand::Register(TargetRegister::RegClass(
@@ -334,6 +352,7 @@ pub enum TargetRegister {
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum TargetImmediate {
+    I8,
     I32,
     I64,
     F64,
@@ -397,6 +416,8 @@ pub enum TargetOpcode {
     IDIV,
     DIVSDrr,
     DIVSDrm,
+    SHLr64i8,
+    SHLr32i8,
     SQRTSDrr,
     MOVrr32,
     MOVri32,
@@ -467,6 +488,8 @@ impl TargetOpcode {
             Self::CDQ => Some(&*inst::CDQ),
             Self::DIVSDrr => Some(&*inst::DIVSDrr),
             Self::DIVSDrm => Some(&*inst::DIVSDrm),
+            Self::SHLr64i8 => Some(&*inst::SHLr64i8),
+            Self::SHLr32i8 => Some(&*inst::SHLr32i8),
             Self::SQRTSDrr => Some(&*inst::SQRTSDrr),
             Self::MOVrr32 => Some(&*inst::MOVrr32),
             Self::MOVri32 => Some(&*inst::MOVri32),
