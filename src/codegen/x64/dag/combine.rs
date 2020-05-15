@@ -125,9 +125,8 @@ impl Combine {
         }
 
         // TODO
-        // (N * 2^n) -> N << n
-        if matches!(node.operand[0].ty, Type::Int64 | Type::Int32) && node.operand[1].is_constant()
-        {
+        // (N(int) * 2^n) -> N(int) << n
+        if node.operand[0].ty.is_integer() && node.operand[1].is_constant() {
             if let Some(n) = node.operand[1].as_constant().is_power_of_two() {
                 let n = heap.alloc(DAGNode::new(
                     NodeKind::Operand(OperandNodeKind::Constant(ConstantKind::Int8(n as i8))),

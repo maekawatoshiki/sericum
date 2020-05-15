@@ -351,8 +351,12 @@ impl Type {
     pub fn is_atomic(&self) -> bool {
         matches!(
             self,
-            Self::Void | Self::Int1 | Self::Int32 | Self::Int64 | Self::F64
+            Self::Void | Self::Int1 | Self::Int8 | Self::Int32 | Self::Int64 | Self::F64
         )
+    }
+
+    pub fn is_integer(&self) -> bool {
+        matches!(self, Self::Int1 | Self::Int8 | Self::Int32 | Self::Int64)
     }
 
     pub fn to_string(&self) -> String {
