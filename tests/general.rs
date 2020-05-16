@@ -956,3 +956,24 @@ fn float5() {
     let res = jit.run(func, vec![]);
     assert_eq!(res, exec::jit::GenericValue::Int32(2));
 }
+
+#[test]
+fn pass_arr() {
+    let mut m = module::Module::new("cilk");
+
+    cilk_ir!(m; define [i32] func [(ptr [16; i32])] {
+    entry:
+        p = gep (%arg.0), [(i32 0), (i32 1)];
+        store (i32 12), (%p);
+        ret (i32 0);
+    });
+
+    let mut jit = exec::jit::JITExecutor::new(&m);
+    let func = jit.find_function_by_name("func").unwrap();
+    let arr: [u32; 8] = [0, 0, 0, 0, 0, 0, 0, 0];
+    jit.run(
+        func,
+        vec![exec::jit::GenericValue::Address(arr.as_ptr() as *mut u8)],
+    );
+    assert_eq!(arr[1], 12);
+}

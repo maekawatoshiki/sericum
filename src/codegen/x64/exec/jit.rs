@@ -22,6 +22,7 @@ fn phys_reg_to_dynasm_reg(r: PhysReg) -> u8 {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum GenericValue {
+    Address(*mut u8),
     Int32(i32),
     F64(f64),
     None,
@@ -144,9 +145,11 @@ impl JITCompiler {
 
         for (idx, arg) in args.iter().enumerate() {
             match arg {
-                GenericValue::Int32(i) => dynasm!(self.asm; mov Ra(phys_reg_to_dynasm_reg(
+                GenericValue::Int32(i) => dynasm!(self.asm; mov Rd(phys_reg_to_dynasm_reg(
                     RegisterClassKind::GR32.get_nth_arg_reg(idx).unwrap())), *i),
                 GenericValue::F64(_) => unimplemented!(),
+                GenericValue::Address(addr) => dynasm!(self.asm; mov Rq(phys_reg_to_dynasm_reg(
+                                RegisterClassKind::GR64.get_nth_arg_reg(idx).unwrap())), QWORD *addr as i64),
                 GenericValue::None => unreachable!(),
             }
         }
