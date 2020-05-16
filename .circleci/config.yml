@@ -14,7 +14,7 @@ jobs:
           command: apt-get update
 
       - run:
-          command: apt-get install -y zlib1g-dev wget clang
+          command: apt-get install -y zlib1g-dev wget gcc
 
       - run:
           command: |
