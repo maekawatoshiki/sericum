@@ -15,7 +15,7 @@ jobs:
 
       - run:
           command: |
-            apt-get install -y zlib1g-dev wget gcc
+            apt-get install -y zlib1g-dev wget gcc libffi-dev
             apt-get install -y libgtk-3-dev libfreetype6-dev zlib1g-dev wget libssl-dev pkg-config cmake zlib1g-dev curl binutils-dev libcurl4-openssl-dev libdw-dev libiberty-dev git cmake make build-essential
 
       - run:
