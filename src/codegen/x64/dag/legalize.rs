@@ -110,7 +110,7 @@ impl Legalize {
                 return heap.alloc(DAGNode::new(
                     NodeKind::MI(MINodeKind::MOVrm32),
                     vec![mem],
-                    node.ty.clone(),
+                    node.ty,
                 ));
             }
 
@@ -187,7 +187,7 @@ impl Legalize {
                 return heap.alloc(DAGNode::new(
                     NodeKind::MI(MINodeKind::LEAr64m),
                     vec![mem],
-                    node.ty.clone(),
+                    node.ty,
                 ));
             } else if node.operand[1].is_constant() {
                 let op1 = node.operand[1];
@@ -198,7 +198,7 @@ impl Legalize {
                 return heap.alloc(DAGNode::new(
                     NodeKind::MI(MINodeKind::LEAr64m),
                     vec![mem],
-                    node.ty.clone(),
+                    node.ty,
                 ));
             }
         }
@@ -212,12 +212,16 @@ impl Legalize {
         tys: &Types,
         regs_info: &RegistersInfo,
         heap: &mut DAGHeap,
-        node: Raw<DAGNode>,
+        mut node: Raw<DAGNode>,
     ) -> Raw<DAGNode> {
-        let mut lhs = node.operand[0];
-        let mut rhs = node.operand[1];
+        let lhs = node.operand[0];
+        let rhs = node.operand[1];
+
         if lhs.is_constant() && rhs.is_maybe_register() {
-            ::std::mem::swap(&mut *lhs, &mut *rhs);
+            let tmp = node.operand[0];
+            node.operand[0] = node.operand[1];
+            node.operand[0] = tmp;
+            return self.run_on_node_mul(tys, regs_info, heap, node);
         }
 
         self.run_on_node_operand(tys, regs_info, heap, node);
@@ -259,17 +263,20 @@ impl Legalize {
         tys: &Types,
         regs_info: &RegistersInfo,
         heap: &mut DAGHeap,
-        node: Raw<DAGNode>,
+        mut node: Raw<DAGNode>,
     ) -> Raw<DAGNode> {
         let mut cond = node.operand[0];
-        let mut lhs = node.operand[1];
-        let mut rhs = node.operand[2];
+        let lhs = node.operand[1];
+        let rhs = node.operand[2];
         // lhs must be register
         if lhs.is_constant() && rhs.is_maybe_register() {
-            ::std::mem::swap(&mut *lhs, &mut *rhs);
+            let tmp = node.operand[1];
+            node.operand[1] = node.operand[2];
+            node.operand[2] = tmp;
             if let NodeKind::Operand(OperandNodeKind::CondKind(kind)) = &mut cond.kind {
                 *kind = kind.flip();
             }
+            return self.run_on_node_brcc(tys, regs_info, heap, node);
         }
         self.run_on_node_operand(tys, regs_info, heap, node);
         node
@@ -280,18 +287,21 @@ impl Legalize {
         tys: &Types,
         regs_info: &RegistersInfo,
         heap: &mut DAGHeap,
-        node: Raw<DAGNode>,
+        mut node: Raw<DAGNode>,
     ) -> Raw<DAGNode> {
         let mut cond = node.operand[0];
-        let mut lhs = node.operand[1];
-        let mut rhs = node.operand[2];
+        let lhs = node.operand[1];
+        let rhs = node.operand[2];
 
         // lhs must be register
         if lhs.is_constant() && rhs.is_maybe_register() {
-            ::std::mem::swap(&mut *lhs, &mut *rhs);
+            let tmp = lhs;
+            node.operand[1] = node.operand[2];
+            node.operand[2] = tmp;
             if let NodeKind::Operand(OperandNodeKind::CondKind(kind)) = &mut cond.kind {
                 *kind = kind.flip();
             }
+            return self.run_on_node_fpbrcc(tys, regs_info, heap, node);
         }
 
         // now: lhs=register, rhs=const|register
@@ -305,7 +315,7 @@ impl Legalize {
             return heap.alloc(DAGNode::new(
                 NodeKind::IR(IRNodeKind::FPBrcc),
                 vec![cond, lhs, rhs, node.operand[3]],
-                node.ty.clone(),
+                node.ty,
             ));
         }
 

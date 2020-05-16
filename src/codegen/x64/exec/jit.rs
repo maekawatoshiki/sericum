@@ -64,9 +64,9 @@ impl JITExecutor {
         machine::regalloc::RegisterAllocator::new().run_on_module(&mut machine_module); //
         machine::pro_epi_inserter::PrologueEpilogueInserter::new()
             .run_on_module(&mut machine_module);
-        machine::replace_data::ConstDataReplacer::new().run_on_module(&mut machine_module);
         machine::replace_copy::ReplaceCopyWithProperMInst::new().run_on_module(&mut machine_module);
-        debug!(println!("{:?}", machine_module));
+        machine::replace_data::ConstDataReplacer::new().run_on_module(&mut machine_module);
+        // debug!(println!("{:?}", machine_module));
 
         // use crate::codegen::x64::asm::print::MachineAsmPrinter;
         // let mut printer = MachineAsmPrinter::new();

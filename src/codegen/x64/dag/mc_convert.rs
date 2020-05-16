@@ -364,6 +364,7 @@ impl<'a> ConversionInfo<'a> {
             }
             e => {
                 println!("{:?}", e);
+                println!("{:?}, {:?}", *node.operand[0], *node.operand[0]);
                 None
             }
         };
@@ -604,6 +605,7 @@ pub fn mov_rx(tys: &Types, regs_info: &RegistersInfo, x: &MachineOperand) -> Opt
     // TODO: special handling for float
     if x.get_type(regs_info).unwrap() == Type::F64 {
         return match x {
+            MachineOperand::Constant(_) => Some(MachineOpcode::MOVSDrm64),
             MachineOperand::FrameIndex(_) | MachineOperand::Mem(_) => Some(MachineOpcode::MOVSDrm),
             MachineOperand::Register(_) => Some(MachineOpcode::MOVSDrr),
             _ => None,

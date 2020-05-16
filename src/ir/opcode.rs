@@ -187,6 +187,7 @@ impl Instruction {
             Opcode::Add => operands[0].as_value().const_add(&operands[1].as_value()),
             Opcode::Sub => operands[0].as_value().const_sub(&operands[1].as_value()),
             Opcode::Mul => operands[0].as_value().const_mul(&operands[1].as_value()),
+            Opcode::Div => operands[0].as_value().const_div(&operands[1].as_value()),
             Opcode::Rem => operands[0].as_value().const_rem(&operands[1].as_value()),
             _ => None,
         }

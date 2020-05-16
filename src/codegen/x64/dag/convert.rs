@@ -273,7 +273,7 @@ impl<'a> ConvertToDAG<'a> {
                                 _ => unreachable!(),
                             },
                             vec![v1, v2],
-                            inst.ty.clone(),
+                            inst.ty,
                         ),
                     );
 
@@ -340,11 +340,7 @@ impl<'a> ConvertToDAG<'a> {
                     ));
                     let id = self.alloc_node_as_necessary(
                         inst_id,
-                        DAGNode::new(
-                            NodeKind::IR(IRNodeKind::Setcc),
-                            vec![cond, v1, v2],
-                            inst.ty.clone(),
-                        ),
+                        DAGNode::new(NodeKind::IR(IRNodeKind::Setcc), vec![cond, v1, v2], inst.ty),
                     );
                     if bb.liveness.borrow().live_out.contains(&inst_id) {
                         let copy_from_reg = self.make_chain_with_copying(id);
@@ -364,11 +360,7 @@ impl<'a> ConvertToDAG<'a> {
                     ));
                     let id = self.alloc_node_as_necessary(
                         inst_id,
-                        DAGNode::new(
-                            NodeKind::IR(IRNodeKind::FCmp),
-                            vec![cond, v1, v2],
-                            inst.ty.clone(),
-                        ),
+                        DAGNode::new(NodeKind::IR(IRNodeKind::FCmp), vec![cond, v1, v2], inst.ty),
                     );
                     if bb.liveness.borrow().live_out.contains(&inst_id) {
                         let copy_from_reg = self.make_chain_with_copying(id);
@@ -401,7 +393,7 @@ impl<'a> ConvertToDAG<'a> {
                     }
                     let id = self.alloc_node_as_necessary(
                         inst_id,
-                        DAGNode::new(NodeKind::IR(IRNodeKind::Phi), operands, inst.ty.clone()),
+                        DAGNode::new(NodeKind::IR(IRNodeKind::Phi), operands, inst.ty),
                     );
                     if bb.liveness.borrow().live_out.contains(&inst_id) {
                         let copy_from_reg = self.make_chain_with_copying(id);
