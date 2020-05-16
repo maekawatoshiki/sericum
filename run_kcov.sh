@@ -1,4 +1,7 @@
 #!/bin/bash
+cd minilang
+cargo test
+cd ..
 cargo test
 REPORT=$(find ./target/debug -maxdepth 2 -regex '.+/deps/.*' -a ! -regex '.+\.\(d\|rlib\|rmeta\|so\)')
 for file in $REPORT; do  
