@@ -1,8 +1,9 @@
 use cilk::{
+    cilk_ir,
     codegen::x64::{asm::print::MachineAsmPrinter, dag, machine},
     ir::{builder, types, value},
     module::Module,
-    *,
+    *, // for macro
 };
 use std::{
     fs,
@@ -26,7 +27,7 @@ fn unique_file_name(extension: &str) -> String {
     format!("/tmp/{}.{}", name, extension)
 }
 
-fn compile_and_run(c_parent: &str, s_target: &str) {
+fn assemble_and_run(c_parent: &str, s_target: &str) {
     let parent_name = unique_file_name("c");
     let target_name = unique_file_name("s");
     {
@@ -58,21 +59,10 @@ fn compile_and_run(c_parent: &str, s_target: &str) {
     fs::remove_file(target_name).unwrap();
 }
 
-#[test]
-fn test_asm() {
-    let mut m = Module::new("cilk");
+fn compile_and_run(c_parent: &str, module: &Module) {
+    // println!("{:?}", module);
 
-    let func = cilk_ir!(m; define [i32] test [] {
-        entry:
-            a = alloca i32;
-            store (i32 1), (%a);
-            la = load (%a);
-            ret (%la);
-    });
-
-    println!("{}", m.dump(func));
-
-    let mut dag_module = dag::convert::ConvertToDAG::new(&m).convert_module();
+    let mut dag_module = dag::convert::ConvertToDAG::new(&module).convert_module();
     dag::combine::Combine::new().combine_module(&mut dag_module);
     dag::legalize::Legalize::new().run_on_module(&mut dag_module);
     dag::isel::MISelector::new().run_on_module(&mut dag_module);
@@ -88,8 +78,21 @@ fn test_asm() {
 
     let mut printer = MachineAsmPrinter::new();
     printer.run_on_module(&machine_module);
-    // println!("ASM DUMP: \n{}", printer.output);
+    // println!("{}", printer.output);
 
+    assemble_and_run(c_parent, printer.output.as_str());
+}
+
+#[test]
+fn asm_load_store() {
+    let mut m = Module::new("cilk");
+    cilk_ir!(m; define [i32] test [] {
+        entry:
+            a = alloca i32;
+            store (i32 1), (%a);
+            la = load (%a);
+            ret (%la);
+    });
     compile_and_run(
         "
     #include <assert.h>
@@ -98,6 +101,34 @@ fn test_asm() {
         assert(test() == 1);
     }
             ",
-        printer.output.as_str(),
+        &m,
+    );
+}
+
+#[test]
+fn asm_fibo_phi() {
+    let mut m = Module::new("cilk");
+    cilk_ir!(m; define [i32] test [(i32)] {
+        entry:
+            cond = icmp le (%arg.0), (i32 2);
+            br (%cond) l1, l2;
+        l1:
+            br merge;
+        l2:
+            a1 = sub (%arg.0), (i32 1);
+            r1 = call test [(%a1)];
+            a2 = sub (%arg.0), (i32 2);
+            r2 = call test [(%a2)];
+            r3 = add (%r1), (%r2);
+            br merge;
+        merge:
+            p = phi [ [(i32 1), l1], [(%r3), l2] ];
+            ret (%p);
+    });
+    compile_and_run(
+        "#include <assert.h>
+        extern int test(int);
+        int main() { assert(test(10) == 55); }",
+        &m,
     );
 }
