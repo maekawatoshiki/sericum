@@ -19,7 +19,14 @@ type BB<T> = <<T as FunctionTrait>::BBS as BasicBlocksTrait>::BB;
 pub struct DominatorTreeConstructor<'a, F: FunctionTrait> {
     func: &'a F,
     tree: DominatorTree<BB<F>>,
-    dom: FxHashMap<Id<BB<F>>, FxHashSet<Id<BB<F>>>>, // <a, bs>, b dominates a
+    dfnum: FxHashMap<Id<BB<F>>, usize>,
+    semi: FxHashMap<Id<BB<F>>, Id<BB<F>>>,
+    ancestor: FxHashMap<Id<BB<F>>, Id<BB<F>>>,
+    idom: FxHashMap<Id<BB<F>>, Id<BB<F>>>,
+    samedom: FxHashMap<Id<BB<F>>, Id<BB<F>>>,
+    vertex: FxHashMap<usize, Id<BB<F>>>,
+    parent: FxHashMap<Id<BB<F>>, Id<BB<F>>>,
+    best: FxHashMap<Id<BB<F>>, Id<BB<F>>>,
 }
 
 impl<T: BasicBlockTrait> DominatorTree<T> {
@@ -49,41 +56,103 @@ impl<'a, F: FunctionTrait> DominatorTreeConstructor<'a, F> {
         Self {
             func,
             tree: DominatorTree::new(),
-            dom: FxHashMap::default(),
+            dfnum: FxHashMap::default(),
+            semi: FxHashMap::default(),
+            ancestor: FxHashMap::default(),
+            idom: FxHashMap::default(),
+            samedom: FxHashMap::default(),
+            vertex: FxHashMap::default(),
+            parent: FxHashMap::default(),
+            best: FxHashMap::default(),
         }
     }
 
-    pub fn construct(mut self) -> DominatorTree<BB<F>> {
-        self.inspect_dominators();
-
-        let mut strictly_dominated = FxHashMap::default();
-        let mut idom = FxHashMap::default();
-
-        for (a, bs) in &self.dom {
-            for b in bs {
-                if a != b {
-                    strictly_dominated
-                        .entry(*a)
-                        .or_insert(FxHashSet::default())
-                        .insert(*b);
+    pub fn construct_dom(&mut self) {
+        let mut num = 0;
+        let entry = self.func.get_basic_blocks().get_order()[0];
+        let mut bucket: FxHashMap<Id<BB<F>>, FxHashSet<Id<BB<F>>>> = FxHashMap::default();
+        self.dfs(None, entry, &mut num);
+        for i in (1..num).rev() {
+            let node = *self.vertex.get(&i).unwrap();
+            let pred = *self.parent.get(&node).unwrap();
+            let mut s = pred;
+            for v in self.func.get_basic_blocks().get_arena()[node].get_preds() {
+                let s_ = if self.dfnum.get(v).unwrap() <= self.dfnum.get(&node).unwrap() {
+                    *v
+                } else {
+                    let n = self.ancestor_with_lowest_semi(*v);
+                    *self.semi.get(&n).unwrap()
+                };
+                if self.dfnum.get(&s_).unwrap() < self.dfnum.get(&s).unwrap() {
+                    s = s_;
                 }
             }
-        }
-
-        for (a, bs) in &strictly_dominated {
-            for b in bs {
-                if !bs.iter().any(|bb| {
-                    if bb == b {
-                        return false;
+            self.semi.insert(node, s);
+            bucket.entry(s).or_insert(FxHashSet::default()).insert(node);
+            self.link(pred, node);
+            if let Some(set) = bucket.get_mut(&pred) {
+                for v in &*set {
+                    let y = self.ancestor_with_lowest_semi(*v);
+                    if self.semi.get(&y).unwrap() == self.semi.get(&v).unwrap() {
+                        self.idom.insert(*v, pred);
+                    } else {
+                        self.samedom.insert(*v, y);
                     }
-                    strictly_dominated.get(bb).map_or(false, |s| s.contains(b))
-                }) {
-                    idom.insert(*a, *b);
                 }
+                set.clear();
             }
         }
+        for i in 1..num {
+            let n = *self.vertex.get(&i).unwrap();
+            if let Some(s) = self.samedom.get(&n) {
+                self.idom.insert(n, *s);
+            }
+        }
+    }
 
-        for (&b, &a) in &idom {
+    fn dfs(&mut self, pred: Option<Id<BB<F>>>, node: Id<BB<F>>, num: &mut usize) {
+        if !self.dfnum.contains_key(&node)
+            || (self.dfnum.contains_key(&node) && *self.dfnum.get(&node).unwrap() == 0)
+        {
+            self.dfnum.insert(node, *num);
+            self.vertex.insert(*num, node);
+            if let Some(pred) = pred {
+                self.parent.insert(node, pred);
+            }
+            *num += 1;
+            for succ in self.func.get_basic_blocks().get_arena()[node].get_succs() {
+                self.dfs(Some(node), *succ, num);
+            }
+        }
+    }
+
+    fn ancestor_with_lowest_semi(&mut self, node: Id<BB<F>>) -> Id<BB<F>> {
+        let a = *self.ancestor.get(&node).unwrap();
+        if self.ancestor.contains_key(&a) {
+            let b = self.ancestor_with_lowest_semi(a);
+            let aa = *self.ancestor.get(&a).unwrap();
+            self.ancestor.insert(node, aa);
+            if self.dfnum.get(self.semi.get(&b).unwrap()).unwrap()
+                < self
+                    .dfnum
+                    .get(self.semi.get(&self.best.get(&node).unwrap()).unwrap())
+                    .unwrap()
+            {
+                self.best.insert(node, b);
+            }
+        }
+        *self.best.get(&node).unwrap()
+    }
+
+    fn link(&mut self, pred: Id<BB<F>>, node: Id<BB<F>>) {
+        self.ancestor.insert(node, pred);
+        self.best.insert(node, node);
+    }
+
+    pub fn construct(mut self) -> DominatorTree<BB<F>> {
+        self.construct_dom();
+
+        for (&b, &a) in &self.idom {
             self.tree
                 .tree
                 .entry(a)
@@ -112,49 +181,5 @@ impl<'a, F: FunctionTrait> DominatorTreeConstructor<'a, F> {
         self.tree.root = Some(entry);
 
         self.tree
-    }
-
-    fn inspect_dominators(&mut self) {
-        let all = self
-            .func
-            .get_basic_blocks()
-            .get_order()
-            .iter()
-            .map(|&x| x)
-            .collect::<FxHashSet<_>>();
-        let entry = self.func.get_basic_blocks().get_order()[0];
-        self.dom
-            .entry(entry)
-            .or_insert(FxHashSet::default())
-            .insert(entry);
-        for cur in &self.func.get_basic_blocks().get_order()[1..] {
-            self.dom.insert(*cur, all.clone());
-        }
-        loop {
-            let mut changed = false;
-            for cur in &self.func.get_basic_blocks().get_order()[1..] {
-                changed |= self.inspect_dominators_of(*cur);
-            }
-            if !changed {
-                break;
-            }
-        }
-    }
-
-    fn inspect_dominators_of(&mut self, cur_bb: Id<BB<F>>) -> bool {
-        let mut set = None;
-        for &pred in self.func.get_basic_blocks().get_arena()[cur_bb].get_preds() {
-            let dominators_of_pred = self.dom.get(&pred).unwrap().clone();
-            if let Some(ref mut set) = &mut set {
-                *set = &*set & &dominators_of_pred;
-            } else {
-                set = Some(dominators_of_pred);
-            }
-        }
-        let mut set = set.unwrap_or(FxHashSet::default());
-        set.insert(cur_bb);
-        let changed = self.dom.get(&cur_bb).unwrap() != &set;
-        self.dom.insert(cur_bb, set);
-        changed
     }
 }
