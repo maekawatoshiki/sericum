@@ -1,12 +1,15 @@
-use crate::analysis::dom_tree::{DominatorTree, DominatorTreeConstructor};
-use crate::ir::{
-    basic_block::{BasicBlock, BasicBlockId},
-    const_folding::ConstantFolding,
-    function::Function,
-    module::Module,
-    opcode::{Instruction, InstructionId, Opcode, Operand},
-    types::Types,
-    value::{InstructionValue, Value},
+use crate::{
+    analysis::dom_tree::{DominatorTree, DominatorTreeConstructor},
+    ir::{
+        basic_block::{BasicBlock, BasicBlockId},
+        const_folding::ConstantFolding,
+        function::Function,
+        module::Module,
+        opcode::{Instruction, InstructionId, Opcode, Operand},
+        types::Types,
+        value::{InstructionValue, Value},
+    },
+    traits::function::FunctionTrait,
 };
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::cmp::Ordering;
@@ -42,7 +45,7 @@ impl Mem2Reg {
             }
 
             Mem2RegOnFunction {
-                dom_tree: DominatorTreeConstructor::new(func).construct(),
+                dom_tree: DominatorTreeConstructor::new(func.get_basic_blocks()).construct(),
                 cur_func: func,
                 inst_indexes: InstructionIndexes::new(),
                 phi_block_to_allocas: FxHashMap::default(),

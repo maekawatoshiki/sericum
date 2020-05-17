@@ -1,7 +1,10 @@
 use super::{basic_block::MachineBasicBlock, function::MachineFunction, liveness::LiveRegMatrix};
-use crate::analysis::{
-    dom_tree::DominatorTreeConstructor,
-    loops::{Loops, LoopsConstructor},
+use crate::{
+    analysis::{
+        dom_tree::DominatorTreeConstructor,
+        loops::{Loops, LoopsConstructor},
+    },
+    traits::function::FunctionTrait,
 };
 use rustc_hash::FxHashSet;
 
@@ -12,7 +15,7 @@ struct SpillWeightCalculator<'a> {
 }
 
 pub fn calc_spill_weight(func: &MachineFunction, matrix: &mut LiveRegMatrix) {
-    let dom_tree = DominatorTreeConstructor::new(func).construct();
+    let dom_tree = DominatorTreeConstructor::new(func.get_basic_blocks()).construct();
     let loops = LoopsConstructor::new(&dom_tree, &func.body.basic_blocks).analyze();
     SpillWeightCalculator {
         func,
