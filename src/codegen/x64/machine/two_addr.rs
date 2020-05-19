@@ -1,7 +1,20 @@
 use super::{builder::*, function::*, inst::*, module::*};
+use crate::traits::pass::ModulePassTrait;
 use std::mem;
 
 pub struct TwoAddressConverter {}
+
+impl ModulePassTrait for TwoAddressConverter {
+    type M = MachineModule;
+
+    fn name(&self) -> &'static str {
+        "TwoAddressConverter"
+    }
+
+    fn run_on_module(&mut self, module: &mut Self::M) {
+        self.run_on_module(module)
+    }
+}
 
 impl TwoAddressConverter {
     pub fn new() -> Self {

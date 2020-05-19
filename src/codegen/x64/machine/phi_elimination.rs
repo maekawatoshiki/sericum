@@ -1,6 +1,19 @@
 use super::{builder::*, function::*, inst::*, module::*};
+use crate::traits::pass::ModulePassTrait;
 
 pub struct PhiElimination {}
+
+impl ModulePassTrait for PhiElimination {
+    type M = MachineModule;
+
+    fn name(&self) -> &'static str {
+        "PhiElimination"
+    }
+
+    fn run_on_module(&mut self, module: &mut Self::M) {
+        self.run_on_module(module)
+    }
+}
 
 impl PhiElimination {
     pub fn new() -> Self {

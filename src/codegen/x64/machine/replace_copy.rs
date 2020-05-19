@@ -5,9 +5,21 @@ use super::{
     inst::MachineOpcode,
     module::MachineModule,
 };
-use crate::ir::types::Types;
+use crate::{ir::types::Types, traits::pass::ModulePassTrait};
 
 pub struct ReplaceCopyWithProperMInst {}
+
+impl ModulePassTrait for ReplaceCopyWithProperMInst {
+    type M = MachineModule;
+
+    fn name(&self) -> &'static str {
+        "ReplaceCopy"
+    }
+
+    fn run_on_module(&mut self, module: &mut Self::M) {
+        self.run_on_module(module)
+    }
+}
 
 impl ReplaceCopyWithProperMInst {
     pub fn new() -> Self {

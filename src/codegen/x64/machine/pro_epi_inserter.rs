@@ -1,10 +1,21 @@
 use super::super::{dag::mc_convert::mov_mx, frame_object::*, register::*};
 use super::{builder::*, function::MachineFunction, inst::*, module::MachineModule};
-use crate::codegen::x64::exec::roundup;
-use crate::ir::types::*;
+use crate::{codegen::x64::exec::roundup, ir::types::*, traits::pass::ModulePassTrait};
 use std::cmp;
 
 pub struct PrologueEpilogueInserter {}
+
+impl ModulePassTrait for PrologueEpilogueInserter {
+    type M = MachineModule;
+
+    fn name(&self) -> &'static str {
+        "PrologueEpilogueInserter"
+    }
+
+    fn run_on_module(&mut self, module: &mut Self::M) {
+        self.run_on_module(module)
+    }
+}
 
 struct CopyArgs<'a> {
     offset: i32,

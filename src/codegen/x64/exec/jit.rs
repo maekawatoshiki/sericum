@@ -1,11 +1,17 @@
 // TODO: much legacy code remains.
 
 use super::super::register::{PhysReg, RegisterClassKind};
-use crate::codegen::x64::machine::{
-    basic_block::*, const_data::*, frame_object::*, function::*, inst::*, module::*,
+use crate::{
+    codegen::{
+        internal_function_names,
+        x64::machine::{
+            basic_block::*, const_data::*, frame_object::*, function::*, inst::*, module::*,
+        },
+    },
+    ir,
+    ir::types::*,
+    traits::pass::ModulePassManager,
 };
-use crate::ir;
-use crate::{codegen::internal_function_names, ir::types::*};
 use dynasmrt::*;
 use rustc_hash::FxHashMap;
 
@@ -44,34 +50,24 @@ impl JITExecutor {
         use super::super::{dag, machine};
 
         let mut dag_module = dag::convert::ConvertToDAG::new(module).convert_module();
-
         // println!("dag: before: {:?}", dag_module);
 
-        use crate::traits::pass::*;
-        let mut pass_mgr = ModulePassManager { list: vec![] };
+        let mut pass_mgr = ModulePassManager::new();
         pass_mgr.add_pass(dag::combine::Combine::new());
         pass_mgr.add_pass(dag::legalize::Legalize::new());
         pass_mgr.add_pass(dag::isel::MISelector::new());
         pass_mgr.run_on_module(&mut dag_module);
-        // dag::combine::Combine::new().combine_module(&mut dag_module);
-        // dag::legalize::Legalize::new().run_on_module(&mut dag_module);
-        // debug!(println!("dag: legalize: {:?}", dag_module));
-        // dag::isel::MISelector::new().run_on_module(&mut dag_module);
-        // debug!(println!("dag: isel: {:?}", dag_module));
 
         let mut machine_module = dag::mc_convert::convert_module(dag_module);
 
-        // debug!(println!("{:?}", machine_module));
-
-        machine::phi_elimination::PhiElimination::new().run_on_module(&mut machine_module); //
-        machine::two_addr::TwoAddressConverter::new().run_on_module(&mut machine_module);
-        // debug!(println!("{:?}", machine_module));
-        machine::regalloc::RegisterAllocator::new().run_on_module(&mut machine_module); //
-        machine::pro_epi_inserter::PrologueEpilogueInserter::new()
-            .run_on_module(&mut machine_module);
-        machine::replace_copy::ReplaceCopyWithProperMInst::new().run_on_module(&mut machine_module);
-        machine::replace_data::ConstDataReplacer::new().run_on_module(&mut machine_module);
-        // debug!(println!("{:?}", machine_module));
+        let mut pass_mgr = ModulePassManager::new();
+        pass_mgr.add_pass(machine::phi_elimination::PhiElimination::new());
+        pass_mgr.add_pass(machine::two_addr::TwoAddressConverter::new());
+        pass_mgr.add_pass(machine::regalloc::RegisterAllocator::new());
+        pass_mgr.add_pass(machine::pro_epi_inserter::PrologueEpilogueInserter::new());
+        pass_mgr.add_pass(machine::replace_copy::ReplaceCopyWithProperMInst::new());
+        pass_mgr.add_pass(machine::replace_data::ConstDataReplacer::new());
+        pass_mgr.run_on_module(&mut machine_module);
 
         // use crate::codegen::x64::asm::print::MachineAsmPrinter;
         // let mut printer = MachineAsmPrinter::new();

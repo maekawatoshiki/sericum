@@ -6,7 +6,7 @@ use super::super::{
 use super::calc_spill_weight::calc_spill_weight;
 use super::reg_coalescer::coalesce_function;
 use super::{builder::*, function::*, inst::*, liveness::*, module::*, spiller::Spiller};
-use crate::ir::types::Types;
+use crate::{ir::types::Types, traits::pass::ModulePassTrait};
 use rustc_hash::FxHashSet;
 use std::collections::VecDeque;
 
@@ -17,6 +17,18 @@ pub struct RegisterAllocator {
 pub struct AllocationOrder<'a> {
     matrix: &'a LiveRegMatrix,
     func: &'a MachineFunction,
+}
+
+impl ModulePassTrait for RegisterAllocator {
+    type M = MachineModule;
+
+    fn name(&self) -> &'static str {
+        "RegisterAllocator"
+    }
+
+    fn run_on_module(&mut self, module: &mut Self::M) {
+        self.run_on_module(module)
+    }
 }
 
 impl RegisterAllocator {
