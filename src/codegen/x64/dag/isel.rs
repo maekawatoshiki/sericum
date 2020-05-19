@@ -1,13 +1,24 @@
-use super::super::register::*;
 use super::{
+    super::register::*,
     function::{DAGFunction, DAGHeap},
     module::DAGModule,
     node::*,
 };
-use crate::ir::types::*;
-use crate::util::allocator::*;
+use crate::{ir::types::*, traits::pass::ModulePassTrait, util::allocator::*};
 use defs::isel_pat;
 use rustc_hash::FxHashMap;
+
+impl ModulePassTrait for MISelector {
+    type M = DAGModule;
+
+    fn name(&self) -> &'static str {
+        "MachineInstSelector"
+    }
+
+    fn run_on_module(&mut self, module: &mut Self::M) {
+        self.run_on_module(module);
+    }
+}
 
 pub struct MISelector {
     selected: FxHashMap<Raw<DAGNode>, Raw<DAGNode>>,

@@ -47,11 +47,16 @@ impl JITExecutor {
 
         // println!("dag: before: {:?}", dag_module);
 
-        dag::combine::Combine::new().combine_module(&mut dag_module);
-        // debug!(println!("dag: comibine: {:?}", dag_module));
-        dag::legalize::Legalize::new().run_on_module(&mut dag_module);
+        use crate::traits::pass::*;
+        let mut pass_mgr = ModulePassManager { list: vec![] };
+        pass_mgr.add_pass(dag::combine::Combine::new());
+        pass_mgr.add_pass(dag::legalize::Legalize::new());
+        pass_mgr.add_pass(dag::isel::MISelector::new());
+        pass_mgr.run_on_module(&mut dag_module);
+        // dag::combine::Combine::new().combine_module(&mut dag_module);
+        // dag::legalize::Legalize::new().run_on_module(&mut dag_module);
         // debug!(println!("dag: legalize: {:?}", dag_module));
-        dag::isel::MISelector::new().run_on_module(&mut dag_module);
+        // dag::isel::MISelector::new().run_on_module(&mut dag_module);
         // debug!(println!("dag: isel: {:?}", dag_module));
 
         let mut machine_module = dag::mc_convert::convert_module(dag_module);

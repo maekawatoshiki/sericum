@@ -1,9 +1,20 @@
 use super::{function::*, module::*, node::*};
-use crate::ir::types::*;
-use crate::util::allocator::*;
+use crate::{ir::types::*, traits::pass::ModulePassTrait, util::allocator::*};
 use rustc_hash::FxHashMap;
 
 pub struct Combine {}
+
+impl ModulePassTrait for Combine {
+    type M = DAGModule;
+
+    fn name(&self) -> &'static str {
+        "Combine"
+    }
+
+    fn run_on_module(&mut self, module: &mut Self::M) {
+        self.combine_module(module);
+    }
+}
 
 impl Combine {
     pub fn new() -> Self {
