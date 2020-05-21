@@ -11,17 +11,19 @@ pub struct DominatorTree<T: BasicBlockTrait> {
     pub level: FxHashMap<Id<T>, usize>,
 }
 
+type Map<T> = FxHashMap<T, T>;
+
 pub struct DominatorTreeConstructor<'a, BBS: BasicBlocksTrait> {
     basic_blocks: &'a BBS,
     tree: DominatorTree<BBS::BB>,
     dfnum: FxHashMap<Id<BBS::BB>, usize>,
-    semi: FxHashMap<Id<BBS::BB>, Id<BBS::BB>>,
-    ancestor: FxHashMap<Id<BBS::BB>, Id<BBS::BB>>,
-    idom: FxHashMap<Id<BBS::BB>, Id<BBS::BB>>,
-    samedom: FxHashMap<Id<BBS::BB>, Id<BBS::BB>>,
-    vertex: FxHashMap<usize, Id<BBS::BB>>,
-    parent: FxHashMap<Id<BBS::BB>, Id<BBS::BB>>,
-    best: FxHashMap<Id<BBS::BB>, Id<BBS::BB>>,
+    vertex: Vec<Id<BBS::BB>>,
+    semi: Map<Id<BBS::BB>>,
+    ancestor: Map<Id<BBS::BB>>,
+    idom: Map<Id<BBS::BB>>,
+    samedom: Map<Id<BBS::BB>>,
+    parent: Map<Id<BBS::BB>>,
+    best: Map<Id<BBS::BB>>,
 }
 
 impl<T: BasicBlockTrait> DominatorTree<T> {
@@ -46,6 +48,12 @@ impl<T: BasicBlockTrait> DominatorTree<T> {
     }
 }
 
+macro_rules! cmp {
+    ($base:expr; ($a:expr) $t:tt ($b:expr)) => {
+        $base.get(&$a).unwrap() $t $base.get(&$b).unwrap()
+    };
+}
+
 impl<'a, BBS: BasicBlocksTrait> DominatorTreeConstructor<'a, BBS> {
     pub fn new(basic_blocks: &'a BBS) -> Self {
         Self {
@@ -56,7 +64,7 @@ impl<'a, BBS: BasicBlocksTrait> DominatorTreeConstructor<'a, BBS> {
             ancestor: FxHashMap::default(),
             idom: FxHashMap::default(),
             samedom: FxHashMap::default(),
-            vertex: FxHashMap::default(),
+            vertex: Vec::new(),
             parent: FxHashMap::default(),
             best: FxHashMap::default(),
         }
@@ -67,21 +75,21 @@ impl<'a, BBS: BasicBlocksTrait> DominatorTreeConstructor<'a, BBS> {
         let mut bucket = FxHashMap::default();
         let mut num = 0;
 
-        self.dfs(None, entry, &mut num);
+        self.number_by_dfs(None, entry, &mut num);
 
         for i in (1..num).rev() {
-            let node = *self.vertex.get(&i).unwrap();
+            let node = self.vertex[i];
             let pred = *self.parent.get(&node).unwrap();
             let mut s = pred;
 
             for v in self.basic_blocks.get_arena()[node].get_preds() {
-                let s_ = if self.dfnum.get(v).unwrap() <= self.dfnum.get(&node).unwrap() {
+                let s_ = if cmp!(self.dfnum; (v) <= (node)) {
                     *v
                 } else {
                     let n = self.ancestor_with_lowest_semi(*v);
                     *self.semi.get(&n).unwrap()
                 };
-                if self.dfnum.get(&s_).unwrap() < self.dfnum.get(&s).unwrap() {
+                if cmp!(self.dfnum; (s_) < (s)) {
                     s = s_;
                 }
             }
@@ -93,7 +101,7 @@ impl<'a, BBS: BasicBlocksTrait> DominatorTreeConstructor<'a, BBS> {
             if let Some(set) = bucket.get_mut(&pred) {
                 for v in &*set {
                     let y = self.ancestor_with_lowest_semi(*v);
-                    if self.semi.get(&y).unwrap() == self.semi.get(&v).unwrap() {
+                    if cmp!(self.semi; (y) == (v)) {
                         self.idom.insert(*v, pred);
                     } else {
                         self.samedom.insert(*v, y);
@@ -103,15 +111,14 @@ impl<'a, BBS: BasicBlocksTrait> DominatorTreeConstructor<'a, BBS> {
             }
         }
 
-        for i in 1..num {
-            let n = *self.vertex.get(&i).unwrap();
+        for &n in &self.vertex[1..] {
             if let Some(s) = self.samedom.get(&n) {
                 self.idom.insert(n, *s);
             }
         }
     }
 
-    fn dfs(&mut self, pred: Option<Id<BBS::BB>>, node: Id<BBS::BB>, num: &mut usize) {
+    fn number_by_dfs(&mut self, pred: Option<Id<BBS::BB>>, node: Id<BBS::BB>, num: &mut usize) {
         if self.dfnum.contains_key(&node) {
             return;
         }
@@ -124,7 +131,7 @@ impl<'a, BBS: BasicBlocksTrait> DominatorTreeConstructor<'a, BBS> {
         *num += 1;
 
         for succ in self.basic_blocks.get_arena()[node].get_succs() {
-            self.dfs(Some(node), *succ, num);
+            self.number_by_dfs(Some(node), *succ, num);
         }
     }
 
@@ -134,11 +141,8 @@ impl<'a, BBS: BasicBlocksTrait> DominatorTreeConstructor<'a, BBS> {
             let b = self.ancestor_with_lowest_semi(a);
             let aa = *self.ancestor.get(&a).unwrap();
             self.ancestor.insert(node, aa);
-            if self.dfnum.get(self.semi.get(&b).unwrap()).unwrap()
-                < self
-                    .dfnum
-                    .get(self.semi.get(&self.best.get(&node).unwrap()).unwrap())
-                    .unwrap()
+            if cmp!(self.dfnum; (self.semi.get(&b).unwrap()) <
+                 (self.semi.get(&self.best.get(&node).unwrap()).unwrap()))
             {
                 self.best.insert(node, b);
             }
