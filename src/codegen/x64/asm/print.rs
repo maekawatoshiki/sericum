@@ -31,7 +31,7 @@ impl MachineAsmPrinter {
     }
 
     fn run_on_function(&mut self, tys: &Types, f: &MachineFunction) {
-        if f.internal {
+        if f.is_internal {
             return;
         }
 

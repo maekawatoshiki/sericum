@@ -23,6 +23,9 @@ impl Combine {
 
     pub fn combine_module(&mut self, module: &mut DAGModule) {
         for (_, func) in &mut module.functions {
+            if func.is_internal {
+                continue;
+            }
             self.combine_function(func)
         }
     }

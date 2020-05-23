@@ -127,7 +127,7 @@ impl<'a> ConvertToDAG<'a> {
                 let fi_ty = self.types.new_pointer_ty(ty);
                 let fi = self.alloc_node(DAGNode::new(
                     NodeKind::Operand(OperandNodeKind::FrameIndex(FrameIndexInfo::new(
-                        ty.clone(),
+                        ty,
                         FrameIndexKind::Arg(av.index),
                     ))),
                     vec![],
@@ -189,7 +189,7 @@ impl<'a> ConvertToDAG<'a> {
                     let fi = self.cur_conv_info_mut_with(|c| {
                         let frinfo = c.local_mgr.alloc(&ty);
                         c.dag_heap.alloc(DAGNode::new(
-                            NodeKind::Operand(OperandNodeKind::FrameIndex(frinfo.clone())), // TODO
+                            NodeKind::Operand(OperandNodeKind::FrameIndex(frinfo)), // TODO
                             vec![],
                             ty,
                         ))
@@ -208,7 +208,7 @@ impl<'a> ConvertToDAG<'a> {
                     let v = self.get_dag_id_from_value(&v);
                     let load_id = self.alloc_node_as_necessary(
                         inst_id,
-                        DAGNode::new(NodeKind::IR(IRNodeKind::Load), vec![v], inst.ty.clone()),
+                        DAGNode::new(NodeKind::IR(IRNodeKind::Load), vec![v], inst.ty),
                     );
 
                     if bb.liveness.borrow().live_out.contains(&inst_id) {

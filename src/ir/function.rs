@@ -1,4 +1,5 @@
 use super::{basic_block::*, module::Module, opcode::*, types::*, value::*, DumpToString};
+use crate::codegen::is_internal_function;
 use crate::traits::function::FunctionTrait;
 use id_arena::*;
 
@@ -35,6 +36,8 @@ pub struct Function {
     pub id: Option<FunctionId>,
 
     pub types: Types,
+
+    pub is_internal: bool,
 }
 
 impl Function {
@@ -47,11 +50,7 @@ impl Function {
             inst_table: Arena::new(),
             id: None,
             types: module.types.clone(),
-            // TODO
-            // internal: match name {
-            //     "cilk.memset.p0i32.i32" | "cilk.println.i32" | "cilk.printch.i32" => true, // TODO
-            //     _ => false,
-            // },
+            is_internal: is_internal_function(name),
         })
     }
 

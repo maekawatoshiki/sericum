@@ -187,7 +187,7 @@ impl JITCompiler {
     fn compile_function(&mut self, module: &MachineModule, id: MachineFunctionId) {
         let f = module.function_ref(id);
 
-        if f.internal {
+        if f.is_internal {
             return;
         }
 
@@ -775,12 +775,8 @@ impl JITCompiler {
             })
             .unwrap();
         let callee_entity = module.function_ref(callee_id);
-        // let ret_ty = &callee_entity.ty.get_function_ty().unwrap().ret_ty;
 
-        // rsp_offset += self.push_args(f, args);
-        // self.assign_args_to_regs(&inst.operand[1..]);
-
-        if callee_entity.internal {
+        if callee_entity.is_internal {
             let callee = self.internal_functions.get(&callee_entity.name).unwrap();
             dynasm!(self.asm
                 ; mov rax, QWORD *callee as _
@@ -790,16 +786,6 @@ impl JITCompiler {
             let f_entry = self.get_label(callee_id);
             dynasm!(self.asm; call => f_entry);
         }
-
-        // match ret_ty {
-        //     Type::Int32 => self.reg_copy(ret_ty, register!(inst), 0),
-        //     Type::Void => {}
-        //     _ => unimplemented!(),
-        // }
-
-        // for save_reg in save_regs.iter().rev() {
-        //     dynasm!(self.asm; pop Ra(*save_reg));
-        // }
     }
 
     fn compile_add_rr32(&mut self, inst: &MachineInst) {

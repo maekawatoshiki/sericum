@@ -1,8 +1,8 @@
 use super::super::dag::function::*;
 use super::super::register::*;
 use super::{basic_block::*, frame_object::*, inst::*};
+use crate::ir::types::*;
 use crate::traits::function::FunctionTrait;
-use crate::{codegen::is_internal_function, ir::types::*};
 use id_arena::*;
 use std::cell::Ref;
 use std::fmt;
@@ -23,7 +23,7 @@ pub struct MachineFunction {
     pub body: MachineFunctionBody,
 
     /// True if internal function
-    pub internal: bool,
+    pub is_internal: bool,
 
     /// Local variables info
     pub local_mgr: LocalVariables,
@@ -110,7 +110,7 @@ impl MachineFunction {
         inst_arena: InstructionArena,
     ) -> Self {
         Self {
-            internal: is_internal_function(&f.name),
+            is_internal: f.is_internal,
             name: f.name,
             ty: f.ty,
             body: MachineFunctionBody {

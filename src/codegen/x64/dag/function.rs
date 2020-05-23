@@ -23,14 +23,14 @@ pub struct DAGFunction {
     /// DAG node arena
     pub dag_heap: DAGHeap,
 
-    // /// True if internal function
-    // pub internal: bool,
     pub local_mgr: LocalVariables,
 
     /// Virtual register generator
     pub vreg_gen: VirtRegGen,
 
     pub regs_info: RegistersInfo,
+
+    pub is_internal: bool,
 }
 
 pub struct DAGHeap {
@@ -50,6 +50,7 @@ impl DAGFunction {
         regs_info: RegistersInfo,
     ) -> Self {
         Self {
+            is_internal: func.is_internal,
             name: func.name.clone(),
             ty: func.ty.clone(),
             dag_basic_block_arena,
