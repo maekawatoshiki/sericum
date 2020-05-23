@@ -59,11 +59,11 @@ impl<'a> ConvertToDAG<'a> {
 
         let func = self.module.function_ref(func_id);
 
-        debug!(println!(
-            "{}: dump function: \n{}",
-            file!(),
-            self.module.dump(func),
-        ));
+        // debug!(println!(
+        //     "{}: dump function: \n{}",
+        //     file!(),
+        //     self.module.dump(func),
+        // ));
 
         let mut dag_bb_arena: Arena<DAGBasicBlock> = Arena::new();
         let mut dag_bb_list: Vec<DAGBasicBlockId> = vec![];

@@ -18,7 +18,6 @@ impl<M: Debug> ModulePassManager<M> {
     pub fn run_on_module(&mut self, module: &mut M) {
         for pass in &mut self.list {
             pass.run_on_module(module);
-            // debug!(println!("after pass '{}': {:?}", pass.name(), module));
         }
     }
 

@@ -25,9 +25,7 @@ impl<'a> IRLivenessAnalyzer<'a> {
                 let inst = &f.inst_table[inst_id];
 
                 if inst.opcode == Opcode::Call
-                    && self
-                        .module
-                        .types
+                    && f.types
                         .base
                         .borrow()
                         .as_function_ty(inst.operands[0].as_value().get_type(self.module))

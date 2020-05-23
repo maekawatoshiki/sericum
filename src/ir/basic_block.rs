@@ -2,10 +2,7 @@ use super::{module::Module, opcode::*, value::*, DumpToString};
 use crate::traits::basic_block::*;
 use id_arena::*;
 use rustc_hash::FxHashSet;
-use std::{
-    cell::{Ref, RefCell, RefMut},
-    rc::Rc,
-};
+use std::cell::{Ref, RefCell, RefMut};
 
 pub type BasicBlockId = Id<BasicBlock>;
 
@@ -19,7 +16,7 @@ pub struct BasicBlocks {
 pub struct BasicBlock {
     /// Information for liveness analysis
     // TODO: Will be removed
-    pub liveness: Rc<RefCell<LivenessInfo>>,
+    pub liveness: RefCell<LivenessInfo>,
 
     /// Predecessors
     pub pred: Vec<BasicBlockId>,
@@ -28,7 +25,7 @@ pub struct BasicBlock {
     pub succ: Vec<BasicBlockId>,
 
     /// Instruction list
-    pub iseq: Rc<RefCell<Vec<Value>>>,
+    pub iseq: RefCell<Vec<Value>>,
 }
 
 #[derive(Clone, Debug)]
@@ -50,10 +47,10 @@ impl BasicBlocks {
 impl BasicBlock {
     pub fn new() -> Self {
         Self {
-            iseq: Rc::new(RefCell::new(Vec::new())),
+            iseq: RefCell::new(Vec::new()),
             pred: vec![],
             succ: vec![],
-            liveness: Rc::new(RefCell::new(LivenessInfo::new())),
+            liveness: RefCell::new(LivenessInfo::new()),
         }
     }
 
