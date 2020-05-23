@@ -24,7 +24,7 @@ impl LocalVariables {
     }
 
     pub fn alloc(&mut self, ty: &Type) -> FrameIndexInfo {
-        let info = FrameIndexInfo::new(ty.clone(), FrameIndexKind::Local(self.cur_idx));
+        let info = FrameIndexInfo::new(*ty, FrameIndexKind::Local(self.cur_idx));
         self.cur_idx += 1;
         self.locals.push(info.clone());
         info

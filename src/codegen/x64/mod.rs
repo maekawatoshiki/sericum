@@ -7,6 +7,8 @@ pub mod machine;
 pub mod register;
 
 use crate::ir::types::*;
+use crate::{ir::module::Module, traits::pass::ModulePassManager};
+use machine::module::MachineModule;
 
 impl TypeSize for Type {
     fn size_in_byte(&self, tys: &Types) -> usize {
@@ -65,4 +67,27 @@ impl TypeSize for StructType {
     fn size_in_bits(&self, tys: &Types) -> usize {
         self.size_in_byte(tys) * 8
     }
+}
+
+pub fn standard_conversion_into_machine_module(module: &Module) -> MachineModule {
+    let mut dag_module = dag::convert::ConvertToDAG::new(module).convert_module();
+
+    let mut pass_mgr = ModulePassManager::new();
+    pass_mgr.add_pass(dag::combine::Combine::new());
+    pass_mgr.add_pass(dag::legalize::Legalize::new());
+    pass_mgr.add_pass(dag::isel::MISelector::new());
+    pass_mgr.run_on_module(&mut dag_module);
+
+    let mut machine_module = dag::mc_convert::convert_module(dag_module);
+
+    let mut pass_mgr = ModulePassManager::new();
+    pass_mgr.add_pass(machine::phi_elimination::PhiElimination::new());
+    pass_mgr.add_pass(machine::two_addr::TwoAddressConverter::new());
+    pass_mgr.add_pass(machine::regalloc::RegisterAllocator::new());
+    pass_mgr.add_pass(machine::pro_epi_inserter::PrologueEpilogueInserter::new());
+    pass_mgr.add_pass(machine::replace_copy::ReplaceCopyWithProperMInst::new());
+    pass_mgr.add_pass(machine::replace_data::ConstDataReplacer::new());
+    pass_mgr.run_on_module(&mut machine_module);
+
+    machine_module
 }

@@ -1,6 +1,6 @@
 use cilk::{
     cilk_ir,
-    codegen::x64::{asm::print::MachineAsmPrinter, dag, machine},
+    codegen::x64::{asm::print::MachineAsmPrinter, standard_conversion_into_machine_module},
     ir::{builder, types, value},
     module::Module,
     *, // for macro
@@ -60,26 +60,10 @@ fn assemble_and_run(c_parent: &str, s_target: &str) {
 }
 
 fn compile_and_run(c_parent: &str, module: &Module) {
-    // println!("{:?}", module);
-
-    let mut dag_module = dag::convert::ConvertToDAG::new(&module).convert_module();
-    dag::combine::Combine::new().combine_module(&mut dag_module);
-    dag::legalize::Legalize::new().run_on_module(&mut dag_module);
-    dag::isel::MISelector::new().run_on_module(&mut dag_module);
-
-    let mut machine_module = dag::mc_convert::convert_module(dag_module);
-    machine::phi_elimination::PhiElimination::new().run_on_module(&mut machine_module); //
-    machine::two_addr::TwoAddressConverter::new().run_on_module(&mut machine_module);
-    machine::regalloc::RegisterAllocator::new().run_on_module(&mut machine_module); //
-    machine::pro_epi_inserter::PrologueEpilogueInserter::new().run_on_module(&mut machine_module);
-    machine::replace_data::ConstDataReplacer::new().run_on_module(&mut machine_module);
-    machine::replace_copy::ReplaceCopyWithProperMInst::new().run_on_module(&mut machine_module);
-    // debug!(println!("{:?}", machine_module));
-
+    let machine_module = standard_conversion_into_machine_module(module);
     let mut printer = MachineAsmPrinter::new();
     printer.run_on_module(&machine_module);
     // println!("{}", printer.output);
-
     assemble_and_run(c_parent, printer.output.as_str());
 }
 

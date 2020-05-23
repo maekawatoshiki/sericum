@@ -598,7 +598,7 @@ fn jit_executor2() {
 
 #[test]
 fn fibo() {
-    use cilk::codegen::x64::{dag, machine};
+    use cilk::codegen::x64::standard_conversion_into_machine_module;
 
     let mut m = module::Module::new("cilk");
 
@@ -623,19 +623,7 @@ fn fibo() {
             ret (%r);
     });
 
-    let mut dag_module = dag::convert::ConvertToDAG::new(&m).convert_module();
-    dag::combine::Combine::new().combine_module(&mut dag_module);
-    dag::legalize::Legalize::new().run_on_module(&mut dag_module);
-    dag::isel::MISelector::new().run_on_module(&mut dag_module);
-
-    let mut machine_module = dag::mc_convert::convert_module(dag_module);
-    machine::phi_elimination::PhiElimination::new().run_on_module(&mut machine_module);
-    machine::two_addr::TwoAddressConverter::new().run_on_module(&mut machine_module);
-    machine::regalloc::RegisterAllocator::new().run_on_module(&mut machine_module);
-    machine::pro_epi_inserter::PrologueEpilogueInserter::new().run_on_module(&mut machine_module);
-    machine::replace_data::ConstDataReplacer::new().run_on_module(&mut machine_module);
-    machine::replace_copy::ReplaceCopyWithProperMInst::new().run_on_module(&mut machine_module);
-
+    let machine_module = standard_conversion_into_machine_module(&m);
     use crate::codegen::x64::asm::print::MachineAsmPrinter;
     let mut printer = MachineAsmPrinter::new();
     printer.run_on_module(&machine_module);

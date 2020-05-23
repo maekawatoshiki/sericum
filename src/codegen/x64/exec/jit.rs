@@ -4,13 +4,15 @@ use super::super::register::{PhysReg, RegisterClassKind};
 use crate::{
     codegen::{
         internal_function_names,
-        x64::machine::{
-            basic_block::*, const_data::*, frame_object::*, function::*, inst::*, module::*,
+        x64::{
+            machine::{
+                basic_block::*, const_data::*, frame_object::*, function::*, inst::*, module::*,
+            },
+            standard_conversion_into_machine_module,
         },
     },
     ir,
     ir::types::*,
-    traits::pass::ModulePassManager,
 };
 use dynasmrt::*;
 use rustc_hash::FxHashMap;
@@ -47,27 +49,7 @@ pub struct JITCompiler {
 
 impl JITExecutor {
     pub fn new(module: &ir::module::Module) -> Self {
-        use super::super::{dag, machine};
-
-        let mut dag_module = dag::convert::ConvertToDAG::new(module).convert_module();
-        // println!("dag: before: {:?}", dag_module);
-
-        let mut pass_mgr = ModulePassManager::new();
-        pass_mgr.add_pass(dag::combine::Combine::new());
-        pass_mgr.add_pass(dag::legalize::Legalize::new());
-        pass_mgr.add_pass(dag::isel::MISelector::new());
-        pass_mgr.run_on_module(&mut dag_module);
-
-        let mut machine_module = dag::mc_convert::convert_module(dag_module);
-
-        let mut pass_mgr = ModulePassManager::new();
-        pass_mgr.add_pass(machine::phi_elimination::PhiElimination::new());
-        pass_mgr.add_pass(machine::two_addr::TwoAddressConverter::new());
-        pass_mgr.add_pass(machine::regalloc::RegisterAllocator::new());
-        pass_mgr.add_pass(machine::pro_epi_inserter::PrologueEpilogueInserter::new());
-        pass_mgr.add_pass(machine::replace_copy::ReplaceCopyWithProperMInst::new());
-        pass_mgr.add_pass(machine::replace_data::ConstDataReplacer::new());
-        pass_mgr.run_on_module(&mut machine_module);
+        let machine_module = standard_conversion_into_machine_module(module);
 
         // use crate::codegen::x64::asm::print::MachineAsmPrinter;
         // let mut printer = MachineAsmPrinter::new();
