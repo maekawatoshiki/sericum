@@ -2,7 +2,7 @@ use super::machine::inst::{MachineInstId, RegisterBase};
 use crate::ir::types::*;
 use bitvec::vec::BitVec;
 use id_arena::{Arena, Id};
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxHashMap, FxHashSet};
 use std::{
     cell::{Ref, RefCell, RefMut},
     fmt,
@@ -412,6 +412,9 @@ impl TargetRegisterTrait for PhysReg {
     }
 
     fn regs_sharing_same_register_file(&self) -> PhysRegSet {
+        if let Some(set) = REG_FILE.with(|f| f.borrow().get(self).map(|s| s.clone())) {
+            return set;
+        }
         let mut set = PhysRegSet::new();
         let mut cur = *self;
         set.set(*self);
@@ -423,6 +426,7 @@ impl TargetRegisterTrait for PhysReg {
             set.set(r);
             cur = r;
         }
+        REG_FILE.with(|f| f.borrow_mut().insert(*self, set.clone()));
         set
     }
 }
@@ -546,11 +550,11 @@ thread_local! {
             bits.set(reg)
         }
         bits
-    }
-}
+    };
 
-pub fn callee_saved_register() -> PhysRegSet {
-    CALLEE_SAVED_REGS.with(|v| v.clone())
+    pub static REG_FILE: RefCell<FxHashMap<PhysReg, PhysRegSet>> = {
+        RefCell::new(FxHashMap::default())
+    }
 }
 
 #[derive(Debug, Clone)]

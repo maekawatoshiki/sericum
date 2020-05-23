@@ -111,13 +111,15 @@ impl RegisterAllocator {
     }
 
     fn rewrite_vregs(&mut self, cur_func: &mut MachineFunction, matrix: &LiveRegMatrix) {
+        let mut arena = cur_func.regs_info.arena_ref_mut();
         for (_id, bb) in cur_func.body.basic_blocks.id_and_block() {
+            let mut liveness = bb.liveness_ref_mut();
             for inst_id in &*bb.iseq_ref() {
                 let inst = &mut cur_func.body.inst_arena[*inst_id];
                 for reg in inst.collect_all_regs_mut() {
-                    let r = &mut cur_func.regs_info.arena_ref_mut()[*reg];
+                    let r = &mut arena[*reg];
                     if reg.is_phys_reg() {
-                        bb.liveness_ref_mut().add_phys_def(reg.as_phys_reg());
+                        liveness.add_phys_def(reg.as_phys_reg());
                         continue;
                     }
 
@@ -129,7 +131,7 @@ impl RegisterAllocator {
                         .unwrap();
                     r.phys_reg = Some(p);
                     reg.kind = VirtOrPhys::Phys(p);
-                    bb.liveness_ref_mut().add_phys_def(p);
+                    liveness.add_phys_def(p);
                 }
             }
         }
