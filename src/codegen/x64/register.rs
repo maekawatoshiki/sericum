@@ -1,12 +1,11 @@
 use super::machine::inst::{MachineInstId, RegisterBase};
 use crate::ir::types::*;
-use bitvec::vec::BitVec;
 use id_arena::{Arena, Id};
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::{
     cell::{Ref, RefCell, RefMut},
     fmt,
-    ops::{BitAnd, BitOr, BitOrAssign},
+    ops::{BitAnd, BitOr},
     ops::{Index, IndexMut},
     rc::Rc,
 };
@@ -558,29 +557,33 @@ thread_local! {
 }
 
 #[derive(Debug, Clone)]
-pub struct PhysRegSet(pub BitVec);
+pub struct PhysRegSet(pub [u64; 1]); // 8*8*1 > PHYS_REGISTERS_NUM
 
 impl PhysRegSet {
     pub fn new() -> Self {
-        Self(bitvec![0; PHYS_REGISTERS_NUM])
+        Self([0; 1])
     }
 
     pub fn set<T: TargetRegisterTrait>(&mut self, r: T) {
-        self.0.insert(r.as_phys_reg().retrieve(), true);
+        self.0[0] |= 1 << r.as_phys_reg().retrieve();
     }
 
     pub fn has<T: TargetRegisterTrait>(&self, r: T) -> bool {
-        *self.0.get(r.as_phys_reg().retrieve()).unwrap()
+        (self.0[0] & (1 << r.as_phys_reg().retrieve())) != 0
     }
 
     pub fn to_phys_set(&self) -> FxHashSet<PhysReg> {
         let mut set = FxHashSet::default();
-        for (i, &bit) in self.0.iter().enumerate() {
-            if bit {
+        for i in 0..PHYS_REGISTERS_NUM {
+            if (self.0[0] & (1 << i)) != 0 {
                 set.insert(PhysReg(i));
             }
         }
         set
+    }
+
+    pub fn unite(&mut self, rhs: &Self) {
+        self.0[0] |= rhs.0[0];
     }
 }
 
@@ -588,13 +591,7 @@ impl BitOr for PhysRegSet {
     type Output = Self;
 
     fn bitor(self, rhs: Self) -> Self {
-        Self(self.0 | rhs.0)
-    }
-}
-
-impl BitOrAssign for PhysRegSet {
-    fn bitor_assign(&mut self, rhs: Self) {
-        self.0 |= rhs.0
+        Self([self.0[0] & rhs.0[0]])
     }
 }
 
@@ -602,7 +599,7 @@ impl BitAnd for PhysRegSet {
     type Output = Self;
 
     fn bitand(self, rhs: Self) -> Self {
-        Self(self.0 & rhs.0)
+        Self([self.0[0] & rhs.0[0]])
     }
 }
 

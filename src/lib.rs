@@ -21,8 +21,6 @@ extern crate dynasmrt;
 extern crate id_arena;
 #[macro_use]
 extern crate lazy_static;
-#[macro_use]
-extern crate bitvec;
 extern crate rustc_hash;
 
 pub use rustc_hash::{FxHashMap, FxHashSet};

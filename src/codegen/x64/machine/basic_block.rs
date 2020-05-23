@@ -131,7 +131,7 @@ impl LivenessInfo {
     }
 
     pub fn add_phys_def<T: TargetRegisterTrait>(&mut self, r: T) {
-        self.phys_def |= r.regs_sharing_same_register_file();
+        self.phys_def.unite(&r.regs_sharing_same_register_file());
     }
 
     /// Add def.
