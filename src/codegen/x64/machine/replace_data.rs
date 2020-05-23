@@ -2,13 +2,13 @@ use super::const_data::ConstDataArena;
 use super::{function::*, inst::*, module::*};
 use crate::traits::pass::ModulePassTrait;
 
-pub struct ConstDataReplacer {}
+pub struct ReplaceConstFPWithMemoryRef {}
 
-impl ModulePassTrait for ConstDataReplacer {
+impl ModulePassTrait for ReplaceConstFPWithMemoryRef {
     type M = MachineModule;
 
     fn name(&self) -> &'static str {
-        "ConstDataReplacer"
+        "ReplaceConstFPWithMemoryRef"
     }
 
     fn run_on_module(&mut self, module: &mut Self::M) {
@@ -16,7 +16,7 @@ impl ModulePassTrait for ConstDataReplacer {
     }
 }
 
-impl ConstDataReplacer {
+impl ReplaceConstFPWithMemoryRef {
     pub fn new() -> Self {
         Self {}
     }
