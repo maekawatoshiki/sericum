@@ -153,7 +153,7 @@ impl DumpToString for &Function {
         let base = module.types.base.borrow();
         let ty = base.as_function_ty(self.ty).unwrap();
         format!(
-            "define {} {}({}) {{\n{}}}",
+            "define {} {}({}) {}",
             base.to_string(ty.ret_ty),
             self.name,
             ty.params_ty
@@ -163,7 +163,11 @@ impl DumpToString for &Function {
                     s
                 })
                 .trim_matches(&[',', ' '][0..]),
-            self.basic_blocks.arena.dump(module)
+            if self.is_internal {
+                "internal;".to_owned()
+            } else {
+                format!("{{\n{}}}", self.basic_blocks.arena.dump(module))
+            },
         )
     }
 }
