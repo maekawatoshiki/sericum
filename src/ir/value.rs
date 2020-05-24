@@ -1,4 +1,5 @@
 use super::{function::*, module::*, opcode::*, types::*, DumpToString};
+use std::hash;
 
 macro_rules! const_op {
     ($name:ident, $op:tt) => {
@@ -20,7 +21,7 @@ macro_rules! const_op {
     } }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Hash, Eq)]
 pub enum Value {
     Argument(ArgumentValue),
     Immediate(ImmediateValue),
@@ -29,21 +30,21 @@ pub enum Value {
     None,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Hash, Eq)]
 pub struct ArgumentValue {
     pub func_id: FunctionId,
     pub index: usize,
     // pub parent: ModuleRef,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Hash, Eq)]
 pub struct InstructionValue {
     pub func_id: FunctionId,
     pub id: InstructionId,
     // pub parent: ModuleRef,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Hash, Eq)]
 pub struct FunctionValue {
     pub func_id: FunctionId,
     // pub parent: ModuleRef,
@@ -55,6 +56,18 @@ pub enum ImmediateValue {
     Int64(i64),
     F64(f64),
 }
+
+impl hash::Hash for ImmediateValue {
+    fn hash<H: hash::Hasher>(&self, state: &mut H) {
+        match self {
+            Self::Int32(i) => i.hash(state),
+            Self::Int64(i) => i.hash(state),
+            Self::F64(f) => unsafe { ::std::mem::transmute::<f64, u64>(*f) }.hash(state),
+        }
+    }
+}
+
+impl Eq for ImmediateValue {}
 
 impl Value {
     pub fn new_imm_int32(i: i32) -> Self {

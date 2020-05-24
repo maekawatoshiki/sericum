@@ -24,7 +24,7 @@ pub enum NonPrimitiveType {
     Struct(StructType),
 }
 
-#[derive(Clone, PartialEq, Eq, Copy)]
+#[derive(Clone, PartialEq, Eq, Copy, Hash)]
 pub enum Type {
     Void,
     Int1,

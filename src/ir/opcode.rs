@@ -18,7 +18,7 @@ pub struct Instruction {
     pub users: RefCell<Vec<InstructionId>>,
 }
 
-#[derive(Clone, Debug, Copy, PartialEq)]
+#[derive(Clone, Debug, Copy, PartialEq, Eq, Hash)]
 pub enum Opcode {
     Alloca,
     Load,
@@ -38,7 +38,7 @@ pub enum Opcode {
     Ret,
 }
 
-#[derive(Debug, Clone, PartialEq, Copy)]
+#[derive(Debug, Clone, PartialEq, Copy, Hash, Eq)]
 pub enum Operand {
     Type(Type),
     Value(Value),
@@ -47,7 +47,7 @@ pub enum Operand {
     FCmpKind(FCmpKind),
 }
 
-#[derive(Clone, Debug, Copy, PartialEq)]
+#[derive(Clone, Debug, Copy, PartialEq, Hash, Eq)]
 pub enum ICmpKind {
     Eq,
     Le,
@@ -55,7 +55,7 @@ pub enum ICmpKind {
     // Ne,
 }
 
-#[derive(Clone, Debug, Copy, PartialEq)]
+#[derive(Clone, Debug, Copy, PartialEq, Hash, Eq)]
 pub enum FCmpKind {
     UEq,
     ULe,
