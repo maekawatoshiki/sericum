@@ -6,7 +6,6 @@ use crate::{
         function::Function,
         module::Module,
         opcode::{Instruction, InstructionId, Opcode, Operand},
-        types::Types,
         value::{InstructionValue, Value},
     },
     traits::function::FunctionTrait,
@@ -30,7 +29,7 @@ struct InstructionIndexes {
     inst2index: FxHashMap<InstructionId, InstructionIndex>,
 }
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
-struct LeveledBB(usize, BasicBlockId);
+struct BBWithLevel(usize, BasicBlockId);
 
 impl Mem2Reg {
     pub fn new() -> Self {
@@ -39,8 +38,7 @@ impl Mem2Reg {
 
     pub fn run_on_module(&mut self, module: &mut Module) {
         for (_, func) in &mut module.functions {
-            // ignore internal function TODO
-            if func.basic_blocks.order.len() == 0 {
+            if func.is_internal {
                 continue;
             }
 
@@ -50,7 +48,7 @@ impl Mem2Reg {
                 inst_indexes: InstructionIndexes::new(),
                 phi_block_to_allocas: FxHashMap::default(),
             }
-            .run(&module.types);
+            .run();
         }
 
         ConstantFolding::new().run_on_module(module)
@@ -58,7 +56,7 @@ impl Mem2Reg {
 }
 
 impl<'a> Mem2RegOnFunction<'a> {
-    fn run(&mut self, _tys: &Types) {
+    fn run(&mut self) {
         let mut single_store_allocas = vec![];
         let mut single_block_allocas = vec![];
         let mut multi_block_allocas = vec![];
@@ -268,7 +266,7 @@ impl<'a> Mem2RegOnFunction<'a> {
 
         let mut queue = def_blocks
             .iter()
-            .map(|&def| LeveledBB(self.dom_tree.get_level_of(def), def))
+            .map(|&def| BBWithLevel(self.dom_tree.get_level_of(def), def))
             .collect::<BinaryHeap<_>>();
         let mut visited_worklist = FxHashSet::default();
         let mut visited_queue = FxHashSet::default();
@@ -300,7 +298,7 @@ impl<'a> Mem2RegOnFunction<'a> {
                         .push(alloca_id);
 
                     if !def_blocks.contains(&succ_id) {
-                        queue.push(LeveledBB(succ_level, succ_id));
+                        queue.push(BBWithLevel(succ_level, succ_id));
                     }
                 }
 
@@ -506,13 +504,13 @@ impl InstructionIndexes {
     }
 }
 
-impl Ord for LeveledBB {
-    fn cmp(&self, other: &LeveledBB) -> Ordering {
+impl Ord for BBWithLevel {
+    fn cmp(&self, other: &BBWithLevel) -> Ordering {
         self.0.cmp(&other.0)
     }
 }
-impl PartialOrd for LeveledBB {
-    fn partial_cmp(&self, other: &LeveledBB) -> Option<Ordering> {
+impl PartialOrd for BBWithLevel {
+    fn partial_cmp(&self, other: &BBWithLevel) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
