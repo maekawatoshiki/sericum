@@ -335,7 +335,7 @@ impl DAGNode {
                 continue;
             }
             let id = *id4op!(*op);
-            op.debug(f, tys, s, id, indent + 2)?;
+            // op.debug(f, tys, s, id, indent + 2)?;
         }
         if let Some(next) = self.next {
             let id = *id4op!(next);

@@ -1,5 +1,4 @@
 use crate::ir::{
-    basic_block::BasicBlockId,
     function::Function,
     module::Module,
     opcode::{Instruction, InstructionId, Opcode, Operand},
@@ -12,9 +11,6 @@ pub struct CommonSubexprElimination {}
 
 struct LocalCommonSubexprEliminationOnFunction<'a> {
     func: &'a mut Function,
-    // inst_indexes: InstructionIndexes,
-    // dom_tree: DominatorTree<BasicBlock>,
-    // phi_block_to_allocas: FxHashMap<BasicBlockId, Vec<InstructionId>>,
 }
 
 impl CommonSubexprElimination {
@@ -29,13 +25,6 @@ impl CommonSubexprElimination {
             }
 
             LocalCommonSubexprEliminationOnFunction { func }.run()
-            // Mem2RegOnFunction {
-            //     dom_tree: DominatorTreeConstructor::new(func.get_basic_blocks()).construct(),
-            //     cur_func: func,
-            //     inst_indexes: InstructionIndexes::new(),
-            //     phi_block_to_allocas: FxHashMap::default(),
-            // }
-            // .run(&module.types);
         }
     }
 }

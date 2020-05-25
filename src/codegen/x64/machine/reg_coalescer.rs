@@ -1,10 +1,9 @@
-use super::super::register::RegisterId;
-use super::{basic_block::*, function::*, inst::MachineInstId, liveness::*};
+use super::super::register::{RegisterId, RegistersInfo};
+use super::{basic_block::*, function::*, liveness::*};
 use rustc_hash::FxHashSet;
 use std::collections::VecDeque;
 
 pub fn coalesce_function(matrix: &mut LiveRegMatrix, f: &mut MachineFunction) {
-    let mut removal_list = FxHashSet::default();
     let mut worklist = VecDeque::new();
     for (_, _, iiter) in f.body.mbb_iter() {
         for (id, inst) in iiter {
@@ -14,14 +13,25 @@ pub fn coalesce_function(matrix: &mut LiveRegMatrix, f: &mut MachineFunction) {
         }
     }
 
+    fn no_tied_use(f: &MachineFunction, r: &RegisterId) -> bool {
+        f.regs_info.arena_ref()[*r].uses.iter().all(|u| {
+            let inst = &f.body.inst_arena[*u];
+            let pos = inst
+                .operand
+                .iter()
+                .position(|o| o.is_register() && o.as_register() == r)
+                .unwrap();
+            f.body.inst_arena[*u].opcode.inst_def().map_or(true, |i| {
+                assert!(i.tie.len() <= 1); // TODO: support for more than one tied register
+                i.tie.len() == 0 || i.tie.iter().next().unwrap().1.as_use() != pos
+            })
+        })
+    }
+
+    let mut removal_list = FxHashSet::default();
     while let Some(copy_id) = worklist.pop_front() {
         let copy = f.body.inst_arena[copy_id].clone();
 
-        // debug!(println!(
-        //     "dst:{:?}, src:{:?}",
-        //     copy.def[0],
-        //     copy.operand[0].as_register()
-        // ));
         let copy_dst = copy.def[0];
         let copy_src = *copy.operand[0].as_register();
 
@@ -44,14 +54,9 @@ pub fn coalesce_function(matrix: &mut LiveRegMatrix, f: &mut MachineFunction) {
         }
 
         // p_dst = Copy v_src. v_src uses & defs may be replaced with p_dst
-        // TODO: SOMEHOW THE FOLLOWING CODE DOESN'T WORK
+        // TODO: THE FOLLOWING CODE DOESN'T WORK
         if copy_dst.is_phys_reg() && copy_src.is_virt_reg() {
-            // println!(
-            //     "{:?} {:?}",
-            //     copy_dst,
-            //     f.regs_info.arena_ref()[copy_dst].defs
-            // );
-            //
+            use super::super::register::{TargetRegisterTrait, GR64};
             let can_eliminate_copy =
                 !matrix.interferes(copy_src.as_virt_reg(), copy_dst.as_phys_reg()) && {
                     let l = &f.body.basic_blocks.arena[copy.parent].liveness_ref();
@@ -71,11 +76,12 @@ pub fn coalesce_function(matrix: &mut LiveRegMatrix, f: &mut MachineFunction) {
 
         // v_dst = Copy p_src. v_dst uses & defs may be replaced with p_src
         if copy_dst.is_virt_reg() && copy_src.is_phys_reg() {
-            let can_eliminate_copy =
-                !matrix.interferes(copy_dst.as_virt_reg(), copy_src.as_phys_reg()) && {
+            let can_eliminate_copy = no_tied_use(f, &copy_dst)
+                && !matrix.interferes(copy_dst.as_virt_reg(), copy_src.as_phys_reg())
+                && {
                     let bb = &f.body.basic_blocks.arena[copy.parent];
                     let l = &bb.liveness_ref();
-                    !l.live_out.contains(&copy_dst)
+                    !l.live_in.contains(&copy_dst) && !l.live_out.contains(&copy_dst)
                 };
             if !can_eliminate_copy {
                 continue;
@@ -91,8 +97,11 @@ pub fn coalesce_function(matrix: &mut LiveRegMatrix, f: &mut MachineFunction) {
 
         // v_dst = Copy v_src. v_dst uses & defs may be replaced with v_src
         if copy_dst.is_virt_reg() && copy_src.is_virt_reg() {
-            let can_eliminate_copy =
-                !matrix.interferes_virt_regs(copy_dst.as_virt_reg(), copy_src.as_virt_reg()) && {
+            let can_eliminate_copy = f.regs_info.arena_ref()[copy_dst].defs.len() == 1
+                && !matrix.interferes_virt_regs(copy_dst.as_virt_reg(), copy_src.as_virt_reg())
+                && no_tied_use(f, &copy_dst)
+                && no_tied_use(f, &copy_src)
+                && {
                     let bb = &f.body.basic_blocks.arena[copy.parent];
                     let l = &bb.liveness_ref();
                     !l.live_in.contains(&copy_dst)
@@ -105,8 +114,8 @@ pub fn coalesce_function(matrix: &mut LiveRegMatrix, f: &mut MachineFunction) {
             }
 
             replace_regs(f, copy.parent, copy_dst, copy_src);
-
             matrix.merge_virt_regs(&f.regs_info, copy_src.as_virt_reg(), copy_dst.as_virt_reg());
+
             removal_list.insert(copy_id);
             worklist.push_back(copy_id);
             continue;

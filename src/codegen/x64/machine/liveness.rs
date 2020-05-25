@@ -27,6 +27,7 @@ pub struct LiveInterval {
     pub reg: Option<PhysReg>,
     pub range: LiveRange,
     pub spill_weight: f32,
+    pub is_spillable: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -38,8 +39,8 @@ pub struct LiveRange {
 
 #[derive(Debug, Clone, Copy)]
 pub struct LiveSegment {
-    start: ProgramPoint,
-    end: ProgramPoint,
+    pub start: ProgramPoint,
+    pub end: ProgramPoint,
 }
 
 #[derive(Clone, Copy)]
@@ -56,6 +57,7 @@ pub struct ProgramPointBase {
 }
 
 pub struct ProgramPoints {
+    head: Option<Raw<ProgramPointBase>>,
     allocator: RawAllocator<ProgramPointBase>,
 }
 
@@ -84,7 +86,7 @@ impl LiveRegMatrix {
         self.vreg2entity.insert(reg.as_virt_reg(), reg);
     }
 
-    pub fn add_live_interval(&mut self, vreg: VirtReg, range: LiveRange) {
+    pub fn add_live_interval(&mut self, vreg: VirtReg, range: LiveRange) -> &mut LiveInterval {
         self.virt_reg_interval.add(vreg, range)
     }
 
@@ -141,34 +143,34 @@ impl LiveRegMatrix {
         interferings
     }
 
-    pub fn pick_assigned_and_longest_lived_vreg(&self, vregs: &[VirtReg]) -> Option<VirtReg> {
-        let mut longest: Option<(ProgramPoint, VirtReg)> = None;
-
-        for vreg in vregs {
-            match longest {
-                Some((ref mut endpp1, ref mut vreg1)) => {
-                    let interval2 = self.virt_reg_interval.get(vreg).unwrap();
-                    if interval2.reg.is_none() {
-                        continue;
-                    }
-                    let endpp2 = interval2.end_point().unwrap();
-                    if *endpp1 < endpp2 {
-                        *endpp1 = endpp2;
-                        *vreg1 = *vreg
-                    }
-                }
-                None => {
-                    let interval = self.virt_reg_interval.get(vreg).unwrap();
-                    if interval.reg.is_none() {
-                        continue;
-                    }
-                    longest = Some((interval.end_point().unwrap(), *vreg))
-                }
-            }
-        }
-
-        longest.and_then(|(_, vreg)| Some(vreg))
-    }
+    // pub fn pick_assigned_and_longest_lived_vreg(&self, vregs: &[VirtReg]) -> Option<VirtReg> {
+    //     let mut longest: Option<(ProgramPoint, VirtReg)> = None;
+    //
+    //     for vreg in vregs {
+    //         match longest {
+    //             Some((ref mut endpp1, ref mut vreg1)) => {
+    //                 let interval2 = self.virt_reg_interval.get(vreg).unwrap();
+    //                 if interval2.reg.is_none() {
+    //                     continue;
+    //                 }
+    //                 let endpp2 = interval2.end_point().unwrap();
+    //                 if *endpp1 < endpp2 {
+    //                     *endpp1 = endpp2;
+    //                     *vreg1 = *vreg
+    //                 }
+    //             }
+    //             None => {
+    //                 let interval = self.virt_reg_interval.get(vreg).unwrap();
+    //                 if interval.reg.is_none() {
+    //                     continue;
+    //                 }
+    //                 longest = Some((interval.end_point().unwrap(), *vreg))
+    //             }
+    //         }
+    //     }
+    //
+    //     longest.and_then(|(_, vreg)| Some(vreg))
+    // }
 
     pub fn assign_reg(&mut self, vreg: VirtReg, reg: PhysReg) {
         // assign reg to vreg
@@ -191,10 +193,10 @@ impl LiveRegMatrix {
 
         let range = &self.virt_reg_interval.get(&vreg).unwrap().range;
         self.phys_reg_range.get_or_create(reg).remove_range(range);
-        // assert_eq!(
-        //     self.phys_reg_range.get_or_create(reg).interferes(range),
-        //     false
-        // );
+        assert_eq!(
+            self.phys_reg_range.get_or_create(reg).interferes(range),
+            false
+        );
 
         Some(reg)
     }
@@ -206,6 +208,9 @@ impl LiveRegMatrix {
         let mut arena = regs_info.arena_ref_mut();
         for use_ in arena[v2_e].uses.clone() {
             arena[v1_e].add_use(use_)
+        }
+        for def in arena[v2_e].defs.clone() {
+            arena[v1_e].add_def(def)
         }
         let v2_i = self.virt_reg_interval.remove(&v2).unwrap();
         let v1_i = self.virt_reg_interval.get_mut(&v1).unwrap();
@@ -268,8 +273,8 @@ impl VirtRegInterval {
         self.0.remove(vreg)
     }
 
-    pub fn add(&mut self, vreg: VirtReg, range: LiveRange) {
-        self.0.entry(vreg).or_insert(LiveInterval::new(vreg, range));
+    pub fn add(&mut self, vreg: VirtReg, range: LiveRange) -> &mut LiveInterval {
+        self.0.entry(vreg).or_insert(LiveInterval::new(vreg, range))
     }
 
     pub fn collect_virt_regs(&self) -> Vec<VirtReg> {
@@ -293,6 +298,7 @@ impl LiveInterval {
             range,
             reg: None,
             spill_weight: 0.0,
+            is_spillable: true,
         }
     }
 
@@ -337,8 +343,12 @@ impl LiveRange {
     }
 
     pub fn add_segment(&mut self, seg: LiveSegment) {
-        self.segments.push(seg);
-        // let pt = self.segments.binary_search_by(|s| s.start.cmp(&seg.start));
+        // self.segments.push(seg);
+        let pt = self
+            .segments
+            .binary_search_by(|s| s.start.cmp(&seg.start))
+            .unwrap_or_else(|x| x);
+        self.segments.insert(pt, seg);
         // let found = pt.is_ok();
         // let pt = pt.unwrap_or_else(|x| x);
         // if pt == 0 {
@@ -370,13 +380,10 @@ impl LiveRange {
     }
 
     pub fn remove_segment(&mut self, seg: &LiveSegment) {
-        // self.remove.push(seg);
-        // let mut new_segments = vec![];
-        // let mut a=None;
         let a = self.segments.len();
         self.segments
             .retain(|seg1| !(seg1.start == seg.start && seg.end == seg1.end));
-        assert_ne!(self.segments.len(), a);
+        assert!(a - 1 == self.segments.len());
         // for seg1 in &self.segments {
         //         return;
         //         // break;
@@ -448,11 +455,17 @@ impl LiveRange {
     }
 
     pub fn interferes(&self, other: &LiveRange) -> bool {
+        let mut s: usize = 0;
+        // for (i, a) in self.segments.iter().enumerate() {
+        //     if other.end_point().unwrap() < a.start {
+        //         s = i;
+        //     }
+        // }
         // let s = self
         //     .segments
-        //     .binary_search_by(|s| s.start.cmp(&other.segments[0].end))
+        //     .binary_search_by(|s| s.start.cmp(&other.end_point().unwrap()))
         //     .unwrap_or_else(|x| x)
-        //     .saturating_sub(1);
+        //     .saturating_sub(2);
         for seg1 in &self.segments {
             for seg2 in &other.segments {
                 if seg1.interferes(seg2) {
@@ -471,9 +484,8 @@ impl LiveSegment {
 
     pub fn interferes(&self, seg: &LiveSegment) -> bool {
         (self.start < seg.end && self.end > seg.start)
-        // || self.start == seg.start
-        // || self.end == seg.end
-        // || (self.start == seg.start && self.end == seg.end)
+        // || (self.start == seg.start)
+        // || (self.end == seg.end)
     }
 }
 
@@ -481,11 +493,16 @@ impl ProgramPoints {
     pub fn new() -> Self {
         Self {
             allocator: RawAllocator::new(),
+            head: None,
         }
     }
 
     pub fn new_program_point(&mut self, ppb: ProgramPointBase) -> ProgramPoint {
-        ProgramPoint::new(self.allocator.alloc(ppb))
+        let mut x = self.allocator.alloc(ppb);
+        if self.head.is_none() {
+            self.head = Some(x);
+        }
+        ProgramPoint::new(x)
     }
 
     pub fn prev_of(&mut self, pp: ProgramPoint) -> ProgramPoint {
@@ -500,6 +517,7 @@ impl ProgramPoints {
 
         // need to renumber program points belonging to the same block as pp
         if end.idx() - start.idx() < 2 {
+            // panic!();
             start.renumber_in_bb();
             return self.prev_of(pp);
         }
@@ -657,6 +675,9 @@ impl LivenessAnalysis {
         for &reg in &inst.def {
             bb.liveness.borrow_mut().add_def(reg);
         }
+        for &reg in &inst.imp_def {
+            bb.liveness.borrow_mut().add_def(reg);
+        }
     }
 
     fn visit(&mut self, cur_func: &MachineFunction) {
@@ -754,6 +775,8 @@ impl LivenessAnalysis {
                 }
                 .add_segment(LiveSegment::new(cur_pp!(), cur_pp!()))
             }
+
+            index += IDX_STEP;
 
             for (inst_id, inst) in iiter {
                 id2pp.insert(inst_id, cur_pp!());

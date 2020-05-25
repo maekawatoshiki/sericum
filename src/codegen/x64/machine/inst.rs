@@ -266,27 +266,53 @@ impl MachineInst {
         regs_info: &RegistersInfo,
         from: RegisterId,
         to: RegisterId,
-    ) {
+    ) -> Vec<usize> {
+        let mut replaced_operands_idx = vec![];
+        let mut processed = FxHashSet::default();
         // TODO: This loop may run once at most
-        for r in self
-            .operand
-            .iter_mut()
-            .filter_map(|o| match o {
-                MachineOperand::Register(_) | MachineOperand::Mem(_) => Some(o),
-                _ => None,
-            })
-            .flat_map(|o| o.registers_mut())
-            .filter_map(|r| {
-                if r.kind == from.kind {
-                    return Some(r);
+        for (i, o) in self.operand.iter_mut().enumerate() {
+            let mut rs = match o {
+                MachineOperand::Register(_) | MachineOperand::Mem(_) => o.registers_mut(),
+                _ => continue,
+            };
+            for r in &mut rs {
+                if !processed.insert(**r) {
+                    continue;
                 }
-                None
-            })
-        {
-            regs_info.arena_ref_mut()[*r].remove_use(self.id.unwrap());
-            *r = to;
-            regs_info.arena_ref_mut()[*r].add_use(self.id.unwrap());
+                if r.kind == from.kind {
+                    regs_info.arena_ref_mut()[**r].remove_use(self.id.unwrap());
+                    **r = to;
+                    regs_info.arena_ref_mut()[**r].add_use(self.id.unwrap());
+                    replaced_operands_idx.push(i);
+                }
+            }
         }
+        // for r in self
+        //     .operand
+        //     .iter_mut()
+        //     .enumerate()
+        //     .filter_map(|(i, o)| {
+        //         replaced_operands_idx.push(i);
+        //         match o {
+        //             MachineOperand::Register(_) | MachineOperand::Mem(_) => Some(o),
+        //             _ => None,
+        //         }
+        //     })
+        //     .flat_map(|o| o.registers_mut())
+        //     .collect::<FxHashSet<_>>()
+        //     .into_iter()
+        //     .filter_map(|r| {
+        //         if r.kind == from.kind {
+        //             return Some(r);
+        //         }
+        //         None
+        //     })
+        // {
+        //     regs_info.arena_ref_mut()[*r].remove_use(self.id.unwrap());
+        //     *r = to;
+        //     regs_info.arena_ref_mut()[*r].add_use(self.id.unwrap());
+        // }
+        replaced_operands_idx
     }
 
     pub fn tie_regs(&mut self, def: RegisterId, use_: RegisterId) {

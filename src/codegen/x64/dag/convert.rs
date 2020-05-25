@@ -252,9 +252,8 @@ impl<'a> ConvertToDAG<'a> {
                         let copy_from_reg = self.make_chain_with_copying(id);
                         self.inst_id_node_id.insert(inst_id, copy_from_reg);
                     } else {
-                        if inst.ty == Type::Void || inst.users.borrow().len() == 0 {
-                            make_chain!(id);
-                        }
+                        if inst.ty == Type::Void || inst.users.borrow().len() == 0 {}
+                        make_chain!(id);
                         self.inst_id_node_id.insert(inst_id, id);
                     }
                 }

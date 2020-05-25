@@ -2,7 +2,7 @@ use super::{
     basic_block::*,
     function::*,
     inst::*,
-    liveness::{LiveInterval, LiveRange, LiveRegMatrix, LiveSegment, ProgramPoint},
+    liveness::{LiveRange, LiveRegMatrix, LiveSegment, ProgramPoint},
 };
 
 pub struct BuilderWithLiveInfoEdit<'a> {
@@ -137,21 +137,11 @@ impl<'a> BuilderTrait for BuilderWithLiveInfoEdit<'a> {
                         .get_or_create(phys_reg)
                         .add_segment(LiveSegment::new(pp, pp));
                 } else {
-                    if self.matrix.vreg2entity.contains_key(&def.as_virt_reg()) {
-                        self.matrix
-                            .virt_reg_interval
-                            .inner_mut()
-                            .entry(def.as_virt_reg())
-                            .or_insert(LiveInterval::new(def.as_virt_reg(), LiveRange::new_empty()))
-                            .range
-                            .add_segment(LiveSegment::new(pp, pp));
-                    } else {
-                        self.matrix.add_vreg_entity(def);
-                        self.matrix.add_live_interval(
-                            def_.virt_reg,
-                            LiveRange::new(vec![LiveSegment::new(pp, pp)]),
-                        );
-                    }
+                    self.matrix.add_vreg_entity(def);
+                    self.matrix.add_live_interval(
+                        def_.virt_reg,
+                        LiveRange::new(vec![LiveSegment::new(pp, pp)]),
+                    );
                 }
             }
         }
