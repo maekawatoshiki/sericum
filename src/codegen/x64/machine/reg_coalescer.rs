@@ -1,5 +1,5 @@
 use super::super::register::RegisterId;
-use super::{basic_block::*, function::*, liveness::*};
+use super::{basic_block::*, function::*, inst::MachineInstId, liveness::*};
 use rustc_hash::FxHashSet;
 use std::collections::VecDeque;
 
@@ -133,7 +133,6 @@ fn replace_regs(
     for use_ in uses {
         f.body.inst_arena[use_].replace_operand_register(&f.regs_info, from, to);
     }
-
     if f.regs_info.arena_ref()[from].defs.len() == 0 {
         let bb = &f.body.basic_blocks.arena[parent];
         bb.liveness_ref_mut().def.remove(&from);

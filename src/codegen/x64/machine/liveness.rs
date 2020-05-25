@@ -33,6 +33,7 @@ pub struct LiveInterval {
 pub struct LiveRange {
     // TODO: segments should be sorted by LiveSegment.start
     pub segments: Vec<LiveSegment>,
+    pub remove: Vec<LiveSegment>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -190,6 +191,10 @@ impl LiveRegMatrix {
 
         let range = &self.virt_reg_interval.get(&vreg).unwrap().range;
         self.phys_reg_range.get_or_create(reg).remove_range(range);
+        // assert_eq!(
+        //     self.phys_reg_range.get_or_create(reg).interferes(range),
+        //     false
+        // );
 
         Some(reg)
     }
@@ -310,11 +315,17 @@ impl LiveInterval {
 
 impl LiveRange {
     pub fn new(segments: Vec<LiveSegment>) -> Self {
-        Self { segments }
+        Self {
+            segments,
+            remove: Vec::new(),
+        }
     }
 
     pub fn new_empty() -> Self {
-        Self { segments: vec![] }
+        Self {
+            segments: vec![],
+            remove: Vec::new(),
+        }
     }
 
     pub fn adjust_end_to_start(&mut self) {
@@ -326,29 +337,30 @@ impl LiveRange {
     }
 
     pub fn add_segment(&mut self, seg: LiveSegment) {
-        let pt = self.segments.binary_search_by(|s| s.start.cmp(&seg.start));
-        let found = pt.is_ok();
-        let pt = pt.unwrap_or_else(|x| x);
-        if pt == 0 {
-            self.segments.insert(pt, seg);
-            return;
-        }
-        /* pt > 0 */
-        let mpt = if found { pt } else { pt - 1 };
-        let prev_seg = self.segments[mpt];
-        if prev_seg.end == seg.start {
-            self.segments[mpt].end = seg.end;
-            return;
-        }
-        if prev_seg.start != seg.start {
-            self.segments.insert(pt, seg);
-            return;
-        }
-        // prev_seg.start == seg.start
-        if prev_seg.end < seg.end {
-            self.segments[mpt].end = seg.end;
-            return;
-        }
+        self.segments.push(seg);
+        // let pt = self.segments.binary_search_by(|s| s.start.cmp(&seg.start));
+        // let found = pt.is_ok();
+        // let pt = pt.unwrap_or_else(|x| x);
+        // if pt == 0 {
+        //     self.segments.insert(pt, seg);
+        //     return;
+        // }
+        // /* pt > 0 */
+        // let mpt = if found { pt } else { pt - 1 };
+        // let prev_seg = self.segments[mpt];
+        // if prev_seg.end == seg.start {
+        //     self.segments[mpt].end = seg.end;
+        //     return;
+        // }
+        // if prev_seg.start != seg.start {
+        //     self.segments.insert(pt, seg);
+        //     return;
+        // }
+        // // prev_seg.start == seg.start
+        // if prev_seg.end < seg.end {
+        //     self.segments[mpt].end = seg.end;
+        //     return;
+        // }
     }
 
     pub fn unite_range(&mut self, range: LiveRange) {
@@ -358,29 +370,54 @@ impl LiveRange {
     }
 
     pub fn remove_segment(&mut self, seg: &LiveSegment) {
-        let mut found = false;
-        let pt = match self.segments.binary_search_by(|s| s.start.cmp(&seg.start)) {
-            Ok(pt) => {
-                found = true;
-                pt
-            }
-            Err(pt) => pt,
-        };
-
-        if found {
-            if self.segments[pt].end == seg.end {
-                self.segments.remove(pt);
-                return;
-            }
-            if seg.end < self.segments[pt].end {
-                let s = self.segments[pt];
-                self.segments.remove(pt);
-                self.add_segment(LiveSegment::new(seg.end, s.end));
-                return;
-            }
-        }
-
-        unimplemented!("WOW");
+        // self.remove.push(seg);
+        // let mut new_segments = vec![];
+        // let mut a=None;
+        let a = self.segments.len();
+        self.segments
+            .retain(|seg1| !(seg1.start == seg.start && seg.end == seg1.end));
+        assert_ne!(self.segments.len(), a);
+        // for seg1 in &self.segments {
+        //         return;
+        //         // break;
+        //         // continue;
+        //     }
+        // }
+        // panic!()
+        //     if !seg1.interferes(seg) {
+        //         new_segments.push(*seg1);
+        //         continue;
+        //     }
+        //     let mut a = false;
+        //     if seg.start < seg1.start && seg1.end < seg.end {
+        //         continue;
+        //     }
+        //     if seg.start == seg1.start && seg1.end == seg.end {
+        //         continue;
+        //     }
+        //     // panic!("{:?} {:?}", seg, seg1);
+        //     let aa = if seg1.start < seg.start {
+        //         LiveSegment::new(seg1.start, seg.start)
+        //     } else {
+        //         LiveSegment::new(seg.start, seg1.start)
+        //     };
+        //     let bb = if seg1.end < seg.end {
+        //         LiveSegment::new(seg1.end, seg.end)
+        //     } else {
+        //         LiveSegment::new(seg.end, seg1.end)
+        //     };
+        //     if seg1.start <= aa.start && aa.end <= seg1.end {
+        //         a = true;
+        //         new_segments.push(aa)
+        //     }
+        //     if seg1.start <= bb.start && bb.end <= seg1.end {
+        //         a = true;
+        //         new_segments.push(bb)
+        //     }
+        //     // assert_eq!(a, true);
+        // }
+        // self.segments = new_segments;
+        // return;
     }
 
     pub fn remove_range(&mut self, range: &LiveRange) {
@@ -411,12 +448,12 @@ impl LiveRange {
     }
 
     pub fn interferes(&self, other: &LiveRange) -> bool {
-        let s = self
-            .segments
-            .binary_search_by(|s| s.start.cmp(&other.segments[0].end))
-            .unwrap_or_else(|x| x)
-            .saturating_sub(1);
-        for seg1 in &self.segments[s..] {
+        // let s = self
+        //     .segments
+        //     .binary_search_by(|s| s.start.cmp(&other.segments[0].end))
+        //     .unwrap_or_else(|x| x)
+        //     .saturating_sub(1);
+        for seg1 in &self.segments {
             for seg2 in &other.segments {
                 if seg1.interferes(seg2) {
                     return true;
@@ -433,7 +470,10 @@ impl LiveSegment {
     }
 
     pub fn interferes(&self, seg: &LiveSegment) -> bool {
-        self.start < seg.end && self.end > seg.start
+        (self.start < seg.end && self.end > seg.start)
+        // || self.start == seg.start
+        // || self.end == seg.end
+        // || (self.start == seg.start && self.end == seg.end)
     }
 }
 

@@ -7,7 +7,7 @@ use super::{
     builder::{BuilderTrait, BuilderWithLiveInfoEdit},
     function::MachineFunction,
     inst::{MachineInst, MachineMemOperand, MachineOperand},
-    liveness::LiveRegMatrix,
+    liveness::{LiveInterval, LiveRange, LiveRegMatrix, LiveSegment},
 };
 use crate::ir::types::Types;
 
@@ -27,31 +27,32 @@ impl<'a> Spiller<'a> {
         // e.g.
         //   %v1 = COPY %v2
         //   %v1 = ADD %v1, 2 <- def_id
-        let def_id = *r_defs
-            .iter()
-            .max_by(|x, y| {
-                let x = &self.matrix.get_program_point(**x).unwrap();
-                let y = &self.matrix.get_program_point(**y).unwrap();
-                x.cmp(&y)
-            })
-            .unwrap();
+        // let def_id = *r_defs
+        //     .iter()
+        //     .max_by(|x, y| {
+        //         let x = &self.matrix.get_program_point(**x).unwrap();
+        //         let y = &self.matrix.get_program_point(**y).unwrap();
+        //         x.cmp(&y)
+        //     })
+        //     .unwrap();
+        for def_id in r_defs {
+            let bb = self.func.body.inst_arena[def_id].parent;
+            let dst = MachineOperand::FrameIndex(slot.clone());
+            let src = MachineOperand::Register(r);
+            let rbp = self.func.regs_info.get_phys_reg(GR64::RBP);
+            let store = MachineInst::new_simple(
+                mov_mx(&self.func.regs_info, &src).unwrap(),
+                vec![
+                    MachineOperand::Mem(MachineMemOperand::BaseFi(rbp, *dst.as_frame_index())),
+                    src,
+                ],
+                bb,
+            );
 
-        let bb = self.func.body.inst_arena[def_id].parent;
-        let dst = MachineOperand::FrameIndex(slot.clone());
-        let src = MachineOperand::Register(r);
-        let rbp = self.func.regs_info.get_phys_reg(GR64::RBP);
-        let store = MachineInst::new_simple(
-            mov_mx(&self.func.regs_info, &src).unwrap(),
-            vec![
-                MachineOperand::Mem(MachineMemOperand::BaseFi(rbp, *dst.as_frame_index())),
-                src,
-            ],
-            bb,
-        );
-
-        let mut builder = BuilderWithLiveInfoEdit::new(self.matrix, self.func);
-        builder.set_insert_point_after_inst(def_id).unwrap();
-        builder.insert(store);
+            let mut builder = BuilderWithLiveInfoEdit::new(self.matrix, self.func);
+            builder.set_insert_point_after_inst(def_id).unwrap();
+            builder.insert(store);
+        }
     }
 
     pub fn insert_reload(
@@ -84,10 +85,25 @@ impl<'a> Spiller<'a> {
                 use_inst.parent,
             )
             .with_def(vec![new_r]);
+            let load_id = self.func.body.inst_arena.alloc(&self.func.regs_info, load);
 
-            let mut builder = BuilderWithLiveInfoEdit::new(self.matrix, self.func);
-            builder.set_insert_point_before_inst(use_id);
-            builder.insert(load);
+            {
+                let mut builder = BuilderWithLiveInfoEdit::new(self.matrix, self.func);
+                builder.set_insert_point_before_inst(use_id).unwrap();
+                builder.insert(load_id);
+            }
+
+            // let a = self.matrix.get_program_point(load_id).unwrap();
+            // let b = self.matrix.get_program_point(use_id).unwrap();
+            // self.matrix.virt_reg_interval.inner_mut().insert(
+            //     new_r.as_virt_reg(),
+            //     LiveInterval {
+            //         vreg: new_r.as_virt_reg(),
+            //         reg: None,
+            //         range: LiveRange::new(vec![LiveSegment::new(a, b)]),
+            //         spill_weight: 100.0,
+            //     },
+            // );
         }
 
         self.func.regs_info.arena_ref_mut()[reg_id].uses.clear();

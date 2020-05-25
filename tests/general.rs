@@ -965,3 +965,29 @@ fn pass_arr() {
     );
     assert_eq!(arr[1], 12);
 }
+
+#[test]
+fn cse0() {
+    let mut m = module::Module::new("cilk");
+
+    cilk_ir!(m; define [i32] func [] {
+    entry:
+        a = alloca i32;
+        store (i32 1), (%a);
+        b = load (%a);
+        c = add (%b), (i32 2);
+        d = mul (%c), (i32 2);
+        e = add (%b), (i32 2);
+        f = mul (%e), (i32 3);
+        g = add (%d), (%f);
+        ret (%g);
+    });
+    println!("{:?}", m);
+
+    ir::cse::CommonSubexprElimination::new().run_on_module(&mut m);
+    println!("{:?}", m);
+
+    let mut jit = exec::jit::JITExecutor::new(&m);
+    let func = jit.find_function_by_name("func").unwrap();
+    assert_eq!(jit.run(func, vec![]), exec::jit::GenericValue::Int32(15));
+}

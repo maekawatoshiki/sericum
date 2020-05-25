@@ -51,16 +51,26 @@ impl RegisterAllocator {
         let mut matrix = LivenessAnalysis::new().analyze_function(cur_func);
         calc_spill_weight(cur_func, &mut matrix);
 
-        // debug!(println!("before coalesing {:?}", cur_func));
+        debug!(println!("before coalesing {:?}", cur_func));
 
-        coalesce_function(&mut matrix, cur_func);
+        // coalesce_function(&mut matrix, cur_func);
 
-        // debug!(println!("after coalesing {:?}", cur_func));
+        debug!(println!("after coalesing {:?}", cur_func));
 
         // TODO: preserve_phys_reg_uses_across_call
         self.preserve_reg_uses_across_call(tys, cur_func, &mut matrix);
 
+        // TODO: Is this correct?
         self.queue = matrix.collect_virt_regs().into_iter().collect();
+
+        // assert!(matrix
+        //     .phys_reg_range
+        //     .get(GR32::EAX.as_phys_reg())
+        //     .unwrap()
+        //     .interferes(&matrix.virt_reg_interval.get(&VirtReg(19)).unwrap().range));
+        // for (a, b) in matrix.virt_reg_interval.inner() {
+        //     println!("AAAAA {:?} - {:?}", a, b);
+        // }
 
         while let Some(vreg) = self.queue.pop_front() {
             let mut allocated = false;
@@ -83,23 +93,52 @@ impl RegisterAllocator {
             }
 
             let interfering = matrix.collect_interfering_assigned_regs(vreg);
-            let mut reg_to_spill = VirtReg(0xffffffff);
+            let mut reg_to_spill = VirtReg(1234000);
+            // .pick_assigned_and_longest_lived_vreg(&interfering)
+            // .unwrap();
             let mut last_spill_weight = f32::MAX;
-            for &vreg in &interfering {
-                let spill_weight = matrix.virt_reg_interval.get(&vreg).unwrap().spill_weight;
-                if spill_weight < last_spill_weight {
-                    reg_to_spill = vreg;
-                    last_spill_weight = spill_weight;
+            let mut aa = vec![];
+            // let mut aa = false;
+            self.queue.push_back(vreg);
+            for &vreg2 in &interfering {
+                // let spill_weight = matrix.virt_reg_interval.get(&vreg).unwrap().spill_weight;
+                // if spill_weight < last_spill_weight {
+                //     reg_to_spill = vreg;
+                //     last_spill_weight = spill_weight;
+                //     // break;
+                // }
+                let reg_to_spill = vreg2;
+                let phy_reg = matrix.unassign_reg(reg_to_spill).unwrap();
+                let new_regs = Spiller::new(cur_func, &mut matrix).spill(tys, reg_to_spill);
+                self.queue.push_back(reg_to_spill);
+                for new_reg in new_regs {
+                    self.queue.push_back(new_reg);
                 }
+                aa.push(phy_reg);
             }
-            let phy_reg = matrix.unassign_reg(reg_to_spill).unwrap();
-            matrix.assign_reg(vreg, phy_reg);
-
-            let new_regs = Spiller::new(cur_func, &mut matrix).spill(tys, reg_to_spill);
-            self.queue.push_back(reg_to_spill);
-            for new_reg in new_regs {
-                self.queue.push_back(new_reg);
-            }
+            // let mut f = false;
+            // for aa in aa {
+            //     if !matrix.interferes(vreg, aa) {
+            //         matrix.assign_reg(vreg, aa);
+            //         f = true;
+            //         break;
+            //     }
+            // }
+            // assert!(f);
+            return self.run_on_function(tys, cur_func);
+            // assert!(aa);
+            // if !aa {
+            //     self.queue.push_back(vreg)
+            // }
+            // self.queue.push_back(vreg);
+            // let phy_reg = matrix.unassign_reg(reg_to_spill).unwrap();
+            // // matrix.assign_reg(vreg, phy_reg);
+            //
+            // let new_regs = Spiller::new(cur_func, &mut matrix).spill(tys, reg_to_spill);
+            // self.queue.push_back(reg_to_spill);
+            // for new_reg in new_regs {
+            //     self.queue.push_back(new_reg);
+            // }
 
             debug!(println!("interfering({:?}): {:?}", vreg, interfering);
                    println!("spill target: {:?}", reg_to_spill));
@@ -107,7 +146,7 @@ impl RegisterAllocator {
 
         self.rewrite_vregs(cur_func, &matrix);
 
-        coalesce_function(&mut matrix, cur_func); // spilling may cause another coalesce needs
+        // coalesce_function(&mut matrix, cur_func); // spilling may cause another coalesce needs
     }
 
     fn rewrite_vregs(&mut self, cur_func: &mut MachineFunction, matrix: &LiveRegMatrix) {
@@ -194,6 +233,15 @@ impl RegisterAllocator {
             }
         }
 
+        // for reg_to_spill in regs_to_save {
+        //     let new_regs = Spiller::new(cur_func, &mut matrix).spill(tys, reg_to_spill);
+        //     self.queue.push_back(reg_to_spill);
+        //     for new_reg in new_regs {
+        //         self.queue.push_back(new_reg);
+        //     }
+        // }
+        // return;
+
         // debug!(println!("REG TO SAVE: {:?}", regs_to_save));
 
         let mut slots_to_save_regs = vec![];
@@ -213,10 +261,7 @@ impl RegisterAllocator {
                 &cur_func.regs_info,
                 mov_mx(&cur_func.regs_info, &src).unwrap(),
                 vec![
-                    MachineOperand::Mem(MachineMemOperand::BaseFi(
-                        rbp.clone(),
-                        *dst.as_frame_index(),
-                    )),
+                    MachineOperand::Mem(MachineMemOperand::BaseFi(rbp, *dst.as_frame_index())),
                     src,
                 ],
                 None,

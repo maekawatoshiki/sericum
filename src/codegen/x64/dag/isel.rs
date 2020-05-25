@@ -162,7 +162,10 @@ impl MISelector {
                     }
                     mem32  c {
                         GR32  b => (mi.MOVmr32 [BaseFi %rbp, c], b)
-                        imm32 b => (mi.MOVmi32 [BaseFi %rbp, c], b) } }
+                        imm32 b => (mi.MOVmi32 [BaseFi %rbp, c], b) }
+                    mem64  c {
+                        GR64  b => (mi.MOVmr64 [BaseFi %rbp, c], b) }
+                }
                 GR64   a {
                     imm32 b => (mi.MOVmi32 [Base a], b)
                     GR32  b => (mi.MOVmr32 [Base a], b)

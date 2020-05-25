@@ -285,6 +285,7 @@ fn brainfuxk() {
 
     // Comment out and get faster
     ir::mem2reg::Mem2Reg::new().run_on_module(&mut m);
+    ir::cse::CommonSubexprElimination::new().run_on_module(&mut m);
 
     // println!("IR: {}", m.dump(f_id));
 

@@ -376,6 +376,8 @@ fn main() {
       var temp_col: *struct Vec;
       var j: i32;
       var q: *struct Ray;
+      var q1: *struct Ray;
+      var q2: *struct Ray;
 
       env = Env_new();
 
@@ -418,6 +420,11 @@ fn main() {
     let mut codegen = codegen::CodeGenerator::new();
     codegen.run(input);
 
+    cilk::ir::mem2reg::Mem2Reg::new().run_on_module(&mut codegen.module);
+    cilk::ir::cse::CommonSubexprElimination::new().run_on_module(&mut codegen.module);
+
+    println!("{:?}", codegen.module);
+
     let mut jit = cilk::codegen::x64::exec::jit::JITExecutor::new(&codegen.module);
     let func = jit.find_function_by_name("main").unwrap();
     println!("Result: {:?}", jit.run(func, vec![]));
@@ -425,6 +432,7 @@ fn main() {
 
 #[test]
 fn pi() {
+    //66/51
     let input = r#"
     function main(output: * [600] i32): i32 {
         var a: i32; a = 10000;
@@ -469,6 +477,10 @@ fn pi() {
 
     let mut codegen = codegen::CodeGenerator::new();
     codegen.run(input);
+
+    cilk::ir::mem2reg::Mem2Reg::new().run_on_module(&mut codegen.module);
+    // cilk::ir::cse::CommonSubexprElimination::new().run_on_module(&mut codegen.module);
+    println!("{:?}", codegen.module);
 
     let mut jit = cilk::codegen::x64::exec::jit::JITExecutor::new(&codegen.module);
     let func = jit.find_function_by_name("main").unwrap();

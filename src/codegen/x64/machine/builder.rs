@@ -2,7 +2,7 @@ use super::{
     basic_block::*,
     function::*,
     inst::*,
-    liveness::{LiveRange, LiveRegMatrix, LiveSegment, ProgramPoint},
+    liveness::{LiveInterval, LiveRange, LiveRegMatrix, LiveSegment, ProgramPoint},
 };
 
 pub struct BuilderWithLiveInfoEdit<'a> {
@@ -105,21 +105,6 @@ impl<'a> BuilderTrait for BuilderWithLiveInfoEdit<'a> {
         {
             // update registers' use&def list. TODO: refine code
             let inst = &self.function.body.inst_arena[inst_id];
-            for &def in inst.collect_defined_regs() {
-                let def_ = &self.function.regs_info.arena_ref()[def];
-                if let Some(phys_reg) = def_.phys_reg {
-                    self.matrix
-                        .phys_reg_range
-                        .get_or_create(phys_reg)
-                        .add_segment(LiveSegment::new(pp, pp));
-                } else {
-                    self.matrix.add_vreg_entity(def);
-                    self.matrix.add_live_interval(
-                        def_.virt_reg,
-                        LiveRange::new(vec![LiveSegment::new(pp, pp)]),
-                    );
-                }
-            }
             for use_ in inst.collect_used_regs() {
                 if use_.is_phys_reg() {
                     let range = self.matrix.phys_reg_range.get_mut(use_.as_phys_reg());
@@ -141,6 +126,31 @@ impl<'a> BuilderTrait for BuilderWithLiveInfoEdit<'a> {
                         .unwrap();
                     if *end_point <= pp {
                         *end_point = pp
+                    }
+                }
+            }
+            for &def in inst.collect_defined_regs() {
+                let def_ = &self.function.regs_info.arena_ref()[def];
+                if let Some(phys_reg) = def_.phys_reg {
+                    self.matrix
+                        .phys_reg_range
+                        .get_or_create(phys_reg)
+                        .add_segment(LiveSegment::new(pp, pp));
+                } else {
+                    if self.matrix.vreg2entity.contains_key(&def.as_virt_reg()) {
+                        self.matrix
+                            .virt_reg_interval
+                            .inner_mut()
+                            .entry(def.as_virt_reg())
+                            .or_insert(LiveInterval::new(def.as_virt_reg(), LiveRange::new_empty()))
+                            .range
+                            .add_segment(LiveSegment::new(pp, pp));
+                    } else {
+                        self.matrix.add_vreg_entity(def);
+                        self.matrix.add_live_interval(
+                            def_.virt_reg,
+                            LiveRange::new(vec![LiveSegment::new(pp, pp)]),
+                        );
                     }
                 }
             }

@@ -205,7 +205,6 @@ impl<'a> CodeGeneratorForFunction<'a> {
         func_id: cilk::function::FunctionId,
         func: &'a parser::Function,
     ) -> Self {
-        // cilk::ir::mem2reg::Mem2Reg::new().run_on_module(module);
         Self {
             builder: cilk::builder::Builder::new(module, func_id),
             types,

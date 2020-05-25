@@ -186,7 +186,7 @@ impl<'a> ConversionInfo<'a> {
 
                 self.push_inst(
                     MachineInst::new_simple(MachineOpcode::CDQ, vec![], self.cur_bb)
-                        .with_imp_def(edx)
+                        .with_imp_defs(vec![eax, edx])
                         .with_imp_use(eax),
                 );
 
@@ -230,7 +230,7 @@ impl<'a> ConversionInfo<'a> {
 
                 self.push_inst(
                     MachineInst::new_simple(MachineOpcode::CDQ, vec![], self.cur_bb)
-                        .with_imp_def(edx)
+                        .with_imp_defs(vec![eax, edx])
                         .with_imp_use(eax),
                 );
 
