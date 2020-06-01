@@ -155,26 +155,18 @@ impl LivenessInfo {
 
         while let Some(sub) = cur.sub_reg() {
             cur = sub;
-            let key = RegisterId {
-                id: reg.id,
-                kind: VirtOrPhys::Phys(cur),
-            };
-            if self.def.contains(&key) {
-                self.def.remove(&key);
-                self.def.insert(reg);
-                return false;
-            }
+            self.def.retain(|k| k.kind != VirtOrPhys::Phys(cur));
         }
 
         cur = p;
 
         while let Some(sub) = cur.super_reg() {
             cur = sub;
-            let key = RegisterId {
-                id: reg.id,
-                kind: VirtOrPhys::Phys(cur),
-            };
-            if self.def.contains(&key) {
+            // let key = RegisterId {
+            //     id: cur.id,
+            //     kind: VirtOrPhys::Phys(cur),
+            // };
+            if self.def.iter().any(|k| k.kind == VirtOrPhys::Phys(cur)) {
                 return false;
             }
         }
@@ -203,26 +195,19 @@ impl LivenessInfo {
 
         while let Some(sub) = cur.sub_reg() {
             cur = sub;
-            let key = RegisterId {
-                id: reg.id,
-                kind: VirtOrPhys::Phys(cur),
-            };
-            if self.live_in.contains(&key) {
-                self.live_in.remove(&key);
-                self.live_in.insert(reg);
-                return false;
-            }
+            self.live_in.retain(|k| k.kind != VirtOrPhys::Phys(cur));
         }
 
         cur = p;
 
         while let Some(sub) = cur.super_reg() {
             cur = sub;
-            let key = RegisterId {
-                id: reg.id,
-                kind: VirtOrPhys::Phys(cur),
-            };
-            if self.live_in.contains(&key) {
+            // let key = RegisterId {
+            //     id: reg.id,
+            //     kind: VirtOrPhys::Phys(cur),
+            // };
+            if self.live_in.iter().any(|k| k.kind == VirtOrPhys::Phys(cur)) {
+                // if self.live_in.contains(&key) {
                 return false;
             }
         }
@@ -251,26 +236,27 @@ impl LivenessInfo {
 
         while let Some(sub) = cur.sub_reg() {
             cur = sub;
-            let key = RegisterId {
-                id: reg.id,
-                kind: VirtOrPhys::Phys(cur),
-            };
-            if self.live_out.contains(&key) {
-                self.live_out.remove(&key);
-                self.live_out.insert(reg);
-                return false;
-            }
+            // let key = RegisterId {
+            //     id: reg.id,
+            //     kind: VirtOrPhys::Phys(cur),
+            // };
+            self.live_out.retain(|k| k.kind != VirtOrPhys::Phys(cur));
         }
 
         cur = p;
 
         while let Some(sub) = cur.super_reg() {
             cur = sub;
-            let key = RegisterId {
-                id: reg.id,
-                kind: VirtOrPhys::Phys(cur),
-            };
-            if self.live_out.contains(&key) {
+            // let key = RegisterId {
+            //     id: reg.id,
+            //     kind: VirtOrPhys::Phys(cur),
+            // };
+            if self
+                .live_out
+                .iter()
+                .any(|k| k.kind == VirtOrPhys::Phys(cur))
+            {
+                // if self.live_out.contains(&key) {
                 return false;
             }
         }

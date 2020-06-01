@@ -420,8 +420,8 @@ fn main() {
     let mut codegen = codegen::CodeGenerator::new();
     codegen.run(input);
 
-    cilk::ir::mem2reg::Mem2Reg::new().run_on_module(&mut codegen.module);
     cilk::ir::cse::CommonSubexprElimination::new().run_on_module(&mut codegen.module);
+    cilk::ir::mem2reg::Mem2Reg::new().run_on_module(&mut codegen.module);
 
     println!("{:?}", codegen.module);
 
@@ -464,7 +464,6 @@ fn pi() {
                 b = b - 1;
             }
 
-            println_i32(e + d / a);
             output[i] = e + d / a;
 
             e = d % a;
@@ -478,9 +477,8 @@ fn pi() {
     let mut codegen = codegen::CodeGenerator::new();
     codegen.run(input);
 
+    cilk::ir::cse::CommonSubexprElimination::new().run_on_module(&mut codegen.module);
     cilk::ir::mem2reg::Mem2Reg::new().run_on_module(&mut codegen.module);
-    // cilk::ir::cse::CommonSubexprElimination::new().run_on_module(&mut codegen.module);
-    println!("{:?}", codegen.module);
 
     let mut jit = cilk::codegen::x64::exec::jit::JITExecutor::new(&codegen.module);
     let func = jit.find_function_by_name("main").unwrap();
@@ -536,4 +534,51 @@ fn pi() {
     for (a, b) in output.iter().zip(answer.iter()) {
         assert_eq!(a, b);
     }
+}
+
+#[test]
+fn pi2() {
+    let input = r#"
+    function main(output: * [600] i32): i32 {
+        var a: [52514] i32;
+        var b: i32;
+        var c: i32;
+        var d: i32; d = 0;
+        var e: i32;
+        var f: i32; f = 10000;
+        var g: i32;
+        var h: i32; h = 0;
+        var i: i32; 
+        c = 52500;
+        b = 0;
+        while b < 52514 {
+            a[b] = f / 5;
+            b = b + 1;
+        }
+        while 0 < c {
+            d = d % f;
+            e = d;
+            b = c - 1;
+            while 0 < b {
+                g = 2 * b - 1;
+                d = d * b + f * a[b];
+                a[b] = d % g;
+                d = d / g;
+                b = b - 1;
+            }
+            println_i32(e+d/f);
+            c = c - 14;
+        }
+        return 0;
+    }"#;
+
+    let mut codegen = codegen::CodeGenerator::new();
+    codegen.run(input);
+
+    cilk::ir::cse::CommonSubexprElimination::new().run_on_module(&mut codegen.module);
+    cilk::ir::mem2reg::Mem2Reg::new().run_on_module(&mut codegen.module);
+
+    let mut jit = cilk::codegen::x64::exec::jit::JITExecutor::new(&codegen.module);
+    let func = jit.find_function_by_name("main").unwrap();
+    jit.run(func, vec![]);
 }

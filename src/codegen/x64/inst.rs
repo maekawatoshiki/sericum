@@ -323,7 +323,7 @@ pub struct TargetInstDef {
     pub opcode: TargetOpcode,
     pub uses: Vec<TargetOperand>,
     pub defs: Vec<TargetRegister>,
-    pub tie: FxHashMap<DefOrUseReg, DefOrUseReg>,
+    pub tie: FxHashMap<DefOrUseReg, DefOrUseReg>, // def -> use
     pub imp_use: Vec<TargetRegister>,
     pub imp_def: Vec<TargetRegister>,
 }
@@ -552,6 +552,22 @@ impl TargetRegister {
     pub fn as_reg_class(&self) -> RegisterClassKind {
         match self {
             Self::RegClass(rc) => *rc,
+            _ => panic!(),
+        }
+    }
+}
+
+impl DefOrUseReg {
+    pub fn as_def(&self) -> usize {
+        match self {
+            Self::Def(d) => *d,
+            _ => panic!(),
+        }
+    }
+
+    pub fn as_use(&self) -> usize {
+        match self {
+            Self::Use(u) => *u,
             _ => panic!(),
         }
     }

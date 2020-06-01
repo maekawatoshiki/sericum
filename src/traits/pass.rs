@@ -17,8 +17,13 @@ impl<M: Debug> ModulePassManager<M> {
 
     pub fn run_on_module(&mut self, module: &mut M) {
         for pass in &mut self.list {
+            let now = ::std::time::Instant::now();
             pass.run_on_module(module);
-            // debug!(println!("after pass '{}': {:?}", pass.name(), module));
+            debug!(println!(
+                "after pass '{}': {:?}",
+                pass.name(),
+                ::std::time::Instant::now().duration_since(now)
+            ));
         }
     }
 
