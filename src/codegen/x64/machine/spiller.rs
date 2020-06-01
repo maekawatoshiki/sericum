@@ -7,10 +7,9 @@ use super::{
     builder::{BuilderTrait, BuilderWithLiveInfoEdit},
     function::MachineFunction,
     inst::{MachineInst, MachineMemOperand, MachineOpcode, MachineOperand},
-    liveness::{LiveInterval, LiveRange, LiveRegMatrix, LiveSegment},
+    liveness::{LiveRange, LiveRegMatrix, LiveSegment},
 };
 use crate::ir::types::Types;
-use rustc_hash::FxHashMap;
 
 pub struct Spiller<'a> {
     func: &'a mut MachineFunction,

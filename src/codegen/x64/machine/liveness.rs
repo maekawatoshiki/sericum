@@ -57,7 +57,6 @@ pub struct ProgramPointBase {
 }
 
 pub struct ProgramPoints {
-    head: Option<Raw<ProgramPointBase>>,
     allocator: RawAllocator<ProgramPointBase>,
 }
 
@@ -455,17 +454,6 @@ impl LiveRange {
     }
 
     pub fn interferes(&self, other: &LiveRange) -> bool {
-        let mut s: usize = 0;
-        // for (i, a) in self.segments.iter().enumerate() {
-        //     if other.end_point().unwrap() < a.start {
-        //         s = i;
-        //     }
-        // }
-        // let s = self
-        //     .segments
-        //     .binary_search_by(|s| s.start.cmp(&other.end_point().unwrap()))
-        //     .unwrap_or_else(|x| x)
-        //     .saturating_sub(2);
         for seg1 in &self.segments {
             for seg2 in &other.segments {
                 if seg1.interferes(seg2) {
@@ -483,9 +471,7 @@ impl LiveSegment {
     }
 
     pub fn interferes(&self, seg: &LiveSegment) -> bool {
-        (self.start < seg.end && self.end > seg.start)
-        // || (self.start == seg.start)
-        // || (self.end == seg.end)
+        self.start < seg.end && self.end > seg.start
     }
 }
 
@@ -493,16 +479,11 @@ impl ProgramPoints {
     pub fn new() -> Self {
         Self {
             allocator: RawAllocator::new(),
-            head: None,
         }
     }
 
     pub fn new_program_point(&mut self, ppb: ProgramPointBase) -> ProgramPoint {
-        let mut x = self.allocator.alloc(ppb);
-        if self.head.is_none() {
-            self.head = Some(x);
-        }
-        ProgramPoint::new(x)
+        ProgramPoint::new(self.allocator.alloc(ppb))
     }
 
     pub fn prev_of(&mut self, pp: ProgramPoint) -> ProgramPoint {

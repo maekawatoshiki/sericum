@@ -1,4 +1,4 @@
-use super::super::register::{RegisterId, RegistersInfo};
+use super::super::register::RegisterId;
 use super::{basic_block::*, function::*, liveness::*};
 use rustc_hash::FxHashSet;
 use std::collections::VecDeque;
@@ -56,7 +56,6 @@ pub fn coalesce_function(matrix: &mut LiveRegMatrix, f: &mut MachineFunction) {
         // p_dst = Copy v_src. v_src uses & defs may be replaced with p_dst
         // TODO: THE FOLLOWING CODE DOESN'T WORK
         if copy_dst.is_phys_reg() && copy_src.is_virt_reg() {
-            use super::super::register::{TargetRegisterTrait, GR64};
             let can_eliminate_copy =
                 !matrix.interferes(copy_src.as_virt_reg(), copy_dst.as_phys_reg()) && {
                     let l = &f.body.basic_blocks.arena[copy.parent].liveness_ref();
