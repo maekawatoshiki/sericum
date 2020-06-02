@@ -43,6 +43,7 @@ impl<'a> Spiller<'a> {
         // new_reg = mov a
         // new_reg = add new_reg, b
         // mov [mem], new_reg
+
         for def_id in defs {
             let reg_class = self.func.regs_info.arena_ref()[reg_id].reg_class;
             let new_reg = self.func.regs_info.new_virt_reg(reg_class);
