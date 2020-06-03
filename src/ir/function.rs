@@ -100,6 +100,11 @@ impl Function {
         Some(params_ty[idx])
     }
 
+    pub fn get_params_len(&self) -> usize {
+        let base = self.types.base.borrow();
+        base.as_function_ty(self.ty).unwrap().params_ty.len()
+    }
+
     pub fn find_inst_pos(&self, inst_id: InstructionId) -> Option<(BasicBlockId, usize)> {
         let parent = self.inst_table[inst_id].parent;
         self.basic_blocks.arena[parent]

@@ -638,9 +638,8 @@ fibo:
   push rbp
   mov rbp, rsp
   sub rsp, 16
-  mov dword ptr [rbp - 4], edi
-  mov eax, dword ptr [rbp - 4]
-  cmp eax, 2
+  mov ecx, edi
+  cmp ecx, 2
   jle .L1
   jmp .L2
 .L1:
@@ -649,15 +648,18 @@ fibo:
   pop rbp
   ret
 .L2:
-  mov edi, dword ptr [rbp - 4]
+  mov edi, ecx
   sub edi, 1
-  call fibo
-  mov ecx, eax
-  mov edi, dword ptr [rbp - 4]
-  sub edi, 2
   mov dword ptr [rbp - 8], ecx
   call fibo
   mov ecx, dword ptr [rbp - 8]
+  mov edx, eax
+  mov edi, ecx
+  sub edi, 2
+  mov dword ptr [rbp - 8], edx
+  call fibo
+  mov edx, dword ptr [rbp - 8]
+  mov ecx, edx
   add ecx, eax
   mov eax, ecx
   mov rsp, rbp
@@ -668,7 +670,6 @@ main:
 .L3:
   push rbp
   mov rbp, rsp
-  sub rsp, 0
   mov edi, 10
   call fibo
   mov rsp, rbp

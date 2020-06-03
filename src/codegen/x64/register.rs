@@ -76,7 +76,7 @@ pub fn ty2rc(ty: &Type) -> Option<RegisterClassKind> {
         Type::Int64 => Some(RegisterClassKind::GR64),
         Type::F64 => Some(RegisterClassKind::XMM),
         Type::Pointer(_) => Some(RegisterClassKind::GR64),
-        Type::Array(_) => Some(RegisterClassKind::GR64),
+        Type::Array(_) => None,
         e => unimplemented!("{:?}", e),
     }
 }

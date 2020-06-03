@@ -115,17 +115,20 @@ impl PrologueEpilogueInserter {
 
         // sub rsp, adjust
         let adjust = roundup(finfo.total_size() + down, 16);
-        let sub_rsp = MachineInst::new_simple(
-            MachineOpcode::SUBr64i32,
-            vec![
-                MachineOperand::phys_reg(&builder.function.regs_info, GR64::RSP),
-                MachineOperand::imm_i32(adjust),
-            ],
-            builder.get_cur_bb().unwrap(),
-        )
-        .with_def(vec![builder.function.regs_info.get_phys_reg(GR64::RSP)]);
-        let sub_rsp = builder.function.alloc_inst(sub_rsp);
-        builder.insert(sub_rsp);
+
+        if adjust > 0 {
+            let sub_rsp = MachineInst::new_simple(
+                MachineOpcode::SUBr64i32,
+                vec![
+                    MachineOperand::phys_reg(&builder.function.regs_info, GR64::RSP),
+                    MachineOperand::imm_i32(adjust),
+                ],
+                builder.get_cur_bb().unwrap(),
+            )
+            .with_def(vec![builder.function.regs_info.get_phys_reg(GR64::RSP)]);
+            let sub_rsp = builder.function.alloc_inst(sub_rsp);
+            builder.insert(sub_rsp);
+        }
 
         self.insert_arg_copy(&tys.base.borrow(), &mut builder);
     }
@@ -205,7 +208,7 @@ impl<'a> CopyArgs<'a> {
         let ret_reg = XMM::XMM0.as_phys_reg();
         let dst = FrameIndexInfo::new(Type::F64, FrameIndexKind::Arg(i));
         let src = match RegisterClassKind::XMM.get_nth_arg_reg(i) {
-            Some(arg_reg) => MachineOperand::phys_reg(&self.builder.function.regs_info, arg_reg),
+            Some(_arg_reg) => return, // MachineOperand::phys_reg(&self.builder.function.regs_info, arg_reg),
             None => {
                 let ax = self.builder.function.regs_info.get_phys_reg(ret_reg);
                 let inst = MachineInst::new_simple(
@@ -252,7 +255,7 @@ impl<'a> CopyArgs<'a> {
         };
         let dst = FrameIndexInfo::new(ty, FrameIndexKind::Arg(i));
         let src = match rc.get_nth_arg_reg(i) {
-            Some(arg_reg) => MachineOperand::phys_reg(&self.builder.function.regs_info, arg_reg),
+            Some(_arg_reg) => return, // MachineOperand::phys_reg(&self.builder.function.regs_info, arg_reg),
             None => {
                 let ax = self.builder.function.regs_info.get_phys_reg(ax);
                 let inst = MachineInst::new_simple(

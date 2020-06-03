@@ -15,6 +15,18 @@ pub struct FrameObjectsInfo {
     pub total_size: usize,
 }
 
+#[derive(Clone, PartialEq, Copy)]
+pub struct FrameIndexInfo {
+    pub ty: Type,
+    pub idx: FrameIndexKind,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Copy)]
+pub enum FrameIndexKind {
+    Arg(usize),
+    Local(usize),
+}
+
 impl LocalVariables {
     pub fn new() -> Self {
         Self {
@@ -67,18 +79,6 @@ impl FrameObjectsInfo {
     pub fn total_size(&self) -> i32 {
         self.total_size as i32
     }
-}
-
-#[derive(Clone, PartialEq, Copy)]
-pub struct FrameIndexInfo {
-    pub ty: Type,
-    pub idx: FrameIndexKind,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Copy)]
-pub enum FrameIndexKind {
-    Arg(usize),
-    Local(usize),
 }
 
 impl FrameIndexKind {
