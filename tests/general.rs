@@ -650,15 +650,15 @@ fibo:
 .L2:
   mov edi, ecx
   sub edi, 1
-  mov dword ptr [rbp - 8], ecx
+  mov dword ptr [rbp - 4], ecx
   call fibo
-  mov ecx, dword ptr [rbp - 8]
+  mov ecx, dword ptr [rbp - 4]
   mov edx, eax
   mov edi, ecx
   sub edi, 2
-  mov dword ptr [rbp - 8], edx
+  mov dword ptr [rbp - 4], edx
   call fibo
-  mov edx, dword ptr [rbp - 8]
+  mov edx, dword ptr [rbp - 4]
   mov ecx, edx
   add ecx, eax
   mov eax, ecx

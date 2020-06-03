@@ -1,4 +1,5 @@
 use super::machine::function::MachineFunction;
+use super::register::ty2rc;
 use crate::ir::types::*;
 use rustc_hash::FxHashMap;
 use std::fmt;
@@ -57,8 +58,12 @@ impl FrameObjectsInfo {
             .iter()
             .enumerate()
         {
-            offset += param_ty.size_in_byte(tys);
-            offset_map.insert(FrameIndexKind::Arg(i), offset);
+            // TODO: Correct?
+            let rc = ty2rc(param_ty).unwrap();
+            if rc.get_nth_arg_reg(i).is_none() {
+                offset += param_ty.size_in_byte(tys);
+                offset_map.insert(FrameIndexKind::Arg(i), offset);
+            }
         }
 
         for FrameIndexInfo { idx, ty } in &f.local_mgr.locals {
