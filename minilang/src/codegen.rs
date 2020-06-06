@@ -1,14 +1,15 @@
 use crate::parser::{self, Node};
 use cilk;
+use cilk::ir::module;
 use std::collections::HashMap;
 
 pub struct CodeGenerator {
-    pub module: cilk::module::Module,
+    pub module: module::Module,
     types: Types,
 }
 
 pub struct CodeGeneratorForFunction<'a> {
-    builder: cilk::builder::Builder<'a>,
+    builder: cilk::builder::Builder<'a, cilk::builder::ModuleAndFuncId<'a>>,
     types: &'a Types,
     func: &'a parser::Function,
     vars: Vec<HashMap<String, (bool, parser::Type, cilk::value::Value)>>, // name, (is_arg, ty, val)
@@ -193,20 +194,20 @@ impl CodeGenerator {
 
         // Actaully generate function
         for (func_id, func) in worklist {
-            CodeGeneratorForFunction::new(&mut self.module, &self.types, func_id, func).run()
+            let mut base = cilk::builder::ModuleAndFuncId::new(&mut self.module, func_id);
+            CodeGeneratorForFunction::new(&mut base, &self.types, func).run()
         }
     }
 }
 
 impl<'a> CodeGeneratorForFunction<'a> {
     pub fn new(
-        module: &'a mut cilk::module::Module,
+        base: &'a mut cilk::builder::ModuleAndFuncId<'a>,
         types: &'a Types,
-        func_id: cilk::function::FunctionId,
         func: &'a parser::Function,
     ) -> Self {
         Self {
-            builder: cilk::builder::Builder::new(module, func_id),
+            builder: cilk::builder::Builder::new(base),
             types,
             func,
             vars: vec![HashMap::new()],
@@ -230,7 +231,7 @@ impl<'a> CodeGeneratorForFunction<'a> {
     pub fn run_on_node(&mut self, node: &Node) -> (cilk::value::Value, parser::Type) {
         match node {
             Node::VarDecl(name, ty) => {
-                let ty_ = ty.into_cilk_type(&self.types, &mut self.builder.module.types);
+                let ty_ = ty.into_cilk_type(&self.types, &mut self.builder.func.module.types);
                 let alloca = self.builder.build_alloca(ty_);
                 self.create_var(
                     name.clone(),
@@ -350,7 +351,7 @@ impl<'a> CodeGeneratorForFunction<'a> {
                     "malloc" => "cilk.malloc.i32",
                     name => name,
                 };
-                let func_id = self.builder.module.find_function(name).unwrap();
+                let func_id = self.builder.func.module.find_function(name).unwrap();
                 let args: Vec<cilk::value::Value> =
                     args.iter().map(|i| self.run_on_node(i).0).collect();
                 let ret_ty = self.types.functions.get(&func_id).unwrap().0.clone();
@@ -358,7 +359,7 @@ impl<'a> CodeGeneratorForFunction<'a> {
                     self.builder.build_call(
                         cilk::value::Value::new_func(cilk::value::FunctionValue {
                             func_id,
-                            ty: self.builder.module.function_ref(func_id).ty,
+                            ty: self.builder.func.module.function_ref(func_id).ty,
                         }),
                         args,
                     ),

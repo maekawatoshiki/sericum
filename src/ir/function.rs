@@ -72,12 +72,12 @@ impl Function {
         &mut self.basic_blocks.arena[id]
     }
 
-    pub fn get_param_value(&self, func_id: FunctionId, idx: usize) -> Option<Value> {
+    pub fn get_param_value(&self, idx: usize) -> Option<Value> {
         let base = self.types.base.borrow();
         let params_ty = &base.as_function_ty(self.ty).unwrap().params_ty;
         params_ty.get(idx).map_or(None, |&ty| {
             Some(Value::Argument(ArgumentValue {
-                func_id,
+                func_id: self.id.unwrap(),
                 index: idx,
                 ty,
             }))

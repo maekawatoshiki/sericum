@@ -1,6 +1,5 @@
 use crate::ir::{
-    builder::FunctionBuilder, function::Function, module::Module, opcode::Opcode, types::Type,
-    value::Value,
+    builder::Builder, function::Function, module::Module, opcode::Opcode, types::Type, value::Value,
 };
 
 pub struct GatherReturns {}
@@ -56,7 +55,7 @@ impl<'a> GatherReturnsOnFunction<'a> {
             return;
         }
 
-        let mut builder = FunctionBuilder::new(self.func);
+        let mut builder = Builder::new(self.func);
         let mut pairs = vec![];
         let ret_bb = builder.append_basic_block();
 

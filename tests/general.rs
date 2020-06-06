@@ -1,5 +1,6 @@
 use cilk::{
     codegen::x64::exec,
+    ir::builder::FuncRef,
     // exec::{interpreter::interp, jit::x64::compiler},
     ir::{builder, opcode, types, value},
     *,
@@ -727,13 +728,19 @@ fn struct1() {
 
     let f = m.create_function("f", types::Type::Int32, vec![]);
 
-    let mut builder = builder::Builder::new(&mut m, f);
+    let mut base = builder::ModuleAndFuncId::new(&mut m, f);
+    let mut builder = builder::Builder::new(&mut base);
 
     let entry = builder.append_basic_block();
     builder.set_insert_point(entry);
 
-    let ary_ty = builder.module.types.new_array_ty(types::Type::Int32, 16);
+    let ary_ty = builder
+        .func
+        .module
+        .types
+        .new_array_ty(types::Type::Int32, 16);
     let struct_ty = builder
+        .func
         .module
         .types
         .new_struct_ty(vec![ary_ty, types::Type::Int32]);
@@ -765,7 +772,8 @@ fn struct2() {
 
     let f = m.create_function("f", types::Type::Void, vec![ptr_struct_ty]);
 
-    let mut builder = builder::Builder::new(&mut m, f);
+    let mut base = builder::ModuleAndFuncId::new(&mut m, f);
+    let mut builder = builder::Builder::new(&mut base);
 
     let entry = builder.append_basic_block();
     builder.set_insert_point(entry);
@@ -778,7 +786,8 @@ fn struct2() {
 
     let main = m.create_function("main", types::Type::Int32, vec![]);
 
-    let mut builder = builder::Builder::new(&mut m, main);
+    let mut base = builder::ModuleAndFuncId::new(&mut m, main);
+    let mut builder = builder::Builder::new(&mut base);
 
     let entry = builder.append_basic_block();
     builder.set_insert_point(entry);
