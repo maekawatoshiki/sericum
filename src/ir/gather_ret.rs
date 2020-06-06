@@ -1,5 +1,10 @@
 use crate::ir::{
-    builder::Builder, function::Function, module::Module, opcode::Opcode, types::Type, value::Value,
+    builder::{Builder, FunctionEntity},
+    function::Function,
+    module::Module,
+    opcode::Opcode,
+    types::Type,
+    value::Value,
 };
 
 pub struct GatherReturns {}
@@ -26,15 +31,7 @@ impl GatherReturns {
 
 impl<'a> GatherReturnsOnFunction<'a> {
     pub fn run(&mut self) {
-        let ret_void = self
-            .func
-            .types
-            .base
-            .borrow()
-            .as_function_ty(self.func.ty)
-            .unwrap()
-            .ret_ty
-            == Type::Void;
+        let ret_void = self.func.get_return_type() == Type::Void;
 
         let mut returns = vec![];
         for &id in &self.func.basic_blocks.order {
@@ -55,26 +52,26 @@ impl<'a> GatherReturnsOnFunction<'a> {
             return;
         }
 
-        let mut builder = Builder::new(self.func);
+        let mut builder = Builder::new(FunctionEntity(self.func));
         let mut pairs = vec![];
         let ret_bb = builder.append_basic_block();
 
         for ret_id in returns {
-            let ret = &builder.func.inst_table[ret_id];
+            let ret = &builder.func.0.inst_table[ret_id];
             let parent = ret.parent;
             if !ret_void {
                 pairs.push((*ret.operands[0].as_value(), parent));
             }
-            builder.func.remove_inst(ret_id);
+            builder.func.0.remove_inst(ret_id);
             builder.set_insert_point(parent);
             builder.build_br(ret_bb);
         }
 
         builder.set_insert_point(ret_bb);
-        let val = if !ret_void {
-            builder.build_phi(pairs)
-        } else {
+        let val = if ret_void {
             Value::None
+        } else {
+            builder.build_phi(pairs)
         };
         builder.build_ret(val);
     }

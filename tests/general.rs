@@ -728,8 +728,7 @@ fn struct1() {
 
     let f = m.create_function("f", types::Type::Int32, vec![]);
 
-    let mut base = builder::ModuleAndFuncId::new(&mut m, f);
-    let mut builder = builder::Builder::new(&mut base);
+    let mut builder = builder::Builder::new(builder::FunctionIdWithModule::new(&mut m, f));
 
     let entry = builder.append_basic_block();
     builder.set_insert_point(entry);
@@ -772,8 +771,7 @@ fn struct2() {
 
     let f = m.create_function("f", types::Type::Void, vec![ptr_struct_ty]);
 
-    let mut base = builder::ModuleAndFuncId::new(&mut m, f);
-    let mut builder = builder::Builder::new(&mut base);
+    let mut builder = builder::Builder::new(builder::FunctionIdWithModule::new(&mut m, f));
 
     let entry = builder.append_basic_block();
     builder.set_insert_point(entry);
@@ -786,8 +784,7 @@ fn struct2() {
 
     let main = m.create_function("main", types::Type::Int32, vec![]);
 
-    let mut base = builder::ModuleAndFuncId::new(&mut m, main);
-    let mut builder = builder::Builder::new(&mut base);
+    let mut builder = builder::Builder::new(builder::FunctionIdWithModule::new(&mut m, main));
 
     let entry = builder.append_basic_block();
     builder.set_insert_point(entry);

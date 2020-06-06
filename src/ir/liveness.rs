@@ -24,15 +24,7 @@ impl<'a> IRLivenessAnalyzer<'a> {
                 let inst_id = inst_val.get_inst_id().unwrap();
                 let inst = &f.inst_table[inst_id];
 
-                if inst.opcode == Opcode::Call
-                    && f.types
-                        .base
-                        .borrow()
-                        .as_function_ty(inst.operands[0].as_value().get_type())
-                        .unwrap()
-                        .ret_ty
-                        != Type::Void
-                {
+                if inst.opcode == Opcode::Call && f.get_return_type() != Type::Void {
                     def.insert(inst_id);
                     continue;
                 }

@@ -1,18 +1,20 @@
 use super::{basic_block::*, function::*, module::Module, opcode::*, types::*, value::*};
 
 #[derive(Debug)]
-pub struct Builder<'a, F: FuncRef> {
-    pub func: &'a mut F,
+pub struct Builder<F: FuncRef> {
+    pub func: F,
     cur_bb: Option<BasicBlockId>,
     insert_point: usize,
 }
 
-pub struct ModuleAndFuncId<'a> {
+pub struct FunctionEntity<'a>(pub &'a mut Function);
+
+pub struct FunctionIdWithModule<'a> {
     pub module: &'a mut Module,
     pub func_id: FunctionId,
 }
 
-impl<'a> ModuleAndFuncId<'a> {
+impl<'a> FunctionIdWithModule<'a> {
     pub fn new(module: &'a mut Module, func_id: FunctionId) -> Self {
         Self { module, func_id }
     }
@@ -23,17 +25,17 @@ pub trait FuncRef {
     fn func_ref_mut(&mut self) -> &mut Function;
 }
 
-impl FuncRef for Function {
+impl<'a> FuncRef for FunctionEntity<'a> {
     fn func_ref(&self) -> &Function {
-        self
+        self.0
     }
 
     fn func_ref_mut(&mut self) -> &mut Function {
-        self
+        self.0
     }
 }
 
-impl<'a> FuncRef for ModuleAndFuncId<'a> {
+impl<'a> FuncRef for FunctionIdWithModule<'a> {
     fn func_ref(&self) -> &Function {
         self.module.function_ref(self.func_id)
     }
@@ -43,8 +45,8 @@ impl<'a> FuncRef for ModuleAndFuncId<'a> {
     }
 }
 
-impl<'a, F: FuncRef> Builder<'a, F> {
-    pub fn new(func: &'a mut F) -> Self {
+impl<F: FuncRef> Builder<F> {
+    pub fn new(func: F) -> Self {
         Self {
             func,
             cur_bb: None,

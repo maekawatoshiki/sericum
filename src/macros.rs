@@ -244,8 +244,7 @@ macro_rules! cilk_ir {
         let f_id = $m.create_function(
                 stringify!($name), ret_ty, args_ty
             );
-        let mut base = builder::ModuleAndFuncId::new(&mut $m, f_id);
-        let mut builder = builder::Builder::new(&mut base);
+        let mut builder = builder::Builder::new(builder::FunctionIdWithModule::new(&mut $m, f_id));
         let mut bb_map: FxHashMap<&str, basic_block::BasicBlockId> = FxHashMap::default();
         cilk_expr!(builder; bb_map; $( $exp )*);
         f_id

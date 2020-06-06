@@ -175,8 +175,7 @@ fn brainfuxk() {
 
     let f_id = m.create_function("compiled_brainfuxk_code", types::Type::Void, vec![]);
 
-    let mut base = builder::ModuleAndFuncId::new(&mut m, f_id);
-    let mut builder = builder::Builder::new(&mut base);
+    let mut builder = builder::Builder::new(builder::FunctionIdWithModule::new(&mut m, f_id));
     let entry = builder.append_basic_block();
     builder.set_insert_point(entry);
 

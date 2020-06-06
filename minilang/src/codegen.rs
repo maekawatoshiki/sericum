@@ -9,7 +9,7 @@ pub struct CodeGenerator {
 }
 
 pub struct CodeGeneratorForFunction<'a> {
-    builder: cilk::builder::Builder<'a, cilk::builder::ModuleAndFuncId<'a>>,
+    builder: cilk::builder::Builder<cilk::builder::FunctionIdWithModule<'a>>,
     types: &'a Types,
     func: &'a parser::Function,
     vars: Vec<HashMap<String, (bool, parser::Type, cilk::value::Value)>>, // name, (is_arg, ty, val)
@@ -194,15 +194,19 @@ impl CodeGenerator {
 
         // Actaully generate function
         for (func_id, func) in worklist {
-            let mut base = cilk::builder::ModuleAndFuncId::new(&mut self.module, func_id);
-            CodeGeneratorForFunction::new(&mut base, &self.types, func).run()
+            CodeGeneratorForFunction::new(
+                cilk::builder::FunctionIdWithModule::new(&mut self.module, func_id),
+                &self.types,
+                func,
+            )
+            .run()
         }
     }
 }
 
 impl<'a> CodeGeneratorForFunction<'a> {
     pub fn new(
-        base: &'a mut cilk::builder::ModuleAndFuncId<'a>,
+        base: cilk::builder::FunctionIdWithModule<'a>,
         types: &'a Types,
         func: &'a parser::Function,
     ) -> Self {

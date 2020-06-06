@@ -72,6 +72,11 @@ impl Function {
         &mut self.basic_blocks.arena[id]
     }
 
+    pub fn get_return_type(&self) -> Type {
+        let base = self.types.base.borrow();
+        base.as_function_ty(self.ty).unwrap().ret_ty
+    }
+
     pub fn get_param_value(&self, idx: usize) -> Option<Value> {
         let base = self.types.base.borrow();
         let params_ty = &base.as_function_ty(self.ty).unwrap().params_ty;
