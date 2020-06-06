@@ -462,7 +462,7 @@ impl<'a> ConvertToDAG<'a> {
         indices: &[Value],
     ) -> Raw<DAGNode> {
         let mut gep = self.get_dag_id_from_value(ptr);
-        let mut ty = ptr.get_type(self.module);
+        let mut ty = ptr.get_type();
 
         for idx in indices {
             // TODO: we need better way

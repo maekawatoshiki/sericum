@@ -155,17 +155,10 @@ impl<'a> Mem2RegOnFunction<'a> {
         }
 
         // remove loads and replace them with src
-        for (load, load_users) in loads_to_remove {
-            let load_ty = self.cur_func.inst_table[load].ty;
-            self.cur_func.remove_inst(load);
-
+        for (load_id, load_users) in loads_to_remove {
+            self.cur_func.remove_inst(load_id);
             for u in load_users {
-                Instruction::replace_operand(
-                    &mut self.cur_func.inst_table,
-                    u,
-                    &Operand::new_inst(self.cur_func.id.unwrap(), load, load_ty),
-                    src,
-                )
+                Instruction::replace_operand_inst(&mut self.cur_func.inst_table, u, load_id, src)
             }
         }
     }
@@ -214,20 +207,12 @@ impl<'a> Mem2RegOnFunction<'a> {
             let nearest_store = &self.cur_func.inst_table[nearest_store_id];
             let src = nearest_store.operands[0];
 
-            let load_ty = self.cur_func.inst_table[load_id].ty;
-
             self.cur_func.remove_inst(nearest_store_id);
             self.cur_func.remove_inst(load_id);
 
             // remove loads and replace them with src
             for u in load_users {
-                // let inst = &self.cur_func.inst_table[u];
-                Instruction::replace_operand(
-                    &mut self.cur_func.inst_table,
-                    u,
-                    &Operand::new_inst(self.cur_func.id.unwrap(), load_id, load_ty),
-                    src,
-                )
+                Instruction::replace_operand_inst(&mut self.cur_func.inst_table, u, load_id, src)
             }
         }
 

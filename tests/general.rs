@@ -644,9 +644,7 @@ fibo:
   jmp .L2
 .L1:
   mov eax, 1
-  mov rsp, rbp
-  pop rbp
-  ret
+  jmp .L3
 .L2:
   mov edi, ecx
   sub edi, 1
@@ -662,12 +660,14 @@ fibo:
   mov ecx, edx
   add ecx, eax
   mov eax, ecx
+  jmp .L3
+.L3:
   mov rsp, rbp
   pop rbp
   ret
   .globl main
 main:
-.L3:
+.L4:
   push rbp
   mov rbp, rsp
   mov edi, 10

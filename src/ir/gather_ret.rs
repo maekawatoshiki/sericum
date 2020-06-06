@@ -58,7 +58,7 @@ impl<'a> GatherReturnsOnFunction<'a> {
 
         let mut builder = FunctionBuilder::new(self.func);
         let mut pairs = vec![];
-        let new_bb = builder.append_basic_block();
+        let ret_bb = builder.append_basic_block();
 
         for ret_id in returns {
             let ret = &builder.func.inst_table[ret_id];
@@ -68,15 +68,15 @@ impl<'a> GatherReturnsOnFunction<'a> {
             }
             builder.func.remove_inst(ret_id);
             builder.set_insert_point(parent);
-            builder.build_br(new_bb);
+            builder.build_br(ret_bb);
         }
 
-        builder.set_insert_point(new_bb);
-        if !ret_void {
-            let val = builder.build_phi(pairs);
-            builder.build_ret(val);
+        builder.set_insert_point(ret_bb);
+        let val = if !ret_void {
+            builder.build_phi(pairs)
         } else {
-            builder.build_ret(Value::None);
-        }
+            Value::None
+        };
+        builder.build_ret(val);
     }
 }

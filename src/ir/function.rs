@@ -60,9 +60,9 @@ impl Function {
         id
     }
 
-    pub fn append_existing_basic_block(&mut self, bb_id: BasicBlockId) {
-        self.basic_blocks.order.push(bb_id);
-    }
+    // pub fn append_existing_basic_block(&mut self, bb_id: BasicBlockId) {
+    //     self.basic_blocks.order.push(bb_id);
+    // }
 
     pub fn basic_block_ref(&self, id: BasicBlockId) -> &BasicBlock {
         &self.basic_blocks.arena[id]
@@ -75,23 +75,19 @@ impl Function {
     pub fn get_param_value(&self, func_id: FunctionId, idx: usize) -> Option<Value> {
         let base = self.types.base.borrow();
         let params_ty = &base.as_function_ty(self.ty).unwrap().params_ty;
-        if idx >= params_ty.len() {
-            return None;
-        }
-        Some(Value::Argument(ArgumentValue {
-            func_id,
-            index: idx,
-            ty: params_ty[idx],
-        }))
+        params_ty.get(idx).map_or(None, |&ty| {
+            Some(Value::Argument(ArgumentValue {
+                func_id,
+                index: idx,
+                ty,
+            }))
+        })
     }
 
     pub fn get_param_type(&self, idx: usize) -> Option<Type> {
         let base = self.types.base.borrow();
         let params_ty = &base.as_function_ty(self.ty).unwrap().params_ty;
-        if idx >= params_ty.len() {
-            return None;
-        }
-        Some(params_ty[idx])
+        params_ty.get(idx).map_or(None, |&ty| Some(ty))
     }
 
     pub fn get_params_len(&self) -> usize {

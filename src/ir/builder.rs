@@ -69,7 +69,7 @@ impl<'a> Builder<'a> {
         let ty = self.module.types.new_pointer_ty(
             self.module
                 .types
-                .get_element_ty_with_indices(v.get_type(self.module), &indices)
+                .get_element_ty_with_indices(v.get_type(), &indices)
                 .unwrap(),
         );
         let mut operands = vec![Operand::Value(v)];
@@ -85,7 +85,7 @@ impl<'a> Builder<'a> {
             vec![Operand::Value(v)],
             self.module
                 .types
-                .get_element_ty(v.get_type(self.module), None)
+                .get_element_ty(v.get_type(), None)
                 .unwrap()
                 .clone(),
         );
@@ -111,7 +111,7 @@ impl<'a> Builder<'a> {
         let inst = self.create_inst_value(
             Opcode::Add,
             vec![Operand::Value(v1), Operand::Value(v2)],
-            v1.get_type(self.module).clone(),
+            v1.get_type(),
         );
         self.append_inst_to_cur_bb(inst);
         inst
@@ -125,7 +125,7 @@ impl<'a> Builder<'a> {
         let inst = self.create_inst_value(
             Opcode::Sub,
             vec![Operand::Value(v1), Operand::Value(v2)],
-            v1.get_type(self.module).clone(),
+            v1.get_type(),
         );
         self.append_inst_to_cur_bb(inst);
         inst
@@ -139,7 +139,7 @@ impl<'a> Builder<'a> {
         let inst = self.create_inst_value(
             Opcode::Mul,
             vec![Operand::Value(v1), Operand::Value(v2)],
-            v1.get_type(self.module).clone(),
+            v1.get_type(),
         );
         self.append_inst_to_cur_bb(inst);
         inst
@@ -153,7 +153,7 @@ impl<'a> Builder<'a> {
         let inst = self.create_inst_value(
             Opcode::Div,
             vec![Operand::Value(v1), Operand::Value(v2)],
-            v1.get_type(self.module).clone(),
+            v1.get_type(),
         );
         self.append_inst_to_cur_bb(inst);
         inst
@@ -167,7 +167,7 @@ impl<'a> Builder<'a> {
         let inst = self.create_inst_value(
             Opcode::Rem,
             vec![Operand::Value(v1), Operand::Value(v2)],
-            v1.get_type(self.module).clone(),
+            v1.get_type(),
         );
         self.append_inst_to_cur_bb(inst);
         inst
@@ -241,7 +241,7 @@ impl<'a> Builder<'a> {
     }
 
     pub fn build_phi(&mut self, pairs: Vec<(Value, BasicBlockId)>) -> Value {
-        let ty = pairs.get(0).unwrap().0.get_type(self.module).clone();
+        let ty = pairs.get(0).unwrap().0.get_type();
         let mut operands = vec![];
         for (v, bb) in pairs {
             operands.push(Operand::Value(v));
@@ -258,7 +258,7 @@ impl<'a> Builder<'a> {
             .types
             .base
             .borrow()
-            .as_function_ty(f.get_type(self.module))
+            .as_function_ty(f.get_type())
             .unwrap()
             .ret_ty;
         let mut operands = vec![Operand::Value(f)];
@@ -538,7 +538,7 @@ impl<'a> FunctionBuilder<'a> {
     // }
 
     pub fn build_phi(&mut self, pairs: Vec<(Value, BasicBlockId)>) -> Value {
-        let ty = pairs.get(0).unwrap().0.get_type2();
+        let ty = pairs.get(0).unwrap().0.get_type();
         let mut operands = vec![];
         for (v, bb) in pairs {
             operands.push(Operand::Value(v));

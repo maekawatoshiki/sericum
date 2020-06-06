@@ -28,7 +28,7 @@ impl<'a> IRLivenessAnalyzer<'a> {
                     && f.types
                         .base
                         .borrow()
-                        .as_function_ty(inst.operands[0].as_value().get_type(self.module))
+                        .as_function_ty(inst.operands[0].as_value().get_type())
                         .unwrap()
                         .ret_ty
                         != Type::Void
