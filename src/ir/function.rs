@@ -56,7 +56,7 @@ impl Function {
 
     pub fn append_basic_block(&mut self) -> BasicBlockId {
         let id = self.basic_blocks.arena.alloc(BasicBlock::new());
-        // self.basic_blocks.push(id);
+        self.basic_blocks.order.push(id);
         id
     }
 
@@ -73,21 +73,15 @@ impl Function {
     }
 
     pub fn get_param_value(&self, func_id: FunctionId, idx: usize) -> Option<Value> {
-        if idx
-            >= self
-                .types
-                .base
-                .borrow()
-                .as_function_ty(self.ty)
-                .unwrap()
-                .params_ty
-                .len()
-        {
+        let base = self.types.base.borrow();
+        let params_ty = &base.as_function_ty(self.ty).unwrap().params_ty;
+        if idx >= params_ty.len() {
             return None;
         }
         Some(Value::Argument(ArgumentValue {
             func_id,
             index: idx,
+            ty: params_ty[idx],
         }))
     }
 

@@ -3,6 +3,7 @@ pub mod builder;
 pub mod const_folding;
 pub mod cse;
 pub mod function;
+pub mod gather_ret;
 pub mod liveness;
 pub mod mem2reg;
 pub mod module;

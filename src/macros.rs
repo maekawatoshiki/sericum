@@ -186,15 +186,20 @@ macro_rules! cilk_expr {
 };
 ($builder:expr; $bb_map:expr; $x:ident = call $name:ident [$( ( $($arg:tt)* ) ),*] ; $($remain:tt)*) => {
     let args = vec![ $( cilk_value!($builder; $( $arg )*) ),* ];
-    let $x = $builder.build_call(value::Value::Function(
+    let $x = $builder.build_call(value::Value::Function({
+            let id = $builder.module.find_function(stringify!($name)).unwrap();
             value::FunctionValue {
-                func_id: $builder.module.find_function(stringify!($name)).unwrap(),
-            }), args);
+                func_id: id,
+                ty: $builder.module.function_ref(id).ty,
+            }}), args);
     cilk_expr!($builder; $bb_map; $( $remain )*);
 };
 ($builder:expr; $bb_map:expr; $x:ident = call (->$id:expr) [$( ( $($arg:tt)* ) ),*] ; $($remain:tt)*) => {
         let args = vec![ $( cilk_value!($builder; $( $arg )*) ),* ];
-        let $x = $builder.build_call(value::Value::Function(value::FunctionValue { func_id: $id }), args);
+        let $x = $builder.build_call(value::Value::Function({
+            let ty = $builder.module.function_ref($id).ty;
+            value::FunctionValue { func_id: $id, ty}
+        }), args);
         cilk_expr!($builder; $bb_map; $( $remain )*);
 };
 ($builder:expr; $bb_map:expr; $x:ident = icmp $kind:ident ($($val1:tt)*), ($($val2:tt)*); $($remain:tt)*) => {

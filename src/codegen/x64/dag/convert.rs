@@ -150,7 +150,7 @@ impl<'a> ConvertToDAG<'a> {
                 ));
                 load_id
             }
-            Value::Function(FunctionValue { func_id }) => {
+            Value::Function(FunctionValue { func_id, .. }) => {
                 let f = self.module.function_ref(*func_id);
                 self.alloc_node(DAGNode::new(
                     NodeKind::Operand(OperandNodeKind::Address(AddressKind::FunctionName(

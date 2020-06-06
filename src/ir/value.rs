@@ -34,6 +34,7 @@ pub enum Value {
 pub struct ArgumentValue {
     pub func_id: FunctionId,
     pub index: usize,
+    pub ty: Type,
     // pub parent: ModuleRef,
 }
 
@@ -41,12 +42,14 @@ pub struct ArgumentValue {
 pub struct InstructionValue {
     pub func_id: FunctionId,
     pub id: InstructionId,
+    pub ty: Type,
     // pub parent: ModuleRef,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Hash, Eq)]
 pub struct FunctionValue {
     pub func_id: FunctionId,
+    pub ty: Type,
     // pub parent: ModuleRef,
 }
 
@@ -87,6 +90,7 @@ impl Value {
             Value::Argument(ArgumentValue {
                 func_id,
                 index,
+                ..
                 // parent,
             }) => {
                 let f = parent.function_ref(*func_id);
@@ -94,13 +98,23 @@ impl Value {
             }
             Value::Instruction(InstructionValue {
                 func_id,
-                id,
+                id,..
                 // parent,
             }) => {
                 let f = parent.function_ref(*func_id);
                 f.inst_table[*id].ty
             }
-            Value::Function(FunctionValue { func_id }) => parent.function_ref(*func_id).ty,
+            Value::Function(FunctionValue { func_id,.. }) => parent.function_ref(*func_id).ty,
+            Value::Immediate(ref im) => *im.get_type(),
+            Value::None => Type::Void,
+        }
+    }
+
+    pub fn get_type2(&self) -> Type {
+        match self {
+            Value::Argument(ArgumentValue { ty, .. }) => *ty,
+            Value::Instruction(InstructionValue { ty, .. }) => *ty,
+            Value::Function(FunctionValue { ty, .. }) => *ty,
             Value::Immediate(ref im) => *im.get_type(),
             Value::None => Type::Void,
         }
@@ -127,7 +141,7 @@ impl Value {
         match self {
             Value::Argument(ArgumentValue {
                 index,
-                func_id,
+                func_id,..
                 // parent,
             }) => {
                 let f = parent.function_ref(*func_id);
@@ -141,7 +155,7 @@ impl Value {
             },
             Value::Instruction(InstructionValue {
                 func_id,
-                id,
+                id,..
                 // parent,
             }) if inst => {
                 let f = parent.function_ref(*func_id);
@@ -152,7 +166,7 @@ impl Value {
                     format!("    %{} = {}", id.index(), inst.to_string(parent))
                 }
             }
-            Value::Instruction(InstructionValue { func_id, id }) => {
+            Value::Instruction(InstructionValue { func_id, id ,..}) => {
                 let f = parent.function_ref(*func_id);
                 format!(
                     "{} %{}",
@@ -160,11 +174,11 @@ impl Value {
                     id.index()
                 )
             }
-            Value::Function(FunctionValue { func_id }) if inst => {
+            Value::Function(FunctionValue { func_id,.. }) if inst => {
                 let f = parent.function_ref(*func_id);
                 f.dump(parent)
             }
-            Value::Function(FunctionValue { func_id }) => {
+            Value::Function(FunctionValue { func_id ,..}) => {
                 let f = parent.function_ref(*func_id);
                 let ret_ty = parent
                     .types

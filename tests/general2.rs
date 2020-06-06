@@ -59,7 +59,7 @@ fn assemble_and_run(c_parent: &str, s_target: &str) {
     fs::remove_file(target_name).unwrap();
 }
 
-fn compile_and_run(c_parent: &str, module: &Module) {
+fn compile_and_run(c_parent: &str, module: &mut Module) {
     let machine_module = standard_conversion_into_machine_module(module);
     let mut printer = MachineAsmPrinter::new();
     printer.run_on_module(&machine_module);
@@ -85,7 +85,7 @@ fn asm_load_store() {
         assert(test() == 1);
     }
             ",
-        &m,
+        &mut m,
     );
 }
 
@@ -113,6 +113,6 @@ fn asm_fibo_phi() {
         "#include <assert.h>
         extern int test(int);
         int main() { assert(test(10) == 55); }",
-        &m,
+        &mut m,
     );
 }

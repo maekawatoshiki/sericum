@@ -405,9 +405,7 @@ fn main() {
 
               j = j + 1;
             }
-            print_col(dest_col);
           } else {
-            print_col(Vec_new((*(*ray).dir).y, (*(*ray).dir).y, (*(*ray).dir).y));
           }
           col = col + 1;
         }
@@ -425,7 +423,7 @@ fn main() {
 
     println!("{:?}", codegen.module);
 
-    let mut jit = cilk::codegen::x64::exec::jit::JITExecutor::new(&codegen.module);
+    let mut jit = cilk::codegen::x64::exec::jit::JITExecutor::new(&mut codegen.module);
     let func = jit.find_function_by_name("main").unwrap();
     println!("Result: {:?}", jit.run(func, vec![]));
 }
@@ -480,7 +478,7 @@ fn pi() {
     cilk::ir::cse::CommonSubexprElimination::new().run_on_module(&mut codegen.module);
     cilk::ir::mem2reg::Mem2Reg::new().run_on_module(&mut codegen.module);
 
-    let mut jit = cilk::codegen::x64::exec::jit::JITExecutor::new(&codegen.module);
+    let mut jit = cilk::codegen::x64::exec::jit::JITExecutor::new(&mut codegen.module);
     let func = jit.find_function_by_name("main").unwrap();
     let output: [i32; 600] = [0; 600];
     jit.run(
@@ -557,7 +555,7 @@ fn pi2() {
     cilk::ir::cse::CommonSubexprElimination::new().run_on_module(&mut codegen.module);
     cilk::ir::mem2reg::Mem2Reg::new().run_on_module(&mut codegen.module);
 
-    let mut jit = cilk::codegen::x64::exec::jit::JITExecutor::new(&codegen.module);
+    let mut jit = cilk::codegen::x64::exec::jit::JITExecutor::new(&mut codegen.module);
     let func = jit.find_function_by_name("main").unwrap();
     let output: [i32; 3750] = [0; 3750];
     jit.run(

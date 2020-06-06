@@ -356,7 +356,10 @@ impl<'a> CodeGeneratorForFunction<'a> {
                 let ret_ty = self.types.functions.get(&func_id).unwrap().0.clone();
                 (
                     self.builder.build_call(
-                        cilk::value::Value::new_func(cilk::value::FunctionValue { func_id }),
+                        cilk::value::Value::new_func(cilk::value::FunctionValue {
+                            func_id,
+                            ty: self.builder.module.function_ref(func_id).ty,
+                        }),
                         args,
                     ),
                     ret_ty,

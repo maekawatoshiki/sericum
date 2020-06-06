@@ -235,6 +235,7 @@ fn brainfuxk() {
                 builder.build_call(
                     value::Value::new_func(value::FunctionValue {
                         func_id: cilk_printch_i32,
+                        ty: builder.module.function_ref(cilk_printch_i32).ty,
                     }),
                     vec![cur_val],
                 );
@@ -289,7 +290,7 @@ fn brainfuxk() {
 
     // println!("IR: {}", m.dump(f_id));
 
-    let mut jit = exec::jit::JITExecutor::new(&m);
+    let mut jit = exec::jit::JITExecutor::new(&mut m);
     let func = jit
         .find_function_by_name("compiled_brainfuxk_code")
         .unwrap();

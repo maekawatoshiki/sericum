@@ -6,6 +6,7 @@ pub mod inst;
 pub mod machine;
 pub mod register;
 
+use crate::ir;
 use crate::ir::types::*;
 use crate::{ir::module::Module, traits::pass::ModulePassManager};
 use machine::module::MachineModule;
@@ -69,7 +70,9 @@ impl TypeSize for StructType {
     }
 }
 
-pub fn standard_conversion_into_machine_module(module: &Module) -> MachineModule {
+pub fn standard_conversion_into_machine_module(module: &mut Module) -> MachineModule {
+    ir::gather_ret::GatherReturns::new().run_on_module(module);
+
     let mut dag_module = dag::convert::ConvertToDAG::new(module).convert_module();
 
     let mut pass_mgr = ModulePassManager::new();

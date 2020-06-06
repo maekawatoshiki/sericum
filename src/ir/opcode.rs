@@ -249,8 +249,8 @@ impl Opcode {
 }
 
 impl Operand {
-    pub fn new_inst(func_id: FunctionId, id: InstructionId) -> Self {
-        Operand::Value(Value::Instruction(InstructionValue { func_id, id }))
+    pub fn new_inst(func_id: FunctionId, id: InstructionId, ty: Type) -> Self {
+        Operand::Value(Value::Instruction(InstructionValue { func_id, id, ty }))
     }
 
     // TODO: should return cow?
