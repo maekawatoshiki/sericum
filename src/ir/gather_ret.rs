@@ -1,5 +1,5 @@
 use crate::ir::{
-    builder::{Builder, FunctionEntity},
+    builder::{Builder, FuncRef, FunctionEntity},
     function::Function,
     module::Module,
     opcode::Opcode,
@@ -34,9 +34,9 @@ impl<'a> GatherReturnsOnFunction<'a> {
         let ret_void = self.func.get_return_type() == Type::Void;
 
         let mut returns = vec![];
-        for &id in &self.func.basic_blocks.order {
-            let bb = &self.func.basic_blocks.arena[id];
-            let iseq = bb.iseq.borrow();
+        let mut return_at_last_block = false;
+        for (i, &id) in self.func.basic_blocks.order.iter().enumerate() {
+            let iseq = self.func.basic_blocks.arena[id].iseq.borrow();
             let val = match iseq.last() {
                 Some(val) => val,
                 None => continue,
@@ -44,11 +44,12 @@ impl<'a> GatherReturnsOnFunction<'a> {
             let inst_id = val.get_inst_id().unwrap();
             let inst = &self.func.inst_table[inst_id];
             if inst.opcode == Opcode::Ret {
-                returns.push(inst_id)
+                returns.push(inst_id);
+                return_at_last_block = self.func.basic_blocks.order.len() - 1 == i;
             }
         }
 
-        if returns.len() <= 1 {
+        if returns.len() == 1 && return_at_last_block {
             return;
         }
 
@@ -62,7 +63,7 @@ impl<'a> GatherReturnsOnFunction<'a> {
             if !ret_void {
                 pairs.push((*ret.operands[0].as_value(), parent));
             }
-            builder.func.0.remove_inst(ret_id);
+            builder.func.func_ref_mut().remove_inst(ret_id);
             builder.set_insert_point(parent);
             builder.build_br(ret_bb);
         }
