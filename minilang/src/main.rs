@@ -405,7 +405,9 @@ fn main() {
 
               j = j + 1;
             }
+            print_col(dest_col);
           } else {
+            print_col(Vec_new((*(*ray).dir).y, (*(*ray).dir).y, (*(*ray).dir).y));
           }
           col = col + 1;
         }

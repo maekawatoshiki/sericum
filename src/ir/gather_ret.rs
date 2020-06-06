@@ -72,7 +72,11 @@ impl<'a> GatherReturnsOnFunction<'a> {
         let val = if ret_void {
             Value::None
         } else {
-            builder.build_phi(pairs)
+            if pairs.len() == 1 {
+                pairs[0].0
+            } else {
+                builder.build_phi(pairs)
+            }
         };
         builder.build_ret(val);
     }

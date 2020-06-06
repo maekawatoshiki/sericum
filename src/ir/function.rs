@@ -166,7 +166,7 @@ impl DumpToString for &Function {
             if self.is_internal {
                 "internal;".to_owned()
             } else {
-                format!("{{\n{}}}", self.basic_blocks.arena.dump(module))
+                format!("{{\n{}}}", self.basic_blocks.dump(module))
             },
         )
     }
@@ -178,9 +178,10 @@ impl DumpToString for FunctionId {
     }
 }
 
-impl DumpToString for Arena<BasicBlock> {
+impl DumpToString for BasicBlocks {
     fn dump(&self, module: &Module) -> String {
-        self.iter().fold("".to_string(), |s, (id, b)| {
+        self.order.iter().fold("".to_string(), |s, &id| {
+            let b = &self.arena[id];
             format!(
                 "{}label.{}:\t// pred({}), succ({}), def({}), in({}), out({})\n{}\n",
                 s,

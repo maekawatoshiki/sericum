@@ -24,10 +24,6 @@ pub enum NonPrimitiveType {
     Struct(StructType),
 }
 
-#[test]
-fn ff() {
-    println!("{:?}", ::std::mem::size_of::<Value>());
-}
 #[derive(Clone, PartialEq, Eq, Copy, Hash)]
 pub enum Type {
     Void,

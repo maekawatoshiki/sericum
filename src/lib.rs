@@ -1,6 +1,7 @@
 #![feature(proc_macro_hygiene)]
 #![feature(stmt_expr_attributes)]
 #![feature(drain_filter)]
+#![feature(vec_remove_item)]
 #![recursion_limit = "128"]
 
 #[macro_use]
