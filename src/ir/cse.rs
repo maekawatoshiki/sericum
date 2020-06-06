@@ -55,6 +55,7 @@ impl<'a> LocalCommonSubexprEliminationOnFunction<'a> {
                     let common_val = Value::Instruction(InstructionValue {
                         id: *common,
                         func_id: self.func.id.unwrap(),
+                        ty: self.func.inst_table[*common].ty,
                     });
                     Instruction::replace_all_uses(
                         &mut self.func.inst_table,

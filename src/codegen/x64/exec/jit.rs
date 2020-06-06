@@ -48,7 +48,7 @@ pub struct JITCompiler {
 }
 
 impl JITExecutor {
-    pub fn new(module: &ir::module::Module) -> Self {
+    pub fn new(module: &mut ir::module::Module) -> Self {
         let machine_module = standard_conversion_into_machine_module(module);
         // println!("{:?}", machine_module);
 

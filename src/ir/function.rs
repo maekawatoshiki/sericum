@@ -56,13 +56,13 @@ impl Function {
 
     pub fn append_basic_block(&mut self) -> BasicBlockId {
         let id = self.basic_blocks.arena.alloc(BasicBlock::new());
-        // self.basic_blocks.push(id);
+        self.basic_blocks.order.push(id);
         id
     }
 
-    pub fn append_existing_basic_block(&mut self, bb_id: BasicBlockId) {
-        self.basic_blocks.order.push(bb_id);
-    }
+    // pub fn append_existing_basic_block(&mut self, bb_id: BasicBlockId) {
+    //     self.basic_blocks.order.push(bb_id);
+    // }
 
     pub fn basic_block_ref(&self, id: BasicBlockId) -> &BasicBlock {
         &self.basic_blocks.arena[id]
@@ -72,32 +72,32 @@ impl Function {
         &mut self.basic_blocks.arena[id]
     }
 
-    pub fn get_param_value(&self, func_id: FunctionId, idx: usize) -> Option<Value> {
-        if idx
-            >= self
-                .types
-                .base
-                .borrow()
-                .as_function_ty(self.ty)
-                .unwrap()
-                .params_ty
-                .len()
-        {
-            return None;
-        }
-        Some(Value::Argument(ArgumentValue {
-            func_id,
-            index: idx,
-        }))
+    pub fn get_return_type(&self) -> Type {
+        let base = self.types.base.borrow();
+        base.as_function_ty(self.ty).unwrap().ret_ty
+    }
+
+    pub fn get_param_value(&self, idx: usize) -> Option<Value> {
+        let base = self.types.base.borrow();
+        let params_ty = &base.as_function_ty(self.ty).unwrap().params_ty;
+        params_ty.get(idx).map_or(None, |&ty| {
+            Some(Value::Argument(ArgumentValue {
+                func_id: self.id.unwrap(),
+                index: idx,
+                ty,
+            }))
+        })
     }
 
     pub fn get_param_type(&self, idx: usize) -> Option<Type> {
         let base = self.types.base.borrow();
         let params_ty = &base.as_function_ty(self.ty).unwrap().params_ty;
-        if idx >= params_ty.len() {
-            return None;
-        }
-        Some(params_ty[idx])
+        params_ty.get(idx).map_or(None, |&ty| Some(ty))
+    }
+
+    pub fn get_params_len(&self) -> usize {
+        let base = self.types.base.borrow();
+        base.as_function_ty(self.ty).unwrap().params_ty.len()
     }
 
     pub fn find_inst_pos(&self, inst_id: InstructionId) -> Option<(BasicBlockId, usize)> {

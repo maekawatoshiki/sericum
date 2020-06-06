@@ -155,16 +155,10 @@ impl<'a> Mem2RegOnFunction<'a> {
         }
 
         // remove loads and replace them with src
-        for (load, load_users) in loads_to_remove {
-            self.cur_func.remove_inst(load);
-
+        for (load_id, load_users) in loads_to_remove {
+            self.cur_func.remove_inst(load_id);
             for u in load_users {
-                Instruction::replace_operand(
-                    &mut self.cur_func.inst_table,
-                    u,
-                    &Operand::new_inst(self.cur_func.id.unwrap(), load),
-                    src,
-                )
+                Instruction::replace_operand_inst(&mut self.cur_func.inst_table, u, load_id, src)
             }
         }
     }
@@ -218,13 +212,7 @@ impl<'a> Mem2RegOnFunction<'a> {
 
             // remove loads and replace them with src
             for u in load_users {
-                // let inst = &self.cur_func.inst_table[u];
-                Instruction::replace_operand(
-                    &mut self.cur_func.inst_table,
-                    u,
-                    &Operand::new_inst(self.cur_func.id.unwrap(), load_id),
-                    src,
-                )
+                Instruction::replace_operand_inst(&mut self.cur_func.inst_table, u, load_id, src)
             }
         }
 
@@ -369,6 +357,7 @@ impl<'a> Mem2RegOnFunction<'a> {
                         let val = Value::Instruction(InstructionValue {
                             func_id: self.cur_func.id.unwrap(),
                             id,
+                            ty,
                         });
                         self.cur_func.basic_blocks.arena[cur]
                             .iseq_ref_mut()

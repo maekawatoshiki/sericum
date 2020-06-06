@@ -53,10 +53,12 @@ impl<'a> ConstantFoldingOnFunction<'a> {
             };
             let users = inst.users.clone();
             for &user_id in &*users.borrow() {
+                let ty = self.cur_func.inst_table[inst_id].ty;
                 Instruction::replace_operand(
                     &mut self.cur_func.inst_table,
                     user_id,
-                    &Operand::new_inst(self.cur_func.id.unwrap(), inst_id),
+                    // TODO: Very inefficient!
+                    &Operand::new_inst(self.cur_func.id.unwrap(), inst_id, ty),
                     Operand::Value(folded),
                 );
                 let user = &self.cur_func.inst_table[user_id];

@@ -109,7 +109,7 @@ impl Instruction {
         arena[self_id].operands.push(operand);
     }
 
-    // TODO: any better idea?
+    // TODO: using two loops is inefficient
     pub fn replace_operand(
         arena: &mut Arena<Instruction>,
         self_id: InstructionId,
@@ -132,8 +132,8 @@ impl Instruction {
         }
     }
 
-    // TODO: any better idea?
-    pub fn replace_operand_insts(
+    // TODO: using two loops is inefficient
+    pub fn replace_operand_inst(
         arena: &mut Arena<Instruction>,
         self_id: InstructionId,
         from: InstructionId,
@@ -154,7 +154,7 @@ impl Instruction {
                 Operand::Value(Value::Instruction(InstructionValue { id, .. })) if *id == from => {}
                 _ => continue,
             };
-            // actually replace from with to
+            // replace 'from' with 'to'
             *operand = to;
         }
     }
@@ -162,7 +162,7 @@ impl Instruction {
     pub fn replace_all_uses(arena: &mut Arena<Instruction>, self_id: InstructionId, to: Operand) {
         let users = arena[self_id].users.borrow().clone();
         for u in users {
-            Self::replace_operand_insts(arena, u, self_id, to);
+            Self::replace_operand_inst(arena, u, self_id, to);
         }
         assert!(arena[self_id].users.borrow().len() == 0);
     }
@@ -249,8 +249,8 @@ impl Opcode {
 }
 
 impl Operand {
-    pub fn new_inst(func_id: FunctionId, id: InstructionId) -> Self {
-        Operand::Value(Value::Instruction(InstructionValue { func_id, id }))
+    pub fn new_inst(func_id: FunctionId, id: InstructionId, ty: Type) -> Self {
+        Operand::Value(Value::Instruction(InstructionValue { func_id, id, ty }))
     }
 
     // TODO: should return cow?

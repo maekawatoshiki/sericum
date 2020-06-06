@@ -16,15 +16,17 @@ pub fn coalesce_function(matrix: &mut LiveRegMatrix, f: &mut MachineFunction) {
     fn no_tied_use(f: &MachineFunction, r: &RegisterId) -> bool {
         f.regs_info.arena_ref()[*r].uses.iter().all(|u| {
             let inst = &f.body.inst_arena[*u];
-            let pos = inst
+            match inst
                 .operand
                 .iter()
                 .position(|o| o.is_register() && o.as_register() == r)
-                .unwrap();
-            f.body.inst_arena[*u].opcode.inst_def().map_or(true, |i| {
-                assert!(i.tie.len() <= 1); // TODO: support for more than one tied register
-                i.tie.len() == 0 || i.tie.iter().next().unwrap().1.as_use() != pos
-            })
+            {
+                Some(pos) => f.body.inst_arena[*u].opcode.inst_def().map_or(true, |i| {
+                    assert!(i.tie.len() <= 1); // TODO: support for more than one tied register
+                    i.tie.len() == 0 || i.tie.iter().next().unwrap().1.as_use() != pos
+                }),
+                None => true,
+            }
         })
     }
 

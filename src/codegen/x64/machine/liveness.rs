@@ -342,34 +342,50 @@ impl LiveRange {
     }
 
     pub fn add_segment(&mut self, seg: LiveSegment) {
-        // self.segments.push(seg);
+        let mut found = true;
         let pt = self
             .segments
             .binary_search_by(|s| s.start.cmp(&seg.start))
-            .unwrap_or_else(|x| x);
-        self.segments.insert(pt, seg);
-        // let found = pt.is_ok();
-        // let pt = pt.unwrap_or_else(|x| x);
-        // if pt == 0 {
-        //     self.segments.insert(pt, seg);
-        //     return;
-        // }
-        // /* pt > 0 */
-        // let mpt = if found { pt } else { pt - 1 };
-        // let prev_seg = self.segments[mpt];
-        // if prev_seg.end == seg.start {
-        //     self.segments[mpt].end = seg.end;
-        //     return;
-        // }
-        // if prev_seg.start != seg.start {
-        //     self.segments.insert(pt, seg);
-        //     return;
-        // }
-        // // prev_seg.start == seg.start
-        // if prev_seg.end < seg.end {
-        //     self.segments[mpt].end = seg.end;
-        //     return;
-        // }
+            .unwrap_or_else(|x| {
+                found = false;
+                x
+            });
+
+        fn arrange(range: &mut Vec<LiveSegment>, start: usize) {
+            if start + 1 >= range.len() {
+                return;
+            }
+
+            if range[start].end < range[start + 1].start {
+                // no problem
+            } else if range[start + 1].start <= range[start].end
+                && range[start].end < range[start + 1].end
+            {
+                range[start].end = range[start + 1].end;
+                range.remove(start + 1);
+                return arrange(range, start);
+            } else if range[start + 1].end <= range[start].end {
+                range.remove(start + 1);
+                return arrange(range, start);
+            }
+
+            arrange(range, start + 1);
+        }
+
+        if pt == 0 {
+            self.segments.insert(pt, seg);
+            return arrange(&mut self.segments, 0);
+        }
+
+        if found {
+            if self.segments[pt].end < seg.end {
+                self.segments[pt].end = seg.end;
+                return arrange(&mut self.segments, pt);
+            }
+        } else {
+            self.segments.insert(pt, seg);
+            return arrange(&mut self.segments, pt - 1);
+        }
     }
 
     pub fn unite_range(&mut self, range: LiveRange) {
@@ -379,51 +395,41 @@ impl LiveRange {
     }
 
     pub fn remove_segment(&mut self, seg: &LiveSegment) {
-        let a = self.segments.len();
-        self.segments
-            .retain(|seg1| !(seg1.start == seg.start && seg.end == seg1.end));
-        assert!(a - 1 == self.segments.len());
-        // for seg1 in &self.segments {
-        //         return;
-        //         // break;
-        //         // continue;
-        //     }
-        // }
-        // panic!()
-        //     if !seg1.interferes(seg) {
-        //         new_segments.push(*seg1);
-        //         continue;
-        //     }
-        //     let mut a = false;
-        //     if seg.start < seg1.start && seg1.end < seg.end {
-        //         continue;
-        //     }
-        //     if seg.start == seg1.start && seg1.end == seg.end {
-        //         continue;
-        //     }
-        //     // panic!("{:?} {:?}", seg, seg1);
-        //     let aa = if seg1.start < seg.start {
-        //         LiveSegment::new(seg1.start, seg.start)
-        //     } else {
-        //         LiveSegment::new(seg.start, seg1.start)
-        //     };
-        //     let bb = if seg1.end < seg.end {
-        //         LiveSegment::new(seg1.end, seg.end)
-        //     } else {
-        //         LiveSegment::new(seg.end, seg1.end)
-        //     };
-        //     if seg1.start <= aa.start && aa.end <= seg1.end {
-        //         a = true;
-        //         new_segments.push(aa)
-        //     }
-        //     if seg1.start <= bb.start && bb.end <= seg1.end {
-        //         a = true;
-        //         new_segments.push(bb)
-        //     }
-        //     // assert_eq!(a, true);
-        // }
-        // self.segments = new_segments;
-        // return;
+        let mut found = true;
+        let pt = self
+            .segments
+            .binary_search_by(|s| s.start.cmp(&seg.start))
+            .unwrap_or_else(|x| {
+                found = false;
+                x
+            });
+
+        if found {
+            if seg.end == self.segments[pt].end {
+                self.segments.remove(pt);
+            } else if seg.end <= self.segments[pt].end {
+                self.segments[pt].end = seg.end;
+            } else if self.segments[pt].end < seg.end {
+                let start = self.segments[pt].end;
+                self.segments.remove(pt);
+                self.remove_segment(&LiveSegment::new(start, seg.end));
+            } else {
+                panic!()
+            }
+        } else {
+            if seg.end < self.segments[pt - 1].end {
+                let end = self.segments[pt - 1].end;
+                self.segments[pt - 1].end = seg.start;
+                self.add_segment(LiveSegment::new(seg.end, end));
+            } else if self.segments[pt - 1].end == seg.end {
+                self.segments[pt - 1].end = seg.start;
+            } else if self.segments[pt - 1].end < seg.end {
+                self.segments[pt - 1].end = seg.start;
+                self.remove_segment(seg);
+            } else {
+                panic!()
+            }
+        }
     }
 
     pub fn remove_range(&mut self, range: &LiveRange) {

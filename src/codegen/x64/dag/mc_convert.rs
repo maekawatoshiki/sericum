@@ -139,6 +139,17 @@ impl<'a> ConversionInfo<'a> {
                 Some(self.push_inst(inst))
             }
             NodeKind::IR(IRNodeKind::Entry) => None,
+            NodeKind::IR(IRNodeKind::CopyFromReg) => {
+                let val = self.normal_operand(node.operand[0]);
+                let rc = self.cur_func.regs_info.arena_ref()[*val.as_register()].reg_class;
+                Some(self.push_inst(MachineInst::new(
+                    &self.cur_func.regs_info,
+                    MachineOpcode::Copy,
+                    vec![val],
+                    Some(rc),
+                    self.cur_bb,
+                )))
+            }
             NodeKind::IR(IRNodeKind::CopyToReg) => {
                 let val = self.normal_operand(node.operand[1]);
                 let dst = match &node.operand[0].kind {

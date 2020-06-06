@@ -1,4 +1,5 @@
 use super::machine::function::MachineFunction;
+use super::register::ty2rc;
 use crate::ir::types::*;
 use rustc_hash::FxHashMap;
 use std::fmt;
@@ -13,6 +14,18 @@ pub struct LocalVariables {
 pub struct FrameObjectsInfo {
     offset_map: FxHashMap<FrameIndexKind, usize>, // frame index -> offset
     pub total_size: usize,
+}
+
+#[derive(Clone, PartialEq, Copy)]
+pub struct FrameIndexInfo {
+    pub ty: Type,
+    pub idx: FrameIndexKind,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Copy)]
+pub enum FrameIndexKind {
+    Arg(usize),
+    Local(usize),
 }
 
 impl LocalVariables {
@@ -45,8 +58,12 @@ impl FrameObjectsInfo {
             .iter()
             .enumerate()
         {
-            offset += param_ty.size_in_byte(tys);
-            offset_map.insert(FrameIndexKind::Arg(i), offset);
+            // TODO: Correct?
+            let rc = ty2rc(param_ty).unwrap();
+            if rc.get_nth_arg_reg(i).is_none() {
+                offset += param_ty.size_in_byte(tys);
+                offset_map.insert(FrameIndexKind::Arg(i), offset);
+            }
         }
 
         for FrameIndexInfo { idx, ty } in &f.local_mgr.locals {
@@ -67,18 +84,6 @@ impl FrameObjectsInfo {
     pub fn total_size(&self) -> i32 {
         self.total_size as i32
     }
-}
-
-#[derive(Clone, PartialEq, Copy)]
-pub struct FrameIndexInfo {
-    pub ty: Type,
-    pub idx: FrameIndexKind,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Copy)]
-pub enum FrameIndexKind {
-    Arg(usize),
-    Local(usize),
 }
 
 impl FrameIndexKind {
