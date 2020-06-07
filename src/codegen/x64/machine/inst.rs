@@ -261,6 +261,15 @@ impl MachineInst {
         }
     }
 
+    pub fn replace_operand_block(&mut self, from: MachineBasicBlockId, to: MachineBasicBlockId) {
+        for o in &mut self.operand {
+            match o {
+                MachineOperand::Branch(bb) if bb == &from => *bb = to,
+                _ => continue,
+            };
+        }
+    }
+
     pub fn replace_operand_register(
         &mut self,
         regs_info: &RegistersInfo,
@@ -287,31 +296,6 @@ impl MachineInst {
                 }
             }
         }
-        // for r in self
-        //     .operand
-        //     .iter_mut()
-        //     .enumerate()
-        //     .filter_map(|(i, o)| {
-        //         replaced_operands_idx.push(i);
-        //         match o {
-        //             MachineOperand::Register(_) | MachineOperand::Mem(_) => Some(o),
-        //             _ => None,
-        //         }
-        //     })
-        //     .flat_map(|o| o.registers_mut())
-        //     .collect::<FxHashSet<_>>()
-        //     .into_iter()
-        //     .filter_map(|r| {
-        //         if r.kind == from.kind {
-        //             return Some(r);
-        //         }
-        //         None
-        //     })
-        // {
-        //     regs_info.arena_ref_mut()[*r].remove_use(self.id.unwrap());
-        //     *r = to;
-        //     regs_info.arena_ref_mut()[*r].add_use(self.id.unwrap());
-        // }
         replaced_operands_idx
     }
 
