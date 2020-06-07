@@ -1,3 +1,4 @@
+use super::exec::roundup;
 use super::machine::function::MachineFunction;
 use super::register::ty2rc;
 use crate::ir::types::*;
@@ -12,7 +13,7 @@ pub struct LocalVariables {
 
 #[derive(Debug)]
 pub struct FrameObjectsInfo {
-    offset_map: FxHashMap<FrameIndexKind, usize>, // frame index -> offset
+    offset_map: FxHashMap<FrameIndexKind, i32>, // frame index -> offset
     pub total_size: usize,
 }
 
@@ -48,32 +49,41 @@ impl FrameObjectsInfo {
     pub fn new(tys: &Types, f: &MachineFunction) -> Self {
         let mut offset_map = FxHashMap::default();
         let mut offset = 0;
+        const saved_reg_sz: usize = 8; // 8 is to save s0 register
+        let mut total_size = saved_reg_sz;
 
-        for (i, param_ty) in tys
-            .base
-            .borrow()
-            .as_function_ty(f.ty)
-            .unwrap()
-            .params_ty
-            .iter()
-            .enumerate()
-        {
-            // TODO: Correct?
-            let rc = ty2rc(param_ty).unwrap();
-            if rc.get_nth_arg_reg(i).is_none() {
-                offset += param_ty.size_in_byte(tys);
-                offset_map.insert(FrameIndexKind::Arg(i), offset);
-            }
-        }
+        // TODO: Implement
+        // for (i, param_ty) in tys
+        //     .base
+        //     .borrow()
+        //     .as_function_ty(f.ty)
+        //     .unwrap()
+        //     .params_ty
+        //     .iter()
+        //     .enumerate()
+        // {
+        // let rc = ty2rc(param_ty).unwrap();
+        // if rc.get_nth_arg_reg(i).is_none() {
+        //     offset += param_ty.size_in_byte(tys);
+        //     offset_map.insert(FrameIndexKind::Arg(i), offset);
+        // }
+        // }
 
         for FrameIndexInfo { idx, ty } in &f.local_mgr.locals {
-            offset += ty.size_in_byte(tys);
-            offset_map.insert(*idx, offset);
+            total_size += ty.size_in_byte(tys);
+        }
+
+        total_size = roundup(total_size as i32, 16) as usize;
+
+        let mut sz = 0;
+        for FrameIndexInfo { idx, ty } in &f.local_mgr.locals {
+            sz += ty.size_in_byte(tys) as i32;
+            offset_map.insert(*idx, -(total_size as i32 - saved_reg_sz as i32) - sz);
         }
 
         Self {
             offset_map,
-            total_size: offset,
+            total_size,
         }
     }
 

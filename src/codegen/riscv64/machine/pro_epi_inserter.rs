@@ -46,8 +46,8 @@ impl PrologueEpilogueInserter {
         let frame_info = FrameObjectsInfo::new(tys, cur_func);
         let down = self.calc_max_adjust_stack_down(cur_func);
         let adjust = roundup(frame_info.total_size() + down, 16);
-        // self.insert_prologue(tys, cur_func, adjust);
-        // self.insert_epilogue(cur_func, adjust);
+        self.insert_prologue(tys, cur_func, adjust);
+        self.insert_epilogue(cur_func, adjust);
     }
 
     fn calc_max_adjust_stack_down(&mut self, cur_func: &mut MachineFunction) -> i32 {
@@ -75,57 +75,48 @@ impl PrologueEpilogueInserter {
         down
     }
 
-    // fn insert_prologue(&mut self, tys: &Types, cur_func: &mut MachineFunction, adjust: i32) {
-    //     let has_call = cur_func.body.has_call();
-    //     let mut builder = Builder::new(cur_func);
-    //     builder.set_insert_point_at_entry_bb();
-    //
-    //     if has_call || adjust > 0 {
-    //         // push rbp
-    //         let push_rbp = MachineInst::new_simple(
-    //             MachineOpcode::PUSH64,
-    //             vec![MachineOperand::phys_reg(
-    //                 &builder.function.regs_info,
-    //                 GR64::RBP,
-    //             )],
-    //             builder.get_cur_bb().unwrap(),
-    //         );
-    //         let push_rbp = builder.function.alloc_inst(push_rbp);
-    //         builder.insert(push_rbp);
-    //     }
-    //
-    //     if adjust == 0 {
-    //         return;
-    //     }
-    //
-    //     // mov rbp, rsp
-    //     let mov_rbp_rsp = MachineInst::new_simple(
-    //         MachineOpcode::MOVrr64,
-    //         vec![MachineOperand::phys_reg(
-    //             &builder.function.regs_info,
-    //             GR64::RSP,
-    //         )],
-    //         builder.get_cur_bb().unwrap(),
-    //     )
-    //     .with_def(vec![builder.function.regs_info.get_phys_reg(GR64::RBP)]);
-    //     let mov_rbp_rsp = builder.function.alloc_inst(mov_rbp_rsp);
-    //     builder.insert(mov_rbp_rsp);
-    //
-    //     // sub rsp, adjust
-    //     let sub_rsp = MachineInst::new_simple(
-    //         MachineOpcode::SUBr64i32,
-    //         vec![
-    //             MachineOperand::phys_reg(&builder.function.regs_info, GR64::RSP),
-    //             MachineOperand::imm_i32(adjust),
-    //         ],
-    //         builder.get_cur_bb().unwrap(),
-    //     )
-    //     .with_def(vec![builder.function.regs_info.get_phys_reg(GR64::RSP)]);
-    //     let sub_rsp = builder.function.alloc_inst(sub_rsp);
-    //     builder.insert(sub_rsp);
-    //
-    //     self.insert_arg_copy(&tys.base.borrow(), &mut builder);
-    // }
+    fn insert_prologue(&mut self, tys: &Types, cur_func: &mut MachineFunction, adjust: i32) {
+        let mut builder = Builder::new(cur_func);
+        builder.set_insert_point_at_entry_bb();
+
+        //addi sp,sp,-32
+        let sp = builder.function.regs_info.get_phys_reg(GPR::SP);
+        let addi = MachineInst::new_simple(
+            MachineOpcode::ADDI,
+            vec![
+                MachineOperand::Register(sp),
+                MachineOperand::Constant(MachineConstant::Int32(-adjust)),
+            ],
+            builder.get_cur_bb().unwrap(),
+        )
+        .with_def(vec![sp]);
+        builder.insert(addi);
+
+        let s0 = builder.function.regs_info.get_phys_reg(GPR::S0);
+        let sd = MachineInst::new_simple(
+            MachineOpcode::SD,
+            vec![
+                MachineOperand::Register(s0),
+                MachineOperand::Constant(MachineConstant::Int32(adjust - 8)),
+                MachineOperand::Register(sp),
+            ],
+            builder.get_cur_bb().unwrap(),
+        );
+        builder.insert(sd);
+
+        let addi = MachineInst::new_simple(
+            MachineOpcode::ADDI,
+            vec![
+                MachineOperand::Register(sp),
+                MachineOperand::Constant(MachineConstant::Int32(adjust)),
+            ],
+            builder.get_cur_bb().unwrap(),
+        )
+        .with_def(vec![s0]);
+        builder.insert(addi);
+
+        // self.insert_arg_copy(&tys.base.borrow(), &mut builder);
+    }
     //
     // fn insert_arg_copy<'a>(&mut self, tys: &'a TypesBase, builder: &'a mut Builder<'a>) {
     //     CopyArgs::new(
@@ -135,52 +126,60 @@ impl PrologueEpilogueInserter {
     //     .copy();
     // }
     //
-    // fn insert_epilogue(&mut self, cur_func: &mut MachineFunction, adjust: i32) {
-    //     let mut bb_iseq = vec![];
-    //     let has_call = cur_func.body.has_call();
-    //
-    //     for (bb_id, bb) in cur_func.body.basic_blocks.id_and_block() {
-    //         let last_inst_id = *bb.iseq_ref().last().unwrap();
-    //         let last_inst = &cur_func.body.inst_arena[last_inst_id];
-    //
-    //         if last_inst.opcode != MachineOpcode::RET {
-    //             continue;
-    //         }
-    //
-    //         let mut iseq = vec![];
-    //
-    //         if adjust > 0 {
-    //             // mov rsp, rbp
-    //             let i = MachineInst::new_simple(
-    //                 MachineOpcode::MOVrr64,
-    //                 vec![MachineOperand::phys_reg(&cur_func.regs_info, GR64::RBP)],
-    //                 bb_id,
-    //             )
-    //             .with_def(vec![cur_func.regs_info.get_phys_reg(GR64::RSP)]);
-    //             iseq.push(cur_func.body.inst_arena.alloc(&cur_func.regs_info, i));
-    //         }
-    //
-    //         if has_call || adjust > 0 {
-    //             // pop rbp
-    //             let i = MachineInst::new_simple(
-    //                 MachineOpcode::POP64,
-    //                 vec![MachineOperand::phys_reg(&cur_func.regs_info, GR64::RBP)],
-    //                 bb_id,
-    //             );
-    //             iseq.push(cur_func.body.inst_arena.alloc(&cur_func.regs_info, i));
-    //         }
-    //
-    //         bb_iseq.push((last_inst_id, iseq));
-    //     }
-    //
-    //     for (ret_id, iseq) in bb_iseq {
-    //         let mut builder = Builder::new(cur_func);
-    //         builder.set_insert_point_before_inst(ret_id);
-    //         for inst in iseq {
-    //             builder.insert(inst)
-    //         }
-    //     }
-    // }
+    fn insert_epilogue(&mut self, cur_func: &mut MachineFunction, adjust: i32) {
+        let mut bb_iseq = vec![];
+        // let has_call = cur_func.body.has_call();
+
+        for (bb_id, bb) in cur_func.body.basic_blocks.id_and_block() {
+            let last_inst_id = *bb.iseq_ref().last().unwrap();
+            let last_inst = &cur_func.body.inst_arena[last_inst_id];
+            let is_return =
+                last_inst.opcode == MachineOpcode::JR && last_inst.operand[0].is_register() && {
+                    let r = last_inst.operand[0].as_register();
+                    r.is_phys_reg() && r.as_phys_reg() == GPR::RA.as_phys_reg()
+                };
+
+            if !is_return {
+                continue;
+            }
+
+            let mut iseq = vec![];
+
+            let s0 = cur_func.regs_info.get_phys_reg(GPR::S0);
+            let sp = cur_func.regs_info.get_phys_reg(GPR::SP);
+            let ld = MachineInst::new_simple(
+                MachineOpcode::LD,
+                vec![
+                    MachineOperand::Constant(MachineConstant::Int32(adjust - 8)),
+                    MachineOperand::Register(sp),
+                ],
+                bb_id,
+            )
+            .with_def(vec![s0]);
+            iseq.push(cur_func.body.inst_arena.alloc(&cur_func.regs_info, ld));
+
+            let addi = MachineInst::new_simple(
+                MachineOpcode::ADDI,
+                vec![
+                    MachineOperand::Register(sp),
+                    MachineOperand::Constant(MachineConstant::Int32(adjust)),
+                ],
+                bb_id,
+            )
+            .with_def(vec![sp]);
+            iseq.push(cur_func.body.inst_arena.alloc(&cur_func.regs_info, addi));
+
+            bb_iseq.push((last_inst_id, iseq));
+        }
+
+        for (ret_id, iseq) in bb_iseq {
+            let mut builder = Builder::new(cur_func);
+            builder.set_insert_point_before_inst(ret_id);
+            for inst in iseq {
+                builder.insert(inst)
+            }
+        }
+    }
 }
 
 // impl<'a> CopyArgs<'a> {

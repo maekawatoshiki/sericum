@@ -75,7 +75,13 @@ impl MachineAsmPrinter {
         self.output.push_str("  ");
 
         match inst.opcode {
+            MachineOpcode::ADDI => self.run_on_inst_addi(inst),
+            MachineOpcode::MV => self.run_on_inst_mv(inst),
             MachineOpcode::LI => self.run_on_inst_li(inst),
+            MachineOpcode::LW => self.run_on_inst_lw(fo, inst),
+            MachineOpcode::LD => self.run_on_inst_ld(fo, inst),
+            MachineOpcode::SW => self.run_on_inst_sw(fo, inst),
+            MachineOpcode::SD => self.run_on_inst_sd(fo, inst),
             MachineOpcode::JR => self.run_on_inst_jr(inst),
             // MachineOpcode::MOVSDrm64 => {}
             // MachineOpcode::MOVSXDr64m32 => {}
@@ -117,16 +123,92 @@ impl MachineAsmPrinter {
         self.output.push('\n');
     }
 
+    fn run_on_inst_addi(&mut self, i: &MachineInst) {
+        self.output.push_str(
+            format!(
+                "addi {}, {}, {}",
+                i.def[0].as_phys_reg().name(),
+                operand2string(None, &i.operand[0]),
+                operand2string(None, &i.operand[1])
+            )
+            .as_str(),
+        )
+    }
+
+    fn run_on_inst_mv(&mut self, i: &MachineInst) {
+        self.output.push_str(
+            format!(
+                "mv {}, {}",
+                i.def[0].as_phys_reg().name(),
+                i.operand[0].as_register().as_phys_reg().name()
+            )
+            .as_str(),
+        )
+    }
+
     fn run_on_inst_li(&mut self, i: &MachineInst) {
         self.output.push_str("li ");
-        self.output
-            .push_str(format!("{}, ", i.def[0].as_phys_reg().name()).as_str());
-        self.run_on_operand(&i.operand[0]);
+        self.output.push_str(
+            format!(
+                "{}, {}",
+                i.def[0].as_phys_reg().name(),
+                operand2string(None, &i.operand[0]),
+            )
+            .as_str(),
+        );
+    }
+
+    fn run_on_inst_lw(&mut self, fo: &FrameObjectsInfo, i: &MachineInst) {
+        self.output.push_str(
+            format!(
+                "lw {}, {}({})",
+                i.def[0].as_phys_reg().name(),
+                operand2string(Some(fo), &i.operand[0]),
+                i.operand[1].as_register().as_phys_reg().name(),
+            )
+            .as_str(),
+        );
+    }
+
+    fn run_on_inst_ld(&mut self, fo: &FrameObjectsInfo, i: &MachineInst) {
+        self.output.push_str(
+            format!(
+                "ld {}, {}({})",
+                i.def[0].as_phys_reg().name(),
+                operand2string(Some(fo), &i.operand[0]),
+                i.operand[1].as_register().as_phys_reg().name(),
+            )
+            .as_str(),
+        );
+    }
+
+    fn run_on_inst_sw(&mut self, fo: &FrameObjectsInfo, i: &MachineInst) {
+        self.output.push_str(
+            format!(
+                "sw {}, {}({})",
+                i.operand[0].as_register().as_phys_reg().name(),
+                operand2string(Some(fo), &i.operand[1]),
+                i.operand[2].as_register().as_phys_reg().name(),
+            )
+            .as_str(),
+        );
+    }
+
+    fn run_on_inst_sd(&mut self, fo: &FrameObjectsInfo, i: &MachineInst) {
+        self.output.push_str(
+            format!(
+                "sd {}, {}({})",
+                i.operand[0].as_register().as_phys_reg().name(),
+                operand2string(Some(fo), &i.operand[1]),
+                i.operand[2].as_register().as_phys_reg().name(),
+            )
+            .as_str(),
+        );
     }
 
     fn run_on_inst_jr(&mut self, i: &MachineInst) {
-        self.output.push_str("jr ");
-        self.run_on_operand(&i.operand[0]);
+        self.output
+            .push_str(format!("jr {}", operand2string(None, &i.operand[0])).as_str());
     }
 
     // fn run_on_inst_mov_rx(&mut self, i: &MachineInst) {
@@ -362,22 +444,22 @@ impl MachineAsmPrinter {
     //     self.run_on_operand(&i.operand[0]);
     // }
 
-    fn run_on_operand(&mut self, operand: &MachineOperand) {
-        match operand {
-            // MachineOperand::Branch(id) => self.output.push_str(self.bb_id_to_label_id(id).as_str()),
-            MachineOperand::Constant(MachineConstant::Int32(i)) => {
-                self.output.push_str(format!("{}", i).as_str())
-            }
-            MachineOperand::Register(r) => self.output.push_str(r.as_phys_reg().name()),
-            // MachineOperand::Mem(MachineMemOperand::Address(AddressKind::FunctionName(name))) => {
-            //     self.output.push_str(name.as_str())
-            // }
-            _ => unimplemented!(),
-        }
-    }
     //
     fn bb_id_to_label_id(&self, bb_id: &MachineBasicBlockId) -> String {
         format!(".L{}", bb_id.index() + self.cur_bb_id_base)
+    }
+}
+
+fn operand2string(fo: Option<&FrameObjectsInfo>, operand: &MachineOperand) -> String {
+    match operand {
+        // MachineOperand::Branch(id) => self.output.push_str(self.bb_id_to_label_id(id).as_str()),
+        MachineOperand::Constant(MachineConstant::Int32(i)) => format!("{}", i),
+        MachineOperand::Register(r) => r.as_phys_reg().name().to_string(),
+        MachineOperand::FrameIndex(i) => format!("{}", fo.unwrap().offset(i.idx).unwrap()),
+        // MachineOperand::Mem(MachineMemOperand::Address(AddressKind::FunctionName(name))) => {
+        //     self.output.push_str(name.as_str())
+        // }
+        _ => unimplemented!(),
     }
 }
 

@@ -5,7 +5,8 @@ use super::super::{
 };
 use super::calc_spill_weight::calc_spill_weight;
 use super::reg_coalescer::coalesce_function;
-use super::{builder::*, function::*, inst::*, liveness::*, module::*, spiller::Spiller};
+// use super::spiller::Spiller;
+use super::{builder::*, function::*, inst::*, liveness::*, module::*};
 use crate::{ir::types::Types, traits::pass::ModulePassTrait};
 use rustc_hash::FxHashSet;
 use std::collections::VecDeque;
@@ -82,36 +83,38 @@ impl RegisterAllocator {
                 continue;
             }
 
-            let mut interfering = matrix.collect_interfering_assigned_regs(vreg);
+            unimplemented!();
 
-            interfering.sort_by(|x, y| {
-                let x = matrix.virt_reg_interval.get(x).unwrap().spill_weight;
-                let y = matrix.virt_reg_interval.get(y).unwrap().spill_weight;
-                x.partial_cmp(&y).unwrap()
-            });
-
-            // Spill virtual registers in the order of small spill weight
-            for &reg2spill in &interfering {
-                if matrix
-                    .virt_reg_interval
-                    .get(&reg2spill)
-                    .unwrap()
-                    .is_spillable
-                    == false
-                {
-                    continue;
-                }
-                let r = matrix.unassign_reg(reg2spill).unwrap();
-                let new_regs = Spiller::new(cur_func, &mut matrix).spill(tys, reg2spill);
-                for &new_reg in &new_regs {
-                    self.queue.push_back(new_reg);
-                }
-                if !matrix.interferes(vreg, r) {
-                    self.queue.push_back(vreg);
-                    break;
-                }
-            }
-            self.sort_queue(&matrix); // for better allocation. not necessary
+            // let mut interfering = matrix.collect_interfering_assigned_regs(vreg);
+            //
+            // interfering.sort_by(|x, y| {
+            //     let x = matrix.virt_reg_interval.get(x).unwrap().spill_weight;
+            //     let y = matrix.virt_reg_interval.get(y).unwrap().spill_weight;
+            //     x.partial_cmp(&y).unwrap()
+            // });
+            //
+            // // Spill virtual registers in the order of small spill weight
+            // for &reg2spill in &interfering {
+            //     if matrix
+            //         .virt_reg_interval
+            //         .get(&reg2spill)
+            //         .unwrap()
+            //         .is_spillable
+            //         == false
+            //     {
+            //         continue;
+            //     }
+            //     let r = matrix.unassign_reg(reg2spill).unwrap();
+            //     let new_regs = Spiller::new(cur_func, &mut matrix).spill(tys, reg2spill);
+            //     for &new_reg in &new_regs {
+            //         self.queue.push_back(new_reg);
+            //     }
+            //     if !matrix.interferes(vreg, r) {
+            //         self.queue.push_back(vreg);
+            //         break;
+            //     }
+            // }
+            // self.sort_queue(&matrix); // for better allocation. not necessary
         }
 
         self.rewrite_vregs(cur_func, &matrix);

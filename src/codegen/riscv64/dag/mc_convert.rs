@@ -394,13 +394,7 @@ impl<'a> ConversionInfo<'a> {
         if let Some(ty) = val.get_type(&self.cur_func.regs_info) {
             assert!(ty.is_integer());
             let ret_reg = ty2rc(&ty).unwrap().return_value_register();
-            let set_ret_val = MachineInst::new_simple(
-                MachineOpcode::LI,
-                // mov_rx(self.types, &self.cur_func.regs_info, &val).unwrap(),
-                vec![val],
-                self.cur_bb,
-            )
-            .with_def(vec![self.cur_func.regs_info.get_phys_reg(ret_reg)]);
+            let set_ret_val = self.move2reg(self.cur_func.regs_info.get_phys_reg(ret_reg), val);
             self.push_inst(set_ret_val);
         }
 
@@ -421,6 +415,12 @@ impl<'a> ConversionInfo<'a> {
             //     self.cur_bb,
             // )
             // .with_def(vec![r]),
+            MachineOperand::Constant(MachineConstant::Int32(_)) => {
+                MachineInst::new_simple(MachineOpcode::LI, vec![src], self.cur_bb).with_def(vec![r])
+            }
+            MachineOperand::Register(_) => {
+                MachineInst::new_simple(MachineOpcode::MV, vec![src], self.cur_bb).with_def(vec![r])
+            }
             // MachineOperand::Constant(_) | MachineOperand::Register(_) => MachineInst::new_simple(
             //     mov_rx(self.types, &self.cur_func.regs_info, &src).unwrap(),
             //     vec![src],

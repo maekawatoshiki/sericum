@@ -144,6 +144,23 @@ impl RegisterClassKind {
     pub fn get_arg_reg_order_vec(&self) -> Vec<PhysReg> {
         match self {
             RegisterClassKind::GPR => to_phys!(
+                GPR::A0,
+                GPR::A1,
+                GPR::A2,
+                GPR::A3,
+                GPR::A4,
+                GPR::A5,
+                GPR::A6,
+                GPR::A7
+            ),
+        }
+    }
+
+    // Returns normal order of general-purpose registers
+    pub fn get_gp_reg_order_vec(&self) -> Vec<PhysReg> {
+        // commented-out registers are callee-saved registers
+        match self {
+            RegisterClassKind::GPR => to_phys!(
                 GPR::T0,
                 GPR::T1,
                 GPR::T2,
@@ -159,23 +176,6 @@ impl RegisterClassKind {
                 GPR::T4,
                 GPR::T5,
                 GPR::T6
-            ),
-        }
-    }
-
-    // Returns normal order of general-purpose registers
-    pub fn get_gp_reg_order_vec(&self) -> Vec<PhysReg> {
-        // commented-out registers are callee-saved registers
-        match self {
-            RegisterClassKind::GPR => to_phys!(
-                GPR::A0,
-                GPR::A1,
-                GPR::A2,
-                GPR::A3,
-                GPR::A4,
-                GPR::A5,
-                GPR::A6,
-                GPR::A7
             ),
         }
     }

@@ -66,28 +66,7 @@ fn compile_and_run(c_parent: &str, module: &mut Module) {
     println!("{:?}", machine_module);
     printer.run_on_module(&machine_module);
     println!("{}", printer.output);
-    assemble_and_run(
-        c_parent,
-        "
-        	.text
-        	.globl test
-        test:
-        	addi	sp,sp,-16
-        	sd	s0,8(sp)
-        	addi	s0,sp,16
-
-
-        	li	a5,42
-        	mv	a0,a5
-
-
-        	ld	s0,8(sp)
-        	addi	sp,sp,16
-
-
-        	jr	ra
-                ",
-    );
+    assemble_and_run(c_parent, &printer.output);
 }
 
 #[test]
@@ -96,6 +75,28 @@ fn asm_minimum() {
     cilk_ir!(m; define [i32] test [] {
         entry:
             ret (i32 42);
+    });
+    compile_and_run(
+        "
+    #include <assert.h>
+    extern int test();
+    int main() {
+        assert(test() == 42);
+    }
+            ",
+        &mut m,
+    );
+}
+
+#[test]
+fn asm_local_var() {
+    let mut m = Module::new("cilk");
+    cilk_ir!(m; define [i32] test [] {
+        entry:
+            i = alloca i32;
+            store (i32 42), (%i);
+            li = load (%i);
+            ret (%li);
     });
     compile_and_run(
         "

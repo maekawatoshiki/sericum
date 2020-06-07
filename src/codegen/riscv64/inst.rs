@@ -7,321 +7,46 @@ mod inst {
 
     // TODO: need macro to describe the followings
     lazy_static! {
-        // pub static ref MOVSDrm64: TargetInstDef = {
-        //     TargetInstDef::new(TargetOpcode::MOVSDrm64)
-        //         .set_uses(vec![TargetOperand::Mem])
-        //         .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::XMM)])
-        // };
-        // pub static ref MOVSDrr: TargetInstDef = {
-        //     TargetInstDef::new(TargetOpcode::MOVSDrr)
-        //         .set_uses(vec![TargetOperand::Register(TargetRegister::RegClass(
-        //             RegisterClassKind::XMM,
-        //         ))])
-        //         .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::XMM)])
-        // };
-        // pub static ref MOVSDrm: TargetInstDef = {
-        //     TargetInstDef::new(TargetOpcode::MOVSDrm)
-        //         .set_uses(vec![TargetOperand::Mem])
-        //         .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::XMM)])
-        // };
-        // pub static ref MOVSDmr: TargetInstDef = {
-        //     TargetInstDef::new(TargetOpcode::MOVSDmr).set_uses(vec![
-        //         TargetOperand::Mem,
-        //         TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::XMM)),
-        //     ])
-        // };
-        // pub static ref MOVSXDr64m32: TargetInstDef = {
-        //     TargetInstDef::new(TargetOpcode::MOVSXDr64m32)
-        //         .set_uses(vec![TargetOperand::FrameIndex])
-        //         .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR64)])
-        // };
-        // pub static ref LEAr64m: TargetInstDef = {
-        //     TargetInstDef::new(TargetOpcode::LEAr64m)
-        //         .set_uses(vec![TargetOperand::Mem])
-        //         .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR64)])
-        // };
-        // pub static ref ADDrr32: TargetInstDef = {
-        //     TargetInstDef::new(TargetOpcode::ADDrr32)
-        //         .set_uses(vec![
-        //             TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR32)),
-        //             TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR32)),
-        //         ])
-        //         .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR32)])
-        //         .add_tie(DefOrUseReg::Def(0), DefOrUseReg::Use(0))
-        // };
-        // pub static ref ADDrr64: TargetInstDef = {
-        //     TargetInstDef::new(TargetOpcode::ADDrr64)
-        //         .set_uses(vec![
-        //             TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR64)),
-        //             TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR64)),
-        //         ])
-        //         .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR64)])
-        //         .add_tie(DefOrUseReg::Def(0), DefOrUseReg::Use(0))
-        // };
-        // pub static ref ADDri32: TargetInstDef = {
-        //     TargetInstDef::new(TargetOpcode::ADDri32)
-        //         .set_uses(vec![
-        //             TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR32)),
-        //             TargetOperand::Immediate(TargetImmediate::I32),
-        //         ])
-        //         .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR32)])
-        //         .add_tie(DefOrUseReg::Def(0), DefOrUseReg::Use(0))
-        // };
-        // pub static ref ADDr64i32: TargetInstDef = {
-        //     TargetInstDef::new(TargetOpcode::ADDr64i32)
-        //         .set_uses(vec![
-        //             TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR64)),
-        //             TargetOperand::Immediate(TargetImmediate::I32),
-        //         ])
-        //         .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR64)])
-        //         .add_tie(DefOrUseReg::Def(0), DefOrUseReg::Use(0))
-        // };
-        // pub static ref ADDSDrr: TargetInstDef = {
-        //     TargetInstDef::new(TargetOpcode::ADDSDrr)
-        //         .set_uses(vec![
-        //             TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::XMM)),
-        //             TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::XMM)),
-        //         ])
-        //         .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::XMM)])
-        //         .add_tie(DefOrUseReg::Def(0), DefOrUseReg::Use(0))
-        // };
-        // pub static ref ADDSDrm: TargetInstDef = {
-        //     TargetInstDef::new(TargetOpcode::ADDSDrm)
-        //         .set_uses(vec![
-        //             TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::XMM)),
-        //             TargetOperand::Mem,
-        //         ])
-        //         .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::XMM)])
-        //         .add_tie(DefOrUseReg::Def(0), DefOrUseReg::Use(0))
-        // };
-        // pub static ref SUBrr32: TargetInstDef = {
-        //     TargetInstDef::new(TargetOpcode::SUBrr32)
-        //         .set_uses(vec![
-        //             TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR32)),
-        //             TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR32)),
-        //         ])
-        //         .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR32)])
-        //         .add_tie(DefOrUseReg::Def(0), DefOrUseReg::Use(0))
-        // };
-        // pub static ref SUBri32: TargetInstDef = {
-        //     TargetInstDef::new(TargetOpcode::SUBri32)
-        //         .set_uses(vec![
-        //             TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR32)),
-        //             TargetOperand::Immediate(TargetImmediate::I32),
-        //         ])
-        //         .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR32)])
-        //         .add_tie(DefOrUseReg::Def(0), DefOrUseReg::Use(0))
-        // };
-        // pub static ref SUBr64i32: TargetInstDef = {
-        //     TargetInstDef::new(TargetOpcode::SUBr64i32)
-        //         .set_uses(vec![
-        //             TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR64)),
-        //             TargetOperand::Immediate(TargetImmediate::I32),
-        //         ])
-        //         .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR64)])
-        //         .add_tie(DefOrUseReg::Def(0), DefOrUseReg::Use(0))
-        // };
-        // pub static ref SUBSDrr: TargetInstDef = {
-        //     TargetInstDef::new(TargetOpcode::SUBSDrr)
-        //         .set_uses(vec![
-        //             TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::XMM)),
-        //             TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::XMM)),
-        //         ])
-        //         .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::XMM)])
-        //         .add_tie(DefOrUseReg::Def(0), DefOrUseReg::Use(0))
-        // };
-        // pub static ref SUBSDrm: TargetInstDef = {
-        //     TargetInstDef::new(TargetOpcode::SUBSDrm)
-        //         .set_uses(vec![
-        //             TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::XMM)),
-        //             TargetOperand::Mem,
-        //         ])
-        //         .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::XMM)])
-        //         .add_tie(DefOrUseReg::Def(0), DefOrUseReg::Use(0))
-        // };
-        // pub static ref IMULrr32: TargetInstDef = {
-        //     TargetInstDef::new(TargetOpcode::IMULrr32)
-        //         .set_uses(vec![
-        //             TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR32)),
-        //             TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR32)),
-        //         ])
-        //         .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR32)])
-        //         .add_tie(DefOrUseReg::Def(0), DefOrUseReg::Use(0))
-        // };
-        // pub static ref IMULrri32: TargetInstDef = {
-        //     TargetInstDef::new(TargetOpcode::IMULrri32)
-        //         .set_uses(vec![
-        //             TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR32)),
-        //             TargetOperand::Immediate(TargetImmediate::I32),
-        //         ])
-        //         .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR32)])
-        // };
-        // pub static ref IMULrr64i32: TargetInstDef = {
-        //     TargetInstDef::new(TargetOpcode::IMULrr64i32)
-        //         .set_uses(vec![
-        //             TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR64)),
-        //             TargetOperand::Immediate(TargetImmediate::I32),
-        //         ])
-        //         .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR64)])
-        //         .add_tie(DefOrUseReg::Def(0), DefOrUseReg::Use(0))
-        // };
-        // pub static ref MULSDrr: TargetInstDef = {
-        //     TargetInstDef::new(TargetOpcode::MULSDrr)
-        //         .set_uses(vec![
-        //             TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::XMM)),
-        //             TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::XMM)),
-        //         ])
-        //         .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::XMM)])
-        //         .add_tie(DefOrUseReg::Def(0), DefOrUseReg::Use(0))
-        // };
-        // pub static ref MULSDrm: TargetInstDef = {
-        //     TargetInstDef::new(TargetOpcode::MULSDrm)
-        //         .set_uses(vec![
-        //             TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::XMM)),
-        //             TargetOperand::Mem,
-        //         ])
-        //         .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::XMM)])
-        //         .add_tie(DefOrUseReg::Def(0), DefOrUseReg::Use(0))
-        // };
-        // pub static ref DIVSDrr: TargetInstDef = {
-        //     TargetInstDef::new(TargetOpcode::DIVSDrr)
-        //         .set_uses(vec![
-        //             TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::XMM)),
-        //             TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::XMM)),
-        //         ])
-        //         .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::XMM)])
-        //         .add_tie(DefOrUseReg::Def(0), DefOrUseReg::Use(0))
-        // };
-        // pub static ref DIVSDrm: TargetInstDef = {
-        //     TargetInstDef::new(TargetOpcode::DIVSDrm)
-        //         .set_uses(vec![
-        //             TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::XMM)),
-        //             TargetOperand::Mem,
-        //         ])
-        //         .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::XMM)])
-        //         .add_tie(DefOrUseReg::Def(0), DefOrUseReg::Use(0))
-        // };
-        // pub static ref SHLr32i8: TargetInstDef = {
-        //     TargetInstDef::new(TargetOpcode::SHLr32i8)
-        //         .set_uses(vec![
-        //             TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR32)),
-        //             TargetOperand::Immediate(TargetImmediate::I8),
-        //         ])
-        //         .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR32)])
-        //         .add_tie(DefOrUseReg::Def(0), DefOrUseReg::Use(0))
-        // };
-        // pub static ref SHLr64i8: TargetInstDef = {
-        //     TargetInstDef::new(TargetOpcode::SHLr64i8)
-        //         .set_uses(vec![
-        //             TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR64)),
-        //             TargetOperand::Immediate(TargetImmediate::I8),
-        //         ])
-        //         .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR64)])
-        //         .add_tie(DefOrUseReg::Def(0), DefOrUseReg::Use(0))
-        // };
-        // pub static ref SQRTSDrr: TargetInstDef = {
-        //     TargetInstDef::new(TargetOpcode::SQRTSDrr)
-        //         .set_uses(vec![TargetOperand::Register(TargetRegister::RegClass(
-        //             RegisterClassKind::XMM,
-        //         ))])
-        //         .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::XMM)])
-        //         // .add_tie(DefOrUseReg::Def(0), DefOrUseReg::Use(0))
-        // };
-        // pub static ref CDQ: TargetInstDef = {
-        //     TargetInstDef::new(TargetOpcode::CDQ)
-        //         .set_imp_def(vec![TargetRegister::Specific(GR32::EDX.as_phys_reg())])
-        //         .set_imp_use(vec![TargetRegister::Specific(GR32::EAX.as_phys_reg())])
-        // };
-        // pub static ref MOVrr32: TargetInstDef = {
-        //     TargetInstDef::new(TargetOpcode::MOVrr32)
-        //         .set_uses(vec![TargetOperand::Register(TargetRegister::RegClass(
-        //             RegisterClassKind::GR32,
-        //         ))])
-        //         .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR32)])
-        // };
-        // pub static ref MOVri32: TargetInstDef = {
-        //     TargetInstDef::new(TargetOpcode::MOVri32)
-        //         .set_uses(vec![TargetOperand::Immediate(TargetImmediate::I32)])
-        //         .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR32)])
-        // };
-        // pub static ref MOVrm32: TargetInstDef = {
-        //     TargetInstDef::new(TargetOpcode::MOVrm32)
-        //         .set_uses(vec![TargetOperand::Mem])
-        //         .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR32)])
-        // };
-        // pub static ref MOVmr32: TargetInstDef = {
-        //     TargetInstDef::new(TargetOpcode::MOVmr32).set_uses(vec![
-        //         TargetOperand::Mem,
-        //         TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR32)),
-        //     ])
-        // };
-        // pub static ref MOVmi32: TargetInstDef = {
-        //     TargetInstDef::new(TargetOpcode::MOVmi32).set_uses(vec![
-        //         TargetOperand::Mem,
-        //         TargetOperand::Immediate(TargetImmediate::I32),
-        //     ])
-        // };
-        // pub static ref MOVmr64: TargetInstDef = {
-        //     TargetInstDef::new(TargetOpcode::MOVmr64).set_uses(vec![
-        //         TargetOperand::Mem,
-        //         TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR64)),
-        //     ])
-        // };
-        // pub static ref MOVmi64: TargetInstDef = {
-        //     TargetInstDef::new(TargetOpcode::MOVmi64).set_uses(vec![
-        //         TargetOperand::Mem,
-        //         TargetOperand::Immediate(TargetImmediate::I64),
-        //     ])
-        // };
-        // pub static ref MOVrr64: TargetInstDef = {
-        //     TargetInstDef::new(TargetOpcode::MOVrr64)
-        //         .set_uses(vec![TargetOperand::Register(TargetRegister::RegClass(
-        //             RegisterClassKind::GR64,
-        //         ))])
-        //         .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR64)])
-        // };
-        // pub static ref MOVri64: TargetInstDef = {
-        //     TargetInstDef::new(TargetOpcode::MOVri64)
-        //         .set_uses(vec![TargetOperand::Immediate(TargetImmediate::I64)])
-        //         .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR64)])
-        // };
-        // pub static ref MOVrm64: TargetInstDef = {
-        //     TargetInstDef::new(TargetOpcode::MOVrm64)
-        //         .set_uses(vec![TargetOperand::Mem])
-        //         .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR64)])
-        // };
-        // pub static ref IDIV: TargetInstDef = {
-        //     TargetInstDef::new(TargetOpcode::IDIV)
-        //         .set_uses(vec![TargetOperand::Register(TargetRegister::RegClass(
-        //             RegisterClassKind::GR32,
-        //         ))])
-        //         .set_imp_def(vec![
-        //             TargetRegister::Specific(GR32::EAX.as_phys_reg()),
-        //             TargetRegister::Specific(GR32::EDX.as_phys_reg()),
-        //         ])
-        //         .set_imp_use(vec![
-        //             TargetRegister::Specific(GR32::EAX.as_phys_reg()),
-        //             TargetRegister::Specific(GR32::EDX.as_phys_reg()),
-        //         ])
-        // };
-        // pub static ref PUSH64: TargetInstDef = {
-        //     TargetInstDef::new(TargetOpcode::PUSH64).set_uses(vec![TargetOperand::Register(
-        //         TargetRegister::RegClass(RegisterClassKind::GR64),
-        //     )])
-        // };
-        // pub static ref POP64: TargetInstDef = {
-        //     TargetInstDef::new(TargetOpcode::POP64).set_uses(vec![TargetOperand::Register(
-        //         TargetRegister::RegClass(RegisterClassKind::GR64),
-        //     )])
-        // };
-        // pub static ref RET: TargetInstDef = TargetInstDef::new(TargetOpcode::RET);
-
-        pub static ref LI: TargetInstDef = TargetInstDef::new(TargetOpcode::LI).set_uses(
-            vec![TargetOperand::Any]
-        ).set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GPR)]);
-        pub static ref JR: TargetInstDef = TargetInstDef::new(TargetOpcode::JR).set_uses(
-            vec![TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GPR))]
-        );
+        pub static ref ADDI: TargetInstDef = TargetInstDef::new(TargetOpcode::ADDI)
+            .set_uses(vec![
+                TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GPR)),
+                TargetOperand::Immediate(TargetImmediate::I32),
+            ])
+            .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GPR)]);
+        pub static ref MV: TargetInstDef = TargetInstDef::new(TargetOpcode::LI)
+            .set_uses(vec![TargetOperand::Register(TargetRegister::RegClass(
+                RegisterClassKind::GPR
+            ))])
+            .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GPR)]);
+        pub static ref LI: TargetInstDef = TargetInstDef::new(TargetOpcode::LI)
+            .set_uses(vec![TargetOperand::Any])
+            .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GPR)]);
+        pub static ref LW: TargetInstDef = TargetInstDef::new(TargetOpcode::LW)
+            .set_uses(vec![
+                TargetOperand::Immediate(TargetImmediate::I32),
+                TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GPR))
+            ])
+            .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GPR)]);
+        pub static ref LD: TargetInstDef = TargetInstDef::new(TargetOpcode::LD)
+            .set_uses(vec![
+                TargetOperand::Immediate(TargetImmediate::I32),
+                TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GPR))
+            ])
+            .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GPR)]);
+        pub static ref SW: TargetInstDef = TargetInstDef::new(TargetOpcode::SW).set_uses(vec![
+            TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GPR)),
+            TargetOperand::Immediate(TargetImmediate::I32),
+            TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GPR))
+        ]);
+        pub static ref SD: TargetInstDef = TargetInstDef::new(TargetOpcode::SD).set_uses(vec![
+            TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GPR)),
+            TargetOperand::Immediate(TargetImmediate::I32),
+            TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GPR))
+        ]);
+        pub static ref JR: TargetInstDef =
+            TargetInstDef::new(TargetOpcode::JR).set_uses(vec![TargetOperand::Register(
+                TargetRegister::RegClass(RegisterClassKind::GPR)
+            )]);
     }
 }
 
@@ -378,7 +103,13 @@ pub enum TargetOpcode {
     Setle,
     Setlt,
 
-    LI, // Load Immediate
+    ADDI, // Add Integer
+    MV,   // Move
+    LI,   // Load Immediate
+    LW,   // Load Word
+    LD,   // Load Double
+    SW,   // Store Word
+    SD,   // Store Double
     // BrccEq,
     // BrccLe,
     // BrccLt,
@@ -408,7 +139,13 @@ pub enum TargetOpcode {
 impl TargetOpcode {
     pub fn inst_def(&self) -> Option<&TargetInstDef> {
         match self {
+            Self::ADDI => Some(&*inst::ADDI),
+            Self::MV => Some(&*inst::MV),
             Self::LI => Some(&*inst::LI),
+            Self::LW => Some(&*inst::LW),
+            Self::LD => Some(&*inst::LD),
+            Self::SW => Some(&*inst::SW),
+            Self::SD => Some(&*inst::SD),
             Self::JR => Some(&*inst::JR),
             // Self::MOVSDrm64 => Some(&*inst::MOVSDrm64),
             // Self::MOVSDmr => Some(&*inst::MOVSDmr),
