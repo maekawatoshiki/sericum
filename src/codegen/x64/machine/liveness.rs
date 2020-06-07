@@ -659,6 +659,7 @@ impl LivenessAnalysis {
     }
 
     fn set_def_on_inst(&mut self, bb: &MachineBasicBlock, inst: &MachineInst) {
+        bb.liveness_ref_mut().has_call |= inst.opcode == MachineOpcode::CALL;
         for &reg in &inst.def {
             bb.liveness.borrow_mut().add_def(reg);
         }

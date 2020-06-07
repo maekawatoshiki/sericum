@@ -40,6 +40,7 @@ pub struct LivenessInfo {
     pub def: FxHashSet<RegisterId>,
     pub live_in: FxHashSet<RegisterId>,
     pub live_out: FxHashSet<RegisterId>,
+    pub has_call: bool,
 }
 
 impl BasicBlockTrait for MachineBasicBlock {
@@ -127,6 +128,7 @@ impl LivenessInfo {
             def: FxHashSet::default(),
             live_in: FxHashSet::default(),
             live_out: FxHashSet::default(),
+            has_call: false,
         }
     }
 
@@ -266,6 +268,7 @@ impl LivenessInfo {
 
     pub fn clear(&mut self) {
         self.phys_def = PhysRegSet::new();
+        self.has_call = false;
         self.def.clear();
         self.live_in.clear();
         self.live_out.clear();

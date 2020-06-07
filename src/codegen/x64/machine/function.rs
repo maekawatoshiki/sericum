@@ -65,6 +65,12 @@ impl MachineFunctionBody {
             nth: 0,
         }
     }
+
+    pub fn has_call(&self) -> bool {
+        self.basic_blocks
+            .id_and_block()
+            .any(|(_, block)| block.liveness_ref().has_call)
+    }
 }
 
 impl FunctionTrait for MachineFunction {

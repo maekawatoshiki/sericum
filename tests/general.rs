@@ -670,10 +670,8 @@ fibo:
 main:
 .L4:
   push rbp
-  mov rbp, rsp
   mov edi, 10
   call fibo
-  mov rsp, rbp
   pop rbp
   ret
 ",
