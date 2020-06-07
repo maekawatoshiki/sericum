@@ -77,9 +77,9 @@ impl LiveRegMatrix {
         }
     }
 
-    pub fn contains_vreg_entity(&self, vreg: &MachineRegister) -> bool {
-        self.vreg2entity.contains_key(&vreg.get_vreg())
-    }
+    // pub fn contains_vreg_entity(&self, vreg: &MachineRegister) -> bool {
+    //     self.vreg2entity.contains_key(&vreg.get_vreg())
+    // }
 
     pub fn add_vreg_entity(&mut self, reg: RegisterId) {
         self.vreg2entity.insert(reg.as_virt_reg(), reg);
@@ -659,7 +659,7 @@ impl LivenessAnalysis {
     }
 
     fn set_def_on_inst(&mut self, bb: &MachineBasicBlock, inst: &MachineInst) {
-        bb.liveness_ref_mut().has_call |= inst.opcode == MachineOpcode::CALL;
+        // bb.liveness_ref_mut().has_call |= inst.opcode == MachineOpcode::CALL;
         for &reg in &inst.def {
             bb.liveness.borrow_mut().add_def(reg);
         }

@@ -1,5 +1,5 @@
 use super::super::{
-    dag::mc_convert::{mov_mx, mov_rx},
+    // dag::mc_convert::{mov_mx, mov_rx},
     frame_object::*,
     register::*,
 };
@@ -58,7 +58,7 @@ impl RegisterAllocator {
         // debug!(println!("after coalesing {:?}", cur_func));
 
         // TODO: preserve_phys_reg_uses_across_call
-        self.preserve_reg_uses_across_call(tys, cur_func, &mut matrix);
+        // self.preserve_reg_uses_across_call(tys, cur_func, &mut matrix);
 
         self.queue = matrix.collect_virt_regs().into_iter().collect();
         self.sort_queue(&matrix); // for better allocation. not necessary
@@ -168,141 +168,141 @@ impl RegisterAllocator {
         }
     }
 
-    fn insert_inst_to_save_reg(
-        &mut self,
-        tys: &Types,
-        cur_func: &mut MachineFunction,
-        matrix: &mut LiveRegMatrix,
-        occupied: &mut FxHashSet<FrameIndexKind>,
-        call_inst_id: MachineInstId,
-    ) {
-        // TODO: Refine code. It's hard to understand.
-        fn find_unused_slot(
-            cur_func: &mut MachineFunction,
-            occupied: &mut FxHashSet<FrameIndexKind>,
-            r: RegisterId,
-        ) -> FrameIndexInfo {
-            let rc = cur_func.regs_info.arena_ref()[r].reg_class;
-            for slot in &*cur_func.local_mgr.locals {
-                if occupied.contains(&slot.idx) {
-                    continue;
-                }
-                if Some(rc) == ty2rc(&slot.ty) {
-                    occupied.insert(slot.idx);
-                    return slot.clone();
-                }
-            }
-            let slot = cur_func.local_mgr.alloc(&rc2ty(rc));
-            occupied.insert(slot.idx);
-            slot
-        }
-
-        let call_inst_pp = matrix.get_program_point(call_inst_id).unwrap();
-        let mut regs_to_save = FxHashSet::default();
-
-        // TODO: So slow. Any better algorithms?
-        {
-            let bb_containing_call =
-                &cur_func.body.basic_blocks.arena[cur_func.body.inst_arena[call_inst_id].parent];
-            let liveness = bb_containing_call.liveness_ref();
-            let mut regs_that_may_interfere = &liveness.def | &liveness.live_in;
-            // remove registers like rbp, rsp, rax...
-            for def in cur_func.body.inst_arena[call_inst_id]
-                .collect_defined_regs()
-                .iter()
-                .filter(|def| def.is_phys_reg())
-            {
-                regs_that_may_interfere.remove(def);
-            }
-            let range = LiveRange::new(vec![LiveSegment::new(call_inst_pp, call_inst_pp)]);
-            for r in &regs_that_may_interfere {
-                if (r.is_virt_reg() && matrix.interferes_with_range(r.as_virt_reg(), &range))
-                    || (r.is_phys_reg()
-                        && matrix.interferes_phys_with_range(r.as_phys_reg(), &range))
-                {
-                    regs_to_save.insert(*r);
-                }
-            }
-        }
-
-        // debug!(println!("REG TO SAVE: {:?}", regs_to_save));
-
-        let mut slots_to_save_regs = vec![];
-        for r in &regs_to_save {
-            slots_to_save_regs.push(find_unused_slot(cur_func, occupied, *r));
-        }
-
-        // debug!(println!("NEW SLOTS: {:?}", slots_to_save_regs));
-
-        let call_inst_parent = cur_func.body.inst_arena[call_inst_id].parent;
-
-        for (frinfo, reg) in slots_to_save_regs.into_iter().zip(regs_to_save.into_iter()) {
-            let dst = MachineOperand::FrameIndex(frinfo.clone());
-            let src = MachineOperand::Register(reg);
-            let rbp = cur_func.regs_info.get_phys_reg(GR64::RBP);
-            let store_inst_id = cur_func.alloc_inst(MachineInst::new(
-                &cur_func.regs_info,
-                mov_mx(&cur_func.regs_info, &src).unwrap(),
-                vec![
-                    MachineOperand::Mem(MachineMemOperand::BaseFi(rbp, *dst.as_frame_index())),
-                    src,
-                ],
-                None,
-                call_inst_parent,
-            ));
-
-            let src = MachineOperand::FrameIndex(frinfo);
-
-            let load_inst_id = cur_func.alloc_inst(
-                MachineInst::new_simple(
-                    mov_rx(tys, &cur_func.regs_info, &src).unwrap(),
-                    vec![MachineOperand::Mem(MachineMemOperand::BaseFi(
-                        rbp,
-                        *src.as_frame_index(),
-                    ))],
-                    call_inst_parent,
-                )
-                .with_def(vec![reg]),
-            );
-
-            let mut builder = BuilderWithLiveInfoEdit::new(matrix, cur_func);
-
-            builder.set_insert_point_before_inst(call_inst_id);
-            builder.insert(store_inst_id);
-
-            builder.set_insert_point_after_inst(call_inst_id);
-            builder.insert(load_inst_id);
-        }
-    }
-
-    fn preserve_reg_uses_across_call(
-        &mut self,
-        tys: &Types,
-        cur_func: &mut MachineFunction,
-        matrix: &mut LiveRegMatrix,
-    ) {
-        let mut call_inst_id = vec![];
-
-        for (_, bb) in cur_func.body.basic_blocks.id_and_block() {
-            for inst_id in bb.iseq_ref().iter() {
-                let inst = &cur_func.body.inst_arena[*inst_id];
-                if inst.opcode == MachineOpcode::CALL {
-                    call_inst_id.push(*inst_id)
-                }
-            }
-        }
-
-        let occupied = cur_func
-            .local_mgr
-            .locals
-            .iter()
-            .map(|l| l.idx)
-            .collect::<FxHashSet<_>>();
-
-        for inst_id in call_inst_id {
-            self.insert_inst_to_save_reg(tys, cur_func, matrix, &mut occupied.clone(), inst_id);
-        }
-    }
+    // fn insert_inst_to_save_reg(
+    //     &mut self,
+    //     tys: &Types,
+    //     cur_func: &mut MachineFunction,
+    //     matrix: &mut LiveRegMatrix,
+    //     occupied: &mut FxHashSet<FrameIndexKind>,
+    //     call_inst_id: MachineInstId,
+    // ) {
+    //     // TODO: Refine code. It's hard to understand.
+    //     fn find_unused_slot(
+    //         cur_func: &mut MachineFunction,
+    //         occupied: &mut FxHashSet<FrameIndexKind>,
+    //         r: RegisterId,
+    //     ) -> FrameIndexInfo {
+    //         let rc = cur_func.regs_info.arena_ref()[r].reg_class;
+    //         for slot in &*cur_func.local_mgr.locals {
+    //             if occupied.contains(&slot.idx) {
+    //                 continue;
+    //             }
+    //             if Some(rc) == ty2rc(&slot.ty) {
+    //                 occupied.insert(slot.idx);
+    //                 return slot.clone();
+    //             }
+    //         }
+    //         let slot = cur_func.local_mgr.alloc(&rc2ty(rc));
+    //         occupied.insert(slot.idx);
+    //         slot
+    //     }
+    //
+    //     let call_inst_pp = matrix.get_program_point(call_inst_id).unwrap();
+    //     let mut regs_to_save = FxHashSet::default();
+    //
+    //     // TODO: So slow. Any better algorithms?
+    //     {
+    //         let bb_containing_call =
+    //             &cur_func.body.basic_blocks.arena[cur_func.body.inst_arena[call_inst_id].parent];
+    //         let liveness = bb_containing_call.liveness_ref();
+    //         let mut regs_that_may_interfere = &liveness.def | &liveness.live_in;
+    //         // remove registers like rbp, rsp, rax...
+    //         for def in cur_func.body.inst_arena[call_inst_id]
+    //             .collect_defined_regs()
+    //             .iter()
+    //             .filter(|def| def.is_phys_reg())
+    //         {
+    //             regs_that_may_interfere.remove(def);
+    //         }
+    //         let range = LiveRange::new(vec![LiveSegment::new(call_inst_pp, call_inst_pp)]);
+    //         for r in &regs_that_may_interfere {
+    //             if (r.is_virt_reg() && matrix.interferes_with_range(r.as_virt_reg(), &range))
+    //                 || (r.is_phys_reg()
+    //                     && matrix.interferes_phys_with_range(r.as_phys_reg(), &range))
+    //             {
+    //                 regs_to_save.insert(*r);
+    //             }
+    //         }
+    //     }
+    //
+    //     // debug!(println!("REG TO SAVE: {:?}", regs_to_save));
+    //
+    //     let mut slots_to_save_regs = vec![];
+    //     for r in &regs_to_save {
+    //         slots_to_save_regs.push(find_unused_slot(cur_func, occupied, *r));
+    //     }
+    //
+    //     // debug!(println!("NEW SLOTS: {:?}", slots_to_save_regs));
+    //
+    //     let call_inst_parent = cur_func.body.inst_arena[call_inst_id].parent;
+    //
+    //     for (frinfo, reg) in slots_to_save_regs.into_iter().zip(regs_to_save.into_iter()) {
+    //         let dst = MachineOperand::FrameIndex(frinfo.clone());
+    //         let src = MachineOperand::Register(reg);
+    //         let rbp = cur_func.regs_info.get_phys_reg(GR64::RBP);
+    //         let store_inst_id = cur_func.alloc_inst(MachineInst::new(
+    //             &cur_func.regs_info,
+    //             mov_mx(&cur_func.regs_info, &src).unwrap(),
+    //             vec![
+    //                 MachineOperand::Mem(MachineMemOperand::BaseFi(rbp, *dst.as_frame_index())),
+    //                 src,
+    //             ],
+    //             None,
+    //             call_inst_parent,
+    //         ));
+    //
+    //         let src = MachineOperand::FrameIndex(frinfo);
+    //
+    //         let load_inst_id = cur_func.alloc_inst(
+    //             MachineInst::new_simple(
+    //                 mov_rx(tys, &cur_func.regs_info, &src).unwrap(),
+    //                 vec![MachineOperand::Mem(MachineMemOperand::BaseFi(
+    //                     rbp,
+    //                     *src.as_frame_index(),
+    //                 ))],
+    //                 call_inst_parent,
+    //             )
+    //             .with_def(vec![reg]),
+    //         );
+    //
+    //         let mut builder = BuilderWithLiveInfoEdit::new(matrix, cur_func);
+    //
+    //         builder.set_insert_point_before_inst(call_inst_id);
+    //         builder.insert(store_inst_id);
+    //
+    //         builder.set_insert_point_after_inst(call_inst_id);
+    //         builder.insert(load_inst_id);
+    //     }
+    // }
+    //
+    // fn preserve_reg_uses_across_call(
+    //     &mut self,
+    //     tys: &Types,
+    //     cur_func: &mut MachineFunction,
+    //     matrix: &mut LiveRegMatrix,
+    // ) {
+    //     let mut call_inst_id = vec![];
+    //
+    //     for (_, bb) in cur_func.body.basic_blocks.id_and_block() {
+    //         for inst_id in bb.iseq_ref().iter() {
+    //             let inst = &cur_func.body.inst_arena[*inst_id];
+    //             // if inst.opcode == MachineOpcode::CALL {
+    //             //     call_inst_id.push(*inst_id)
+    //             // }
+    //         }
+    //     }
+    //
+    //     let occupied = cur_func
+    //         .local_mgr
+    //         .locals
+    //         .iter()
+    //         .map(|l| l.idx)
+    //         .collect::<FxHashSet<_>>();
+    //
+    //     for inst_id in call_inst_id {
+    //         self.insert_inst_to_save_reg(tys, cur_func, matrix, &mut occupied.clone(), inst_id);
+    //     }
+    // }
 }
 
 impl<'a> AllocationOrder<'a> {

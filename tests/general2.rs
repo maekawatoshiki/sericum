@@ -61,31 +61,32 @@ fn assemble_and_run(c_parent: &str, s_target: &str) {
 }
 
 fn compile_and_run(c_parent: &str, module: &mut Module) {
-    // let machine_module = standard_conversion_into_machine_module(module);
-    // let mut printer = MachineAsmPrinter::new();
-    // printer.run_on_module(&machine_module);
-    // println!("{}", printer.output);
+    let machine_module = standard_conversion_into_machine_module(module);
+    let mut printer = MachineAsmPrinter::new();
+    println!("{:?}", machine_module);
+    printer.run_on_module(&machine_module);
+    println!("{}", printer.output);
     assemble_and_run(
         c_parent,
         "
-	.text
-	.globl test	
-test:
-	addi	sp,sp,-16
-	sd	s0,8(sp)
-	addi	s0,sp,16
+        	.text
+        	.globl test
+        test:
+        	addi	sp,sp,-16
+        	sd	s0,8(sp)
+        	addi	s0,sp,16
 
 
-	li	a5,42
-	mv	a0,a5
+        	li	a5,42
+        	mv	a0,a5
 
 
-	ld	s0,8(sp)
-	addi	sp,sp,16
+        	ld	s0,8(sp)
+        	addi	sp,sp,16
 
 
-	jr	ra
-        ",
+        	jr	ra
+                ",
     );
 }
 
