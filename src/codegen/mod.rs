@@ -1,4 +1,4 @@
-pub mod x64;
+pub mod riscv64;
 
 thread_local! {
      pub static INTERNALS: Vec<String> = include!("internals").iter().map(|s| s.to_string()).collect();
