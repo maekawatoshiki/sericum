@@ -116,9 +116,10 @@ fn asm_add() {
     cilk_ir!(m; define [i32] test [] {
         entry:
             i = alloca i32;
-            store (i32 40), (%i);
+            store (i32 20), (%i);
             li = load (%i);
-            a = add (%li), (i32 2);
+            a = add (%li), (i32 1);
+            a = add (%a), (%a);
             ret (%a);
     });
     compile_and_run(
