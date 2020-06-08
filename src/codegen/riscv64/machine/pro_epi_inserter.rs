@@ -97,8 +97,7 @@ impl PrologueEpilogueInserter {
             MachineOpcode::SD,
             vec![
                 MachineOperand::Register(s0),
-                MachineOperand::Constant(MachineConstant::Int32(adjust - 8)),
-                MachineOperand::Register(sp),
+                MachineOperand::Mem(MachineMemOperand::ImmReg(adjust - 8, sp)),
             ],
             builder.get_cur_bb().unwrap(),
         );
@@ -149,10 +148,10 @@ impl PrologueEpilogueInserter {
             let sp = cur_func.regs_info.get_phys_reg(GPR::SP);
             let ld = MachineInst::new_simple(
                 MachineOpcode::LD,
-                vec![
-                    MachineOperand::Constant(MachineConstant::Int32(adjust - 8)),
-                    MachineOperand::Register(sp),
-                ],
+                vec![MachineOperand::Mem(MachineMemOperand::ImmReg(
+                    adjust - 8,
+                    sp,
+                ))],
                 bb_id,
             )
             .with_def(vec![s0]);

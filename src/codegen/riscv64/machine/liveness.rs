@@ -684,21 +684,24 @@ impl LivenessAnalysis {
     ) {
         for operand in &inst.operand {
             // live_in and live_out should contain no assigned(physical) registers
-            match operand {
-                MachineOperand::Register(reg)
-                | MachineOperand::Mem(MachineMemOperand::BaseFi(reg, _))
-                | MachineOperand::Mem(MachineMemOperand::BaseFiOff(reg, _, _))
-                | MachineOperand::Mem(MachineMemOperand::BaseOff(reg, _))
-                | MachineOperand::Mem(MachineMemOperand::Base(reg)) => {
-                    self.propagate(cur_func, bb, *reg)
-                }
-                MachineOperand::Mem(MachineMemOperand::BaseAlignOff(reg, _, reg2))
-                | MachineOperand::Mem(MachineMemOperand::BaseFiAlignOff(reg, _, _, reg2)) => {
-                    self.propagate(cur_func, bb, *reg);
-                    self.propagate(cur_func, bb, *reg2);
-                }
-                _ => {}
+            for &r in operand.registers() {
+                self.propagate(cur_func, bb, r)
             }
+            // match operand {
+            //     MachineOperand::Register(reg)
+            //     | MachineOperand::Mem(MachineMemOperand::BaseFi(reg, _))
+            //     | MachineOperand::Mem(MachineMemOperand::BaseFiOff(reg, _, _))
+            //     | MachineOperand::Mem(MachineMemOperand::BaseOff(reg, _))
+            //     | MachineOperand::Mem(MachineMemOperand::Base(reg)) => {
+            //         self.propagate(cur_func, bb, *reg)
+            //     }
+            //     MachineOperand::Mem(MachineMemOperand::BaseAlignOff(reg, _, reg2))
+            //     | MachineOperand::Mem(MachineMemOperand::BaseFiAlignOff(reg, _, _, reg2)) => {
+            //         self.propagate(cur_func, bb, *reg);
+            //         self.propagate(cur_func, bb, *reg2);
+            //     }
+            //     _ => {}
+            // }
         }
     }
 

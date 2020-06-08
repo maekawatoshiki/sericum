@@ -147,10 +147,9 @@ impl MachineAsmPrinter {
     }
 
     fn run_on_inst_li(&mut self, i: &MachineInst) {
-        self.output.push_str("li ");
         self.output.push_str(
             format!(
-                "{}, {}",
+                "li {}, {}",
                 i.def[0].as_phys_reg().name(),
                 operand2string(None, &i.operand[0]),
             )
@@ -161,10 +160,9 @@ impl MachineAsmPrinter {
     fn run_on_inst_lw(&mut self, fo: &FrameObjectsInfo, i: &MachineInst) {
         self.output.push_str(
             format!(
-                "lw {}, {}({})",
+                "lw {}, {}",
                 i.def[0].as_phys_reg().name(),
                 operand2string(Some(fo), &i.operand[0]),
-                i.operand[1].as_register().as_phys_reg().name(),
             )
             .as_str(),
         );
@@ -173,10 +171,9 @@ impl MachineAsmPrinter {
     fn run_on_inst_ld(&mut self, fo: &FrameObjectsInfo, i: &MachineInst) {
         self.output.push_str(
             format!(
-                "ld {}, {}({})",
+                "ld {}, {}",
                 i.def[0].as_phys_reg().name(),
                 operand2string(Some(fo), &i.operand[0]),
-                i.operand[1].as_register().as_phys_reg().name(),
             )
             .as_str(),
         );
@@ -185,10 +182,9 @@ impl MachineAsmPrinter {
     fn run_on_inst_sw(&mut self, fo: &FrameObjectsInfo, i: &MachineInst) {
         self.output.push_str(
             format!(
-                "sw {}, {}({})",
+                "sw {}, {}",
                 i.operand[0].as_register().as_phys_reg().name(),
                 operand2string(Some(fo), &i.operand[1]),
-                i.operand[2].as_register().as_phys_reg().name(),
             )
             .as_str(),
         );
@@ -197,10 +193,9 @@ impl MachineAsmPrinter {
     fn run_on_inst_sd(&mut self, fo: &FrameObjectsInfo, i: &MachineInst) {
         self.output.push_str(
             format!(
-                "sd {}, {}({})",
+                "sd {}, {}",
                 i.operand[0].as_register().as_phys_reg().name(),
                 operand2string(Some(fo), &i.operand[1]),
-                i.operand[2].as_register().as_phys_reg().name(),
             )
             .as_str(),
         );
@@ -456,9 +451,17 @@ fn operand2string(fo: Option<&FrameObjectsInfo>, operand: &MachineOperand) -> St
         MachineOperand::Constant(MachineConstant::Int32(i)) => format!("{}", i),
         MachineOperand::Register(r) => r.as_phys_reg().name().to_string(),
         MachineOperand::FrameIndex(i) => format!("{}", fo.unwrap().offset(i.idx).unwrap()),
-        // MachineOperand::Mem(MachineMemOperand::Address(AddressKind::FunctionName(name))) => {
-        //     self.output.push_str(name.as_str())
-        // }
+        MachineOperand::Mem(MachineMemOperand::FiReg(fi, r)) => format!(
+            "{}({})",
+            fo.unwrap().offset(fi.idx).unwrap(),
+            r.as_phys_reg().name()
+        ),
+        MachineOperand::Mem(MachineMemOperand::ImmReg(imm, r)) => {
+            format!("{}({})", imm, r.as_phys_reg().name())
+        }
+        MachineOperand::Mem(MachineMemOperand::Address(AddressKind::FunctionName(name))) => {
+            name.clone()
+        }
         _ => unimplemented!(),
     }
 }

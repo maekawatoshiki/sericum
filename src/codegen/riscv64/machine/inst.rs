@@ -64,12 +64,14 @@ pub enum MachineOperand {
 // TODO: target dependent
 #[derive(Debug, Clone)]
 pub enum MachineMemOperand {
-    BaseFi(RegisterId, FrameIndexInfo),
-    BaseFiOff(RegisterId, FrameIndexInfo, i32), // base, fi, off
-    BaseFiAlignOff(RegisterId, FrameIndexInfo, i32, RegisterId), // base, fi, align, off
-    BaseAlignOff(RegisterId, i32, RegisterId),  // base, align, off
-    BaseOff(RegisterId, i32),
-    Base(RegisterId),
+    FiReg(FrameIndexInfo, RegisterId),
+    ImmReg(i32, RegisterId),
+    // BaseFi(RegisterId, FrameIndexInfo),
+    // BaseFiOff(RegisterId, FrameIndexInfo, i32), // base, fi, off
+    // BaseFiAlignOff(RegisterId, FrameIndexInfo, i32, RegisterId), // base, fi, align, off
+    // BaseAlignOff(RegisterId, i32, RegisterId),  // base, align, off
+    // BaseOff(RegisterId, i32),
+    // Base(RegisterId),
     Address(AddressKind),
 }
 
@@ -677,24 +679,14 @@ impl MachineOperand {
 impl MachineMemOperand {
     pub fn registers(&self) -> Vec<&RegisterId> {
         match self {
-            MachineMemOperand::BaseFi(r, _)
-            | MachineMemOperand::BaseFiOff(r, _, _)
-            | MachineMemOperand::BaseOff(r, _)
-            | MachineMemOperand::Base(r) => vec![r],
-            MachineMemOperand::BaseAlignOff(r, _, r2)
-            | MachineMemOperand::BaseFiAlignOff(r, _, _, r2) => vec![r, r2],
+            MachineMemOperand::ImmReg(_, r) | MachineMemOperand::FiReg(_, r) => vec![r],
             MachineMemOperand::Address(_) => vec![],
         }
     }
 
     pub fn registers_mut(&mut self) -> Vec<&mut RegisterId> {
         match self {
-            MachineMemOperand::BaseFi(r, _)
-            | MachineMemOperand::BaseFiOff(r, _, _)
-            | MachineMemOperand::BaseOff(r, _)
-            | MachineMemOperand::Base(r) => vec![r],
-            MachineMemOperand::BaseAlignOff(r, _, r2)
-            | MachineMemOperand::BaseFiAlignOff(r, _, _, r2) => vec![r, r2],
+            MachineMemOperand::ImmReg(_, r) | MachineMemOperand::FiReg(_, r) => vec![r],
             MachineMemOperand::Address(_) => vec![],
         }
     }

@@ -134,13 +134,13 @@ impl MISelector {
             // }
             (ir.Load a) {
                 (ir.FIAddr b) a {
-                    mem32 b => (mi.LW b, %s0)
+                    mem32 b => (mi.LW [FiReg b, %s0])
                 }
             }
             (ir.Store a, b) {
                 (ir.FIAddr c) a {
                     mem32 c {
-                        imm32 b => (mi.SW (mi.LI b), c, %s0)
+                        imm32 b => (mi.SW (mi.LI b), [FiReg c, %s0])
                     }
                 }
             }

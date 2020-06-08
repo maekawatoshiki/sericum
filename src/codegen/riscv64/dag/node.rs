@@ -106,11 +106,12 @@ pub enum AddressKind {
 // TODO: target dependent
 #[derive(Debug, Clone, PartialEq)]
 pub enum MemNodeKind {
-    BaseFi,
-    BaseFiOff,
-    BaseFiAlignOff,
-    BaseAlignOff,
-    Base,
+    FiReg,
+    // BaseFi,
+    // BaseFiOff,
+    // BaseFiAlignOff,
+    // BaseAlignOff,
+    // Base,
 }
 
 impl Into<CondKind> for ICmpKind {

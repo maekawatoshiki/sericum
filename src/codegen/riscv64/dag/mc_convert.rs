@@ -557,31 +557,35 @@ impl<'a> ConversionInfo<'a> {
             NodeKind::Operand(OperandNodeKind::BasicBlock(_)) => unimplemented!(),
             NodeKind::Operand(OperandNodeKind::Register(ref r)) => MachineOperand::Register(*r),
             NodeKind::Operand(OperandNodeKind::Mem(ref mem)) => match mem {
-                MemNodeKind::Base => MachineOperand::Mem(MachineMemOperand::Base(
-                    *self.normal_operand(node.operand[0]).as_register(),
+                MemNodeKind::FiReg => MachineOperand::Mem(MachineMemOperand::FiReg(
+                    *self.normal_operand(node.operand[0]).as_frame_index(),
+                    *self.normal_operand(node.operand[1]).as_register(),
                 )),
-                MemNodeKind::BaseAlignOff => MachineOperand::Mem(MachineMemOperand::BaseAlignOff(
-                    *self.normal_operand(node.operand[0]).as_register(),
-                    self.normal_operand(node.operand[1]).as_constant().as_i32(),
-                    *self.normal_operand(node.operand[2]).as_register(),
-                )),
-                MemNodeKind::BaseFi => MachineOperand::Mem(MachineMemOperand::BaseFi(
-                    *self.normal_operand(node.operand[0]).as_register(),
-                    *self.normal_operand(node.operand[1]).as_frame_index(),
-                )),
-                MemNodeKind::BaseFiAlignOff => {
-                    MachineOperand::Mem(MachineMemOperand::BaseFiAlignOff(
-                        *self.normal_operand(node.operand[0]).as_register(),
-                        *self.normal_operand(node.operand[1]).as_frame_index(),
-                        self.normal_operand(node.operand[2]).as_constant().as_i32(),
-                        *self.normal_operand(node.operand[3]).as_register(),
-                    ))
-                }
-                MemNodeKind::BaseFiOff => MachineOperand::Mem(MachineMemOperand::BaseFiOff(
-                    *self.normal_operand(node.operand[0]).as_register(),
-                    *self.normal_operand(node.operand[1]).as_frame_index(),
-                    self.normal_operand(node.operand[2]).as_constant().as_i32(),
-                )),
+                // MemNodeKind::Base => MachineOperand::Mem(MachineMemOperand::Base(
+                //     *self.normal_operand(node.operand[0]).as_register(),
+                // )),
+                // MemNodeKind::BaseAlignOff => MachineOperand::Mem(MachineMemOperand::BaseAlignOff(
+                //     *self.normal_operand(node.operand[0]).as_register(),
+                //     self.normal_operand(node.operand[1]).as_constant().as_i32(),
+                //     *self.normal_operand(node.operand[2]).as_register(),
+                // )),
+                // MemNodeKind::BaseFi => MachineOperand::Mem(MachineMemOperand::BaseFi(
+                //     *self.normal_operand(node.operand[0]).as_register(),
+                //     *self.normal_operand(node.operand[1]).as_frame_index(),
+                // )),
+                // MemNodeKind::BaseFiAlignOff => {
+                //     MachineOperand::Mem(MachineMemOperand::BaseFiAlignOff(
+                //         *self.normal_operand(node.operand[0]).as_register(),
+                //         *self.normal_operand(node.operand[1]).as_frame_index(),
+                //         self.normal_operand(node.operand[2]).as_constant().as_i32(),
+                //         *self.normal_operand(node.operand[3]).as_register(),
+                //     ))
+                // }
+                // MemNodeKind::BaseFiOff => MachineOperand::Mem(MachineMemOperand::BaseFiOff(
+                //     *self.normal_operand(node.operand[0]).as_register(),
+                //     *self.normal_operand(node.operand[1]).as_frame_index(),
+                //     self.normal_operand(node.operand[2]).as_constant().as_i32(),
+                // )),
             },
             NodeKind::None => MachineOperand::None,
             _ => MachineOperand::Register(self.convert_dag(node).unwrap()),
