@@ -65,6 +65,11 @@ impl MISelector {
         let mut selected = isel_pat!(
             // TODO: Refactoring
             // (ir.Call _a) => { self.select_call(tys, regs_info, heap, node) }
+            (ir.Add a, b) {
+                GPR a {
+                    imm32 b => (mi.ADDIW a, b)
+                }
+            }
             // (ir.Add a, b) {
             //     GR32 a {
             //         GR32  b => (mi.ADDrr32   a, b)

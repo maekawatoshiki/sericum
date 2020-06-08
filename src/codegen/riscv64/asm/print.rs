@@ -76,6 +76,7 @@ impl MachineAsmPrinter {
 
         match inst.opcode {
             MachineOpcode::ADDI => self.run_on_inst_addi(inst),
+            MachineOpcode::ADDIW => self.run_on_inst_addiw(inst),
             MachineOpcode::MV => self.run_on_inst_mv(inst),
             MachineOpcode::LI => self.run_on_inst_li(inst),
             MachineOpcode::LW => self.run_on_inst_lw(fo, inst),
@@ -127,6 +128,18 @@ impl MachineAsmPrinter {
         self.output.push_str(
             format!(
                 "addi {}, {}, {}",
+                i.def[0].as_phys_reg().name(),
+                operand2string(None, &i.operand[0]),
+                operand2string(None, &i.operand[1])
+            )
+            .as_str(),
+        )
+    }
+
+    fn run_on_inst_addiw(&mut self, i: &MachineInst) {
+        self.output.push_str(
+            format!(
+                "addiw {}, {}, {}",
                 i.def[0].as_phys_reg().name(),
                 operand2string(None, &i.operand[0]),
                 operand2string(None, &i.operand[1])
