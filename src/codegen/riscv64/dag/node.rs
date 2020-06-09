@@ -156,6 +156,15 @@ impl ConstantKind {
         }
     }
 
+    pub fn neg(self) -> ConstantKind {
+        match self {
+            ConstantKind::Int8(i) => ConstantKind::Int8(-i),
+            ConstantKind::Int32(i) => ConstantKind::Int32(-i),
+            ConstantKind::Int64(i) => ConstantKind::Int64(-i),
+            ConstantKind::F64(f) => ConstantKind::F64(-f),
+        }
+    }
+
     pub fn is_power_of_two(&self) -> Option<u32> {
         match self {
             ConstantKind::Int32(x) if (*x as usize).is_power_of_two() => Some(x.trailing_zeros()),

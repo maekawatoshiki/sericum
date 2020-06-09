@@ -71,6 +71,7 @@ impl Legalize {
             // NodeKind::IR(IRNodeKind::Sext) => self.run_on_node_sext(tys, regs_info, heap, node),
             // NodeKind::IR(IRNodeKind::Brcc) => self.run_on_node_brcc(tys, regs_info, heap, node),
             // NodeKind::IR(IRNodeKind::FPBrcc) => self.run_on_node_fpbrcc(tys, regs_info, heap, node),
+            NodeKind::IR(IRNodeKind::Sub) => self.run_on_node_sub(tys, regs_info, heap, node),
             _ => {
                 self.run_on_node_operand(tys, regs_info, heap, node);
                 node
@@ -84,6 +85,37 @@ impl Legalize {
         }
 
         selected
+    }
+
+    fn run_on_node_sub(
+        &mut self,
+        tys: &Types,
+        regs_info: &RegistersInfo,
+        heap: &mut DAGHeap,
+        node: Raw<DAGNode>,
+    ) -> Raw<DAGNode> {
+        if node.kind == NodeKind::IR(IRNodeKind::Sub)
+            && node.operand[0].is_operation()
+            && node.operand[1].is_constant()
+        {
+            // TODO: Refine code
+            let op0 = self.run_on_node(tys, regs_info, heap, node.operand[0]);
+            let op1 = heap.alloc(DAGNode::new(
+                NodeKind::Operand(OperandNodeKind::Constant(
+                    node.operand[1].as_constant().neg(),
+                )),
+                vec![],
+                node.operand[1].ty,
+            ));
+            return heap.alloc(DAGNode::new(
+                NodeKind::IR(IRNodeKind::Add),
+                vec![op0, op1],
+                node.ty,
+            ));
+        }
+
+        self.run_on_node_operand(tys, regs_info, heap, node);
+        node
     }
 
     // fn run_on_node_load(

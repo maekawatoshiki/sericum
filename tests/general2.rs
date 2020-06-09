@@ -134,6 +134,29 @@ fn asm_add() {
     );
 }
 
+#[test]
+fn asm_sub() {
+    let mut m = Module::new("cilk");
+    cilk_ir!(m; define [i32] test [] {
+        entry:
+            i = alloca i32;
+            store (i32 20), (%i);
+            li = load (%i);
+            a = sub (%li), (i32 5);
+            ret (%a);
+    });
+    compile_and_run(
+        "
+    #include <assert.h>
+    extern int test();
+    int main() {
+        assert(test() == 15);
+    }
+            ",
+        &mut m,
+    );
+}
+
 // #[test]
 // fn asm_load_store() {
 //     let mut m = Module::new("cilk");

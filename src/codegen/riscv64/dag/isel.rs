@@ -69,6 +69,9 @@ impl MISelector {
                 GPR a {
                     imm32 b => (mi.ADDIW a, b)
                     GPR   b => (mi.ADDW  a, b) } }
+            // (ir.Sub a, b): Int32 {
+            //     GPR a {
+            //         imm32 b => (mi.ADDIW a, -b) } }
             // (ir.Add a, b) {
             //     GR32 a {
             //         GR32  b => (mi.ADDrr32   a, b)
