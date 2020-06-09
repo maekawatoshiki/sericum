@@ -1,3 +1,5 @@
+# Now trying to implement backend for RV64 (64bit risc-v) in 'riscv64' branch
+
 # Cilk
 
 [![CircleCI](https://circleci.com/gh/maekawatoshiki/cilk.svg?style=shield)](https://circleci.com/gh/maekawatoshiki/cilk)
