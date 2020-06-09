@@ -3,33 +3,32 @@
 use super::super::inst::DefOrUseReg;
 use super::super::machine::{basic_block::*, function::*, inst, inst::*, module::*};
 use super::super::register::*;
-use super::{basic_block::*, function::*, module::*, node, node::*};
-use crate::ir::types::*;
+use super::{function::*, module::*, node, node::*};
 use crate::util::allocator::*;
 use id_arena::*;
 use rustc_hash::FxHashMap;
 use std::cell::RefCell;
 
 pub struct ConversionInfo<'a> {
-    types: &'a Types,
+    // types: &'a Types,
     cur_func: &'a DAGFunction,
     machine_inst_arena: &'a mut InstructionArena,
     node_to_reg: FxHashMap<Raw<DAGNode>, Option<RegisterId>>,
     cur_bb: MachineBasicBlockId,
     iseq: &'a mut Vec<MachineInstId>,
-    bb_map: &'a FxHashMap<DAGBasicBlockId, MachineBasicBlockId>,
+    // bb_map: &'a FxHashMap<DAGBasicBlockId, MachineBasicBlockId>,
     node2minst: &'a mut FxHashMap<Raw<DAGNode>, MachineInstId>,
 }
 
 pub fn convert_module(module: DAGModule) -> MachineModule {
     let mut functions = Arena::new();
     for (_, func) in module.functions {
-        functions.alloc(convert_function(&module.types, func));
+        functions.alloc(convert_function(/*&module.types,*/ func));
     }
     MachineModule::new(module.name, functions, module.types)
 }
 
-pub fn convert_function(types: &Types, dag_func: DAGFunction) -> MachineFunction {
+pub fn convert_function(/*types: &Types,*/ dag_func: DAGFunction) -> MachineFunction {
     let mut bb_map = FxHashMap::default();
     let mut mbbs = MachineBasicBlocks::new();
 
@@ -61,13 +60,13 @@ pub fn convert_function(types: &Types, dag_func: DAGFunction) -> MachineFunction
         let mut iseq = vec![];
 
         ConversionInfo {
-            types,
+            // types,
             cur_func: &dag_func,
             machine_inst_arena: &mut machine_inst_arena,
             node_to_reg: FxHashMap::default(),
             cur_bb: bb_id,
             iseq: &mut iseq,
-            bb_map: &bb_map,
+            // bb_map: &bb_map,
             node2minst: &mut node2minst,
         }
         .convert_dag(node.entry.unwrap());
@@ -105,10 +104,10 @@ impl<'a> ConversionInfo<'a> {
             return Some(*machine_inst_id);
         }
 
-        #[rustfmt::skip]
-        macro_rules! bb {($id:expr)=>{ $id.as_basic_block() };}
-        #[rustfmt::skip]
-        macro_rules! cond_kind {($id:expr)=>{ $id.as_cond_kind() };}
+        // #[rustfmt::skip]
+        // macro_rules! bb {($id:expr)=>{ $id.as_basic_block() };}
+        // #[rustfmt::skip]
+        // macro_rules! cond_kind {($id:expr)=>{ $id.as_cond_kind() };}
 
         // there should be no NodeKind::IRs here
         let machine_inst_id = match &node.kind {
@@ -592,9 +591,9 @@ impl<'a> ConversionInfo<'a> {
         }
     }
 
-    fn get_machine_bb(&self, dag_bb_id: DAGBasicBlockId) -> MachineBasicBlockId {
-        *self.bb_map.get(&dag_bb_id).unwrap()
-    }
+    // fn get_machine_bb(&self, dag_bb_id: DAGBasicBlockId) -> MachineBasicBlockId {
+    //     *self.bb_map.get(&dag_bb_id).unwrap()
+    // }
 
     pub fn push_inst(&mut self, inst: MachineInst) -> MachineInstId {
         let inst_id = self

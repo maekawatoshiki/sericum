@@ -1,6 +1,5 @@
 use super::exec::roundup;
 use super::machine::function::MachineFunction;
-use super::register::ty2rc;
 use crate::ir::types::*;
 use rustc_hash::FxHashMap;
 use std::fmt;
@@ -48,7 +47,6 @@ impl LocalVariables {
 impl FrameObjectsInfo {
     pub fn new(tys: &Types, f: &MachineFunction) -> Self {
         let mut offset_map = FxHashMap::default();
-        let mut offset = 0;
         const SAVED_REG_SZ: usize = 8; // 8 is to save s0 register
         let mut total_size = SAVED_REG_SZ;
 
@@ -69,7 +67,7 @@ impl FrameObjectsInfo {
         // }
         // }
 
-        for FrameIndexInfo { idx, ty } in &f.local_mgr.locals {
+        for FrameIndexInfo { ty, .. } in &f.local_mgr.locals {
             total_size += ty.size_in_byte(tys);
         }
 

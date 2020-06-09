@@ -5,7 +5,7 @@ use super::{
     node::*,
 };
 use crate::{ir::types::*, traits::pass::ModulePassTrait, util::allocator::*};
-use defs::isel_pat;
+// use defs::isel_pat;
 use rustc_hash::FxHashMap;
 
 impl ModulePassTrait for Legalize {

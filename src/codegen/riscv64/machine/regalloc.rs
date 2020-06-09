@@ -1,14 +1,9 @@
-use super::super::{
-    // dag::mc_convert::{mov_mx, mov_rx},
-    frame_object::*,
-    register::*,
-};
+use super::super::register::*;
 use super::calc_spill_weight::calc_spill_weight;
 use super::reg_coalescer::coalesce_function;
 // use super::spiller::Spiller;
-use super::{builder::*, function::*, inst::*, liveness::*, module::*};
-use crate::{ir::types::Types, traits::pass::ModulePassTrait};
-use rustc_hash::FxHashSet;
+use super::{function::*, liveness::*, module::*};
+use crate::traits::pass::ModulePassTrait;
 use std::collections::VecDeque;
 
 pub struct RegisterAllocator {
@@ -44,11 +39,11 @@ impl RegisterAllocator {
             if func.is_internal {
                 continue;
             }
-            self.run_on_function(&module.types, func);
+            self.run_on_function(/*&module.types,*/ func);
         }
     }
 
-    pub fn run_on_function(&mut self, tys: &Types, cur_func: &mut MachineFunction) {
+    pub fn run_on_function(&mut self, /*tys: &Types,*/ cur_func: &mut MachineFunction) {
         let mut matrix = LivenessAnalysis::new().analyze_function(cur_func);
         calc_spill_weight(cur_func, &mut matrix);
 

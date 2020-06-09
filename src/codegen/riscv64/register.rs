@@ -1,4 +1,4 @@
-use super::machine::inst::{MachineInstId, RegisterBase};
+use super::machine::inst::MachineInstId;
 use crate::ir::types::*;
 use id_arena::{Arena, Id};
 use rustc_hash::{FxHashMap, FxHashSet};

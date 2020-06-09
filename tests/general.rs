@@ -1,10 +1,10 @@
-use cilk::{
-    // codegen::riscv::exec,
-    ir::builder::FuncRef,
-    // exec::{interpreter::interp, jit::x64::compiler},
-    ir::{builder, opcode, types, value},
-    *,
-};
+// use cilk::{
+//     // codegen::riscv::exec,
+//     ir::builder::FuncRef,
+//     // exec::{interpreter::interp, jit::x64::compiler},
+//     ir::{builder, opcode, types, value},
+//     *,
+// };
 
 // #[test]
 // fn test0_mem2reg() {

@@ -5,8 +5,7 @@ use super::super::machine::{
     inst::*,
     module::MachineModule,
 };
-use super::super::register::RegistersInfo;
-use crate::ir::types::{TypeSize, Types};
+use crate::ir::types::Types;
 
 pub struct MachineAsmPrinter {
     pub output: String,
@@ -41,34 +40,39 @@ impl MachineAsmPrinter {
 
         self.output.push_str(format!("{}:\n", f.name).as_str());
 
-        self.run_on_basic_blocks(tys, f, &fo);
+        self.run_on_basic_blocks(f, &fo);
     }
 
-    fn run_on_basic_blocks(&mut self, tys: &Types, f: &MachineFunction, fo: &FrameObjectsInfo) {
+    fn run_on_basic_blocks(
+        &mut self,
+        // tys: &Types,
+        f: &MachineFunction,
+        fo: &FrameObjectsInfo,
+    ) {
         for (id, _, inst_iter) in f.body.mbb_iter() {
             self.output
                 .push_str(format!("{}:\n", self.bb_id_to_label_id(&id)).as_str());
-            self.run_on_basic_block(tys, &f.regs_info, inst_iter, fo);
+            self.run_on_basic_block(inst_iter, fo);
         }
         self.cur_bb_id_base += f.body.basic_blocks.order.len();
     }
 
     fn run_on_basic_block<'a>(
         &mut self,
-        tys: &Types,
-        regs_info: &RegistersInfo,
+        // tys: &Types,
+        // regs_info: &RegistersInfo,
         inst_iter: InstIter<'a>,
         fo: &FrameObjectsInfo,
     ) {
         for (_, inst) in inst_iter {
-            self.run_on_inst(tys, regs_info, inst, fo);
+            self.run_on_inst(inst, fo);
         }
     }
 
     fn run_on_inst(
         &mut self,
-        tys: &Types,
-        regs_info: &RegistersInfo,
+        // tys: &Types,
+        // regs_info: &RegistersInfo,
         inst: &MachineInst,
         fo: &FrameObjectsInfo,
     ) {
@@ -366,14 +370,6 @@ fn operand2string(fo: Option<&FrameObjectsInfo>, operand: &MachineOperand) -> St
         MachineOperand::Mem(MachineMemOperand::Address(AddressKind::FunctionName(name))) => {
             name.clone()
         }
-        _ => unimplemented!(),
-    }
-}
-
-fn byte2word(byte: usize) -> &'static str {
-    match byte {
-        4 => "dword",
-        8 => "qword",
         _ => unimplemented!(),
     }
 }

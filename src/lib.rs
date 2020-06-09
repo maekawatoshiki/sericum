@@ -15,9 +15,8 @@ pub mod util;
 
 pub use ir::*;
 
-#[macro_use]
-extern crate dynasm;
 extern crate defs;
+extern crate dynasm;
 extern crate dynasmrt;
 extern crate id_arena;
 #[macro_use]

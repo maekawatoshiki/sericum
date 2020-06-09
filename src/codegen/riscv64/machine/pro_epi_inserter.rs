@@ -18,11 +18,11 @@ impl ModulePassTrait for PrologueEpilogueInserter {
     }
 }
 
-struct CopyArgs<'a> {
-    offset: i32,
-    builder: &'a mut Builder<'a>,
-    params_ty: &'a Vec<Type>,
-}
+// struct CopyArgs<'a> {
+//     offset: i32,
+//     builder: &'a mut Builder<'a>,
+//     params_ty: &'a Vec<Type>,
+// }
 
 impl PrologueEpilogueInserter {
     pub fn new() -> Self {
@@ -46,7 +46,7 @@ impl PrologueEpilogueInserter {
         let frame_info = FrameObjectsInfo::new(tys, cur_func);
         let down = self.calc_max_adjust_stack_down(cur_func);
         let adjust = roundup(frame_info.total_size() + down, 16);
-        self.insert_prologue(tys, cur_func, adjust);
+        self.insert_prologue(/*tys,*/ cur_func, adjust);
         self.insert_epilogue(cur_func, adjust);
     }
 
@@ -75,7 +75,11 @@ impl PrologueEpilogueInserter {
         down
     }
 
-    fn insert_prologue(&mut self, tys: &Types, cur_func: &mut MachineFunction, adjust: i32) {
+    fn insert_prologue(
+        &mut self,
+        /* tys: &Types, */ cur_func: &mut MachineFunction,
+        adjust: i32,
+    ) {
         let mut builder = Builder::new(cur_func);
         builder.set_insert_point_at_entry_bb();
 

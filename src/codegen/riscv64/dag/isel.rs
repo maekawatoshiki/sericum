@@ -205,43 +205,43 @@ impl MISelector {
         selected
     }
 
-    fn select_call(
-        &mut self,
-        tys: &Types,
-        regs_info: &RegistersInfo,
-        heap: &mut DAGHeap,
-        mut node: Raw<DAGNode>,
-    ) -> Raw<DAGNode> {
-        unimplemented!()
-        // const SQRT_F64: &str = "cilk.sqrt.f64";
-        // let supported = [SQRT_F64];
-        //
-        // let name = match &node.operand[0].kind {
-        //     NodeKind::Operand(OperandNodeKind::Address(AddressKind::FunctionName(name)))
-        //         if supported.contains(&name.as_str()) =>
-        //     {
-        //         name.as_str()
-        //     }
-        //     _ => {
-        //         node.operand = node
-        //             .operand
-        //             .iter()
-        //             .map(|op| self.run_on_node(tys, regs_info, heap, *op))
-        //             .collect();
-        //         return node;
-        //     }
-        // };
-        //
-        // match name {
-        //     SQRT_F64 => {
-        //         let x = self.run_on_node(tys, regs_info, heap, node.operand[1]);
-        //         heap.alloc(DAGNode::new(
-        //             NodeKind::MI(MINodeKind::SQRTSDrr),
-        //             vec![x],
-        //             Type::F64,
-        //         ))
-        //     }
-        //     _ => unreachable!(),
-        // }
-    }
+    // fn select_call(
+    //     &mut self,
+    //     tys: &Types,
+    //     regs_info: &RegistersInfo,
+    //     heap: &mut DAGHeap,
+    //     mut node: Raw<DAGNode>,
+    // ) -> Raw<DAGNode> {
+    //     unimplemented!()
+    // const SQRT_F64: &str = "cilk.sqrt.f64";
+    // let supported = [SQRT_F64];
+    //
+    // let name = match &node.operand[0].kind {
+    //     NodeKind::Operand(OperandNodeKind::Address(AddressKind::FunctionName(name)))
+    //         if supported.contains(&name.as_str()) =>
+    //     {
+    //         name.as_str()
+    //     }
+    //     _ => {
+    //         node.operand = node
+    //             .operand
+    //             .iter()
+    //             .map(|op| self.run_on_node(tys, regs_info, heap, *op))
+    //             .collect();
+    //         return node;
+    //     }
+    // };
+    //
+    // match name {
+    //     SQRT_F64 => {
+    //         let x = self.run_on_node(tys, regs_info, heap, node.operand[1]);
+    //         heap.alloc(DAGNode::new(
+    //             NodeKind::MI(MINodeKind::SQRTSDrr),
+    //             vec![x],
+    //             Type::F64,
+    //         ))
+    //     }
+    //     _ => unreachable!(),
+    // }
+    // }
 }

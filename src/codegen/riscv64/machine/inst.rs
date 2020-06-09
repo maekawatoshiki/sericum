@@ -1,18 +1,12 @@
 pub use super::super::inst::{TargetImmediate, TargetOpcode};
 use super::super::register::{
     rc2ty, PhysReg, RegisterClassKind, RegisterId, RegistersInfo, TargetRegisterTrait, VirtReg,
-    VirtRegGen, PHYS_REGISTERS_NUM,
 };
 use super::{basic_block::*, const_data::DataId, frame_object::*};
 use crate::ir::types::*;
 use id_arena::*;
 use rustc_hash::{FxHashMap, FxHashSet};
-use std::{
-    cell::{Ref, RefCell, RefMut},
-    fmt,
-    fmt::Debug,
-    rc::Rc,
-};
+use std::{cell::RefCell, fmt, fmt::Debug, rc::Rc};
 
 pub type MachineOpcode = TargetOpcode;
 pub type RegisterBaseRef = Rc<RefCell<RegisterBase>>;
