@@ -380,32 +380,11 @@ impl MachineInst {
 
 impl MachineOpcode {
     pub fn is_copy_like(&self) -> bool {
-        false
-        // matches!(
-        //     self,
-        //     MachineOpcode::MOVrr32
-        //         | MachineOpcode::MOVrr64
-        //         | MachineOpcode::Copy
-        //         | MachineOpcode::MOVSDrr
-        // )
+        matches!(self, MachineOpcode::MV)
     }
 
     pub fn is_terminator(&self) -> bool {
-        false
-        // matches!(
-        //     self,
-        //     MachineOpcode::Ret
-        //         | MachineOpcode::RET
-        //         | MachineOpcode::JMP
-        //         | MachineOpcode::BrCond
-        //         | MachineOpcode::JE
-        //         | MachineOpcode::JL
-        //         | MachineOpcode::JLE
-        //         | MachineOpcode::JA
-        //         | MachineOpcode::JAE
-        //         | MachineOpcode::JBE
-        //         | MachineOpcode::JB
-        // )
+        matches!(self, MachineOpcode::JR)
     }
 }
 
