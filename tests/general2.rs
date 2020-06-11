@@ -122,12 +122,32 @@ fn asm_add() {
             a = add (%a), (%a);
             ret (%a);
     });
+    cilk_ir!(m; define [i32] big [] {
+        entry:
+            i = alloca i32;
+            store (i32 23428042), (%i);
+            li = load (%i);
+            a = add (%li), (i32 1366270073);
+            ret (%a);
+    });
+    cilk_ir!(m; define [i32] big2 [] {
+        entry:
+            i = alloca i32;
+            store (i32 0x7fffffff), (%i);
+            li = load (%i);
+            a = add (i32 1), (%li);
+            ret (%a);
+    });
     compile_and_run(
         "
     #include <assert.h>
     extern int test();
+    extern int big();
+    extern int big2();
     int main() {
         assert(test() == 42);
+        assert(big() == 1389698115);
+        assert(big2() == -2147483648);
     }
             ",
         &mut m,

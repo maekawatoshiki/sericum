@@ -71,6 +71,7 @@ impl Legalize {
             // NodeKind::IR(IRNodeKind::Sext) => self.run_on_node_sext(tys, regs_info, heap, node),
             // NodeKind::IR(IRNodeKind::Brcc) => self.run_on_node_brcc(tys, regs_info, heap, node),
             // NodeKind::IR(IRNodeKind::FPBrcc) => self.run_on_node_fpbrcc(tys, regs_info, heap, node),
+            NodeKind::IR(IRNodeKind::Add) => self.run_on_node_add(tys, regs_info, heap, node),
             NodeKind::IR(IRNodeKind::Sub) => self.run_on_node_sub(tys, regs_info, heap, node),
             _ => {
                 self.run_on_node_operand(tys, regs_info, heap, node);
@@ -85,6 +86,38 @@ impl Legalize {
         }
 
         selected
+    }
+
+    fn run_on_node_add(
+        &mut self,
+        tys: &Types,
+        regs_info: &RegistersInfo,
+        heap: &mut DAGHeap,
+        node: Raw<DAGNode>,
+    ) -> Raw<DAGNode> {
+        // if node.kind == NodeKind::IR(IRNodeKind::Add)
+        //     && node.ty == Type::Int32
+        //     && node.operand[0].is_operation()
+        //     && node.operand[1].is_constant()
+        //     && node.operand[1].as_constant().total_bits().unwrap() > 12
+        // {
+        //     // panic!();
+        //     // // TODO: Refine code
+        //     let op0 = self.run_on_node(tys, regs_info, heap, node.operand[0]);
+        //     let li = heap.alloc(DAGNode::new(
+        //         NodeKind::MI(MINodeKind::LI),
+        //         vec![node.operand[1]],
+        //         node.operand[1].ty,
+        //     ));
+        //     return heap.alloc(DAGNode::new(
+        //         NodeKind::MI(MINodeKind::ADDW),
+        //         vec![op0, li],
+        //         node.ty,
+        //     ));
+        // }
+
+        self.run_on_node_operand(tys, regs_info, heap, node);
+        node
     }
 
     fn run_on_node_sub(
@@ -107,11 +140,12 @@ impl Legalize {
                 vec![],
                 node.operand[1].ty,
             ));
-            return heap.alloc(DAGNode::new(
+            let add = heap.alloc(DAGNode::new(
                 NodeKind::IR(IRNodeKind::Add),
                 vec![op0, op1],
                 node.ty,
             ));
+            return self.run_on_node(tys, regs_info, heap, add);
         }
 
         self.run_on_node_operand(tys, regs_info, heap, node);

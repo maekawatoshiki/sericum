@@ -67,7 +67,8 @@ impl MISelector {
             // (ir.Call _a) => { self.select_call(tys, regs_info, heap, node) }
             (ir.Add a, b): Int32 {
                 GPR a {
-                    imm32 b => (mi.ADDIW a, b)
+                    imm12 b => (mi.ADDIW a, b)
+                    imm32 b => (mi.ADDW  a, (mi.LI b))
                     GPR   b => (mi.ADDW  a, b) } }
             // (ir.Sub a, b): Int32 {
             //     GPR a {

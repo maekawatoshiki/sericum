@@ -273,6 +273,12 @@ impl TokenStreamConstructor {
             "imm_f64" => {
                 quote! { if #parent.is_constant() && matches!(#parent.ty, Type::F64) {  #body } }
             }
+            _ if kind.as_str().starts_with("imm") => {
+                let bit = kind.as_str()["imm".len()..].parse::<u32>().unwrap();
+                quote! { if #parent.is_constant() 
+                    && #parent.ty.is_integer() 
+                    && #parent.as_constant().bits_within(#bit).unwrap() { #body } }
+            }
             // TODO
             "mem" => quote! { if #parent.is_frame_index() {  #body } },
             "mem32" | "mem64" => {

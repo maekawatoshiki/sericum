@@ -173,6 +173,15 @@ impl ConstantKind {
         }
     }
 
+    pub fn bits_within(&self, n: u32) -> Option<bool> {
+        match self {
+            ConstantKind::Int8(x) => Some((x << (8 - n)) >> (8 - n) == *x),
+            ConstantKind::Int32(x) => Some((x << (32 - n)) >> (32 - n) == *x),
+            ConstantKind::Int64(x) => Some((x << (64 - n)) >> (64 - n) == *x),
+            ConstantKind::F64(_) => None,
+        }
+    }
+
     pub fn get_type(&self) -> Type {
         match self {
             ConstantKind::Int8(_) => Type::Int8,
