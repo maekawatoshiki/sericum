@@ -7,68 +7,70 @@ mod inst {
 
     // TODO: need macro to describe the followings
     lazy_static! {
-        pub static ref ADDI: TargetInstDef = TargetInstDef::new(TargetOpcode::ADDI)
+        pub static ref ADDI: TargetInstDef = TargetInstDef::new("addi", TargetOpcode::ADDI)
             .set_uses(vec![
                 TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GPR)),
                 TargetOperand::Immediate(TargetImmediate::I32),
             ])
             .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GPR)]);
-        pub static ref ADDIW: TargetInstDef = TargetInstDef::new(TargetOpcode::ADDIW)
+        pub static ref ADDIW: TargetInstDef = TargetInstDef::new("addiw", TargetOpcode::ADDIW)
             .set_uses(vec![
                 TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GPR)),
                 TargetOperand::Immediate(TargetImmediate::I32),
             ])
             .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GPR)]);
-        pub static ref ADDW: TargetInstDef = TargetInstDef::new(TargetOpcode::ADDW)
+        pub static ref ADDW: TargetInstDef = TargetInstDef::new("addw", TargetOpcode::ADDW)
             .set_uses(vec![
                 TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GPR)),
                 TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GPR)),
             ])
             .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GPR)]);
-        pub static ref MULW: TargetInstDef = TargetInstDef::new(TargetOpcode::MULW)
+        pub static ref MULW: TargetInstDef = TargetInstDef::new("mulw", TargetOpcode::MULW)
             .set_uses(vec![
                 TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GPR)),
                 TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GPR)),
             ])
             .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GPR)]);
-        pub static ref DIVW: TargetInstDef = TargetInstDef::new(TargetOpcode::DIVW)
+        pub static ref DIVW: TargetInstDef = TargetInstDef::new("divw", TargetOpcode::DIVW)
             .set_uses(vec![
                 TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GPR)),
                 TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GPR)),
             ])
             .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GPR)]);
-        pub static ref MV: TargetInstDef = TargetInstDef::new(TargetOpcode::LI)
+        pub static ref MV: TargetInstDef = TargetInstDef::new("mv", TargetOpcode::LI)
             .set_uses(vec![TargetOperand::Register(TargetRegister::RegClass(
                 RegisterClassKind::GPR
             ))])
             .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GPR)]);
-        pub static ref LI: TargetInstDef = TargetInstDef::new(TargetOpcode::LI)
+        pub static ref LI: TargetInstDef = TargetInstDef::new("li", TargetOpcode::LI)
             .set_uses(vec![TargetOperand::Any])
             .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GPR)]);
-        pub static ref LW: TargetInstDef = TargetInstDef::new(TargetOpcode::LW)
+        pub static ref LW: TargetInstDef = TargetInstDef::new("lw", TargetOpcode::LW)
             .set_uses(vec![
                 TargetOperand::Immediate(TargetImmediate::I32),
                 TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GPR))
             ])
             .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GPR)]);
-        pub static ref LD: TargetInstDef = TargetInstDef::new(TargetOpcode::LD)
+        pub static ref LD: TargetInstDef = TargetInstDef::new("ld", TargetOpcode::LD)
             .set_uses(vec![
                 TargetOperand::Immediate(TargetImmediate::I32),
                 TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GPR))
             ])
             .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GPR)]);
-        pub static ref SW: TargetInstDef = TargetInstDef::new(TargetOpcode::SW).set_uses(vec![
-            TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GPR)),
-            TargetOperand::Immediate(TargetImmediate::I32),
-            TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GPR))
-        ]);
-        pub static ref SD: TargetInstDef = TargetInstDef::new(TargetOpcode::SD).set_uses(vec![
-            TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GPR)),
-            TargetOperand::Immediate(TargetImmediate::I32),
-            TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GPR))
-        ]);
+        pub static ref SW: TargetInstDef =
+            TargetInstDef::new("sw", TargetOpcode::SW).set_uses(vec![
+                TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GPR)),
+                TargetOperand::Immediate(TargetImmediate::I32),
+                TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GPR))
+            ]);
+        pub static ref SD: TargetInstDef =
+            TargetInstDef::new("sd", TargetOpcode::SD).set_uses(vec![
+                TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GPR)),
+                TargetOperand::Immediate(TargetImmediate::I32),
+                TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GPR))
+            ]);
         pub static ref JR: TargetInstDef =
-            TargetInstDef::new(TargetOpcode::JR).set_uses(vec![TargetOperand::Register(
+            TargetInstDef::new("jr", TargetOpcode::JR).set_uses(vec![TargetOperand::Register(
                 TargetRegister::RegClass(RegisterClassKind::GPR)
             )]);
     }
@@ -76,6 +78,7 @@ mod inst {
 
 #[derive(Clone)]
 pub struct TargetInstDef {
+    pub name: &'static str,
     pub opcode: TargetOpcode,
     pub uses: Vec<TargetOperand>,
     pub defs: Vec<TargetRegister>,
@@ -227,8 +230,9 @@ impl TargetOpcode {
 }
 
 impl TargetInstDef {
-    pub fn new(opcode: TargetOpcode) -> Self {
+    pub fn new(name: &'static str, opcode: TargetOpcode) -> Self {
         Self {
+            name,
             opcode,
             uses: vec![],
             defs: vec![],

@@ -78,21 +78,7 @@ impl MachineAsmPrinter {
     ) {
         self.output.push_str("  ");
 
-        self.output.push_str(match inst.opcode {
-            MachineOpcode::ADDI => "addi",
-            MachineOpcode::ADDIW => "addiw",
-            MachineOpcode::ADDW => "addw",
-            MachineOpcode::MULW => "mulw",
-            MachineOpcode::DIVW => "divw",
-            MachineOpcode::MV => "mv",
-            MachineOpcode::LI => "li",
-            MachineOpcode::LW => "lw",
-            MachineOpcode::LD => "ld",
-            MachineOpcode::SW => "sw",
-            MachineOpcode::SD => "sd",
-            MachineOpcode::JR => "jr",
-            _ => panic!("{:?}", inst),
-        });
+        self.output.push_str(inst.opcode.inst_def().unwrap().name);
         self.output.push(' ');
 
         for (i, r) in inst.def.iter().enumerate() {
