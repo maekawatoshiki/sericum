@@ -165,12 +165,22 @@ fn asm_sub() {
             a = sub (%li), (i32 5);
             ret (%a);
     });
+    cilk_ir!(m; define [i32] small [] {
+        entry:
+            i = alloca i32;
+            store (i32 -23428042), (%i);
+            li = load (%i);
+            a = sub (%li), (i32 1366270073);
+            ret (%a);
+    });
     compile_and_run(
         "
     #include <assert.h>
     extern int test();
+    extern int small();
     int main() {
         assert(test() == 15);
+        assert(small() == -1389698115);
     }
             ",
         &mut m,
