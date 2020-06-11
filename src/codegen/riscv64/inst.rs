@@ -69,6 +69,8 @@ mod inst {
                 TargetOperand::Immediate(TargetImmediate::I32),
                 TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GPR))
             ]);
+        pub static ref J: TargetInstDef =
+            TargetInstDef::new("j", TargetOpcode::J).set_uses(vec![TargetOperand::Block]);
         pub static ref JR: TargetInstDef =
             TargetInstDef::new("jr", TargetOpcode::JR).set_uses(vec![TargetOperand::Register(
                 TargetRegister::RegClass(RegisterClassKind::GPR)
@@ -101,6 +103,7 @@ pub enum TargetOperand {
     FrameIndex,
     Any,
     Mem,
+    Block,
 }
 
 #[derive(Clone)]
@@ -157,6 +160,7 @@ pub enum TargetOpcode {
     // JG,
     // JGE,
     // JMP,
+    J,
     JR,
 
     Phi,
@@ -181,6 +185,7 @@ impl TargetOpcode {
             Self::LD => Some(&*inst::LD),
             Self::SW => Some(&*inst::SW),
             Self::SD => Some(&*inst::SD),
+            Self::J => Some(&*inst::J),
             Self::JR => Some(&*inst::JR),
             // Self::MOVSDrm64 => Some(&*inst::MOVSDrm64),
             // Self::MOVSDmr => Some(&*inst::MOVSDmr),

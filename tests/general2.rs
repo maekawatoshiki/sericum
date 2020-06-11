@@ -222,6 +222,29 @@ fn asm_mul_div() {
     );
 }
 
+#[test]
+fn asm_jmp() {
+    let mut m = Module::new("cilk");
+    cilk_ir!(m; define [i32] test [] {
+        entry:
+            br l2;
+        // l1:
+        //     ret (i32 1);
+        l2:
+            ret (i32 2);
+    });
+    compile_and_run(
+        "
+    #include <assert.h>
+    extern int test();
+    int main() {
+        assert(test() == 2);
+    }
+            ",
+        &mut m,
+    );
+}
+
 // #[test]
 // fn asm_load_store() {
 //     let mut m = Module::new("cilk");

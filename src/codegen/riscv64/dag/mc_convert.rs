@@ -3,7 +3,7 @@
 use super::super::inst::DefOrUseReg;
 use super::super::machine::{basic_block::*, function::*, inst, inst::*, module::*};
 use super::super::register::*;
-use super::{function::*, module::*, node, node::*};
+use super::{basic_block::DAGBasicBlockId, function::*, module::*, node, node::*};
 use crate::util::allocator::*;
 use id_arena::*;
 use rustc_hash::FxHashMap;
@@ -16,7 +16,7 @@ pub struct ConversionInfo<'a> {
     node_to_reg: FxHashMap<Raw<DAGNode>, Option<RegisterId>>,
     cur_bb: MachineBasicBlockId,
     iseq: &'a mut Vec<MachineInstId>,
-    // bb_map: &'a FxHashMap<DAGBasicBlockId, MachineBasicBlockId>,
+    bb_map: &'a FxHashMap<DAGBasicBlockId, MachineBasicBlockId>,
     node2minst: &'a mut FxHashMap<Raw<DAGNode>, MachineInstId>,
 }
 
@@ -66,7 +66,7 @@ pub fn convert_function(/*types: &Types,*/ dag_func: DAGFunction) -> MachineFunc
             node_to_reg: FxHashMap::default(),
             cur_bb: bb_id,
             iseq: &mut iseq,
-            // bb_map: &bb_map,
+            bb_map: &bb_map,
             node2minst: &mut node2minst,
         }
         .convert_dag(node.entry.unwrap());
@@ -104,8 +104,8 @@ impl<'a> ConversionInfo<'a> {
             return Some(*machine_inst_id);
         }
 
-        // #[rustfmt::skip]
-        // macro_rules! bb {($id:expr)=>{ $id.as_basic_block() };}
+        #[rustfmt::skip]
+        macro_rules! bb {($id:expr)=>{ $id.as_basic_block() };}
         // #[rustfmt::skip]
         // macro_rules! cond_kind {($id:expr)=>{ $id.as_cond_kind() };}
 
@@ -163,25 +163,25 @@ impl<'a> ConversionInfo<'a> {
             //     )))
             // }
             // // NodeKind::IR(IRNodeKind::Call) => Some(self.convert_call_dag(&*node)),
-            // NodeKind::IR(IRNodeKind::Phi) => {
-            //     let mut operands = vec![];
-            //     let mut i = 0;
-            //     while i < node.operand.len() {
-            //         operands.push(self.normal_operand(node.operand[i]));
-            //         operands.push(MachineOperand::Branch(
-            //             self.get_machine_bb(bb!(node.operand[i + 1])),
-            //         ));
-            //         i += 2;
-            //     }
-            //     let phi_inst = MachineInst::new(
-            //         &self.cur_func.regs_info,
-            //         MachineOpcode::Phi,
-            //         operands,
-            //         ty2rc(&node.ty),
-            //         self.cur_bb,
-            //     );
-            //     Some(self.push_inst(phi_inst))
-            // }
+            NodeKind::IR(IRNodeKind::Phi) => {
+                let mut operands = vec![];
+                let mut i = 0;
+                while i < node.operand.len() {
+                    operands.push(self.normal_operand(node.operand[i]));
+                    operands.push(MachineOperand::Branch(
+                        self.get_machine_bb(bb!(node.operand[i + 1])),
+                    ));
+                    i += 2;
+                }
+                let phi_inst = MachineInst::new(
+                    &self.cur_func.regs_info,
+                    MachineOpcode::Phi,
+                    operands,
+                    ty2rc(&node.ty),
+                    self.cur_bb,
+                );
+                Some(self.push_inst(phi_inst))
+            }
             // NodeKind::IR(IRNodeKind::Div) => {
             //     let eax = self.cur_func.regs_info.get_phys_reg(GR32::EAX);
             //     let edx = self.cur_func.regs_info.get_phys_reg(GR32::EDX);
@@ -553,7 +553,9 @@ impl<'a> ConversionInfo<'a> {
                     MachineMemOperand::Address(inst::AddressKind::FunctionName(n.clone())),
                 ),
             },
-            NodeKind::Operand(OperandNodeKind::BasicBlock(_)) => unimplemented!(),
+            NodeKind::Operand(OperandNodeKind::BasicBlock(bb)) => {
+                MachineOperand::Branch(self.get_machine_bb(bb))
+            }
             NodeKind::Operand(OperandNodeKind::Register(ref r)) => MachineOperand::Register(*r),
             NodeKind::Operand(OperandNodeKind::Mem(ref mem)) => match mem {
                 MemNodeKind::FiReg => MachineOperand::Mem(MachineMemOperand::FiReg(
@@ -591,9 +593,9 @@ impl<'a> ConversionInfo<'a> {
         }
     }
 
-    // fn get_machine_bb(&self, dag_bb_id: DAGBasicBlockId) -> MachineBasicBlockId {
-    //     *self.bb_map.get(&dag_bb_id).unwrap()
-    // }
+    fn get_machine_bb(&self, dag_bb_id: DAGBasicBlockId) -> MachineBasicBlockId {
+        *self.bb_map.get(&dag_bb_id).unwrap()
+    }
 
     pub fn push_inst(&mut self, inst: MachineInst) -> MachineInstId {
         let inst_id = self
@@ -680,3 +682,13 @@ impl<'a> ConversionInfo<'a> {
 //         _ => None,
 //     }
 // }
+
+pub fn opcode_copy2reg(src: &MachineOperand) -> MachineOpcode {
+    match src {
+        MachineOperand::Constant(MachineConstant::Int32(_))
+        | MachineOperand::Constant(MachineConstant::Int64(_))
+        | MachineOperand::Constant(MachineConstant::Int8(_)) => MachineOpcode::LI,
+        MachineOperand::Register(_) => MachineOpcode::MV,
+        _ => unimplemented!(),
+    }
+}

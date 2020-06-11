@@ -1,4 +1,4 @@
-use super::{function::MachineFunction, inst::MachineOpcode, module::MachineModule};
+use super::{function::MachineFunction, module::MachineModule};
 use crate::traits::pass::ModulePassTrait;
 
 // Must run after phi elimination
@@ -30,16 +30,23 @@ impl BranchFolding {
         }
     }
 
-    // Very simple branch folding. TODO: Implement further complicated one
+    // Very simple branch folding. TODO: Implement further complicated one. Refine code
     pub fn run_on_function(&mut self, f: &mut MachineFunction) {
         let mut worklist = vec![];
+        let mut unreachable_blocks = vec![];
 
-        for (id, block) in f.body.basic_blocks.id_and_block() {
+        for (i, (id, block)) in f.body.basic_blocks.id_and_block().enumerate() {
+            if block.pred.len() == 0 && i > 0 {
+                unreachable_blocks.push(id);
+                continue;
+            }
+
             if block.iseq_ref().len() != 1 {
                 continue;
             }
+
             let inst = &f.body.inst_arena[block.iseq_ref()[0]];
-            if inst.opcode == MachineOpcode::JMP {
+            if inst.opcode.is_unconditional_jmp() {
                 worklist.push((id, inst.operand[0].as_basic_block()));
             }
         }
@@ -91,6 +98,15 @@ impl BranchFolding {
 
         for (remove, _) in worklist {
             f.body.basic_blocks.order.remove_item(&remove).unwrap();
+        }
+
+        for id in unreachable_blocks {
+            let succ = f.body.basic_blocks.arena[id].succ.clone();
+            for succ in succ {
+                let block = &mut f.body.basic_blocks.arena[succ];
+                block.pred.remove_item(&id);
+            }
+            f.body.basic_blocks.order.remove_item(&id).unwrap();
         }
     }
 }

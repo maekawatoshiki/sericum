@@ -1,4 +1,4 @@
-// use super::super::dag::mc_convert::mov_rx;
+use super::super::dag::mc_convert::opcode_copy2reg;
 use super::{
     function::MachineFunction,
     // basic_block::{MachineBasicBlock, MachineBasicBlockId},
@@ -44,8 +44,8 @@ impl ReplaceCopyWithProperMInst {
                     continue;
                 }
 
-                // let mov = mov_rx(tys, &f.regs_info, &inst.operand[0]).unwrap();
-                // inst.opcode = mov;
+                let opcode = opcode_copy2reg(&inst.operand[0]);
+                inst.opcode = opcode;
             }
         }
     }
