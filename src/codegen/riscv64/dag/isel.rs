@@ -70,44 +70,14 @@ impl MISelector {
                     imm12 b => (mi.ADDIW a, b)
                     imm32 b => (mi.ADDW  a, (mi.LI b))
                     GPR   b => (mi.ADDW  a, b) } }
-            // (ir.Sub a, b): Int32 {
-            //     GPR a {
-            //         imm32 b => (mi.ADDIW a, -b) } }
-            // (ir.Add a, b) {
-            //     GR32 a {
-            //         GR32  b => (mi.ADDrr32   a, b)
-            //         imm32 b => (mi.ADDri32   a, b) }
-            //     GR64 a {
-            //         imm32 b => (mi.ADDr64i32 a, b)
-            //         GR64  b => (mi.ADDrr64   a, b) }
-            //     XMM a {
-            //         (ir.Load c) b {
-            //             (ir.FIAddr d) c {
-            //                 f64mem d => (mi.ADDSDrm a, [BaseFi %rbp, d]) } }
-            //         imm_f64 b => (mi.ADDSDrr a, (mi.MOVSDrm64 b))
-            //         XMM    b => (mi.ADDSDrr a, b)
-            //     }
-            // }
-            // (ir.Sub a, b) {
-            //     GR32 a {
-            //         GR32  b => (mi.SUBrr32   a, b)
-            //         imm32 b => (mi.SUBri32   a, b) }
-            //     imm32 a {
-            //         GR32 b => (mi.SUBrr32 (mi.MOVri32 a), b)
-            //     }
-            //     GR64 a {
-            //         imm32 b => (mi.SUBr64i32 a, b) }
-            //     XMM  a {
-            //         (ir.Load c) b {
-            //             (ir.FIAddr d) c {
-            //                 f64mem d => (mi.SUBSDrm a, [BaseFi %rbp, d]) } }
-            //         imm_f64 b => (mi.SUBSDrr a, (mi.MOVSDrm64 b))
-            //         XMM    b => (mi.SUBSDrr a, b)
-            //     }
-            //     imm_f64 a {
-            //         XMM b => (mi.SUBSDrr (mi.MOVSDrm64 a), b)
-            //     }
-            // }
+            (ir.Mul a, b): Int32 {
+                GPR a {
+                    imm32 b => (mi.MULW a, (mi.LI b))
+                    GPR   b => (mi.MULW a, b) } }
+            (ir.Div a, b): Int32 {
+                GPR a {
+                    imm32 b => (mi.DIVW a, (mi.LI b))
+                    GPR   b => (mi.DIVW a, b) } }
             // (ir.Mul a, b) {
             //     GR32 a {
             //         GR32  b => (mi.IMULrr32  a, b)

@@ -82,6 +82,8 @@ impl MachineAsmPrinter {
             MachineOpcode::ADDI => "addi",
             MachineOpcode::ADDIW => "addiw",
             MachineOpcode::ADDW => "addw",
+            MachineOpcode::MULW => "mulw",
+            MachineOpcode::DIVW => "divw",
             MachineOpcode::MV => "mv",
             MachineOpcode::LI => "li",
             MachineOpcode::LW => "lw",

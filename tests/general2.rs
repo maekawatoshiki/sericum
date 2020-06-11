@@ -187,6 +187,41 @@ fn asm_sub() {
     );
 }
 
+#[test]
+fn asm_mul_div() {
+    let mut m = Module::new("cilk");
+    cilk_ir!(m; define [i32] test_mul [] {
+        entry:
+            i = alloca i32;
+            store (i32 3), (%i);
+            li = load (%i);
+            a = mul (%li), (i32 5);
+            a = mul (%a), (%a);
+            ret (%a);
+    });
+    cilk_ir!(m; define [i32] test_div [] {
+        entry:
+            i = alloca i32;
+            store (i32 20), (%i);
+            li = load (%i);
+            a = div (%li), (i32 2); // 10
+            a = div (%li), (%a);
+            ret (%a);
+    });
+    compile_and_run(
+        "
+    #include <assert.h>
+    extern int test_mul();
+    extern int test_div();
+    int main() {
+        assert(test_mul() == 225);
+        assert(test_div() == 2);
+    }
+            ",
+        &mut m,
+    );
+}
+
 // #[test]
 // fn asm_load_store() {
 //     let mut m = Module::new("cilk");
