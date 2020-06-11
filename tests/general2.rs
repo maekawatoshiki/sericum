@@ -228,8 +228,8 @@ fn asm_jmp() {
     cilk_ir!(m; define [i32] test [] {
         entry:
             br l2;
-        // l1:
-        //     ret (i32 1);
+        l1:
+            ret (i32 1);
         l2:
             ret (i32 2);
     });
