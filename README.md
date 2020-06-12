@@ -1,5 +1,3 @@
-# Now trying to implement backend for RV64 (64bit risc-v) in 'riscv64' branch
-
 # Cilk
 
 [![CircleCI](https://circleci.com/gh/maekawatoshiki/cilk.svg?style=shield)](https://circleci.com/gh/maekawatoshiki/cilk)
@@ -9,23 +7,32 @@ Toy Compiler Infrastructure influenced by LLVM written in Rust.
 
 Do not expect too much stuff!
 
-*Requirement: Rust nightly*
 
 # To Do
 
 - Optimization
-    - Easy ones
+    - Easy
         1. Spill registers not to the stack but to callee saved registers such as ebx. (llc does so)
         2. Take into consideration the physical registers' allocation order.
-    - Hard ones
+    - Hard 
         1. ....
-- Refine code (never ending though)
+- Refine code 
 - Write documents in detail
 - Write tests (because I recently removed most of them)
 
+# Build
+
+** Requirement: Rust nightly **
+
+```sh
+cargo test --feature x86_64 # build for x86_64
+cargo test brainfuxk --feature x86_64 -- --nocapture # this is fun. just try it.
+cargo test --feature riscv64 # build for riscv64. very few features are implemented.
+```
+
 # Example
 
-- Fibonacci
+- Fibonacci (**the following code may not work. take a look at ./tests**)
 
 ```rust
 use cilk::{

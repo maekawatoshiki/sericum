@@ -16,6 +16,8 @@ pub mod util;
 pub use ir::*;
 
 extern crate defs;
+#[cfg(feature = "x86_64")]
+#[macro_use]
 extern crate dynasm;
 extern crate dynasmrt;
 extern crate id_arena;

@@ -1,4 +1,7 @@
+#[cfg(feature = "riscv64")]
 pub mod riscv64;
+#[cfg(feature = "x86_64")]
+pub mod x64;
 
 thread_local! {
      pub static INTERNALS: Vec<String> = include!("internals").iter().map(|s| s.to_string()).collect();
