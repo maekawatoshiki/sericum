@@ -405,38 +405,7 @@ impl<'a> ConversionInfo<'a> {
     }
 
     fn move2reg(&self, r: RegisterId, src: MachineOperand) -> MachineInst {
-        match src {
-            MachineOperand::Branch(_) => unimplemented!(),
-            // MachineOperand::Constant(MachineConstant::F64(f)) => MachineInst::new_simple(
-            //     // TODO
-            //     MachineOpcode::MOVSDrm64,
-            //     vec![MachineOperand::Constant(MachineConstant::F64(f))],
-            //     self.cur_bb,
-            // )
-            // .with_def(vec![r]),
-            MachineOperand::Constant(MachineConstant::Int32(_)) => {
-                MachineInst::new_simple(MachineOpcode::LI, vec![src], self.cur_bb).with_def(vec![r])
-            }
-            MachineOperand::Register(_) => {
-                MachineInst::new_simple(MachineOpcode::MV, vec![src], self.cur_bb).with_def(vec![r])
-            }
-            // MachineOperand::Constant(_) | MachineOperand::Register(_) => MachineInst::new_simple(
-            //     mov_rx(self.types, &self.cur_func.regs_info, &src).unwrap(),
-            //     vec![src],
-            //     self.cur_bb,
-            // )
-            // .with_def(vec![r]),
-            // MachineOperand::FrameIndex(fi) => MachineInst::new_with_def_reg(
-            //     MachineOpcode::LEAr64m,
-            //     vec![MachineOperand::Mem(MachineMemOperand::BaseFi(
-            //         self.cur_func.regs_info.get_phys_reg(GR64::RBP),
-            //         fi,
-            //     ))],
-            //     vec![r],
-            //     self.cur_bb,
-            // ),
-            _ => unimplemented!(),
-        }
+        MachineInst::new_simple(opcode_copy2reg(&src), vec![src], self.cur_bb).with_def(vec![r])
     }
 
     // fn convert_call_dag(&mut self, node: &DAGNode) -> MachineInstId {
