@@ -1,9 +1,9 @@
 // TODO: dirty code
 
-use super::super::inst::DefOrUseReg;
 use super::super::machine::{basic_block::*, function::*, inst, inst::*, module::*};
 use super::super::register::*;
 use super::{basic_block::*, function::*, module::*, node, node::*};
+use crate::codegen::common::machine::inst_def::DefOrUseReg;
 use crate::ir::types::*;
 use crate::util::allocator::*;
 use id_arena::*;

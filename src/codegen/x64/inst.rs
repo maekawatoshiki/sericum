@@ -1,5 +1,7 @@
 use super::register::*;
-use rustc_hash::FxHashMap;
+use crate::codegen::common::machine::inst_def::*;
+
+type TargetInstDefTy = TargetInstDef<TargetOpcode, TargetRegister<RegisterClassKind, PhysReg>>;
 
 #[allow(non_upper_case_globals)]
 mod inst {
@@ -7,41 +9,41 @@ mod inst {
 
     // TODO: need macro to describe the followings
     lazy_static! {
-        pub static ref MOVSDrm64: TargetInstDef = {
-            TargetInstDef::new(TargetOpcode::MOVSDrm64)
+        pub static ref MOVSDrm64: TargetInstDefTy = {
+            TargetInstDef::new("movsd", TargetOpcode::MOVSDrm64)
                 .set_uses(vec![TargetOperand::Mem])
                 .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::XMM)])
         };
-        pub static ref MOVSDrr: TargetInstDef = {
-            TargetInstDef::new(TargetOpcode::MOVSDrr)
+        pub static ref MOVSDrr: TargetInstDefTy = {
+            TargetInstDef::new("movsd", TargetOpcode::MOVSDrr)
                 .set_uses(vec![TargetOperand::Register(TargetRegister::RegClass(
                     RegisterClassKind::XMM,
                 ))])
                 .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::XMM)])
         };
-        pub static ref MOVSDrm: TargetInstDef = {
-            TargetInstDef::new(TargetOpcode::MOVSDrm)
+        pub static ref MOVSDrm: TargetInstDefTy = {
+            TargetInstDef::new("movsd",TargetOpcode::MOVSDrm)
                 .set_uses(vec![TargetOperand::Mem])
                 .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::XMM)])
         };
-        pub static ref MOVSDmr: TargetInstDef = {
-            TargetInstDef::new(TargetOpcode::MOVSDmr).set_uses(vec![
+        pub static ref MOVSDmr: TargetInstDefTy = {
+            TargetInstDef::new("movsd",TargetOpcode::MOVSDmr).set_uses(vec![
                 TargetOperand::Mem,
                 TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::XMM)),
             ])
         };
-        pub static ref MOVSXDr64m32: TargetInstDef = {
-            TargetInstDef::new(TargetOpcode::MOVSXDr64m32)
+        pub static ref MOVSXDr64m32: TargetInstDefTy = {
+            TargetInstDef::new("mosxd", TargetOpcode::MOVSXDr64m32)
                 .set_uses(vec![TargetOperand::FrameIndex])
                 .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR64)])
         };
-        pub static ref LEAr64m: TargetInstDef = {
-            TargetInstDef::new(TargetOpcode::LEAr64m)
+        pub static ref LEAr64m: TargetInstDefTy = {
+            TargetInstDef::new("lea", TargetOpcode::LEAr64m)
                 .set_uses(vec![TargetOperand::Mem])
                 .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR64)])
         };
-        pub static ref ADDrr32: TargetInstDef = {
-            TargetInstDef::new(TargetOpcode::ADDrr32)
+        pub static ref ADDrr32: TargetInstDefTy = {
+            TargetInstDef::new("add", TargetOpcode::ADDrr32)
                 .set_uses(vec![
                     TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR32)),
                     TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR32)),
@@ -49,8 +51,8 @@ mod inst {
                 .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR32)])
                 .add_tie(DefOrUseReg::Def(0), DefOrUseReg::Use(0))
         };
-        pub static ref ADDrr64: TargetInstDef = {
-            TargetInstDef::new(TargetOpcode::ADDrr64)
+        pub static ref ADDrr64: TargetInstDefTy = {
+            TargetInstDef::new("add", TargetOpcode::ADDrr64)
                 .set_uses(vec![
                     TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR64)),
                     TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR64)),
@@ -58,8 +60,8 @@ mod inst {
                 .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR64)])
                 .add_tie(DefOrUseReg::Def(0), DefOrUseReg::Use(0))
         };
-        pub static ref ADDri32: TargetInstDef = {
-            TargetInstDef::new(TargetOpcode::ADDri32)
+        pub static ref ADDri32: TargetInstDefTy = {
+            TargetInstDef::new("add", TargetOpcode::ADDri32)
                 .set_uses(vec![
                     TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR32)),
                     TargetOperand::Immediate(TargetImmediate::I32),
@@ -67,8 +69,8 @@ mod inst {
                 .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR32)])
                 .add_tie(DefOrUseReg::Def(0), DefOrUseReg::Use(0))
         };
-        pub static ref ADDr64i32: TargetInstDef = {
-            TargetInstDef::new(TargetOpcode::ADDr64i32)
+        pub static ref ADDr64i32: TargetInstDefTy = {
+            TargetInstDef::new("add", TargetOpcode::ADDr64i32)
                 .set_uses(vec![
                     TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR64)),
                     TargetOperand::Immediate(TargetImmediate::I32),
@@ -76,8 +78,8 @@ mod inst {
                 .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR64)])
                 .add_tie(DefOrUseReg::Def(0), DefOrUseReg::Use(0))
         };
-        pub static ref ADDSDrr: TargetInstDef = {
-            TargetInstDef::new(TargetOpcode::ADDSDrr)
+        pub static ref ADDSDrr: TargetInstDefTy = {
+            TargetInstDef::new("addsd", TargetOpcode::ADDSDrr)
                 .set_uses(vec![
                     TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::XMM)),
                     TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::XMM)),
@@ -85,8 +87,8 @@ mod inst {
                 .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::XMM)])
                 .add_tie(DefOrUseReg::Def(0), DefOrUseReg::Use(0))
         };
-        pub static ref ADDSDrm: TargetInstDef = {
-            TargetInstDef::new(TargetOpcode::ADDSDrm)
+        pub static ref ADDSDrm: TargetInstDefTy = {
+            TargetInstDef::new("addsd", TargetOpcode::ADDSDrm)
                 .set_uses(vec![
                     TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::XMM)),
                     TargetOperand::Mem,
@@ -94,8 +96,8 @@ mod inst {
                 .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::XMM)])
                 .add_tie(DefOrUseReg::Def(0), DefOrUseReg::Use(0))
         };
-        pub static ref SUBrr32: TargetInstDef = {
-            TargetInstDef::new(TargetOpcode::SUBrr32)
+        pub static ref SUBrr32: TargetInstDefTy = {
+            TargetInstDef::new("sub", TargetOpcode::SUBrr32)
                 .set_uses(vec![
                     TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR32)),
                     TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR32)),
@@ -103,8 +105,8 @@ mod inst {
                 .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR32)])
                 .add_tie(DefOrUseReg::Def(0), DefOrUseReg::Use(0))
         };
-        pub static ref SUBri32: TargetInstDef = {
-            TargetInstDef::new(TargetOpcode::SUBri32)
+        pub static ref SUBri32: TargetInstDefTy = {
+            TargetInstDef::new("sub", TargetOpcode::SUBri32)
                 .set_uses(vec![
                     TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR32)),
                     TargetOperand::Immediate(TargetImmediate::I32),
@@ -112,8 +114,8 @@ mod inst {
                 .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR32)])
                 .add_tie(DefOrUseReg::Def(0), DefOrUseReg::Use(0))
         };
-        pub static ref SUBr64i32: TargetInstDef = {
-            TargetInstDef::new(TargetOpcode::SUBr64i32)
+        pub static ref SUBr64i32: TargetInstDefTy = {
+            TargetInstDef::new("sub", TargetOpcode::SUBr64i32)
                 .set_uses(vec![
                     TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR64)),
                     TargetOperand::Immediate(TargetImmediate::I32),
@@ -121,8 +123,8 @@ mod inst {
                 .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR64)])
                 .add_tie(DefOrUseReg::Def(0), DefOrUseReg::Use(0))
         };
-        pub static ref SUBSDrr: TargetInstDef = {
-            TargetInstDef::new(TargetOpcode::SUBSDrr)
+        pub static ref SUBSDrr: TargetInstDefTy = {
+            TargetInstDef::new("subsd", TargetOpcode::SUBSDrr)
                 .set_uses(vec![
                     TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::XMM)),
                     TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::XMM)),
@@ -130,8 +132,8 @@ mod inst {
                 .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::XMM)])
                 .add_tie(DefOrUseReg::Def(0), DefOrUseReg::Use(0))
         };
-        pub static ref SUBSDrm: TargetInstDef = {
-            TargetInstDef::new(TargetOpcode::SUBSDrm)
+        pub static ref SUBSDrm: TargetInstDefTy = {
+            TargetInstDef::new("subsd", TargetOpcode::SUBSDrm)
                 .set_uses(vec![
                     TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::XMM)),
                     TargetOperand::Mem,
@@ -139,8 +141,8 @@ mod inst {
                 .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::XMM)])
                 .add_tie(DefOrUseReg::Def(0), DefOrUseReg::Use(0))
         };
-        pub static ref IMULrr32: TargetInstDef = {
-            TargetInstDef::new(TargetOpcode::IMULrr32)
+        pub static ref IMULrr32: TargetInstDefTy = {
+            TargetInstDef::new("imul", TargetOpcode::IMULrr32)
                 .set_uses(vec![
                     TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR32)),
                     TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR32)),
@@ -148,16 +150,16 @@ mod inst {
                 .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR32)])
                 .add_tie(DefOrUseReg::Def(0), DefOrUseReg::Use(0))
         };
-        pub static ref IMULrri32: TargetInstDef = {
-            TargetInstDef::new(TargetOpcode::IMULrri32)
+        pub static ref IMULrri32: TargetInstDefTy = {
+            TargetInstDef::new("imul", TargetOpcode::IMULrri32)
                 .set_uses(vec![
                     TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR32)),
                     TargetOperand::Immediate(TargetImmediate::I32),
                 ])
                 .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR32)])
         };
-        pub static ref IMULrr64i32: TargetInstDef = {
-            TargetInstDef::new(TargetOpcode::IMULrr64i32)
+        pub static ref IMULrr64i32: TargetInstDefTy = {
+            TargetInstDef::new("imul", TargetOpcode::IMULrr64i32)
                 .set_uses(vec![
                     TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR64)),
                     TargetOperand::Immediate(TargetImmediate::I32),
@@ -165,8 +167,8 @@ mod inst {
                 .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR64)])
                 .add_tie(DefOrUseReg::Def(0), DefOrUseReg::Use(0))
         };
-        pub static ref MULSDrr: TargetInstDef = {
-            TargetInstDef::new(TargetOpcode::MULSDrr)
+        pub static ref MULSDrr: TargetInstDefTy = {
+            TargetInstDef::new("mul", TargetOpcode::MULSDrr)
                 .set_uses(vec![
                     TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::XMM)),
                     TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::XMM)),
@@ -174,26 +176,8 @@ mod inst {
                 .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::XMM)])
                 .add_tie(DefOrUseReg::Def(0), DefOrUseReg::Use(0))
         };
-        pub static ref MULSDrm: TargetInstDef = {
-            TargetInstDef::new(TargetOpcode::MULSDrm)
-                .set_uses(vec![
-                    TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::XMM)),
-                    TargetOperand::Mem,
-                ])
-                .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::XMM)])
-                .add_tie(DefOrUseReg::Def(0), DefOrUseReg::Use(0))
-        };
-        pub static ref DIVSDrr: TargetInstDef = {
-            TargetInstDef::new(TargetOpcode::DIVSDrr)
-                .set_uses(vec![
-                    TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::XMM)),
-                    TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::XMM)),
-                ])
-                .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::XMM)])
-                .add_tie(DefOrUseReg::Def(0), DefOrUseReg::Use(0))
-        };
-        pub static ref DIVSDrm: TargetInstDef = {
-            TargetInstDef::new(TargetOpcode::DIVSDrm)
+        pub static ref MULSDrm: TargetInstDefTy = {
+            TargetInstDef::new("mulsd", TargetOpcode::MULSDrm)
                 .set_uses(vec![
                     TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::XMM)),
                     TargetOperand::Mem,
@@ -201,8 +185,26 @@ mod inst {
                 .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::XMM)])
                 .add_tie(DefOrUseReg::Def(0), DefOrUseReg::Use(0))
         };
-        pub static ref SHLr32i8: TargetInstDef = {
-            TargetInstDef::new(TargetOpcode::SHLr32i8)
+        pub static ref DIVSDrr: TargetInstDefTy = {
+            TargetInstDef::new("divsd", TargetOpcode::DIVSDrr)
+                .set_uses(vec![
+                    TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::XMM)),
+                    TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::XMM)),
+                ])
+                .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::XMM)])
+                .add_tie(DefOrUseReg::Def(0), DefOrUseReg::Use(0))
+        };
+        pub static ref DIVSDrm: TargetInstDefTy = {
+            TargetInstDef::new("divsd", TargetOpcode::DIVSDrm)
+                .set_uses(vec![
+                    TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::XMM)),
+                    TargetOperand::Mem,
+                ])
+                .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::XMM)])
+                .add_tie(DefOrUseReg::Def(0), DefOrUseReg::Use(0))
+        };
+        pub static ref SHLr32i8: TargetInstDefTy = {
+            TargetInstDef::new("shl", TargetOpcode::SHLr32i8)
                 .set_uses(vec![
                     TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR32)),
                     TargetOperand::Immediate(TargetImmediate::I8),
@@ -210,8 +212,8 @@ mod inst {
                 .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR32)])
                 .add_tie(DefOrUseReg::Def(0), DefOrUseReg::Use(0))
         };
-        pub static ref SHLr64i8: TargetInstDef = {
-            TargetInstDef::new(TargetOpcode::SHLr64i8)
+        pub static ref SHLr64i8: TargetInstDefTy = {
+            TargetInstDef::new("shl", TargetOpcode::SHLr64i8)
                 .set_uses(vec![
                     TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR64)),
                     TargetOperand::Immediate(TargetImmediate::I8),
@@ -219,79 +221,79 @@ mod inst {
                 .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR64)])
                 .add_tie(DefOrUseReg::Def(0), DefOrUseReg::Use(0))
         };
-        pub static ref SQRTSDrr: TargetInstDef = {
-            TargetInstDef::new(TargetOpcode::SQRTSDrr)
+        pub static ref SQRTSDrr: TargetInstDefTy = {
+            TargetInstDef::new("sqrtsd", TargetOpcode::SQRTSDrr)
                 .set_uses(vec![TargetOperand::Register(TargetRegister::RegClass(
                     RegisterClassKind::XMM,
                 ))])
                 .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::XMM)])
                 // .add_tie(DefOrUseReg::Def(0), DefOrUseReg::Use(0))
         };
-        pub static ref CDQ: TargetInstDef = {
-            TargetInstDef::new(TargetOpcode::CDQ)
+        pub static ref CDQ: TargetInstDefTy = {
+            TargetInstDef::new("cdq", TargetOpcode::CDQ)
                 .set_imp_def(vec![TargetRegister::Specific(GR32::EDX.as_phys_reg())])
                 .set_imp_use(vec![TargetRegister::Specific(GR32::EAX.as_phys_reg())])
         };
-        pub static ref MOVrr32: TargetInstDef = {
-            TargetInstDef::new(TargetOpcode::MOVrr32)
+        pub static ref MOVrr32: TargetInstDefTy = {
+            TargetInstDef::new("mov", TargetOpcode::MOVrr32)
                 .set_uses(vec![TargetOperand::Register(TargetRegister::RegClass(
                     RegisterClassKind::GR32,
                 ))])
                 .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR32)])
         };
-        pub static ref MOVri32: TargetInstDef = {
-            TargetInstDef::new(TargetOpcode::MOVri32)
+        pub static ref MOVri32: TargetInstDefTy = {
+            TargetInstDef::new("mov", TargetOpcode::MOVri32)
                 .set_uses(vec![TargetOperand::Immediate(TargetImmediate::I32)])
                 .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR32)])
         };
-        pub static ref MOVrm32: TargetInstDef = {
-            TargetInstDef::new(TargetOpcode::MOVrm32)
+        pub static ref MOVrm32: TargetInstDefTy = {
+            TargetInstDef::new("mov", TargetOpcode::MOVrm32)
                 .set_uses(vec![TargetOperand::Mem])
                 .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR32)])
         };
-        pub static ref MOVmr32: TargetInstDef = {
-            TargetInstDef::new(TargetOpcode::MOVmr32).set_uses(vec![
+        pub static ref MOVmr32: TargetInstDefTy = {
+            TargetInstDef::new("mov", TargetOpcode::MOVmr32).set_uses(vec![
                 TargetOperand::Mem,
                 TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR32)),
             ])
         };
-        pub static ref MOVmi32: TargetInstDef = {
-            TargetInstDef::new(TargetOpcode::MOVmi32).set_uses(vec![
+        pub static ref MOVmi32: TargetInstDefTy = {
+            TargetInstDef::new("mov", TargetOpcode::MOVmi32).set_uses(vec![
                 TargetOperand::Mem,
                 TargetOperand::Immediate(TargetImmediate::I32),
             ])
         };
-        pub static ref MOVmr64: TargetInstDef = {
-            TargetInstDef::new(TargetOpcode::MOVmr64).set_uses(vec![
+        pub static ref MOVmr64: TargetInstDefTy = {
+            TargetInstDef::new("mov", TargetOpcode::MOVmr64).set_uses(vec![
                 TargetOperand::Mem,
                 TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR64)),
             ])
         };
-        pub static ref MOVmi64: TargetInstDef = {
-            TargetInstDef::new(TargetOpcode::MOVmi64).set_uses(vec![
+        pub static ref MOVmi64: TargetInstDefTy = {
+            TargetInstDef::new("mov", TargetOpcode::MOVmi64).set_uses(vec![
                 TargetOperand::Mem,
                 TargetOperand::Immediate(TargetImmediate::I64),
             ])
         };
-        pub static ref MOVrr64: TargetInstDef = {
-            TargetInstDef::new(TargetOpcode::MOVrr64)
+        pub static ref MOVrr64: TargetInstDefTy = {
+            TargetInstDef::new("mov", TargetOpcode::MOVrr64)
                 .set_uses(vec![TargetOperand::Register(TargetRegister::RegClass(
                     RegisterClassKind::GR64,
                 ))])
                 .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR64)])
         };
-        pub static ref MOVri64: TargetInstDef = {
-            TargetInstDef::new(TargetOpcode::MOVri64)
+        pub static ref MOVri64: TargetInstDefTy = {
+            TargetInstDef::new("mov", TargetOpcode::MOVri64)
                 .set_uses(vec![TargetOperand::Immediate(TargetImmediate::I64)])
                 .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR64)])
         };
-        pub static ref MOVrm64: TargetInstDef = {
-            TargetInstDef::new(TargetOpcode::MOVrm64)
+        pub static ref MOVrm64: TargetInstDefTy = {
+            TargetInstDef::new("mov", TargetOpcode::MOVrm64)
                 .set_uses(vec![TargetOperand::Mem])
                 .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR64)])
         };
-        pub static ref IDIV: TargetInstDef = {
-            TargetInstDef::new(TargetOpcode::IDIV)
+        pub static ref IDIV: TargetInstDefTy = {
+            TargetInstDef::new("idiv", TargetOpcode::IDIV)
                 .set_uses(vec![TargetOperand::Register(TargetRegister::RegClass(
                     RegisterClassKind::GR32,
                 ))])
@@ -304,58 +306,18 @@ mod inst {
                     TargetRegister::Specific(GR32::EDX.as_phys_reg()),
                 ])
         };
-        pub static ref PUSH64: TargetInstDef = {
-            TargetInstDef::new(TargetOpcode::PUSH64).set_uses(vec![TargetOperand::Register(
+        pub static ref PUSH64: TargetInstDefTy = {
+            TargetInstDef::new("push", TargetOpcode::PUSH64).set_uses(vec![TargetOperand::Register(
                 TargetRegister::RegClass(RegisterClassKind::GR64),
             )])
         };
-        pub static ref POP64: TargetInstDef = {
-            TargetInstDef::new(TargetOpcode::POP64).set_uses(vec![TargetOperand::Register(
+        pub static ref POP64: TargetInstDefTy = {
+            TargetInstDef::new("pop", TargetOpcode::POP64).set_uses(vec![TargetOperand::Register(
                 TargetRegister::RegClass(RegisterClassKind::GR64),
             )])
         };
-        pub static ref RET: TargetInstDef = TargetInstDef::new(TargetOpcode::RET);
+        pub static ref RET: TargetInstDefTy = TargetInstDef::new("ret", TargetOpcode::RET);
     }
-}
-
-#[derive(Clone)]
-pub struct TargetInstDef {
-    pub opcode: TargetOpcode,
-    pub uses: Vec<TargetOperand>,
-    pub defs: Vec<TargetRegister>,
-    pub tie: FxHashMap<DefOrUseReg, DefOrUseReg>, // def -> use
-    pub imp_use: Vec<TargetRegister>,
-    pub imp_def: Vec<TargetRegister>,
-}
-
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
-pub enum DefOrUseReg {
-    Def(usize), // nth def register
-    Use(usize), // nth use register
-}
-
-#[derive(Clone)]
-pub enum TargetOperand {
-    Register(TargetRegister),
-    Immediate(TargetImmediate),
-    Addr,
-    FrameIndex,
-    Any,
-    Mem,
-}
-
-#[derive(Clone)]
-pub enum TargetRegister {
-    RegClass(RegisterClassKind),
-    Specific(PhysReg),
-}
-
-#[derive(Clone, Copy, PartialEq)]
-pub enum TargetImmediate {
-    I8,
-    I32,
-    I64,
-    F64,
 }
 
 // r => register
@@ -461,7 +423,7 @@ pub enum TargetOpcode {
 }
 
 impl TargetOpcode {
-    pub fn inst_def(&self) -> Option<&TargetInstDef> {
+    pub fn inst_def(&self) -> Option<&TargetInstDefTy> {
         match self {
             Self::MOVSDrm64 => Some(&*inst::MOVSDrm64),
             Self::MOVSDmr => Some(&*inst::MOVSDmr),
@@ -506,69 +468,6 @@ impl TargetOpcode {
             Self::POP64 => Some(&*inst::POP64),
             Self::RET => Some(&*inst::RET),
             _ => None,
-        }
-    }
-}
-
-impl TargetInstDef {
-    pub fn new(opcode: TargetOpcode) -> Self {
-        Self {
-            opcode,
-            uses: vec![],
-            defs: vec![],
-            tie: FxHashMap::default(),
-            imp_def: vec![],
-            imp_use: vec![],
-        }
-    }
-
-    pub fn set_uses(mut self, uses: Vec<TargetOperand>) -> Self {
-        self.uses = uses;
-        self
-    }
-
-    pub fn set_defs(mut self, defs: Vec<TargetRegister>) -> Self {
-        self.defs = defs;
-        self
-    }
-
-    pub fn add_tie(mut self, def: DefOrUseReg, use_: DefOrUseReg) -> Self {
-        self.tie.insert(def, use_);
-        self
-    }
-
-    pub fn set_imp_def(mut self, imp_def: Vec<TargetRegister>) -> Self {
-        self.imp_def = imp_def;
-        self
-    }
-
-    pub fn set_imp_use(mut self, imp_use: Vec<TargetRegister>) -> Self {
-        self.imp_use = imp_use;
-        self
-    }
-}
-
-impl TargetRegister {
-    pub fn as_reg_class(&self) -> RegisterClassKind {
-        match self {
-            Self::RegClass(rc) => *rc,
-            _ => panic!(),
-        }
-    }
-}
-
-impl DefOrUseReg {
-    pub fn as_def(&self) -> usize {
-        match self {
-            Self::Def(d) => *d,
-            _ => panic!(),
-        }
-    }
-
-    pub fn as_use(&self) -> usize {
-        match self {
-            Self::Use(u) => *u,
-            _ => panic!(),
         }
     }
 }

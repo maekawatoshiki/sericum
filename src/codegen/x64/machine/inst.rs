@@ -1,4 +1,4 @@
-pub use super::super::inst::{TargetImmediate, TargetOpcode};
+pub use super::super::inst::TargetOpcode;
 use super::super::register::{
     rc2ty, PhysReg, RegisterClassKind, RegisterId, RegistersInfo, TargetRegisterTrait, VirtReg,
     VirtRegGen, GR32, GR64, PHYS_REGISTERS_NUM, XMM,

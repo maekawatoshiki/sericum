@@ -1,3 +1,4 @@
+pub mod common;
 #[cfg(feature = "riscv64")]
 pub mod riscv64;
 #[cfg(feature = "x86_64")]
