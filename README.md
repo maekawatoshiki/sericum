@@ -22,7 +22,7 @@ Do not expect too much stuff!
 
 # Build
 
-** Requirement: Rust nightly **
+**Requirement: Rust nightly**
 
 ```sh
 cargo test --feature x86_64 # build for x86_64
