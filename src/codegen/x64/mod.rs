@@ -2,9 +2,7 @@ pub mod asm;
 pub mod dag;
 pub mod exec;
 pub mod frame_object;
-pub mod inst;
 pub mod machine;
-pub mod register;
 
 use crate::ir;
 use crate::ir::types::*;

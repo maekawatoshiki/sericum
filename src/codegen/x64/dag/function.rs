@@ -1,4 +1,4 @@
-use super::super::register::*;
+use super::super::machine::register::*;
 use super::{basic_block::*, frame_object::*, node::*};
 use crate::ir::{function::*, types::*};
 use crate::util::allocator::*;

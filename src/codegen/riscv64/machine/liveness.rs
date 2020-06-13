@@ -1,4 +1,4 @@
-use super::super::register::*;
+use super::super::machine::register::*;
 use super::{basic_block::*, function::*, inst::*, module::*};
 use crate::util::allocator::{Raw, RawAllocator};
 use rustc_hash::FxHashMap;

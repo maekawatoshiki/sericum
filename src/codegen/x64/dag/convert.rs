@@ -1,7 +1,7 @@
 // Convert IR to architecture-independent DAG form
 // TODO: refactor
 
-use super::super::{frame_object::*, register::*};
+use super::super::{frame_object::*, machine::register::*};
 use super::{basic_block::*, function::*, module::*, node::*};
 use crate::ir::{
     basic_block::*, function::*, liveness::*, module::*, opcode::*, types::*, value::*,

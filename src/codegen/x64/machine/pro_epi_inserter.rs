@@ -1,4 +1,4 @@
-use super::super::{dag::mc_convert::mov_mx, frame_object::*, register::*};
+use super::super::{dag::mc_convert::mov_mx, frame_object::*, machine::register::*};
 use super::{builder::*, function::MachineFunction, inst::*, module::MachineModule};
 use crate::{codegen::x64::exec::roundup, ir::types::*, traits::pass::ModulePassTrait};
 use std::cmp;

@@ -1,7 +1,7 @@
 use super::super::dag::mc_convert::{mov_mx, mov_rx};
 use super::super::{
     frame_object::FrameIndexInfo,
-    register::{rc2ty, RegisterId, VirtReg, GR64},
+    machine::register::{rc2ty, RegisterId, VirtReg, GR64},
 };
 use super::{
     builder::{BuilderTrait, BuilderWithLiveInfoEdit},

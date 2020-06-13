@@ -1,5 +1,5 @@
 use crate::codegen::arch::machine::inst::TargetOpcode;
-use crate::codegen::arch::register::{PhysReg, RegisterClassKind};
+use crate::codegen::arch::machine::register::{PhysReg, RegisterClassKind};
 use rustc_hash::FxHashMap;
 
 #[derive(Clone)]

@@ -1,4 +1,4 @@
-use super::super::register::RegisterId;
+use super::super::machine::register::RegisterId;
 use super::{basic_block::*, function::*, liveness::*};
 use rustc_hash::FxHashSet;
 use std::collections::VecDeque;

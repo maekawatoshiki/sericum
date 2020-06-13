@@ -1,4 +1,4 @@
-use super::register::*;
+use crate::codegen::arch::machine::register::*;
 use crate::codegen::common::machine::inst_def::*;
 
 #[allow(non_upper_case_globals)]

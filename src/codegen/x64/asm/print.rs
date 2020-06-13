@@ -4,8 +4,8 @@ use super::super::machine::{
     function::{InstIter, MachineFunction},
     inst::*,
     module::MachineModule,
+    register::RegistersInfo,
 };
-use super::super::register::RegistersInfo;
 use crate::ir::types::{TypeSize, Types};
 
 pub struct MachineAsmPrinter {

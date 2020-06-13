@@ -1,5 +1,4 @@
-// use super::{module::*, opcode::*, value::*};
-use super::super::register::{
+use super::super::machine::register::{
     PhysRegSet, RegisterId, TargetRegisterTrait, VirtOrPhys, CALLEE_SAVED_REGS,
 };
 use super::inst::*;

@@ -1,5 +1,5 @@
 use super::super::dag::function::*;
-use super::super::register::*;
+use super::super::machine::register::*;
 use super::{basic_block::*, frame_object::*, inst::*};
 use crate::ir::types::*;
 use crate::traits::function::FunctionTrait;

@@ -1,5 +1,4 @@
-use crate::codegen::arch::machine::inst::MachineInstId;
-use crate::codegen::arch::register::*;
+use crate::codegen::arch::machine::{inst::MachineInstId, register::*};
 use id_arena::{Arena, Id};
 use rustc_hash::FxHashSet;
 use std::fmt::Debug;

@@ -1,7 +1,7 @@
 // TODO: dirty code
 
+use super::super::machine::register::*;
 use super::super::machine::{basic_block::*, function::*, inst, inst::*, module::*};
-use super::super::register::*;
 use super::{basic_block::DAGBasicBlockId, function::*, module::*, node, node::*};
 use crate::codegen::common::machine::inst_def::DefOrUseReg;
 use crate::util::allocator::*;

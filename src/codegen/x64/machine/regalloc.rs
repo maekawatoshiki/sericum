@@ -1,7 +1,7 @@
 use super::super::{
     dag::mc_convert::{mov_mx, mov_rx},
     frame_object::*,
-    register::*,
+    machine::register::*,
 };
 use super::calc_spill_weight::calc_spill_weight;
 use super::reg_coalescer::coalesce_function;

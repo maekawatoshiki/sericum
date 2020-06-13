@@ -14,5 +14,7 @@ pub mod regalloc;
 pub mod replace_copy;
 // pub mod replace_data;
 // pub mod spiller;
+pub mod inst_def;
+pub mod register;
 pub mod two_addr;
 pub use super::frame_object;

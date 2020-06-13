@@ -1,4 +1,4 @@
-use super::super::register::*;
+use super::super::machine::register::*;
 use super::calc_spill_weight::calc_spill_weight;
 use super::reg_coalescer::coalesce_function;
 // use super::spiller::Spiller;

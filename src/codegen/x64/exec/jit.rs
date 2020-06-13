@@ -1,6 +1,6 @@
 // TODO: much legacy code remains.
 
-use super::super::register::{PhysReg, RegisterClassKind};
+use super::super::machine::register::{PhysReg, RegisterClassKind};
 use crate::{
     codegen::{
         internal_function_names,
@@ -1134,7 +1134,7 @@ pub extern "C" fn cilk_memset_p0i32_i32_(p: *mut i32, x: i32, count: i32) {
 
 #[test]
 fn test_phys_reg_to_dynasm_reg() {
-    use super::super::register::*;
+    use super::super::machine::register::*;
     assert_eq!(phys_reg_to_dynasm_reg(GR32::EAX.as_phys_reg()), 0);
     assert_eq!(phys_reg_to_dynasm_reg(GR64::RAX.as_phys_reg()), 0);
     assert_eq!(phys_reg_to_dynasm_reg(GR32::R15D.as_phys_reg()), 15);

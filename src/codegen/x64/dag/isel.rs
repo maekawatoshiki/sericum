@@ -1,5 +1,5 @@
 use super::{
-    super::register::*,
+    super::machine::register::*,
     function::{DAGFunction, DAGHeap},
     module::DAGModule,
     node::*,
