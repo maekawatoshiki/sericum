@@ -1,15 +1,16 @@
-// use super::register::*;
+use crate::codegen::arch::machine::inst::TargetOpcode;
+use crate::codegen::arch::register::{PhysReg, RegisterClassKind};
 use rustc_hash::FxHashMap;
 
 #[derive(Clone)]
-pub struct TargetInstDef<OP, R> {
+pub struct TargetInstDef {
     pub name: &'static str,
-    pub opcode: OP,
-    pub uses: Vec<TargetOperand<R>>,
-    pub defs: Vec<R>,
+    pub opcode: TargetOpcode,
+    pub uses: Vec<TargetOperand>,
+    pub defs: Vec<TargetRegister>,
     pub tie: FxHashMap<DefOrUseReg, DefOrUseReg>, // def -> use
-    pub imp_use: Vec<R>,
-    pub imp_def: Vec<R>,
+    pub imp_use: Vec<TargetRegister>,
+    pub imp_def: Vec<TargetRegister>,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
@@ -19,8 +20,8 @@ pub enum DefOrUseReg {
 }
 
 #[derive(Clone)]
-pub enum TargetOperand<R> {
-    Register(R),
+pub enum TargetOperand {
+    Register(TargetRegister),
     Immediate(TargetImmediate),
     Addr,
     FrameIndex,
@@ -31,12 +32,9 @@ pub enum TargetOperand<R> {
 
 use std::{fmt::Debug, hash::Hash};
 #[derive(Clone)]
-pub enum TargetRegister<
-    RC: Debug + Clone + Copy + Hash + PartialEq,
-    P: Debug + Clone + Copy + Hash + PartialEq,
-> {
-    RegClass(RC),
-    Specific(P),
+pub enum TargetRegister {
+    RegClass(RegisterClassKind),
+    Specific(PhysReg),
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -47,8 +45,8 @@ pub enum TargetImmediate {
     F64,
 }
 
-impl<OP, R> TargetInstDef<OP, R> {
-    pub fn new(name: &'static str, opcode: OP) -> Self {
+impl TargetInstDef {
+    pub fn new(name: &'static str, opcode: TargetOpcode) -> Self {
         Self {
             name,
             opcode,
@@ -60,12 +58,12 @@ impl<OP, R> TargetInstDef<OP, R> {
         }
     }
 
-    pub fn set_uses(mut self, uses: Vec<TargetOperand<R>>) -> Self {
+    pub fn set_uses(mut self, uses: Vec<TargetOperand>) -> Self {
         self.uses = uses;
         self
     }
 
-    pub fn set_defs(mut self, defs: Vec<R>) -> Self {
+    pub fn set_defs(mut self, defs: Vec<TargetRegister>) -> Self {
         self.defs = defs;
         self
     }
@@ -75,21 +73,19 @@ impl<OP, R> TargetInstDef<OP, R> {
         self
     }
 
-    pub fn set_imp_def(mut self, imp_def: Vec<R>) -> Self {
+    pub fn set_imp_def(mut self, imp_def: Vec<TargetRegister>) -> Self {
         self.imp_def = imp_def;
         self
     }
 
-    pub fn set_imp_use(mut self, imp_use: Vec<R>) -> Self {
+    pub fn set_imp_use(mut self, imp_use: Vec<TargetRegister>) -> Self {
         self.imp_use = imp_use;
         self
     }
 }
 
-impl<RC: Debug + Clone + Copy + Hash + PartialEq, P: Debug + Clone + Copy + Hash + PartialEq>
-    TargetRegister<RC, P>
-{
-    pub fn as_reg_class(&self) -> RC {
+impl TargetRegister {
+    pub fn as_reg_class(&self) -> RegisterClassKind {
         match self {
             Self::RegClass(rc) => *rc,
             _ => panic!(),

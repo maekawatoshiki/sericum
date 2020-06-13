@@ -1,79 +1,77 @@
 use super::register::*;
 use crate::codegen::common::machine::inst_def::*;
 
-type TargetInstDefTy = TargetInstDef<TargetOpcode, TargetRegister<RegisterClassKind, PhysReg>>;
-
 #[allow(non_upper_case_globals)]
 mod inst {
     use super::*;
 
     // TODO: need macro to describe the followings
     lazy_static! {
-        pub static ref ADDI: TargetInstDefTy = TargetInstDef::new("addi", TargetOpcode::ADDI)
+        pub static ref ADDI: TargetInstDef = TargetInstDef::new("addi", TargetOpcode::ADDI)
             .set_uses(vec![
                 TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GPR)),
                 TargetOperand::Immediate(TargetImmediate::I32),
             ])
             .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GPR)]);
-        pub static ref ADDIW: TargetInstDefTy = TargetInstDef::new("addiw", TargetOpcode::ADDIW)
+        pub static ref ADDIW: TargetInstDef = TargetInstDef::new("addiw", TargetOpcode::ADDIW)
             .set_uses(vec![
                 TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GPR)),
                 TargetOperand::Immediate(TargetImmediate::I32),
             ])
             .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GPR)]);
-        pub static ref ADDW: TargetInstDefTy = TargetInstDef::new("addw", TargetOpcode::ADDW)
+        pub static ref ADDW: TargetInstDef = TargetInstDef::new("addw", TargetOpcode::ADDW)
             .set_uses(vec![
                 TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GPR)),
                 TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GPR)),
             ])
             .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GPR)]);
-        pub static ref MULW: TargetInstDefTy = TargetInstDef::new("mulw", TargetOpcode::MULW)
+        pub static ref MULW: TargetInstDef = TargetInstDef::new("mulw", TargetOpcode::MULW)
             .set_uses(vec![
                 TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GPR)),
                 TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GPR)),
             ])
             .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GPR)]);
-        pub static ref DIVW: TargetInstDefTy = TargetInstDef::new("divw", TargetOpcode::DIVW)
+        pub static ref DIVW: TargetInstDef = TargetInstDef::new("divw", TargetOpcode::DIVW)
             .set_uses(vec![
                 TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GPR)),
                 TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GPR)),
             ])
             .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GPR)]);
-        pub static ref MV: TargetInstDefTy = TargetInstDef::new("mv", TargetOpcode::LI)
+        pub static ref MV: TargetInstDef = TargetInstDef::new("mv", TargetOpcode::LI)
             .set_uses(vec![TargetOperand::Register(TargetRegister::RegClass(
                 RegisterClassKind::GPR
             ))])
             .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GPR)]);
-        pub static ref LI: TargetInstDefTy = TargetInstDef::new("li", TargetOpcode::LI)
+        pub static ref LI: TargetInstDef = TargetInstDef::new("li", TargetOpcode::LI)
             .set_uses(vec![TargetOperand::Any])
             .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GPR)]);
-        pub static ref LW: TargetInstDefTy = TargetInstDef::new("lw", TargetOpcode::LW)
+        pub static ref LW: TargetInstDef = TargetInstDef::new("lw", TargetOpcode::LW)
             .set_uses(vec![
                 TargetOperand::Immediate(TargetImmediate::I32),
                 TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GPR))
             ])
             .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GPR)]);
-        pub static ref LD: TargetInstDefTy = TargetInstDef::new("ld", TargetOpcode::LD)
+        pub static ref LD: TargetInstDef = TargetInstDef::new("ld", TargetOpcode::LD)
             .set_uses(vec![
                 TargetOperand::Immediate(TargetImmediate::I32),
                 TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GPR))
             ])
             .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GPR)]);
-        pub static ref SW: TargetInstDefTy =
+        pub static ref SW: TargetInstDef =
             TargetInstDef::new("sw", TargetOpcode::SW).set_uses(vec![
                 TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GPR)),
                 TargetOperand::Immediate(TargetImmediate::I32),
                 TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GPR))
             ]);
-        pub static ref SD: TargetInstDefTy =
+        pub static ref SD: TargetInstDef =
             TargetInstDef::new("sd", TargetOpcode::SD).set_uses(vec![
                 TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GPR)),
                 TargetOperand::Immediate(TargetImmediate::I32),
                 TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GPR))
             ]);
-        pub static ref J: TargetInstDefTy =
+        pub static ref J: TargetInstDef =
             TargetInstDef::new("j", TargetOpcode::J).set_uses(vec![TargetOperand::Block]);
-        pub static ref JR: TargetInstDefTy =
+        pub static ref JR: TargetInstDef =
             TargetInstDef::new("jr", TargetOpcode::JR).set_uses(vec![TargetOperand::Register(
                 TargetRegister::RegClass(RegisterClassKind::GPR)
             )]);
@@ -128,7 +126,7 @@ pub enum TargetOpcode {
 }
 
 impl TargetOpcode {
-    pub fn inst_def(&self) -> Option<&TargetInstDefTy> {
+    pub fn inst_def(&self) -> Option<&TargetInstDef> {
         match self {
             Self::ADDI => Some(&*inst::ADDI),
             Self::ADDIW => Some(&*inst::ADDIW),
