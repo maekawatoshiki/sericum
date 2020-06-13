@@ -1,7 +1,6 @@
 pub mod basic_block;
 pub mod branch_folding;
 pub mod calc_spill_weight;
-pub mod const_data;
 pub mod inst;
 pub mod liveness;
 pub mod phi_elimination;

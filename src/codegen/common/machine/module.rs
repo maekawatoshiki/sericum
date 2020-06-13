@@ -1,4 +1,4 @@
-use crate::codegen::arch::machine::const_data::ConstDataArena;
+use crate::codegen::common::machine::const_data::ConstDataArena;
 use crate::codegen::common::machine::function::*;
 use crate::ir::types::*;
 use id_arena::*;

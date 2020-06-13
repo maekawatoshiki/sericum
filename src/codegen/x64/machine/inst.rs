@@ -2,7 +2,8 @@ use super::super::machine::register::{
     rc2ty, PhysReg, RegisterClassKind, RegisterId, RegistersInfo, TargetRegisterTrait, VirtReg,
 };
 pub use super::inst_def::TargetOpcode;
-use super::{basic_block::*, const_data::DataId, frame_object::*};
+use super::{basic_block::*, frame_object::*};
+use crate::codegen::common::machine::const_data::DataId;
 use crate::ir::types::*;
 use id_arena::*;
 use rustc_hash::{FxHashMap, FxHashSet};
