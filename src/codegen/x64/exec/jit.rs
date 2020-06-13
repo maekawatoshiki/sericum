@@ -1,13 +1,12 @@
 // TODO: much legacy code remains.
 
 use super::super::machine::register::{PhysReg, RegisterClassKind};
+use crate::codegen::common::machine::function::*;
 use crate::{
     codegen::{
         internal_function_names,
         x64::{
-            machine::{
-                basic_block::*, const_data::*, frame_object::*, function::*, inst::*, module::*,
-            },
+            machine::{basic_block::*, const_data::*, frame_object::*, inst::*, module::*},
             standard_conversion_into_machine_module,
         },
     },
@@ -50,7 +49,7 @@ pub struct JITCompiler {
 impl JITExecutor {
     pub fn new(module: &mut ir::module::Module) -> Self {
         let machine_module = standard_conversion_into_machine_module(module);
-        println!("{:?}", machine_module);
+        // println!("{:?}", machine_module);
 
         // use crate::codegen::x64::asm::print::MachineAsmPrinter;
         // let mut printer = MachineAsmPrinter::new();

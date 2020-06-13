@@ -1,5 +1,5 @@
-use super::machine::function::MachineFunction;
 use super::machine::register::ty2rc;
+use crate::codegen::common::machine::function::MachineFunction;
 use crate::ir::types::*;
 use rustc_hash::FxHashMap;
 use std::fmt;

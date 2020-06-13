@@ -1,5 +1,6 @@
 use super::super::{exec::roundup, frame_object::*, machine::register::*};
-use super::{builder::*, function::MachineFunction, inst::*, module::MachineModule};
+use super::{builder::*, inst::*, module::MachineModule};
+use crate::codegen::common::machine::function::*;
 use crate::{ir::types::*, traits::pass::ModulePassTrait};
 use std::cmp;
 

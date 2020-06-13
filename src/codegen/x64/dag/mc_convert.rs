@@ -1,7 +1,8 @@
 // TODO: dirty code
 
-use super::super::machine::{basic_block::*, function::*, inst, inst::*, module::*, register::*};
+use super::super::machine::{basic_block::*, inst, inst::*, module::*, register::*};
 use super::{basic_block::*, function::*, module::*, node, node::*};
+use crate::codegen::common::machine::function::*;
 use crate::codegen::common::machine::inst_def::DefOrUseReg;
 use crate::ir::types::*;
 use crate::util::allocator::*;

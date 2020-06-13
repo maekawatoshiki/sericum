@@ -1,5 +1,5 @@
 use super::const_data::ConstDataArena;
-use super::function::*;
+use crate::codegen::common::machine::function::*;
 use crate::ir::types::*;
 use id_arena::*;
 use std::fmt;

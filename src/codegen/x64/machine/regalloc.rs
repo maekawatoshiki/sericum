@@ -5,7 +5,8 @@ use super::super::{
 };
 use super::calc_spill_weight::calc_spill_weight;
 use super::reg_coalescer::coalesce_function;
-use super::{builder::*, function::*, inst::*, liveness::*, module::*, spiller::Spiller};
+use super::{builder::*, inst::*, liveness::*, module::*, spiller::Spiller};
+use crate::codegen::common::machine::function::*;
 use crate::{ir::types::Types, traits::pass::ModulePassTrait};
 use rustc_hash::FxHashSet;
 use std::collections::VecDeque;

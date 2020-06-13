@@ -1,10 +1,10 @@
 use super::super::dag::mc_convert::opcode_copy2reg;
 use super::{
-    function::MachineFunction,
     // basic_block::{MachineBasicBlock, MachineBasicBlockId},
     inst::MachineOpcode,
     module::MachineModule,
 };
+use crate::codegen::common::machine::function::MachineFunction;
 use crate::traits::pass::ModulePassTrait;
 
 pub struct ReplaceCopyWithProperMInst {}

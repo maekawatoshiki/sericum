@@ -5,10 +5,10 @@ use super::super::{
 };
 use super::{
     builder::{BuilderTrait, BuilderWithLiveInfoEdit},
-    function::MachineFunction,
     inst::{MachineInst, MachineMemOperand, MachineOpcode, MachineOperand},
     liveness::{LiveRange, LiveRegMatrix, LiveSegment},
 };
+use crate::codegen::common::machine::function::MachineFunction;
 use crate::ir::types::Types;
 
 pub struct Spiller<'a> {

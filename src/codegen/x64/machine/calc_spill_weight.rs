@@ -1,9 +1,10 @@
-use super::{basic_block::MachineBasicBlock, function::MachineFunction, liveness::LiveRegMatrix};
+use super::{basic_block::MachineBasicBlock, liveness::LiveRegMatrix};
 use crate::{
     analysis::{
         dom_tree::DominatorTreeConstructor,
         loops::{Loops, LoopsConstructor},
     },
+    codegen::common::machine::function::MachineFunction,
     traits::function::FunctionTrait,
 };
 use rustc_hash::FxHashSet;

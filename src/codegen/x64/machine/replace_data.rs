@@ -1,5 +1,6 @@
 use super::const_data::ConstDataArena;
-use super::{function::*, inst::*, module::*};
+use super::{inst::*, module::*};
+use crate::codegen::common::machine::function::*;
 use crate::traits::pass::ModulePassTrait;
 
 pub struct ReplaceConstFPWithMemoryRef {}

@@ -1,10 +1,6 @@
 use super::super::frame_object::FrameObjectsInfo;
-use super::super::machine::{
-    basic_block::MachineBasicBlockId,
-    function::{InstIter, MachineFunction},
-    inst::*,
-    module::MachineModule,
-};
+use super::super::machine::{basic_block::MachineBasicBlockId, inst::*, module::MachineModule};
+use crate::codegen::common::machine::function::{InstIter, MachineFunction};
 use crate::ir::types::Types;
 
 pub struct MachineAsmPrinter {

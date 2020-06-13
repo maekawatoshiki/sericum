@@ -1,9 +1,9 @@
 use super::{
     basic_block::*,
-    function::*,
     inst::*,
     liveness::{LiveRange, LiveRegMatrix, LiveSegment, ProgramPoint},
 };
+use crate::codegen::common::machine::function::*;
 
 pub struct BuilderWithLiveInfoEdit<'a> {
     pub matrix: &'a mut LiveRegMatrix,
