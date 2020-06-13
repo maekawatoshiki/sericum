@@ -4,11 +4,13 @@ use super::super::{
     machine::register::{rc2ty, RegisterId, VirtReg, GR64},
 };
 use super::{
-    builder::{BuilderTrait, BuilderWithLiveInfoEdit},
     inst::{MachineInst, MachineMemOperand, MachineOpcode, MachineOperand},
     liveness::{LiveRange, LiveRegMatrix, LiveSegment},
 };
-use crate::codegen::common::machine::function::MachineFunction;
+use crate::codegen::common::machine::{
+    builder::{BuilderTrait, BuilderWithLiveInfoEdit},
+    function::MachineFunction,
+};
 use crate::ir::types::Types;
 
 pub struct Spiller<'a> {

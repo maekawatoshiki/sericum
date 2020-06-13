@@ -1,4 +1,4 @@
-use super::{
+use crate::codegen::arch::machine::{
     basic_block::*,
     inst::*,
     liveness::{LiveRange, LiveRegMatrix, LiveSegment, ProgramPoint},

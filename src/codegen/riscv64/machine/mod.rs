@@ -1,6 +1,5 @@
 pub mod basic_block;
 pub mod branch_folding;
-pub mod builder;
 pub mod calc_spill_weight;
 pub mod const_data;
 pub mod inst;
@@ -14,5 +13,4 @@ pub mod replace_copy;
 // pub mod spiller;
 pub mod inst_def;
 pub mod register;
-pub mod two_addr;
 pub use super::frame_object;

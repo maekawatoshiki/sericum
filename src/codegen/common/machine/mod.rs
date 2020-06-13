@@ -1,3 +1,4 @@
+pub mod builder;
 pub mod function;
 pub mod inst_def;
 pub mod module;
