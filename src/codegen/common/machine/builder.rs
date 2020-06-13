@@ -1,5 +1,6 @@
-use crate::codegen::arch::machine::{basic_block::*, inst::*};
+use crate::codegen::arch::machine::inst::*;
 use crate::codegen::common::machine::{
+    basic_block::*,
     function::*,
     liveness::{LiveRange, LiveRegMatrix, LiveSegment, ProgramPoint},
 };

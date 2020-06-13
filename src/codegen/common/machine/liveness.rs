@@ -1,5 +1,5 @@
-use crate::codegen::arch::machine::{basic_block::*, inst::*, register::*};
-use crate::codegen::common::machine::{function::*, module::*};
+use crate::codegen::arch::machine::{inst::*, register::*};
+use crate::codegen::common::machine::{basic_block::*, function::*, module::*};
 use crate::util::allocator::{Raw, RawAllocator};
 use rustc_hash::FxHashMap;
 use std::cmp::Ordering;

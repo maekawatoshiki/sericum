@@ -1,7 +1,8 @@
-use super::super::machine::register::{
+// use super::{module::*, opcode::*, value::*};
+use crate::codegen::arch::machine::inst::*;
+use crate::codegen::arch::machine::register::{
     PhysRegSet, RegisterId, TargetRegisterTrait, VirtOrPhys, CALLEE_SAVED_REGS,
 };
-use super::inst::*;
 use crate::traits::basic_block::*;
 use id_arena::*;
 use rustc_hash::FxHashSet;

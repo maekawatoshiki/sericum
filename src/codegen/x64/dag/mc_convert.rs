@@ -1,8 +1,10 @@
 // TODO: dirty code
 
-use super::super::machine::{basic_block::*, inst, inst::*, register::*};
+use super::super::machine::{inst, inst::*, register::*};
 use super::{basic_block::*, function::*, module::*, node, node::*};
-use crate::codegen::common::machine::{function::*, inst_def::DefOrUseReg, module::*};
+use crate::codegen::common::machine::{
+    basic_block::*, function::*, inst_def::DefOrUseReg, module::*,
+};
 use crate::ir::types::*;
 use crate::util::allocator::*;
 use id_arena::*;

@@ -1,9 +1,11 @@
 // TODO: dirty code
 
 use super::super::machine::register::*;
-use super::super::machine::{basic_block::*, inst, inst::*};
+use super::super::machine::{inst, inst::*};
 use super::{basic_block::DAGBasicBlockId, function::*, module::*, node, node::*};
-use crate::codegen::common::machine::{function::*, inst_def::DefOrUseReg, module::*};
+use crate::codegen::common::machine::{
+    basic_block::*, function::*, inst_def::DefOrUseReg, module::*,
+};
 use crate::util::allocator::*;
 use id_arena::*;
 use rustc_hash::FxHashMap;

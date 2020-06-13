@@ -1,4 +1,3 @@
-pub mod basic_block;
 pub mod branch_folding;
 pub mod calc_spill_weight;
 pub mod inst;

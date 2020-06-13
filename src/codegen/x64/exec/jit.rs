@@ -3,10 +3,10 @@
 use super::super::machine::register::{PhysReg, RegisterClassKind};
 use crate::{
     codegen::{
-        common::machine::{const_data::*, function::*, module::*},
+        common::machine::{basic_block::*, const_data::*, function::*, module::*},
         internal_function_names,
         x64::{
-            machine::{basic_block::*, frame_object::*, inst::*},
+            machine::{frame_object::*, inst::*},
             standard_conversion_into_machine_module,
         },
     },

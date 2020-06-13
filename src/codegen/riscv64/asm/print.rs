@@ -1,6 +1,7 @@
 use super::super::frame_object::FrameObjectsInfo;
-use super::super::machine::{basic_block::MachineBasicBlockId, inst::*};
+use super::super::machine::inst::*;
 use crate::codegen::common::machine::{
+    basic_block::MachineBasicBlockId,
     function::{InstIter, MachineFunction},
     module::MachineModule,
 };
