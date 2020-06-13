@@ -1,6 +1,5 @@
 use crate::codegen::arch::machine::inst::MachineInstId;
 use crate::codegen::arch::register::*;
-use crate::ir::types::*;
 use id_arena::{Arena, Id};
 use rustc_hash::FxHashSet;
 use std::fmt::Debug;
@@ -11,27 +10,6 @@ use std::{
     ops::{BitAnd, BitOr},
     ops::{Index, IndexMut},
 };
-
-// TODO: TEMPORARY FUNCTIONS. WILL BE REMOVED.
-pub fn ty2rc(ty: &Type) -> Option<RegisterClassKind> {
-    match ty {
-        Type::Void => None,
-        Type::Int32 => Some(RegisterClassKind::GR32),
-        Type::Int64 => Some(RegisterClassKind::GR64),
-        Type::F64 => Some(RegisterClassKind::XMM),
-        Type::Pointer(_) => Some(RegisterClassKind::GR64),
-        Type::Array(_) => None,
-        e => unimplemented!("{:?}", e),
-    }
-}
-
-pub fn rc2ty(rc: RegisterClassKind) -> Type {
-    match rc {
-        RegisterClassKind::GR32 => Type::Int32,
-        RegisterClassKind::GR64 => Type::Int64,
-        RegisterClassKind::XMM => Type::F64,
-    }
-}
 
 pub trait TargetRegisterTrait: Copy + Clone {
     fn as_phys_reg(&self) -> PhysReg;

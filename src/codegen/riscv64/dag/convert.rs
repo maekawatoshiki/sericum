@@ -23,7 +23,6 @@ pub struct ConversionInfo {
     pub local_mgr: LocalVariables,
     pub bb_to_dag_bb: FxHashMap<BasicBlockId, DAGBasicBlockId>,
     pub last_chain_node: Option<Raw<DAGNode>>,
-    pub vreg_gen: VirtRegGen,
     pub regs_info: RegistersInfo,
     pub arg_regs: FxHashMap<usize, Raw<DAGNode>>,
 }
@@ -92,7 +91,6 @@ impl<'a> ConvertToDAG<'a> {
             dag_bb_arena,
             dag_bb_list,
             conv_info.local_mgr,
-            conv_info.vreg_gen,
             conv_info.regs_info,
         )
     }
@@ -626,7 +624,6 @@ impl ConversionInfo {
             local_mgr: LocalVariables::new(),
             bb_to_dag_bb: FxHashMap::default(),
             last_chain_node: None,
-            vreg_gen: VirtRegGen::new(),
             regs_info: RegistersInfo::new(),
             arg_regs: FxHashMap::default(),
         }

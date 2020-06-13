@@ -1,4 +1,5 @@
 pub use crate::codegen::common::machine::register::*;
+use crate::ir::types::Type;
 use id_arena::Arena;
 use rustc_hash::FxHashMap;
 use std::cell::RefCell;
@@ -12,6 +13,27 @@ macro_rules! to_phys {
     ($($r:path),*) => {
         vec![$(($r.as_phys_reg())),*]
     };
+}
+
+// TODO: TEMPORARY FUNCTIONS. WILL BE REMOVED.
+pub fn ty2rc(ty: &Type) -> Option<RegisterClassKind> {
+    match ty {
+        Type::Void => None,
+        Type::Int32 => Some(RegisterClassKind::GR32),
+        Type::Int64 => Some(RegisterClassKind::GR64),
+        Type::F64 => Some(RegisterClassKind::XMM),
+        Type::Pointer(_) => Some(RegisterClassKind::GR64),
+        Type::Array(_) => None,
+        e => unimplemented!("{:?}", e),
+    }
+}
+
+pub fn rc2ty(rc: RegisterClassKind) -> Type {
+    match rc {
+        RegisterClassKind::GR32 => Type::Int32,
+        RegisterClassKind::GR64 => Type::Int64,
+        RegisterClassKind::XMM => Type::F64,
+    }
 }
 
 // Remember to fix PhysReg::reg_class() when appending a variant

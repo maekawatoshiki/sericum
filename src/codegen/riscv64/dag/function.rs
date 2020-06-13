@@ -25,9 +25,6 @@ pub struct DAGFunction {
 
     pub local_mgr: LocalVariables,
 
-    /// Virtual register generator
-    pub vreg_gen: VirtRegGen,
-
     pub regs_info: RegistersInfo,
 
     pub is_internal: bool,
@@ -46,7 +43,6 @@ impl DAGFunction {
         dag_basic_block_arena: Arena<DAGBasicBlock>,
         dag_basic_blocks: Vec<DAGBasicBlockId>,
         local_mgr: LocalVariables,
-        vreg_gen: VirtRegGen,
         regs_info: RegistersInfo,
     ) -> Self {
         Self {
@@ -57,7 +53,6 @@ impl DAGFunction {
             dag_basic_blocks,
             dag_heap,
             local_mgr,
-            vreg_gen,
             regs_info,
         }
     }

@@ -28,9 +28,6 @@ pub struct MachineFunction {
     /// Local variables info
     pub local_mgr: LocalVariables,
 
-    /// Virtual register generator
-    pub vreg_gen: VirtRegGen,
-
     pub regs_info: RegistersInfo,
 }
 
@@ -124,7 +121,6 @@ impl MachineFunction {
                 basic_blocks,
             },
             local_mgr: f.local_mgr,
-            vreg_gen: f.vreg_gen,
             regs_info: f.regs_info,
         }
     }
