@@ -1,5 +1,4 @@
-use super::module::MachineModule;
-use crate::codegen::common::machine::function::*;
+use crate::codegen::common::machine::{function::*, module::MachineModule};
 use crate::traits::pass::ModulePassTrait;
 
 // Must run after phi elimination

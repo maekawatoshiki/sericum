@@ -1,10 +1,6 @@
 use super::super::dag::mc_convert::mov_rx;
-use super::{
-    // basic_block::{MachineBasicBlock, MachineBasicBlockId},
-    inst::MachineOpcode,
-    module::MachineModule,
-};
-use crate::codegen::common::machine::function::MachineFunction;
+use super::inst::MachineOpcode;
+use crate::codegen::common::machine::{function::MachineFunction, module::MachineModule};
 use crate::{ir::types::Types, traits::pass::ModulePassTrait};
 
 pub struct ReplaceCopyWithProperMInst {}

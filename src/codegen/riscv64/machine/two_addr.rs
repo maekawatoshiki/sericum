@@ -1,5 +1,5 @@
-use super::{builder::*, inst::*, module::*};
-use crate::codegen::common::machine::function::*;
+use super::{builder::*, inst::*};
+use crate::codegen::common::machine::{function::*, module::*};
 use crate::traits::pass::ModulePassTrait;
 use std::mem;
 

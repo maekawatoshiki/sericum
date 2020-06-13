@@ -1,12 +1,12 @@
 // TODO: much legacy code remains.
 
 use super::super::machine::register::{PhysReg, RegisterClassKind};
-use crate::codegen::common::machine::function::*;
 use crate::{
     codegen::{
+        common::machine::{function::*, module::*},
         internal_function_names,
         x64::{
-            machine::{basic_block::*, const_data::*, frame_object::*, inst::*, module::*},
+            machine::{basic_block::*, const_data::*, frame_object::*, inst::*},
             standard_conversion_into_machine_module,
         },
     },

@@ -1,8 +1,9 @@
 use super::super::frame_object::FrameObjectsInfo;
-use super::super::machine::{
-    basic_block::MachineBasicBlockId, inst::*, module::MachineModule, register::RegistersInfo,
+use super::super::machine::{basic_block::MachineBasicBlockId, inst::*, register::RegistersInfo};
+use crate::codegen::common::machine::{
+    function::{InstIter, MachineFunction},
+    module::MachineModule,
 };
-use crate::codegen::common::machine::function::{InstIter, MachineFunction};
 use crate::ir::types::{TypeSize, Types};
 
 pub struct MachineAsmPrinter {

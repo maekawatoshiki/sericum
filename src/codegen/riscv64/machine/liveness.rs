@@ -1,6 +1,6 @@
 use super::super::machine::register::*;
-use super::{basic_block::*, inst::*, module::*};
-use crate::codegen::common::machine::function::*;
+use super::{basic_block::*, inst::*};
+use crate::codegen::common::machine::{function::*, module::*};
 use crate::util::allocator::{Raw, RawAllocator};
 use rustc_hash::FxHashMap;
 use std::cmp::Ordering;

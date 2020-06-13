@@ -6,7 +6,6 @@ pub mod const_data;
 pub mod inst;
 pub mod inst_def;
 pub mod liveness;
-pub mod module;
 pub mod phi_elimination;
 pub mod pro_epi_inserter;
 pub mod reg_coalescer;

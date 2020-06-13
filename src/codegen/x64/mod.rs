@@ -6,8 +6,10 @@ pub mod machine;
 
 use crate::ir;
 use crate::ir::types::*;
-use crate::{ir::module::Module, traits::pass::ModulePassManager};
-use machine::module::MachineModule;
+use crate::{
+    codegen::common::machine::module::MachineModule, ir::module::Module,
+    traits::pass::ModulePassManager,
+};
 
 impl TypeSize for Type {
     fn size_in_byte(&self, tys: &Types) -> usize {

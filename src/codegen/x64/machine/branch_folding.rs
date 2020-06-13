@@ -1,5 +1,5 @@
-use super::{inst::MachineOpcode, module::MachineModule};
-use crate::codegen::common::machine::function::MachineFunction;
+use super::inst::MachineOpcode;
+use crate::codegen::common::machine::{function::MachineFunction, module::MachineModule};
 use crate::traits::pass::ModulePassTrait;
 
 // Must run after phi elimination
