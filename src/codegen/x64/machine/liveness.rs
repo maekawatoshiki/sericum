@@ -77,9 +77,9 @@ impl LiveRegMatrix {
         }
     }
 
-    pub fn contains_vreg_entity(&self, vreg: &MachineRegister) -> bool {
-        self.vreg2entity.contains_key(&vreg.get_vreg())
-    }
+    // pub fn contains_vreg_entity(&self, vreg: &MachineRegister) -> bool {
+    //     self.vreg2entity.contains_key(&vreg.get_vreg())
+    // }
 
     pub fn add_vreg_entity(&mut self, reg: RegisterId) {
         self.vreg2entity.insert(reg.as_virt_reg(), reg);

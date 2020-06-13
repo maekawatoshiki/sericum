@@ -1,18 +1,12 @@
 pub use super::super::inst::TargetOpcode;
 use super::super::register::{
     rc2ty, PhysReg, RegisterClassKind, RegisterId, RegistersInfo, TargetRegisterTrait, VirtReg,
-    VirtRegGen, GR32, GR64, PHYS_REGISTERS_NUM, XMM,
 };
 use super::{basic_block::*, const_data::DataId, frame_object::*};
 use crate::ir::types::*;
 use id_arena::*;
 use rustc_hash::{FxHashMap, FxHashSet};
-use std::{
-    cell::{Ref, RefCell, RefMut},
-    fmt,
-    fmt::Debug,
-    rc::Rc,
-};
+use std::{cell::RefCell, fmt, fmt::Debug, rc::Rc};
 
 pub type MachineOpcode = TargetOpcode;
 pub type RegisterBaseRef = Rc<RefCell<RegisterBase>>;
@@ -85,21 +79,6 @@ pub enum MachineConstant {
     Int32(i32),
     Int64(i64),
     F64(f64),
-}
-
-#[derive(Clone, PartialEq)]
-pub struct MachineRegister {
-    pub info: RegisterBaseRef,
-}
-
-impl ::std::cmp::Eq for MachineRegister {}
-impl ::std::hash::Hash for MachineRegister {
-    fn hash<H: ::std::hash::Hasher>(&self, state: &mut H) {
-        state.write_usize(self.info.borrow().vreg.retrieve());
-        if let Some(reg) = self.info_ref().reg {
-            state.write_usize(reg.retrieve())
-        }
-    }
 }
 
 impl MachineInst {
@@ -411,162 +390,6 @@ impl MachineOpcode {
     }
 }
 
-impl MachineRegister {
-    pub fn new(info: RegisterBaseRef) -> Self {
-        Self { info }
-    }
-
-    pub fn phys_reg<T: TargetRegisterTrait>(r: T) -> Self {
-        RegisterBase::phys_reg(r).into_machine_register()
-    }
-
-    pub fn add_use(&self, use_id: MachineInstId) {
-        self.info_ref_mut().uses.insert(use_id);
-    }
-
-    pub fn remove_use(&self, id: MachineInstId) {
-        self.info_ref_mut().uses.remove(&id);
-    }
-
-    pub fn add_def(&self, def_id: MachineInstId) {
-        self.info_ref_mut().defs.insert(def_id);
-    }
-
-    pub fn remove_def(&self, id: MachineInstId) {
-        self.info_ref_mut().defs.remove(&id);
-    }
-
-    pub fn copy_with_new_vreg(&self, vreg_gen: &VirtRegGen) -> Self {
-        let r: RegisterBase = self.info_ref().clone();
-        r.copy_with_new_vreg(vreg_gen).into_machine_register()
-    }
-
-    pub fn has_tied(&self) -> bool {
-        self.info_ref().tied.is_some()
-    }
-
-    pub fn tie_reg(&self, r: &MachineRegister) {
-        self.info_ref_mut().tie_reg(r.info.clone())
-    }
-
-    pub fn set_vreg(&self, vreg: VirtReg) {
-        self.info.borrow_mut().set_vreg(vreg);
-    }
-
-    pub fn set_phys_reg(&self, reg: PhysReg) {
-        let mut info = self.info_ref_mut();
-        info.reg = Some(reg);
-
-        if let Some(tied) = &info.tied {
-            tied.borrow_mut().reg = Some(reg);
-        }
-    }
-
-    pub fn get_vreg(&self) -> VirtReg {
-        self.info.borrow().vreg
-    }
-
-    pub fn get_reg(&self) -> Option<PhysReg> {
-        self.info.borrow().reg
-    }
-
-    pub fn get_reg_class(&self) -> RegisterClassKind {
-        self.info.borrow().reg_class
-    }
-
-    pub fn info_ref(&self) -> Ref<RegisterBase> {
-        self.info.borrow()
-    }
-
-    pub fn info_ref_mut(&self) -> RefMut<RegisterBase> {
-        self.info.borrow_mut()
-    }
-
-    pub fn is_vreg(&self) -> bool {
-        self.info_ref().reg.is_none()
-    }
-
-    pub fn is_phys_reg(&self) -> bool {
-        self.info_ref().reg.is_some()
-    }
-}
-
-impl RegisterBase {
-    pub fn new(reg_class: RegisterClassKind) -> Self {
-        Self {
-            reg_class,
-            vreg: VirtReg(0),
-            reg: None,
-            tied: None,
-            uses: FxHashSet::default(),
-            defs: FxHashSet::default(),
-        }
-    }
-
-    pub fn phys_reg<T: TargetRegisterTrait>(reg: T) -> Self {
-        PHYS_REGS.with(|r| r[reg.as_phys_reg().retrieve()].clone())
-    }
-
-    // not recommended
-    pub fn new_phy_reg<T: TargetRegisterTrait>(reg: T) -> Self {
-        Self {
-            reg_class: reg.as_phys_reg().reg_class(),
-            vreg: VirtReg(0),
-            reg: Some(reg.as_phys_reg()),
-            tied: None,
-            uses: FxHashSet::default(),
-            defs: FxHashSet::default(),
-        }
-    }
-
-    pub fn new_ref(reg_class: RegisterClassKind) -> RegisterBaseRef {
-        Rc::new(RefCell::new(Self {
-            reg_class,
-            vreg: VirtReg(0),
-            reg: None,
-            tied: None,
-            uses: FxHashSet::default(),
-            defs: FxHashSet::default(),
-        }))
-    }
-
-    pub fn copy_with_new_vreg(&self, vreg_gen: &VirtRegGen) -> Self {
-        let mut new = self.clone();
-        new.vreg = vreg_gen.next_vreg();
-        new
-    }
-
-    pub fn into_ref(self) -> RegisterBaseRef {
-        Rc::new(RefCell::new(self))
-    }
-
-    pub fn into_machine_register(self) -> MachineRegister {
-        MachineRegister::new(self.into_ref())
-    }
-
-    pub fn tie_reg(&mut self, tied: RegisterBaseRef) {
-        self.tied = Some(tied);
-    }
-
-    pub fn set_vreg(&mut self, vreg: VirtReg) {
-        self.vreg = vreg;
-    }
-
-    pub fn with_vreg(mut self, vreg: VirtReg) -> Self {
-        self.vreg = vreg;
-        self
-    }
-
-    pub fn with_reg(mut self, reg: PhysReg) -> Self {
-        self.reg = Some(reg);
-        self
-    }
-
-    pub fn is_vreg(&self) -> bool {
-        self.reg.is_none()
-    }
-}
-
 impl MachineOperand {
     pub fn phys_reg<T: TargetRegisterTrait>(regs_info: &RegistersInfo, r: T) -> MachineOperand {
         MachineOperand::Register(regs_info.get_phys_reg(r))
@@ -759,61 +582,6 @@ impl MachineConstant {
     }
 }
 
-thread_local! {
-    pub static PHYS_REGS: [RegisterBase; PHYS_REGISTERS_NUM] = {
-        [
-            RegisterBase::new_phy_reg(GR32::EAX ),
-            RegisterBase::new_phy_reg(GR32::ECX ),
-            RegisterBase::new_phy_reg(GR32::EDX ),
-            RegisterBase::new_phy_reg(GR32::EBX ),
-            RegisterBase::new_phy_reg(GR32::ESP ),
-            RegisterBase::new_phy_reg(GR32::EBP ),
-            RegisterBase::new_phy_reg(GR32::ESI ),
-            RegisterBase::new_phy_reg(GR32::EDI ),
-            RegisterBase::new_phy_reg(GR32::R8D ),
-            RegisterBase::new_phy_reg(GR32::R9D ),
-            RegisterBase::new_phy_reg(GR32::R10D),
-            RegisterBase::new_phy_reg(GR32::R11D),
-            RegisterBase::new_phy_reg(GR32::R12D),
-            RegisterBase::new_phy_reg(GR32::R13D),
-            RegisterBase::new_phy_reg(GR32::R14D),
-            RegisterBase::new_phy_reg(GR32::R15D),
-            RegisterBase::new_phy_reg(GR64::RAX ),
-            RegisterBase::new_phy_reg(GR64::RCX ),
-            RegisterBase::new_phy_reg(GR64::RDX ),
-            RegisterBase::new_phy_reg(GR64::RBX ),
-            RegisterBase::new_phy_reg(GR64::RSP ),
-            RegisterBase::new_phy_reg(GR64::RBP ),
-            RegisterBase::new_phy_reg(GR64::RSI ),
-            RegisterBase::new_phy_reg(GR64::RDI ),
-            RegisterBase::new_phy_reg(GR64::R8  ),
-            RegisterBase::new_phy_reg(GR64::R9  ),
-            RegisterBase::new_phy_reg(GR64::R10 ),
-            RegisterBase::new_phy_reg(GR64::R11 ),
-            RegisterBase::new_phy_reg(GR64::R12 ),
-            RegisterBase::new_phy_reg(GR64::R13 ),
-            RegisterBase::new_phy_reg(GR64::R14 ),
-            RegisterBase::new_phy_reg(GR64::R15 ),
-            RegisterBase::new_phy_reg(XMM::XMM0 ),
-            RegisterBase::new_phy_reg(XMM::XMM1 ),
-            RegisterBase::new_phy_reg(XMM::XMM2 ),
-            RegisterBase::new_phy_reg(XMM::XMM3 ),
-            RegisterBase::new_phy_reg(XMM::XMM4 ),
-            RegisterBase::new_phy_reg(XMM::XMM5 ),
-            RegisterBase::new_phy_reg(XMM::XMM6 ),
-            RegisterBase::new_phy_reg(XMM::XMM7 ),
-            RegisterBase::new_phy_reg(XMM::XMM8 ),
-            RegisterBase::new_phy_reg(XMM::XMM9 ),
-            RegisterBase::new_phy_reg(XMM::XMM10),
-            RegisterBase::new_phy_reg(XMM::XMM11),
-            RegisterBase::new_phy_reg(XMM::XMM12),
-            RegisterBase::new_phy_reg(XMM::XMM13),
-            RegisterBase::new_phy_reg(XMM::XMM14),
-            RegisterBase::new_phy_reg(XMM::XMM15),
-        ]
-    };
-}
-
 impl MachineInst {
     pub fn debug(&self, tys: &Types, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for (i, def) in self.def.iter().enumerate() {
@@ -943,12 +711,6 @@ impl fmt::Debug for MachineConstant {
             Self::Int64(x) => write!(f, "i64 {}", x),
             Self::F64(x) => write!(f, "f64 {}", x),
         }
-    }
-}
-
-impl fmt::Debug for MachineRegister {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.info_ref().fmt(f)
     }
 }
 
