@@ -3,13 +3,11 @@ use super::super::{
     frame_object::FrameIndexInfo,
     machine::register::{rc2ty, RegisterId, VirtReg, GR64},
 };
-use super::{
-    inst::{MachineInst, MachineMemOperand, MachineOpcode, MachineOperand},
-    liveness::{LiveRange, LiveRegMatrix, LiveSegment},
-};
+use super::inst::{MachineInst, MachineMemOperand, MachineOpcode, MachineOperand};
 use crate::codegen::common::machine::{
     builder::{BuilderTrait, BuilderWithLiveInfoEdit},
     function::MachineFunction,
+    liveness::{LiveRange, LiveRegMatrix, LiveSegment},
 };
 use crate::ir::types::Types;
 

@@ -1,6 +1,6 @@
 use super::super::machine::register::RegisterId;
-use super::{basic_block::*, liveness::*};
-use crate::codegen::common::machine::function::*;
+use crate::codegen::arch::machine::basic_block::MachineBasicBlockId;
+use crate::codegen::common::machine::{function::*, liveness::*};
 use rustc_hash::FxHashSet;
 use std::collections::VecDeque;
 

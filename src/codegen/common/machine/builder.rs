@@ -1,9 +1,8 @@
-use crate::codegen::arch::machine::{
-    basic_block::*,
-    inst::*,
+use crate::codegen::arch::machine::{basic_block::*, inst::*};
+use crate::codegen::common::machine::{
+    function::*,
     liveness::{LiveRange, LiveRegMatrix, LiveSegment, ProgramPoint},
 };
-use crate::codegen::common::machine::function::*;
 
 pub struct BuilderWithLiveInfoEdit<'a> {
     pub matrix: &'a mut LiveRegMatrix,

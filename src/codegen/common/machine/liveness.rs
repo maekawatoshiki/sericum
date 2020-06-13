@@ -1,5 +1,4 @@
-use super::super::machine::register::*;
-use super::{basic_block::*, inst::*};
+use crate::codegen::arch::machine::{basic_block::*, inst::*, register::*};
 use crate::codegen::common::machine::{function::*, module::*};
 use crate::util::allocator::{Raw, RawAllocator};
 use rustc_hash::FxHashMap;
@@ -660,7 +659,7 @@ impl LivenessAnalysis {
     }
 
     fn set_def_on_inst(&mut self, bb: &MachineBasicBlock, inst: &MachineInst) {
-        // bb.liveness_ref_mut().has_call |= inst.opcode == MachineOpcode::CALL;
+        bb.liveness_ref_mut().has_call |= inst.opcode == MachineOpcode::CALL;
         for &reg in &inst.def {
             bb.liveness.borrow_mut().add_def(reg);
         }
@@ -685,24 +684,9 @@ impl LivenessAnalysis {
     ) {
         for operand in &inst.operand {
             // live_in and live_out should contain no assigned(physical) registers
-            for &r in operand.registers() {
-                self.propagate(cur_func, bb, r)
+            for r in operand.registers() {
+                self.propagate(cur_func, bb, *r);
             }
-            // match operand {
-            //     MachineOperand::Register(reg)
-            //     | MachineOperand::Mem(MachineMemOperand::BaseFi(reg, _))
-            //     | MachineOperand::Mem(MachineMemOperand::BaseFiOff(reg, _, _))
-            //     | MachineOperand::Mem(MachineMemOperand::BaseOff(reg, _))
-            //     | MachineOperand::Mem(MachineMemOperand::Base(reg)) => {
-            //         self.propagate(cur_func, bb, *reg)
-            //     }
-            //     MachineOperand::Mem(MachineMemOperand::BaseAlignOff(reg, _, reg2))
-            //     | MachineOperand::Mem(MachineMemOperand::BaseFiAlignOff(reg, _, _, reg2)) => {
-            //         self.propagate(cur_func, bb, *reg);
-            //         self.propagate(cur_func, bb, *reg2);
-            //     }
-            //     _ => {}
-            // }
         }
     }
 

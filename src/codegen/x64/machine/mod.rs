@@ -3,7 +3,7 @@ pub mod branch_folding;
 pub mod calc_spill_weight;
 pub mod inst;
 pub mod inst_def;
-pub mod liveness;
+// pub mod liveness;
 pub mod phi_elimination;
 pub mod pro_epi_inserter;
 pub mod reg_coalescer;

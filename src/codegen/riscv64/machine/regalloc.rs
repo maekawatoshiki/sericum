@@ -1,8 +1,7 @@
 use super::super::machine::register::*;
 use super::calc_spill_weight::calc_spill_weight;
-use super::liveness::*;
 use super::reg_coalescer::coalesce_function;
-use crate::codegen::common::machine::{function::*, module::*};
+use crate::codegen::common::machine::{function::*, liveness::*, module::*};
 use crate::traits::pass::ModulePassTrait;
 use std::collections::VecDeque;
 

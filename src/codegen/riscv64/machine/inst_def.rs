@@ -117,6 +117,7 @@ pub enum TargetOpcode {
     J,
     JR,
 
+    CALL,
     Phi,
     Ret,
     Copy,
