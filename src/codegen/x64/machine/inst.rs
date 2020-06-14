@@ -1,5 +1,5 @@
 use super::super::machine::register::{
-    rc2ty, PhysReg, RegisterClassKind, RegisterId, RegistersInfo, TargetRegisterTrait, VirtReg,
+    rc2ty, PhysReg, RegisterClassKind, RegisterId, RegistersInfo, TargetRegisterTrait,
 };
 use super::frame_object::*;
 pub use super::inst_def::TargetOpcode;
@@ -7,10 +7,9 @@ use crate::codegen::common::machine::{basic_block::*, const_data::DataId};
 use crate::ir::types::*;
 use id_arena::*;
 use rustc_hash::{FxHashMap, FxHashSet};
-use std::{cell::RefCell, fmt, fmt::Debug, rc::Rc};
+use std::{fmt, fmt::Debug};
 
 pub type MachineOpcode = TargetOpcode;
-pub type RegisterBaseRef = Rc<RefCell<RegisterBase>>;
 pub type MachineInstId = Id<MachineInst>;
 
 #[derive(Clone)]
@@ -24,27 +23,6 @@ pub struct MachineInst {
     pub imp_def: Vec<RegisterId>,
     pub parent: MachineBasicBlockId,
 }
-
-#[derive(Clone, PartialEq)]
-pub struct RegisterBase {
-    pub vreg: VirtReg,
-    pub reg: Option<PhysReg>,
-    pub reg_class: RegisterClassKind,
-    pub tied: Option<RegisterBaseRef>,
-    pub uses: FxHashSet<MachineInstId>,
-    pub defs: FxHashSet<MachineInstId>,
-}
-
-// #[derive(Clone)]
-// pub struct MachineInstDef {
-//     pub opcode: MachineOpcode,
-//     pub operand: Vec<MachineOperand>, // reg|imm|
-//     pub def: Vec<MachineRegister>,
-//     pub tie: FxHashMap<MachineRegister, MachineRegister>, // def -> use
-//     pub imp_use: Vec<MachineRegister>,
-//     pub imp_def: Vec<MachineRegister>,
-//     pub parent: MachineBasicBlockId,
-// }
 
 #[derive(Debug, Clone)]
 pub enum MachineOperand {
@@ -711,15 +689,6 @@ impl fmt::Debug for MachineConstant {
             Self::Int32(x) => write!(f, "i32 {}", x),
             Self::Int64(x) => write!(f, "i64 {}", x),
             Self::F64(x) => write!(f, "f64 {}", x),
-        }
-    }
-}
-
-impl fmt::Debug for RegisterBase {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.reg {
-            Some(phy_reg) => phy_reg.fmt(f),
-            None => self.vreg.fmt(f),
         }
     }
 }
