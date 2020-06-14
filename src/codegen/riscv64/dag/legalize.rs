@@ -95,7 +95,7 @@ impl Legalize {
         node: Raw<DAGNode>,
     ) -> Raw<DAGNode> {
         if node.kind == NodeKind::IR(IRNodeKind::Sub)
-            && node.operand[0].is_operation()
+            && !node.operand[0].is_constant()
             && node.operand[1].is_constant()
         {
             // TODO: Refine code

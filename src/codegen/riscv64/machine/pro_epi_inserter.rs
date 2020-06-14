@@ -44,40 +44,43 @@ impl PrologueEpilogueInserter {
         }
 
         let frame_info = FrameObjectsInfo::new(tys, cur_func);
-        let down = self.calc_max_adjust_stack_down(cur_func);
-        let adjust = roundup(frame_info.total_size() + down, 16);
-        self.insert_prologue(/*tys,*/ cur_func, adjust);
-        self.insert_epilogue(cur_func, adjust);
+        let mut saved_regs = cur_func
+            .body
+            .appeared_phys_regs()
+            .containing_callee_saved_regs()
+            .to_phys_set()
+            .into_iter()
+            .collect::<Vec<_>>();
+        if cur_func.body.has_call() {
+            saved_regs.push(GPR::RA.as_phys_reg())
+        }
+        Self::remove_adjust_stack_inst(cur_func);
+        let adjust = frame_info.total_size();
+        self.insert_prologue(cur_func, &saved_regs, adjust);
+        self.insert_epilogue(cur_func, &saved_regs, adjust);
     }
 
-    fn calc_max_adjust_stack_down(&mut self, cur_func: &mut MachineFunction) -> i32 {
-        let mut down = 0;
+    fn remove_adjust_stack_inst(cur_func: &mut MachineFunction) {
         let mut removal_list = vec![];
-
         for (_, _, iiter) in cur_func.body.mbb_iter() {
             for (id, inst) in iiter {
-                match inst.opcode {
-                    MachineOpcode::AdjStackDown => {
-                        let d = inst.operand[0].as_constant().as_i32();
-                        down = cmp::max(d, down);
-                        removal_list.push(id)
-                    }
-                    MachineOpcode::AdjStackUp => removal_list.push(id),
-                    _ => continue,
+                if matches!(
+                    inst.opcode,
+                    MachineOpcode::AdjStackDown | MachineOpcode::AdjStackUp
+                ) {
+                    removal_list.push(id)
                 }
             }
         }
-
         for id in removal_list {
             cur_func.remove_inst(id)
         }
-
-        down
     }
 
     fn insert_prologue(
         &mut self,
         /* tys: &Types, */ cur_func: &mut MachineFunction,
+        saved_regs: &[PhysReg],
         adjust: i32,
     ) {
         let mut builder = Builder::new(cur_func);
@@ -96,27 +99,33 @@ impl PrologueEpilogueInserter {
         .with_def(vec![sp]);
         builder.insert(addi);
 
-        let s0 = builder.function.regs_info.get_phys_reg(GPR::S0);
-        let sd = MachineInst::new_simple(
-            MachineOpcode::SD,
-            vec![
-                MachineOperand::Register(s0),
-                MachineOperand::Mem(MachineMemOperand::ImmReg(adjust - 8, sp)),
-            ],
-            builder.get_cur_bb().unwrap(),
-        );
-        builder.insert(sd);
+        let mut s0_used = false;
+        for (i, r) in saved_regs.iter().enumerate() {
+            s0_used |= r == &GPR::S0.as_phys_reg();
+            let r = builder.function.regs_info.get_phys_reg(*r);
+            let sd = MachineInst::new_simple(
+                MachineOpcode::SD,
+                vec![
+                    MachineOperand::Register(r),
+                    MachineOperand::Mem(MachineMemOperand::ImmReg(adjust - 8 - i as i32 * 8, sp)),
+                ],
+                builder.get_cur_bb().unwrap(),
+            );
+            builder.insert(sd);
+        }
 
-        let addi = MachineInst::new_simple(
-            MachineOpcode::ADDI,
-            vec![
-                MachineOperand::Register(sp),
-                MachineOperand::Constant(MachineConstant::Int32(adjust)),
-            ],
-            builder.get_cur_bb().unwrap(),
-        )
-        .with_def(vec![s0]);
-        builder.insert(addi);
+        if s0_used {
+            let addi = MachineInst::new_simple(
+                MachineOpcode::ADDI,
+                vec![
+                    MachineOperand::Register(sp),
+                    MachineOperand::Constant(MachineConstant::Int32(adjust)),
+                ],
+                builder.get_cur_bb().unwrap(),
+            )
+            .with_def(vec![builder.function.regs_info.get_phys_reg(GPR::S0)]);
+            builder.insert(addi);
+        }
 
         // self.insert_arg_copy(&tys.base.borrow(), &mut builder);
     }
@@ -129,7 +138,12 @@ impl PrologueEpilogueInserter {
     //     .copy();
     // }
     //
-    fn insert_epilogue(&mut self, cur_func: &mut MachineFunction, adjust: i32) {
+    fn insert_epilogue(
+        &mut self,
+        cur_func: &mut MachineFunction,
+        saved_regs: &[PhysReg],
+        adjust: i32,
+    ) {
         let mut bb_iseq = vec![];
         // let has_call = cur_func.body.has_call();
 
@@ -148,18 +162,21 @@ impl PrologueEpilogueInserter {
 
             let mut iseq = vec![];
 
-            let s0 = cur_func.regs_info.get_phys_reg(GPR::S0);
+            // let s0 = cur_func.regs_info.get_phys_reg(GPR::S0);
             let sp = cur_func.regs_info.get_phys_reg(GPR::SP);
-            let ld = MachineInst::new_simple(
-                MachineOpcode::LD,
-                vec![MachineOperand::Mem(MachineMemOperand::ImmReg(
-                    adjust - 8,
-                    sp,
-                ))],
-                bb_id,
-            )
-            .with_def(vec![s0]);
-            iseq.push(cur_func.body.inst_arena.alloc(&cur_func.regs_info, ld));
+            for (i, r) in saved_regs.iter().enumerate().rev() {
+                let r = cur_func.regs_info.get_phys_reg(*r);
+                let ld = MachineInst::new_simple(
+                    MachineOpcode::LD,
+                    vec![MachineOperand::Mem(MachineMemOperand::ImmReg(
+                        adjust - 8 - 8 * i as i32,
+                        sp,
+                    ))],
+                    bb_id,
+                )
+                .with_def(vec![r]);
+                iseq.push(cur_func.body.inst_arena.alloc(&cur_func.regs_info, ld));
+            }
 
             let addi = MachineInst::new_simple(
                 MachineOpcode::ADDI,

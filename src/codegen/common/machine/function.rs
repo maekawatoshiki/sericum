@@ -69,6 +69,14 @@ impl MachineFunctionBody {
             .id_and_block()
             .any(|(_, block)| block.liveness_ref().has_call)
     }
+
+    pub fn appeared_phys_regs(&self) -> PhysRegSet {
+        let mut set = PhysRegSet::new();
+        for (_, block) in self.basic_blocks.id_and_block() {
+            set.unite(&block.liveness_ref().phys_def);
+        }
+        set
+    }
 }
 
 impl FunctionTrait for MachineFunction {

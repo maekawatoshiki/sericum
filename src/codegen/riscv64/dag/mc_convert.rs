@@ -7,6 +7,7 @@ use crate::codegen::common::dag::{basic_block::DAGBasicBlockId, function::*, mod
 use crate::codegen::common::machine::{
     basic_block::*, function::*, inst_def::DefOrUseReg, module::*,
 };
+use crate::ir::types::Type;
 use crate::util::allocator::*;
 use id_arena::*;
 use rustc_hash::FxHashMap;
@@ -165,7 +166,7 @@ impl<'a> ConversionInfo<'a> {
                     self.cur_bb,
                 )))
             }
-            // // NodeKind::IR(IRNodeKind::Call) => Some(self.convert_call_dag(&*node)),
+            NodeKind::IR(IRNodeKind::Call) => Some(self.convert_call_dag(&*node)),
             NodeKind::IR(IRNodeKind::Phi) => {
                 let mut operands = vec![];
                 let mut i = 0;
@@ -343,103 +344,107 @@ impl<'a> ConversionInfo<'a> {
         }
     }
 
-    // fn convert_call_dag(&mut self, node: &DAGNode) -> MachineInstId {
-    // let mut arg_regs = vec![self.cur_func.regs_info.get_phys_reg(GR64::RSP)]; // call uses RSP
-    // let mut off = 0;
-    //
-    // let mut args = vec![];
-    // for operand in &node.operand[1..] {
-    //     args.push(self.normal_operand(*operand));
-    // }
-    //
-    // for (i, arg) in args.into_iter().enumerate() {
-    //     let ty = arg.get_type(&self.cur_func.regs_info).unwrap();
-    //
-    //     if !matches!(
-    //         ty,
-    //         Type::Int8 | Type::Int32 | Type::Int64 | Type::F64 | Type::Pointer(_) | Type::Array(_)
-    //     ) {
-    //         unimplemented!()
-    //     };
-    //
-    //     let reg_class = ty2rc(&ty).unwrap();
-    //     let inst = match reg_class.get_nth_arg_reg(i) {
-    //         Some(arg_reg) => {
-    //             let r = self.cur_func.regs_info.get_phys_reg(arg_reg);
-    //             arg_regs.push(r.clone());
-    //             self.move2reg(r, arg)
-    //         }
-    //         None => {
-    //             // Put the exceeded value onto the stack
-    //             let inst = MachineInst::new_simple(
-    //                 mov_mx(&self.cur_func.regs_info, &arg).unwrap(),
-    //                 vec![
-    //                     MachineOperand::Mem(MachineMemOperand::BaseOff(
-    //                         self.cur_func.regs_info.get_phys_reg(GR64::RSP),
-    //                         off,
-    //                     )),
-    //                     arg,
-    //                 ],
-    //                 self.cur_bb,
-    //             );
-    //             off += 8;
-    //             inst
-    //         }
-    //     };
-    //
-    //     self.push_inst(inst);
-    // }
-    //
-    // self.push_inst(
-    //     MachineInst::new_simple(
-    //         MachineOpcode::AdjStackDown,
-    //         vec![MachineOperand::imm_i32(off)],
-    //         self.cur_bb,
-    //     )
-    //     .with_imp_def(self.cur_func.regs_info.get_phys_reg(GR64::RSP))
-    //     .with_imp_use(self.cur_func.regs_info.get_phys_reg(GR64::RSP)),
-    // );
-    //
-    // let callee = self.normal_operand(node.operand[0]);
-    // let ret_reg = self.cur_func.regs_info.get_phys_reg(
-    //     ty2rc(&node.ty)
-    //         .unwrap_or(RegisterClassKind::GR32)
-    //         .return_value_register(),
-    // );
-    // let call_inst = self.push_inst(
-    //     MachineInst::new_simple(MachineOpcode::CALL, vec![callee], self.cur_bb)
-    //         .with_imp_uses(arg_regs)
-    //         .with_imp_def(self.cur_func.regs_info.get_phys_reg(GR64::RSP))
-    //         .with_def(match node.ty {
-    //             Type::Void => vec![],
-    //             _ => vec![ret_reg],
-    //         }),
-    // );
-    //
-    // self.push_inst(
-    //     MachineInst::new_simple(
-    //         MachineOpcode::AdjStackUp,
-    //         vec![MachineOperand::imm_i32(off)],
-    //         self.cur_bb,
-    //     )
-    //     .with_imp_def(self.cur_func.regs_info.get_phys_reg(GR64::RSP))
-    //     .with_imp_use(self.cur_func.regs_info.get_phys_reg(GR64::RSP)),
-    // );
-    //
-    // if node.ty == Type::Void {
-    //     return call_inst;
-    // }
-    //
-    // let reg_class = self.cur_func.regs_info.arena_ref()[ret_reg].reg_class;
-    // let copy = MachineInst::new(
-    //     &self.cur_func.regs_info,
-    //     MachineOpcode::Copy,
-    //     vec![MachineOperand::Register(ret_reg)],
-    //     Some(reg_class),
-    //     self.cur_bb,
-    // );
-    // self.push_inst(copy)
-    // }
+    fn convert_call_dag(&mut self, node: &DAGNode) -> MachineInstId {
+        let mut arg_regs = vec![];
+        // let mut off = 0;
+
+        let mut args = vec![];
+        for operand in &node.operand[1..] {
+            args.push(self.normal_operand(*operand));
+        }
+
+        for (i, arg) in args.into_iter().enumerate() {
+            let ty = arg.get_type(&self.cur_func.regs_info).unwrap();
+
+            if !matches!(
+                ty,
+                Type::Int8 | Type::Int32 | Type::Int64 | Type::F64 | Type::Pointer(_) | Type::Array(_)
+            ) {
+                unimplemented!()
+            };
+
+            let reg_class = ty2rc(&ty).unwrap();
+            let inst = match reg_class.get_nth_arg_reg(i) {
+                Some(arg_reg) => {
+                    let r = self.cur_func.regs_info.get_phys_reg(arg_reg);
+                    arg_regs.push(r.clone());
+                    self.move2reg(r, arg)
+                }
+                None => {
+                    // Put the exceeded value onto the stack
+                    // let inst = MachineInst::new_simple(
+                    //     mov_mx(&self.cur_func.regs_info, &arg).unwrap(),
+                    //     vec![
+                    //         MachineOperand::Mem(MachineMemOperand::BaseOff(
+                    //             self.cur_func.regs_info.get_phys_reg(GR64::RSP),
+                    //             off,
+                    //         )),
+                    //         arg,
+                    //     ],
+                    //     self.cur_bb,
+                    // );
+                    // off += 8;
+                    // inst
+                    unimplemented!()
+                }
+            };
+
+            self.push_inst(inst);
+        }
+
+        // self.push_inst(
+        //     MachineInst::new_simple(
+        //         MachineOpcode::AdjStackDown,
+        //         vec![MachineOperand::imm_i32(off)],
+        //         self.cur_bb,
+        //     )
+        //     .with_imp_def(self.cur_func.regs_info.get_phys_reg(GR64::RSP))
+        //     .with_imp_use(self.cur_func.regs_info.get_phys_reg(GR64::RSP)),
+        // );
+
+        let callee = self.normal_operand(node.operand[0]);
+        let ret_reg = self.cur_func.regs_info.get_phys_reg(
+            ty2rc(&node.ty)
+                .unwrap_or(RegisterClassKind::GPR)
+                .return_value_register(),
+        );
+        let call_inst = self.push_inst(
+            MachineInst::new_simple(MachineOpcode::CALL, vec![callee], self.cur_bb)
+                .with_imp_uses(arg_regs)
+                .with_imp_defs({
+                    let mut imp_defs = match node.ty {
+                        Type::Void => vec![],
+                        _ => vec![ret_reg],
+                    };
+                    imp_defs.push(self.cur_func.regs_info.get_phys_reg(GPR::RA));
+                    imp_defs
+                }),
+        );
+
+        // self.push_inst(
+        //     MachineInst::new_simple(
+        //         MachineOpcode::AdjStackUp,
+        //         vec![MachineOperand::imm_i32(off)],
+        //         self.cur_bb,
+        //     )
+        //     .with_imp_def(self.cur_func.regs_info.get_phys_reg(GR64::RSP))
+        //     .with_imp_use(self.cur_func.regs_info.get_phys_reg(GR64::RSP)),
+        // );
+
+        if node.ty == Type::Void {
+            return call_inst;
+        }
+
+        let reg_class = self.cur_func.regs_info.arena_ref()[ret_reg].reg_class;
+        let copy = MachineInst::new(
+            &self.cur_func.regs_info,
+            MachineOpcode::Copy,
+            vec![MachineOperand::Register(ret_reg)],
+            Some(reg_class),
+            self.cur_bb,
+        );
+        self.push_inst(copy)
+    }
 
     fn normal_operand(&mut self, node: Raw<DAGNode>) -> MachineOperand {
         match node.kind {

@@ -1,7 +1,9 @@
 use super::exec::roundup;
+use crate::codegen::arch::machine::inst::MachineOpcode;
 use crate::codegen::common::machine::function::MachineFunction;
 use crate::ir::types::*;
 use rustc_hash::FxHashMap;
+use std::cmp;
 use std::fmt;
 
 #[derive(Debug, Clone)]
@@ -47,8 +49,16 @@ impl LocalVariables {
 impl FrameObjectsInfo {
     pub fn new(tys: &Types, f: &MachineFunction) -> Self {
         let mut offset_map = FxHashMap::default();
-        const SAVED_REG_SZ: usize = 8; // 8 is to save s0 register
-        let mut total_size = SAVED_REG_SZ;
+        let saved_regs_sz: usize = f
+            .body
+            .appeared_phys_regs()
+            .containing_callee_saved_regs()
+            .to_phys_set()
+            .len()
+            * 8
+            + f.body.has_call() as usize * 8;
+        let stack_down = Self::calc_max_adjust_stack_down(f) as usize;
+        let mut total_size = saved_regs_sz;
 
         // TODO: Implement
         // for (i, param_ty) in tys
@@ -76,8 +86,10 @@ impl FrameObjectsInfo {
         let mut sz = 0;
         for FrameIndexInfo { idx, ty } in &f.local_mgr.locals {
             sz += ty.size_in_byte(tys) as i32;
-            offset_map.insert(*idx, -(total_size as i32 - SAVED_REG_SZ as i32) - sz);
+            offset_map.insert(*idx, -(total_size as i32 - saved_regs_sz as i32) - sz);
         }
+
+        total_size += stack_down;
 
         Self {
             offset_map,
@@ -91,6 +103,25 @@ impl FrameObjectsInfo {
 
     pub fn total_size(&self) -> i32 {
         self.total_size as i32
+    }
+
+    fn calc_max_adjust_stack_down(f: &MachineFunction) -> i32 {
+        let mut down = 0;
+
+        for (_, _, iiter) in f.body.mbb_iter() {
+            for (_, inst) in iiter {
+                match inst.opcode {
+                    MachineOpcode::AdjStackDown => {
+                        let d = inst.operand[0].as_constant().as_i32();
+                        down = cmp::max(d, down);
+                    }
+                    MachineOpcode::AdjStackUp => {}
+                    _ => continue,
+                }
+            }
+        }
+
+        down
     }
 }
 

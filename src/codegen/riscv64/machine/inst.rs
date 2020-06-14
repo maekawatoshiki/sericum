@@ -13,7 +13,7 @@ pub enum MachineMemOperand {
 
 impl MachineOpcode {
     pub fn is_copy_like(&self) -> bool {
-        matches!(self, MachineOpcode::MV)
+        matches!(self, MachineOpcode::MV | MachineOpcode::Copy)
     }
 
     pub fn is_terminator(&self) -> bool {

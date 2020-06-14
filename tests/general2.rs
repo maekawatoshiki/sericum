@@ -396,4 +396,31 @@ mod riscv64 {
             &mut m,
         );
     }
+
+    #[test]
+    fn asm_fact() {
+        let mut m = Module::new("cilk");
+        cilk_ir!(m; define [i32] fact [(i32)] {
+            entry:
+                c = icmp eq (%arg.0), (i32 1);
+                br (%c) l1, l2;
+            l1:
+                ret (i32 1);
+            l2:
+                x = sub (%arg.0), (i32 1);
+                y = call fact [(%x)];
+                z = mul (%y), (%arg.0);
+                ret (%z);
+        });
+        compile_and_run(
+            "
+    #include <assert.h>
+    extern int fact(int);
+    int main() {
+        assert(fact(5) == 120);
+    }
+            ",
+            &mut m,
+        );
+    }
 }

@@ -204,6 +204,10 @@ impl PhysRegSet {
         set
     }
 
+    pub fn containing_callee_saved_regs(&self) -> PhysRegSet {
+        CALLEE_SAVED_REGS.with(|rs| Self([self.0[0] & rs.0[0]]))
+    }
+
     pub fn unite(&mut self, rhs: &Self) {
         self.0[0] |= rhs.0[0];
     }
@@ -213,7 +217,7 @@ impl BitOr for PhysRegSet {
     type Output = Self;
 
     fn bitor(self, rhs: Self) -> Self {
-        Self([self.0[0] & rhs.0[0]])
+        Self([self.0[0] | rhs.0[0]])
     }
 }
 
