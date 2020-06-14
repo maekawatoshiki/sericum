@@ -1,4 +1,5 @@
-use super::{function::*, module::*, node::*};
+use super::{module::*, node::*};
+use crate::codegen::common::dag::function::*;
 use crate::{ir::types::*, traits::pass::ModulePassTrait, util::allocator::*};
 use rustc_hash::FxHashMap;
 

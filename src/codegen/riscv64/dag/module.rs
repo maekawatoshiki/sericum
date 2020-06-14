@@ -1,4 +1,4 @@
-use super::function::*;
+use crate::codegen::common::dag::function::*;
 use crate::ir::types::Types;
 use id_arena::*;
 use std::fmt;

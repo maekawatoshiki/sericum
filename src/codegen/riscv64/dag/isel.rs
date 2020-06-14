@@ -1,9 +1,5 @@
-use super::{
-    super::machine::register::*,
-    function::{DAGFunction, DAGHeap},
-    module::DAGModule,
-    node::*,
-};
+use super::{super::machine::register::*, module::DAGModule, node::*};
+use crate::codegen::common::dag::function::{DAGFunction, DAGHeap};
 use crate::{ir::types::*, traits::pass::ModulePassTrait, util::allocator::*};
 use defs::isel_pat;
 use rustc_hash::FxHashMap;

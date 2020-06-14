@@ -1,5 +1,4 @@
-use super::super::machine::register::*;
-use super::{frame_object::*, node::*};
+use crate::codegen::arch::{dag::node::*, frame_object::*, machine::register::*};
 use crate::codegen::common::dag::basic_block::*;
 use crate::ir::{function::*, types::*};
 use crate::util::allocator::*;

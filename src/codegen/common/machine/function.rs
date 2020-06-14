@@ -1,8 +1,7 @@
 // use super::super::dag::function::*;
 use super::super::machine::register::*;
-use crate::codegen::arch::dag::function::*;
 use crate::codegen::arch::machine::{frame_object::*, inst::*};
-use crate::codegen::common::machine::basic_block::*;
+use crate::codegen::common::{dag::function::*, machine::basic_block::*};
 use crate::ir::types::*;
 use crate::traits::function::FunctionTrait;
 use id_arena::*;
