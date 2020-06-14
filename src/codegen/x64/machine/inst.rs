@@ -2,6 +2,7 @@ use super::super::machine::register::RegisterId;
 use super::frame_object::*;
 pub use super::inst_def::TargetOpcode;
 pub use crate::codegen::common::machine::inst::*;
+use crate::ir::types::Type;
 
 #[derive(Debug, Clone)]
 pub enum MachineMemOperand {
@@ -36,6 +37,18 @@ impl MachineMemOperand {
             MachineMemOperand::BaseAlignOff(r, _, r2)
             | MachineMemOperand::BaseFiAlignOff(r, _, _, r2) => vec![r, r2],
             MachineMemOperand::Address(_) => vec![],
+        }
+    }
+
+    pub fn get_type(&self) -> Option<Type> {
+        match self {
+            Self::BaseFi(_, fi) => Some(fi.ty),
+            Self::BaseFiOff(_, _, _) => None,
+            Self::BaseFiAlignOff(_, _, _, _) => None,
+            Self::Base(_)
+            | Self::BaseAlignOff(_, _, _)
+            | Self::BaseOff(_, _)
+            | Self::Address(_) => None,
         }
     }
 }

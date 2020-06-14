@@ -687,31 +687,39 @@ main:
 
         let _ = cilk_ir!(m; define [i32] func [(i32)] {
             entry:
-                // cond = icmp le (%arg.0), (i32 2);
-                x1 = add (%arg.0), (i32 1);
-                x2 = add (%arg.0), (i32 2);
-                x3 = add (%arg.0), (i32 3);
-                x4 = add (%arg.0), (i32 4);
-                x5 = add (%arg.0), (i32 5);
-                x6 = add (%arg.0), (i32 6);
-                x7 = add (%arg.0), (i32 7);
-                x8 = add (%arg.0), (i32 8);
-                x9 = add (%arg.0), (i32 9);
-                x10 = add (%arg.0), (i32 10);
-                x11 = add (%arg.0), (i32 11);
-                x12 = add (%arg.0), (i32 12);
+                x1  = add (%arg.0), (i32 1);  // 2
+                x2  = add (%arg.0), (i32 2);  // 3
+                x3  = add (%arg.0), (i32 3);  // 4
+                x4  = add (%arg.0), (i32 4);  // 5
+                x5  = add (%arg.0), (i32 5);  // 6
+                x6  = add (%arg.0), (i32 6);  // 7
+                x7  = add (%arg.0), (i32 7);  // 8
+                x8  = add (%arg.0), (i32 8);  // 9
+                x9  = add (%arg.0), (i32 9);  // 10
+                x10 = add (%arg.0), (i32 10); // 11
+                x11 = add (%arg.0), (i32 11); // 12
+                x12 = add (%arg.0), (i32 12); // 13
 
-                y1 = add (%x1), (%x2);
-                y2 = add (%y1), (%x3);
-                y3 = add (%y2), (%x4);
-                y4 = add (%y3), (%x5);
-                y5 = add (%y4), (%x6);
-                y6 = add (%y5), (%x7);
-                y7 = add (%y6), (%x8);
-                y8 = add (%y7), (%x9);
-                y9 = add (%y8), (%x10);
+                y1  = add (%x1), (%x2);
+                y2  = add (%y1), (%x3);
+                y3  = add (%y2), (%x4);
+                y4  = add (%y3), (%x5);
+                y5  = add (%y4), (%x6);
+                y6  = add (%y5), (%x7);
+                y7  = add (%y6), (%x8);
+                y8  = add (%y7), (%x9);
+                y9  = add (%y8), (%x10);
                 y10 = add (%y9), (%x11);
                 y11 = add (%y10), (%x12);
+                y11 = add (%y11), (%y2);
+                y11 = add (%y11), (%y3);
+                y11 = add (%y11), (%y4);
+                y11 = add (%y11), (%y5);
+                y11 = add (%y11), (%y6);
+                y11 = add (%y11), (%y7);
+                y11 = add (%y11), (%y8);
+                y11 = add (%y11), (%y9);
+                y11 = add (%y11), (%y10);
                 ret (%y11);
         });
 
@@ -719,7 +727,7 @@ main:
         let func = jit.find_function_by_name("func").unwrap();
         let res = jit.run(func, vec![exec::jit::GenericValue::Int32(1)]);
         println!("return: {:?}", res);
-        assert_eq!(res, exec::jit::GenericValue::Int32(90));
+        assert_eq!(res, exec::jit::GenericValue::Int32(435));
     }
 
     #[test]

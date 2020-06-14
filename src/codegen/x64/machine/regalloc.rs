@@ -252,15 +252,11 @@ impl RegisterAllocator {
                 call_inst_parent,
             ));
 
-            let src = MachineOperand::FrameIndex(frinfo);
-
+            let src = MachineOperand::Mem(MachineMemOperand::BaseFi(rbp, frinfo));
             let load_inst_id = cur_func.alloc_inst(
                 MachineInst::new_simple(
                     mov_rx(tys, &cur_func.regs_info, &src).unwrap(),
-                    vec![MachineOperand::Mem(MachineMemOperand::BaseFi(
-                        rbp,
-                        *src.as_frame_index(),
-                    ))],
+                    vec![src],
                     call_inst_parent,
                 )
                 .with_def(vec![reg]),

@@ -409,32 +409,8 @@ impl<'a> ConversionInfo<'a> {
     }
 
     fn move2reg(&self, r: RegisterId, src: MachineOperand) -> MachineInst {
-        match src {
-            MachineOperand::Branch(_) => unimplemented!(),
-            MachineOperand::Constant(MachineConstant::F64(f)) => MachineInst::new_simple(
-                // TODO
-                MachineOpcode::MOVSDrm64,
-                vec![MachineOperand::Constant(MachineConstant::F64(f))],
-                self.cur_bb,
-            )
-            .with_def(vec![r]),
-            MachineOperand::Constant(_) | MachineOperand::Register(_) => MachineInst::new_simple(
-                mov_rx(self.types, &self.cur_func.regs_info, &src).unwrap(),
-                vec![src],
-                self.cur_bb,
-            )
-            .with_def(vec![r]),
-            MachineOperand::FrameIndex(fi) => MachineInst::new_with_def_reg(
-                MachineOpcode::LEAr64m,
-                vec![MachineOperand::Mem(MachineMemOperand::BaseFi(
-                    self.cur_func.regs_info.get_phys_reg(GR64::RBP),
-                    fi,
-                ))],
-                vec![r],
-                self.cur_bb,
-            ),
-            _ => unimplemented!(),
-        }
+        let opcode = mov_rx(self.types, &self.cur_func.regs_info, &src).unwrap();
+        MachineInst::new_simple(opcode, vec![src], self.cur_bb).with_def(vec![r])
     }
 
     fn convert_call_dag(&mut self, node: &DAGNode) -> MachineInstId {
@@ -638,7 +614,7 @@ pub fn mov_rx(tys: &Types, regs_info: &RegistersInfo, x: &MachineOperand) -> Opt
     let (bit, xidx) = match x {
         MachineOperand::Register(r) => (regs_info.arena_ref()[*r].reg_class.size_in_bits(), 0),
         MachineOperand::Constant(c) => (c.size_in_bits(), 1),
-        MachineOperand::FrameIndex(f) => (f.ty.size_in_bits(tys), 2),
+        MachineOperand::Mem(m) => (m.get_type().unwrap().size_in_bits(tys), 2),
         _ => return None, // TODO: Support Address?
     };
     match bit {

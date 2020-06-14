@@ -438,8 +438,8 @@ impl MachineOperand {
             MachineOperand::Constant(MachineConstant::Int32(_)) => Some(Type::Int32),
             MachineOperand::Constant(MachineConstant::Int64(_)) => Some(Type::Int64),
             MachineOperand::Constant(MachineConstant::F64(_)) => Some(Type::F64),
-            MachineOperand::FrameIndex(fi) => Some(fi.ty.clone()),
-            MachineOperand::Mem(_) => None,
+            MachineOperand::FrameIndex(fi) => Some(fi.ty),
+            MachineOperand::Mem(mem) => mem.get_type(),
             MachineOperand::None => None, // TODO
             MachineOperand::Register(r) => Some(rc2ty(regs_info.arena_ref()[*r].reg_class)),
         }

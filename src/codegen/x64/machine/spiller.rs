@@ -156,14 +156,11 @@ impl<'a> Spiller<'a> {
                 }
             }
 
-            let fi = MachineOperand::FrameIndex(slot.clone());
             let rbp = self.func.regs_info.get_phys_reg(GR64::RBP);
+            let src = MachineOperand::Mem(MachineMemOperand::BaseFi(rbp, slot.clone()));
             let load = MachineInst::new_simple(
-                mov_rx(tys, &self.func.regs_info, &fi).unwrap(),
-                vec![MachineOperand::Mem(MachineMemOperand::BaseFi(
-                    rbp,
-                    *fi.as_frame_index(),
-                ))],
+                mov_rx(tys, &self.func.regs_info, &src).unwrap(),
+                vec![src],
                 parent,
             )
             .with_def(vec![new_reg]);
