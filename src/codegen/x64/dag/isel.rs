@@ -2,6 +2,7 @@ use super::{
     super::machine::register::*,
     function::{DAGFunction, DAGHeap},
     module::DAGModule,
+    // node::AddressKind,
     node::*,
 };
 use crate::{ir::types::*, traits::pass::ModulePassTrait, util::allocator::*};

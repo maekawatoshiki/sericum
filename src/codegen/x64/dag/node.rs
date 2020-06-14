@@ -1,6 +1,6 @@
 use super::{
     super::frame_object::FrameIndexInfo,
-    super::machine::{inst::*, register::*},
+    super::machine::{inst::MachineOpcode, register::*},
     basic_block::*,
 };
 use crate::ir::{opcode::*, types::*};
