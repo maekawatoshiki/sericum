@@ -1,9 +1,9 @@
 // TODO: dirty code
 
 use super::super::machine::{inst, inst::*, register::*};
-use super::{module::*, node, node::*};
+use super::{node, node::*};
 use crate::codegen::common::{
-    dag::{basic_block::*, function::*},
+    dag::{basic_block::*, function::*, module::*},
     machine::{basic_block::*, function::*, inst_def::DefOrUseReg, module::*},
 };
 use crate::ir::types::*;
