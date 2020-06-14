@@ -57,7 +57,6 @@ impl FrameObjectsInfo {
             .len()
             * 8
             + f.body.has_call() as usize * 8;
-        let stack_down = Self::calc_max_adjust_stack_down(f) as usize;
         let mut total_size = saved_regs_sz;
 
         // TODO: Implement
@@ -89,7 +88,8 @@ impl FrameObjectsInfo {
             offset_map.insert(*idx, -(total_size as i32 - saved_regs_sz as i32) - sz);
         }
 
-        total_size += stack_down;
+        let stack_down = Self::calc_max_adjust_stack_down(f) as usize;
+        total_size = roundup(total_size as i32 + stack_down, 16) as usize;
 
         Self {
             offset_map,
@@ -105,7 +105,7 @@ impl FrameObjectsInfo {
         self.total_size as i32
     }
 
-    fn calc_max_adjust_stack_down(f: &MachineFunction) -> i32 {
+    fn calc_max_adjust_stack_down(f: &MachineFunction) -> usize {
         let mut down = 0;
 
         for (_, _, iiter) in f.body.mbb_iter() {
@@ -113,7 +113,7 @@ impl FrameObjectsInfo {
                 match inst.opcode {
                     MachineOpcode::AdjStackDown => {
                         let d = inst.operand[0].as_constant().as_i32();
-                        down = cmp::max(d, down);
+                        down = cmp::max(d as usize, down);
                     }
                     MachineOpcode::AdjStackUp => {}
                     _ => continue,

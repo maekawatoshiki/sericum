@@ -1,7 +1,10 @@
 use super::machine::register::ty2rc;
+use crate::codegen::arch::machine::inst::MachineOpcode;
 use crate::codegen::common::machine::function::MachineFunction;
+use crate::codegen::x64::exec::roundup;
 use crate::ir::types::*;
 use rustc_hash::FxHashMap;
+use std::cmp;
 use std::fmt;
 
 #[derive(Debug, Clone)]
@@ -71,6 +74,9 @@ impl FrameObjectsInfo {
             offset_map.insert(*idx, offset);
         }
 
+        let stack_down = Self::calc_max_adjust_stack_down(f);
+        offset = roundup(offset as i32 + stack_down as i32, 16) as usize;
+
         Self {
             offset_map,
             total_size: offset,
@@ -83,6 +89,23 @@ impl FrameObjectsInfo {
 
     pub fn total_size(&self) -> i32 {
         self.total_size as i32
+    }
+
+    fn calc_max_adjust_stack_down(f: &MachineFunction) -> usize {
+        let mut down = 0;
+        for (_, _, iiter) in f.body.mbb_iter() {
+            for (_, inst) in iiter {
+                match inst.opcode {
+                    MachineOpcode::AdjStackDown => {
+                        let d = inst.operand[0].as_constant().as_i32();
+                        down = cmp::max(d as usize, down);
+                    }
+                    MachineOpcode::AdjStackUp => {}
+                    _ => continue,
+                }
+            }
+        }
+        down
     }
 }
 

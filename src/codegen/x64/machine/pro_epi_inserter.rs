@@ -3,8 +3,7 @@ use super::inst::*;
 use crate::codegen::common::machine::{
     builder::*, function::MachineFunction, module::MachineModule,
 };
-use crate::{codegen::x64::exec::roundup, ir::types::*, traits::pass::ModulePassTrait};
-use std::cmp;
+use crate::{ir::types::*, traits::pass::ModulePassTrait};
 
 pub struct PrologueEpilogueInserter {}
 
@@ -46,35 +45,27 @@ impl PrologueEpilogueInserter {
         }
 
         let frame_info = FrameObjectsInfo::new(tys, cur_func);
-        let down = self.calc_max_adjust_stack_down(cur_func);
-        let adjust = roundup(frame_info.total_size() + down, 16);
+        Self::remove_adjust_stack_inst(cur_func);
+        let adjust = frame_info.total_size();
         self.insert_prologue(tys, cur_func, adjust);
         self.insert_epilogue(cur_func, adjust);
     }
 
-    fn calc_max_adjust_stack_down(&mut self, cur_func: &mut MachineFunction) -> i32 {
-        let mut down = 0;
+    fn remove_adjust_stack_inst(cur_func: &mut MachineFunction) {
         let mut removal_list = vec![];
-
         for (_, _, iiter) in cur_func.body.mbb_iter() {
             for (id, inst) in iiter {
-                match inst.opcode {
-                    MachineOpcode::AdjStackDown => {
-                        let d = inst.operand[0].as_constant().as_i32();
-                        down = cmp::max(d, down);
-                        removal_list.push(id)
-                    }
-                    MachineOpcode::AdjStackUp => removal_list.push(id),
-                    _ => continue,
+                if matches!(
+                    inst.opcode,
+                    MachineOpcode::AdjStackDown | MachineOpcode::AdjStackUp
+                ) {
+                    removal_list.push(id)
                 }
             }
         }
-
         for id in removal_list {
             cur_func.remove_inst(id)
         }
-
-        down
     }
 
     fn insert_prologue(&mut self, tys: &Types, cur_func: &mut MachineFunction, adjust: i32) {

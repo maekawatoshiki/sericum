@@ -1,8 +1,7 @@
-use super::super::{exec::roundup, frame_object::*, machine::register::*};
+use super::super::{frame_object::*, machine::register::*};
 use super::inst::*;
 use crate::codegen::common::machine::{builder::*, function::*, module::MachineModule};
 use crate::{ir::types::*, traits::pass::ModulePassTrait};
-use std::cmp;
 
 pub struct PrologueEpilogueInserter {}
 
