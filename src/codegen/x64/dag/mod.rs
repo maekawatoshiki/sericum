@@ -1,4 +1,3 @@
-pub mod combine;
 pub mod convert;
 pub mod isel;
 pub mod legalize;

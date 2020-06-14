@@ -4,10 +4,11 @@ pub mod exec;
 pub mod frame_object;
 pub mod machine;
 
-use crate::ir;
-use crate::ir::types::*;
 use crate::{
-    codegen::common::machine::module::MachineModule, ir::module::Module,
+    codegen::common::{dag::combine, machine::module::MachineModule},
+    ir,
+    ir::module::Module,
+    ir::types::*,
     traits::pass::ModulePassManager,
 };
 
@@ -76,7 +77,7 @@ pub fn standard_conversion_into_machine_module(module: &mut Module) -> MachineMo
     let mut dag_module = dag::convert::ConvertToDAG::new(module).convert_module();
 
     let mut pass_mgr = ModulePassManager::new();
-    pass_mgr.add_pass(dag::combine::Combine::new());
+    pass_mgr.add_pass(combine::Combine::new());
     pass_mgr.add_pass(dag::legalize::Legalize::new());
     pass_mgr.add_pass(dag::isel::MISelector::new());
     pass_mgr.run_on_module(&mut dag_module);

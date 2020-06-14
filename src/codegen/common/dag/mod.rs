@@ -1,3 +1,4 @@
 pub mod basic_block;
-pub mod module;
+pub mod combine;
 pub mod function;
+pub mod module;
