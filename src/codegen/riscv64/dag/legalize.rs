@@ -1,4 +1,5 @@
-use super::{super::machine::register::*, node::*};
+use super::super::machine::register::*;
+use crate::codegen::arch::dag::node::*;
 use crate::codegen::common::dag::{
     function::{DAGFunction, DAGHeap},
     module::DAGModule,

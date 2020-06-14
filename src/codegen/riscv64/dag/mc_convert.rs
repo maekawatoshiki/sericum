@@ -2,7 +2,7 @@
 
 use super::super::machine::register::*;
 use super::super::machine::{inst, inst::*};
-use super::{node, node::*};
+use crate::codegen::arch::dag::{node, node::*};
 use crate::codegen::common::dag::{basic_block::DAGBasicBlockId, function::*, module::*};
 use crate::codegen::common::machine::{
     basic_block::*, function::*, inst_def::DefOrUseReg, module::*,
