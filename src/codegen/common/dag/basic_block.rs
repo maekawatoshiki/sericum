@@ -1,4 +1,5 @@
-use super::node::DAGNode;
+// use super::node::DAGNode;
+use crate::codegen::arch::dag::node::DAGNode;
 use crate::{ir::types::Types, util::allocator::*};
 use id_arena::*;
 use rustc_hash::FxHashMap;

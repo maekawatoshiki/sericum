@@ -2,7 +2,8 @@
 // TODO: refactor
 
 use super::super::{frame_object::*, machine::register::*};
-use super::{basic_block::*, function::*, module::*, node::*};
+use super::{function::*, module::*, node::*};
+use crate::codegen::common::dag::basic_block::*;
 use crate::ir::{
     basic_block::*, function::*, liveness::*, module::*, opcode::*, types::*, value::*,
 };

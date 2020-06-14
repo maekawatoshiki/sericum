@@ -1,5 +1,6 @@
 use super::super::machine::register::*;
-use super::{basic_block::*, frame_object::*, node::*};
+use super::{frame_object::*, node::*};
+use crate::codegen::common::dag::basic_block::*;
 use crate::ir::{function::*, types::*};
 use crate::util::allocator::*;
 use id_arena::*;

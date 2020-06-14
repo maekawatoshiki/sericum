@@ -1,8 +1,8 @@
 use super::{
     super::frame_object::FrameIndexInfo,
     super::machine::{inst::MachineOpcode, register::*},
-    basic_block::*,
 };
+use crate::codegen::common::dag::basic_block::*;
 use crate::ir::{opcode::*, types::*};
 use crate::util::allocator::*;
 use id_arena::*;
