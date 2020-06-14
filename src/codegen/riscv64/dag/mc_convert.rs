@@ -109,8 +109,8 @@ impl<'a> ConversionInfo<'a> {
 
         #[rustfmt::skip]
         macro_rules! bb {($id:expr)=>{ $id.as_basic_block() };}
-        // #[rustfmt::skip]
-        // macro_rules! cond_kind {($id:expr)=>{ $id.as_cond_kind() };}
+        #[rustfmt::skip]
+        macro_rules! cond_kind {($id:expr)=>{ $id.as_cond_kind() };}
 
         // there should be no NodeKind::IRs here
         let machine_inst_id = match &node.kind {
@@ -152,19 +152,19 @@ impl<'a> ConversionInfo<'a> {
             //         self.cur_bb,
             //     )))
             // }
-            // NodeKind::IR(IRNodeKind::CopyToReg) => {
-            //     let val = self.normal_operand(node.operand[1]);
-            //     let dst = match &node.operand[0].kind {
-            //         NodeKind::Operand(OperandNodeKind::Register(r)) => *r,
-            //         _ => unreachable!(),
-            //     };
-            //     Some(self.push_inst(MachineInst::new_with_def_reg(
-            //         MachineOpcode::Copy,
-            //         vec![val],
-            //         vec![dst],
-            //         self.cur_bb,
-            //     )))
-            // }
+            NodeKind::IR(IRNodeKind::CopyToReg) => {
+                let val = self.normal_operand(node.operand[1]);
+                let dst = match &node.operand[0].kind {
+                    NodeKind::Operand(OperandNodeKind::Register(r)) => *r,
+                    _ => unreachable!(),
+                };
+                Some(self.push_inst(MachineInst::new_with_def_reg(
+                    MachineOpcode::Copy,
+                    vec![val],
+                    vec![dst],
+                    self.cur_bb,
+                )))
+            }
             // // NodeKind::IR(IRNodeKind::Call) => Some(self.convert_call_dag(&*node)),
             NodeKind::IR(IRNodeKind::Phi) => {
                 let mut operands = vec![];
@@ -185,93 +185,6 @@ impl<'a> ConversionInfo<'a> {
                 );
                 Some(self.push_inst(phi_inst))
             }
-            // NodeKind::IR(IRNodeKind::Div) => {
-            //     let eax = self.cur_func.regs_info.get_phys_reg(GR32::EAX);
-            //     let edx = self.cur_func.regs_info.get_phys_reg(GR32::EDX);
-            //
-            //     let op1 = self.normal_operand(node.operand[0]);
-            //     let op2 = self.normal_operand(node.operand[1]);
-            //
-            //     self.push_inst(
-            //         MachineInst::new_simple(mov_n_rx(32, &op1).unwrap(), vec![op1], self.cur_bb)
-            //             .with_def(vec![eax]),
-            //     );
-            //
-            //     self.push_inst(
-            //         MachineInst::new_simple(MachineOpcode::CDQ, vec![], self.cur_bb)
-            //             .with_imp_defs(vec![eax, edx])
-            //             .with_imp_use(eax),
-            //     );
-            //
-            //     assert_eq!(op2.get_type(&self.cur_func.regs_info), Some(Type::Int32));
-            //     let inst1 = MachineInst::new(
-            //         &self.cur_func.regs_info,
-            //         mov_n_rx(32, &op2).unwrap(),
-            //         vec![op2],
-            //         Some(RegisterClassKind::GR32), // TODO: support other types
-            //         self.cur_bb,
-            //     );
-            //     let op2 = MachineOperand::Register(inst1.def[0]);
-            //     self.push_inst(inst1);
-            //
-            //     self.push_inst(
-            //         MachineInst::new_simple(MachineOpcode::IDIV, vec![op2], self.cur_bb)
-            //             .with_imp_defs(vec![eax, edx])
-            //             .with_imp_uses(vec![eax, edx]),
-            //     );
-            //
-            //     let copy_inst = MachineInst::new(
-            //         &self.cur_func.regs_info,
-            //         MachineOpcode::Copy,
-            //         vec![MachineOperand::Register(eax)],
-            //         Some(RegisterClassKind::GR32), // TODO
-            //         self.cur_bb,
-            //     );
-            //     Some(self.push_inst(copy_inst))
-            // }
-            // NodeKind::IR(IRNodeKind::Rem) => {
-            //     let eax = self.cur_func.regs_info.get_phys_reg(GR32::EAX);
-            //     let edx = self.cur_func.regs_info.get_phys_reg(GR32::EDX);
-            //
-            //     let op1 = self.normal_operand(node.operand[0]);
-            //     let op2 = self.normal_operand(node.operand[1]);
-            //
-            //     self.push_inst(
-            //         MachineInst::new_simple(mov_n_rx(32, &op1).unwrap(), vec![op1], self.cur_bb)
-            //             .with_def(vec![eax]),
-            //     );
-            //
-            //     self.push_inst(
-            //         MachineInst::new_simple(MachineOpcode::CDQ, vec![], self.cur_bb)
-            //             .with_imp_defs(vec![eax, edx])
-            //             .with_imp_use(eax),
-            //     );
-            //
-            //     assert_eq!(op2.get_type(&self.cur_func.regs_info), Some(Type::Int32));
-            //     let inst1 = MachineInst::new(
-            //         &self.cur_func.regs_info,
-            //         mov_n_rx(32, &op2).unwrap(),
-            //         vec![op2],
-            //         Some(RegisterClassKind::GR32), // TODO: support other types
-            //         self.cur_bb,
-            //     );
-            //     let op2 = MachineOperand::Register(inst1.def[0]);
-            //     self.push_inst(inst1);
-            //
-            //     self.push_inst(
-            //         MachineInst::new_simple(MachineOpcode::IDIV, vec![op2], self.cur_bb)
-            //             .with_imp_defs(vec![eax, edx])
-            //             .with_imp_uses(vec![eax, edx]),
-            //     );
-            //
-            //     Some(self.push_inst(MachineInst::new(
-            //         &self.cur_func.regs_info,
-            //         MachineOpcode::Copy,
-            //         vec![MachineOperand::Register(edx)],
-            //         Some(RegisterClassKind::GR32), // TODO
-            //         self.cur_bb,
-            //     )))
-            // }
             // NodeKind::IR(IRNodeKind::Setcc) => {
             //     let new_op1 = self.normal_operand(node.operand[1]);
             //     let new_op2 = self.normal_operand(node.operand[2]);
@@ -315,37 +228,36 @@ impl<'a> ConversionInfo<'a> {
             //     );
             //     Some(self.push_inst(inst))
             // }
-            // NodeKind::IR(IRNodeKind::Brcc) => {
-            //     let op0 = self.normal_operand(node.operand[1]);
-            //     let op1 = self.normal_operand(node.operand[2]);
-            //
-            //     self.push_inst(MachineInst::new_simple(
-            //         if op0.is_register() && op1.is_constant() {
-            //             MachineOpcode::CMPri
-            //         } else if op0.is_register() && op1.is_register() {
-            //             MachineOpcode::CMPrr
-            //         } else {
-            //             unreachable!()
-            //         },
-            //         vec![op0, op1],
-            //         self.cur_bb,
-            //     ));
-            //
-            //     Some(self.push_inst(MachineInst::new_simple(
-            //         match cond_kind!(node.operand[0]) {
-            //             CondKind::Eq => MachineOpcode::JE,
-            //             CondKind::Le => MachineOpcode::JLE,
-            //             CondKind::Lt => MachineOpcode::JL,
-            //             CondKind::Ge => MachineOpcode::JGE,
-            //             CondKind::Gt => MachineOpcode::JG,
-            //             _ => unreachable!(),
-            //         },
-            //         vec![MachineOperand::Branch(
-            //             self.get_machine_bb(bb!(node.operand[3])),
-            //         )],
-            //         self.cur_bb,
-            //     )))
-            // }
+            NodeKind::IR(IRNodeKind::Brcc) => {
+                let mut operands = node.operand[1..3]
+                    .iter()
+                    .map(|&op| {
+                        let op = self.normal_operand(op);
+                        match self.move2reg_if_necessary(op) {
+                            Ok((r, inst)) => {
+                                self.push_inst(inst);
+                                MachineOperand::Register(r)
+                            }
+                            Err(op) => op,
+                        }
+                    })
+                    .collect::<Vec<_>>();
+                operands.push(MachineOperand::Branch(
+                    self.get_machine_bb(bb!(node.operand[3])),
+                ));
+                Some(self.push_inst(MachineInst::new_simple(
+                    match cond_kind!(node.operand[0]) {
+                        CondKind::Eq => MachineOpcode::BEQ,
+                        // CondKind::Le => MachineOpcode::JLE,
+                        // CondKind::Lt => MachineOpcode::JL,
+                        // CondKind::Ge => MachineOpcode::JGE,
+                        // CondKind::Gt => MachineOpcode::JG,
+                        _ => unreachable!(),
+                    },
+                    operands,
+                    self.cur_bb,
+                )))
+            }
             // NodeKind::IR(IRNodeKind::FPBrcc) => {
             //     let op0 = self.normal_operand(node.operand[1]);
             //     let op1 = self.normal_operand(node.operand[2]);
@@ -409,6 +321,26 @@ impl<'a> ConversionInfo<'a> {
 
     fn move2reg(&self, r: RegisterId, src: MachineOperand) -> MachineInst {
         MachineInst::new_simple(opcode_copy2reg(&src), vec![src], self.cur_bb).with_def(vec![r])
+    }
+
+    fn move2reg_if_necessary(
+        &self,
+        src: MachineOperand,
+    ) -> Result<(RegisterId, MachineInst), MachineOperand> {
+        match src {
+            MachineOperand::Register(_) => Err(src),
+            _ => {
+                let r = self
+                    .cur_func
+                    .regs_info
+                    .new_virt_reg(ty2rc(&src.get_type(&self.cur_func.regs_info).unwrap()).unwrap());
+                Ok((
+                    r,
+                    MachineInst::new_simple(opcode_copy2reg(&src), vec![src], self.cur_bb)
+                        .with_def(vec![r]),
+                ))
+            }
+        }
     }
 
     // fn convert_call_dag(&mut self, node: &DAGNode) -> MachineInstId {
