@@ -88,7 +88,7 @@ impl FrameObjectsInfo {
             offset_map.insert(*idx, -(total_size as i32 - saved_regs_sz as i32) - sz);
         }
 
-        let stack_down = Self::calc_max_adjust_stack_down(f) as usize;
+        let stack_down = Self::calc_max_adjust_stack_down(f) as i32;
         total_size = roundup(total_size as i32 + stack_down, 16) as usize;
 
         Self {

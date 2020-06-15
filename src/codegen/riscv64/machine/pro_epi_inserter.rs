@@ -83,7 +83,7 @@ impl PrologueEpilogueInserter {
         adjust: i32,
     ) {
         let mut builder = Builder::new(cur_func);
-        builder.set_insert_point_at_entry_bb();
+        builder.set_insert_point_at_entry_block();
 
         //addi sp,sp,-32
         let sp = builder.function.regs_info.get_phys_reg(GPR::SP);
