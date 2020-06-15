@@ -420,8 +420,8 @@ fn main() {
     let mut codegen = codegen::CodeGenerator::new();
     codegen.run(input);
 
-    cilk::ir::cse::CommonSubexprElimination::new().run_on_module(&mut codegen.module);
     cilk::ir::mem2reg::Mem2Reg::new().run_on_module(&mut codegen.module);
+    cilk::ir::cse::CommonSubexprElimination::new().run_on_module(&mut codegen.module);
 
     println!("{:?}", codegen.module);
 

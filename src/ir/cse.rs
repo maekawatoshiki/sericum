@@ -1,6 +1,6 @@
 use crate::analysis::dom_tree::{DominatorTree, DominatorTreeConstructor};
 use crate::ir::{
-    basic_block::{BasicBlock, BasicBlockId, BasicBlocks},
+    basic_block::{BasicBlock, BasicBlockId},
     function::Function,
     module::Module,
     opcode::{Instruction, InstructionId, Opcode, Operand},
@@ -12,9 +12,8 @@ use rustc_hash::{FxHashMap, FxHashSet};
 
 pub struct CommonSubexprElimination {}
 
-struct LocalCommonSubexprEliminationOnFunction<'a> {
+struct GlobalCommonSubexprEliminationOnFunction<'a> {
     func: &'a mut Function,
-    dom_tree: DominatorTree<BasicBlock>,
     removal_list: Vec<InstructionId>,
 }
 
@@ -29,8 +28,7 @@ impl CommonSubexprElimination {
                 continue;
             }
 
-            LocalCommonSubexprEliminationOnFunction {
-                dom_tree: DominatorTreeConstructor::new(&func.basic_blocks).construct(),
+            GlobalCommonSubexprEliminationOnFunction {
                 func,
                 removal_list: vec![],
             }
@@ -39,23 +37,17 @@ impl CommonSubexprElimination {
     }
 }
 
-type C = FxHashMap<Opcode, FxHashMap<Vec<Operand>, InstructionId>>;
+type Subexprs = FxHashMap<Opcode, FxHashMap<Vec<Operand>, InstructionId>>;
 
-impl<'a> LocalCommonSubexprEliminationOnFunction<'a> {
-    fn get_ordered_blocks(&self, root: BasicBlockId) -> Vec<BasicBlockId> {
-        let mut blocks = vec![];
-        blocks.push(root);
-        for children in self.dom_tree.tree.get(&root) {
-            for &child in children {
-                blocks.append(&mut self.get_ordered_blocks(child));
-            }
-        }
-        blocks
-    }
-
-    pub fn run_sub(&mut self, root: BasicBlockId, mut commons: C) {
+impl<'a> GlobalCommonSubexprEliminationOnFunction<'a> {
+    pub fn run_sub(
+        &mut self,
+        dom_tree: &DominatorTree<BasicBlock>,
+        root: BasicBlockId,
+        mut commons: Subexprs,
+    ) {
         fn find_common<'a>(
-            commons: &'a C,
+            commons: &'a Subexprs,
             arena: &mut Arena<Instruction>,
             inst_id: &InstructionId,
         ) -> Option<&'a InstructionId> {
@@ -105,26 +97,27 @@ impl<'a> LocalCommonSubexprEliminationOnFunction<'a> {
             }
         }
 
-        let children = self
-            .dom_tree
-            .tree
-            .get(&root)
-            .unwrap_or(&FxHashSet::default())
-            .clone();
-        for child in children {
-            self.run_sub(child, commons.clone())
+        for &child in dom_tree.tree.get(&root).unwrap_or(&FxHashSet::default()) {
+            self.run_sub(dom_tree, child, commons.clone())
         }
     }
 
-    pub fn run(&mut self) {
-        self.run_sub(self.func.basic_blocks.order[0], FxHashMap::default());
+    pub fn run(mut self) {
+        let dom_tree = DominatorTreeConstructor::new(&self.func.basic_blocks).construct();
+
+        self.run_sub(
+            &dom_tree,
+            self.func.basic_blocks.order[0],
+            FxHashMap::default(),
+        );
+
         debug!(println!(
-            "{}: {} insts removed",
+            "function '{}': {} insts removed",
             self.func.name,
             self.removal_list.len()
         ));
 
-        for &remove in &self.removal_list {
+        for remove in self.removal_list {
             self.func.remove_inst(remove);
         }
     }

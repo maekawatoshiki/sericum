@@ -267,9 +267,11 @@ impl<'a> ConvertToDAG<'a> {
                     let gep =
                         self.construct_dag_for_gep(inst, inst.operands[0].as_value(), &indices);
                     if bb.liveness.borrow().live_out.contains(&inst_id) {
-                        self.make_chain(gep);
+                        let gep = self.make_chain_with_copying(gep);
+                        self.inst_id_node_id.insert(inst_id, gep);
+                    } else {
+                        self.inst_id_node_id.insert(inst_id, gep);
                     }
-                    self.inst_id_node_id.insert(inst_id, gep);
                 }
                 Opcode::Call => {
                     let mut operands: Vec<Raw<DAGNode>> = inst.operands[1..]
