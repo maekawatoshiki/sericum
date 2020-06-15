@@ -82,6 +82,12 @@ mod inst {
                 TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GPR)),
                 TargetOperand::Block
             ]);
+        pub static ref BLE: TargetInstDef =
+            TargetInstDef::new("ble", TargetOpcode::BLE).set_uses(vec![
+                TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GPR)),
+                TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GPR)),
+                TargetOperand::Block
+            ]);
         pub static ref J: TargetInstDef =
             TargetInstDef::new("j", TargetOpcode::J).set_uses(vec![TargetOperand::Block]);
         pub static ref JR: TargetInstDef =
@@ -130,6 +136,7 @@ pub enum TargetOpcode {
     // JMP,
     CALL,
     BEQ,
+    BLE,
     J,
     JR,
 
@@ -158,6 +165,7 @@ impl TargetOpcode {
             Self::SD => Some(&*inst::SD),
             Self::CALL => Some(&*inst::CALL),
             Self::BEQ => Some(&*inst::BEQ),
+            Self::BLE => Some(&*inst::BLE),
             Self::J => Some(&*inst::J),
             Self::JR => Some(&*inst::JR),
             _ => None,

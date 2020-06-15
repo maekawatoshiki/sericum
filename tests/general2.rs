@@ -434,4 +434,58 @@ mod riscv64 {
             &mut m,
         );
     }
+
+    #[test]
+    fn asm_prime() {
+        let mut m = Module::new("cilk");
+        cilk_ir!(m; define [i32] prime [(i32)] {
+            // primarity test
+            entry:
+                i = alloca i32;
+                cond = icmp eq (%arg.0), (i32 2);
+                br (%cond) l1, l2;
+            l1:
+                ret (i32 1);
+            l2:
+                r = rem (%arg.0), (i32 2);
+                cond = icmp eq (%r), (i32 0);
+                br (%cond) l3, l4;
+            l3:
+                ret (i32 0);
+            l4:
+                store (i32 3), (%i);
+                br l5;
+            l5:
+                li = load (%i);
+                m = mul (%li), (%li);
+                cond = icmp le (%m), (%arg.0);
+                br (%cond) l6, l7;
+            l6:
+                li = load (%i);
+                r = rem (%arg.0), (%li);
+                cond = icmp eq (%r), (i32 0);
+                br (%cond) l8, l9;
+            l8:
+                ret (i32 0);
+            l9:
+                a = add (%li), (i32 2);
+                store (%a), (%i);
+                br l5;
+            l7:
+                ret (i32 1);
+        });
+        compile_and_run(
+            "
+    #include <assert.h>
+    extern int prime(int);
+    int main() {
+        int p[] = {2,3,5,7,11,13,17,19,23,29,31,37,
+          41,43,47,53,59,61,67,71,73,79,83,89,97}, *q=p;
+        for (int i = 2; i < 100; i++)
+            if (prime(i)) assert(i == *(q++));
+    }
+            ",
+            &mut m,
+        );
+    }
 }

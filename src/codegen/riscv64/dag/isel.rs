@@ -124,6 +124,7 @@ impl MISelector {
                 (ir.FIAddr c) a {
                     mem32 c {
                         imm32 b => (mi.SW (mi.LI b), [FiReg c, %s0])
+                        GPR   b => (mi.SW         b, [FiReg c, %s0])
                     }
                 }
             }

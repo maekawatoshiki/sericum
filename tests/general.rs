@@ -351,56 +351,6 @@ mod x86_64 {
         );
 
         let func = cilk_ir!(m; define [i32] func [(i32)] {
-            // entry:
-            //     i = alloca i32;
-            //     store (i32 10), (%i);
-            //     x1 = load (%i);
-            //     x2 = add (%x1), (%arg.0);
-            //     br l1;
-            // l1:
-            //     ret (%x2);
-
-            // entry:
-            //     i = alloca i32;
-            //     store (i32 1), (%i);
-            //     c = icmp eq (%i), (i32 1);
-            //     br (%c) l1, l2;
-            // l1:
-            //     x = load (%i);
-            //     x2 = load (%i);
-            //     y = add (%x), (%x2);
-            //     ret (%y);
-            // l2:
-            //     ret (i32 1);
-
-             // entry:
-             //     a = alloca_ ([8; i32]);
-             //     // a = alloca_ ([2; [2; i32]]);
-             //     i = alloca i32;
-             //     store (i32 1), (%i);
-             //     li = load (%i);
-             //
-             //     idx = gep (%a), [(i32 0), (%li)];
-             //     store (i32 123), (%idx);
-             //
-             //     idx = gep (%a), [(i32 0), (i32 1)];
-             //     l = load (%idx);
-             //     ret (%l);
-
-            // entry:
-            //     // i = alloca i32;
-            //     // store (i32 10), (%i);
-            //     // li = load (%i);
-            //     // c = icmp eq (%li), (%arg.0);
-            //     x = sub (%arg.0), (i32 3);
-            //     c = icmp eq (%x), (i32 10);
-            //     br (%c) l1, l2;
-            // l1:
-            //     ret (i32 0);
-            // l2:
-            //     ret (i32 1);
-
-
             // primarity test
             entry:
                 i = alloca i32;
@@ -435,78 +385,6 @@ mod x86_64 {
                 br l5;
             l7:
                 ret (i32 1);
-
-            // entry:
-            //     i = alloca i32;
-            //     store (i32 0), (%i);
-            //     li = load (%i);
-            //     __ = call (->cilk_println_i32) [(i32 0)];
-            //     li2 = load (%i);
-            //     __ = call (->cilk_println_i32) [(%li)];
-            //     ret (%li2);
-
-
-            // entry:
-            //     a = add (%arg.0), (i32 123);
-            //     br l;
-            // l:
-            //     ret (%a);
-
-            // entry:
-            //     a = add (%arg.0), (i32 2);
-            //     i = rem (%arg.0), (i32 3);
-            //     a = add (%a), (%i);
-            //     __ = call (->cilk_println_i32) [(%a)];
-            //     b = add (%a), (i32 1);
-            //     br label1;
-            // label1:
-            //     c = add (%a), (%b);
-            //     d = add (%a), (%c);
-            //     ret (%d);
-
-            // entry:
-            //     i = alloca i32;
-            //     store (i32 2), (%i);
-            //     li = load (%i);
-            //     c = icmp eq (%li), (i32 2);
-            //     br (%c) l1, l2;
-            // l1:
-            //     a = add (%li), (i32 3);
-            //     br l3;
-            // l2:
-            //     b = add (%li), (i32 2);
-            //     br l3;
-            // l3:
-            //     p = phi [ [(%a), l1], [(%b), l2] ];
-            //     __ = call (->cilk_println_i32) [(%p)];
-            //     ret (i32 0);
-
-            // entry:
-            //     i = alloca i32;
-            //     store (i32 12), (%i);
-            //     li = load (%i);
-            //     a = add (%arg.0), (%li);
-            //     ret (%a);
-
-
-
-            // entry:
-            //     cond = icmp le (%arg.0), (i32 2);
-            //     br (%cond) l1, l2;
-            // l1:
-            //     // br merge;
-            //     ret (i32 1);
-            // l2:
-            //     a1 = sub (%arg.0), (i32 1);
-            //     r1 = call func [(%a1)];
-            //     a2 = sub (%arg.0), (i32 2);
-            //     r2 = call func [(%a2)];
-            //     r3 = add (%r1), (%r2);
-            //     ret (%r3);
-                // br merge;
-            // merge:
-            //     p = phi [ [(i32 1), l1], [(%r3), l2] ];
-            //     ret (%p);
         });
 
         let _main = cilk_ir!(m; define [void] main [(i32)] {
