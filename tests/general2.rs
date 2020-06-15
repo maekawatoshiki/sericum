@@ -315,7 +315,7 @@ mod riscv64 {
     }
 
     #[test]
-    fn asm_mul_div() {
+    fn asm_mul_div_rem() {
         let mut m = Module::new("cilk");
         cilk_ir!(m; define [i32] test_mul [] {
             entry:
@@ -335,14 +335,25 @@ mod riscv64 {
                 a = div (%li), (%a);
                 ret (%a);
         });
+        cilk_ir!(m; define [i32] test_rem [] {
+            entry:
+                i = alloca i32;
+                store (i32 10), (%i);
+                li = load (%i);
+                a = rem (%li), (i32 7); // 3
+                a = div (%li), (%a);
+                ret (%a);
+        });
         compile_and_run(
             "
     #include <assert.h>
     extern int test_mul();
     extern int test_div();
+    extern int test_rem();
     int main() {
         assert(test_mul() == 225);
         assert(test_div() == 2);
+        assert(test_rem() == 3);
     }
             ",
             &mut m,
