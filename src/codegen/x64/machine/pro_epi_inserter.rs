@@ -45,8 +45,8 @@ impl PrologueEpilogueInserter {
         }
 
         let frame_info = FrameObjectsInfo::new(tys, cur_func);
-        Self::remove_adjust_stack_inst(cur_func);
         let adjust = frame_info.total_size();
+        Self::remove_adjust_stack_inst(cur_func);
         self.insert_prologue(tys, cur_func, adjust);
         self.insert_epilogue(cur_func, adjust);
     }
@@ -71,7 +71,7 @@ impl PrologueEpilogueInserter {
     fn insert_prologue(&mut self, tys: &Types, cur_func: &mut MachineFunction, adjust: i32) {
         let has_call = cur_func.body.has_call();
         let mut builder = Builder::new(cur_func);
-        builder.set_insert_point_at_entry_bb();
+        builder.set_insert_point_at_entry_block();
 
         if has_call || adjust > 0 {
             // push rbp
@@ -83,7 +83,6 @@ impl PrologueEpilogueInserter {
                 )],
                 builder.get_cur_bb().unwrap(),
             );
-            let push_rbp = builder.function.alloc_inst(push_rbp);
             builder.insert(push_rbp);
         }
 
@@ -101,21 +100,21 @@ impl PrologueEpilogueInserter {
             builder.get_cur_bb().unwrap(),
         )
         .with_def(vec![builder.function.regs_info.get_phys_reg(GR64::RBP)]);
-        let mov_rbp_rsp = builder.function.alloc_inst(mov_rbp_rsp);
         builder.insert(mov_rbp_rsp);
 
-        // sub rsp, adjust
-        let sub_rsp = MachineInst::new_simple(
-            MachineOpcode::SUBr64i32,
-            vec![
-                MachineOperand::phys_reg(&builder.function.regs_info, GR64::RSP),
-                MachineOperand::imm_i32(adjust),
-            ],
-            builder.get_cur_bb().unwrap(),
-        )
-        .with_def(vec![builder.function.regs_info.get_phys_reg(GR64::RSP)]);
-        let sub_rsp = builder.function.alloc_inst(sub_rsp);
-        builder.insert(sub_rsp);
+        if has_call {
+            // sub rsp, adjust
+            let sub_rsp = MachineInst::new_simple(
+                MachineOpcode::SUBr64i32,
+                vec![
+                    MachineOperand::phys_reg(&builder.function.regs_info, GR64::RSP),
+                    MachineOperand::imm_i32(adjust),
+                ],
+                builder.get_cur_bb().unwrap(),
+            )
+            .with_def(vec![builder.function.regs_info.get_phys_reg(GR64::RSP)]);
+            builder.insert(sub_rsp);
+        }
 
         self.insert_arg_copy(&tys.base.borrow(), &mut builder);
     }
@@ -142,7 +141,7 @@ impl PrologueEpilogueInserter {
 
             let mut iseq = vec![];
 
-            if adjust > 0 {
+            if adjust > 0 && has_call {
                 // mov rsp, rbp
                 let i = MachineInst::new_simple(
                     MachineOpcode::MOVrr64,

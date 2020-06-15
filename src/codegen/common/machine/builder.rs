@@ -23,7 +23,7 @@ pub trait MachineInstTrait {
 }
 
 pub trait BuilderTrait {
-    fn set_insert_point_at_entry_bb(&mut self);
+    fn set_insert_point_at_entry_block(&mut self);
     fn set_insert_point_at(&mut self, pt: usize, bb_id: MachineBasicBlockId);
     fn set_insert_point_at_end(&mut self, bb_id: MachineBasicBlockId);
     fn set_insert_point_before_inst(&mut self, inst_id: MachineInstId) -> Option<()>;
@@ -64,7 +64,7 @@ impl<'a> BuilderWithLiveInfoEdit<'a> {
 }
 
 impl<'a> BuilderTrait for BuilderWithLiveInfoEdit<'a> {
-    fn set_insert_point_at_entry_bb(&mut self) {
+    fn set_insert_point_at_entry_block(&mut self) {
         let entry = *self.function.get_entry_bb().unwrap();
         self.set_insert_point_at(0, entry);
     }
@@ -185,7 +185,7 @@ impl<'a> Builder<'a> {
 }
 
 impl<'a> BuilderTrait for Builder<'a> {
-    fn set_insert_point_at_entry_bb(&mut self) {
+    fn set_insert_point_at_entry_block(&mut self) {
         let entry = *self.function.get_entry_bb().unwrap();
         self.set_insert_point_at(0, entry);
     }
