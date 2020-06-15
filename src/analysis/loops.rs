@@ -130,10 +130,13 @@ impl<'a, BBS: BasicBlocksTrait> LoopsConstructor<'a, BBS> {
 
     fn get_post_ordered_blocks(&self, root: Id<BBS::BB>) -> Vec<Id<BBS::BB>> {
         let mut blocks = vec![];
-        for children in self.dom_tree.tree.get(&root) {
-            for &child in children {
-                blocks.append(&mut self.get_post_ordered_blocks(child));
-            }
+        for &child in self
+            .dom_tree
+            .tree
+            .get(&root)
+            .unwrap_or(&FxHashSet::default())
+        {
+            blocks.append(&mut self.get_post_ordered_blocks(child));
         }
         blocks.push(root);
         blocks
