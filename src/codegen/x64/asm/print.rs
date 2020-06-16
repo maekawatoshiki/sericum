@@ -74,45 +74,180 @@ impl MachineAsmPrinter {
     ) {
         self.output.push_str("  ");
 
-        match inst.opcode {
-            MachineOpcode::MOVSDrm64 => {}
-            MachineOpcode::MOVSXDr64m32 => {}
-            MachineOpcode::MOVrr32
-            | MachineOpcode::MOVri32
-            | MachineOpcode::MOVrr64
-            | MachineOpcode::MOVri64 => self.run_on_inst_mov_rx(inst),
-            MachineOpcode::MOVrm32 | MachineOpcode::MOVrm64 => self.run_on_inst_mov_rm(inst, fo),
-            MachineOpcode::MOVmr32 | MachineOpcode::MOVmi32 => {
-                self.run_on_inst_mov_mx(tys, regs_info, inst, fo)
+        println!("{:?}", inst.opcode);
+        self.output.push_str(inst.opcode.inst_def().unwrap().name);
+        self.output.push(' ');
+
+        let mut word = None;
+        for (i, r) in inst.def.iter().enumerate() {
+            use crate::codegen::common::machine::inst_def::DefOrUseReg;
+            if inst
+                .opcode
+                .inst_def()
+                .unwrap()
+                .tie
+                .get(&DefOrUseReg::Def(i))
+                .is_some()
+            {
+                continue;
             }
-            MachineOpcode::LEAr64m => self.run_on_inst_lea_rm(inst, fo),
-            MachineOpcode::ADDrr32 | MachineOpcode::ADDri32 | MachineOpcode::ADDr64i32 => {
-                self.run_on_inst_add(inst)
+            self.output.push_str(r.as_phys_reg().name());
+            word = Some(byte2word(r.as_phys_reg().reg_class().size_in_byte()));
+            if i != inst.def.len() - 1 - inst.opcode.inst_def().unwrap().tie.len() {
+                self.output.push_str(", ");
             }
-            MachineOpcode::SUBrr32 | MachineOpcode::SUBri32 | MachineOpcode::SUBr64i32 => {
-                self.run_on_inst_sub(inst)
+        }
+
+        if inst.def.len() - inst.opcode.inst_def().unwrap().tie.len() > 0 && inst.operand.len() > 0
+        {
+            self.output.push_str(", ");
+        }
+
+        for (i, o) in inst.operand.iter().enumerate() {
+            self.operand2asm(inst.opcode, fo, o);
+            if i != inst.operand.len() - 1 {
+                self.output.push_str(", ");
             }
-            MachineOpcode::IMULrr32 => self.run_on_inst_imul_rr(inst),
-            MachineOpcode::IMULrri32 | MachineOpcode::IMULrr64i32 => {
-                self.run_on_inst_imul_rri(inst)
-            }
-            MachineOpcode::CDQ => self.run_on_inst_cdq(),
-            MachineOpcode::IDIV => self.run_on_inst_idiv(inst),
-            MachineOpcode::PUSH64 => self.run_on_inst_push(inst),
-            MachineOpcode::POP64 => self.run_on_inst_pop(inst),
-            MachineOpcode::RET => self.run_on_inst_ret(),
-            MachineOpcode::CALL => self.run_on_inst_call(inst),
-            MachineOpcode::Seteq | MachineOpcode::Setle | MachineOpcode::Setlt => {}
-            MachineOpcode::JMP => self.run_on_inst_jmp(inst),
-            MachineOpcode::BrCond => {}
-            MachineOpcode::CMPri | MachineOpcode::CMPrr => self.run_on_inst_cmp(inst),
-            MachineOpcode::JE => self.run_on_inst_je(inst),
-            MachineOpcode::JLE => self.run_on_inst_jle(inst),
-            MachineOpcode::JL => self.run_on_inst_jl(inst),
-            _ => panic!("{:?}", inst),
         }
 
         self.output.push('\n');
+
+        // if inst.opcode.inst_def().is_none() {
+        //     println!(">>> {:?}", inst.opcode);
+        // }
+        // match inst.opcode {
+        //     MachineOpcode::MOVSDrm64 => {}
+        //     MachineOpcode::MOVSXDr64m32 => {}
+        //     MachineOpcode::MOVrr32
+        //     | MachineOpcode::MOVri32
+        //     | MachineOpcode::MOVrr64
+        //     | MachineOpcode::MOVri64 => self.run_on_inst_mov_rx(inst),
+        //     MachineOpcode::MOVrm32 | MachineOpcode::MOVrm64 => self.run_on_inst_mov_rm(inst, fo),
+        //     MachineOpcode::MOVmr32 | MachineOpcode::MOVmi32 => {
+        //         self.run_on_inst_mov_mx(tys, regs_info, inst, fo)
+        //     }
+        //     MachineOpcode::LEAr64m => self.run_on_inst_lea_rm(inst, fo),
+        //     MachineOpcode::ADDrr32 | MachineOpcode::ADDri32 | MachineOpcode::ADDr64i32 => {
+        //         self.run_on_inst_add(inst)
+        //     }
+        //     MachineOpcode::SUBrr32 | MachineOpcode::SUBri32 | MachineOpcode::SUBr64i32 => {
+        //         self.run_on_inst_sub(inst)
+        //     }
+        //     MachineOpcode::IMULrr32 => self.run_on_inst_imul_rr(inst),
+        //     MachineOpcode::IMULrri32 | MachineOpcode::IMULrr64i32 => {
+        //         self.run_on_inst_imul_rri(inst)
+        //     }
+        //     MachineOpcode::CDQ => self.run_on_inst_cdq(),
+        //     MachineOpcode::IDIV => self.run_on_inst_idiv(inst),
+        //     MachineOpcode::PUSH64 => self.run_on_inst_push(inst),
+        //     MachineOpcode::POP64 => self.run_on_inst_pop(inst),
+        //     MachineOpcode::RET => self.run_on_inst_ret(),
+        //     MachineOpcode::CALL => self.run_on_inst_call(inst),
+        //     MachineOpcode::Seteq | MachineOpcode::Setle | MachineOpcode::Setlt => {}
+        //     MachineOpcode::JMP => self.run_on_inst_jmp(inst),
+        //     MachineOpcode::BrCond => {}
+        //     MachineOpcode::CMPri | MachineOpcode::CMPrr => self.run_on_inst_cmp(inst),
+        //     MachineOpcode::JE => self.run_on_inst_je(inst),
+        //     MachineOpcode::JLE => self.run_on_inst_jle(inst),
+        //     MachineOpcode::JL => self.run_on_inst_jl(inst),
+        //     _ => panic!("{:?}", inst),
+        // }
+        //
+        // self.output.push('\n');
+    }
+
+    fn operand2asm(
+        &mut self,
+        opcode: MachineOpcode,
+        fo: &FrameObjectsInfo,
+        operand: &MachineOperand,
+    ) {
+        match operand {
+            MachineOperand::Branch(id) => self.output.push_str(self.bb_id_to_label_id(id).as_str()),
+            MachineOperand::Constant(MachineConstant::Int32(i)) => {
+                self.output.push_str(format!("{}", i).as_str())
+            }
+            MachineOperand::Constant(MachineConstant::Int8(i)) => {
+                self.output.push_str(format!("{}", i).as_str())
+            }
+            MachineOperand::Register(r) => self.output.push_str(r.as_phys_reg().name()),
+            MachineOperand::FrameIndex(i) => self
+                .output
+                .push_str(format!("{}", fo.offset(i.idx).unwrap()).as_str()),
+            // MachineOperand::Mem(MachineMemOperand::FiReg(fi, r)) => self.output.push_str(
+            //     format!("{}({})", fo.offset(fi.idx).unwrap(), r.as_phys_reg().name()).as_str(),
+            // ),
+            // MachineOperand::Mem(MachineMemOperand::ImmReg(imm, r)) => self
+            //     .output
+            //     .push_str(format!("{}({})", imm, r.as_phys_reg().name()).as_str()),
+            MachineOperand::Mem(MachineMemOperand::Address(AddressKind::FunctionName(name))) => {
+                self.output.push_str(name.as_str())
+            }
+            MachineOperand::Mem(_) => {
+                let w = match opcode {
+                    MachineOpcode::MOVSDrm64 => 8,
+                    MachineOpcode::MOVSDmr => 8,
+                    MachineOpcode::MOVSDrm => 8,
+                    MachineOpcode::MOVSDrr => 8,
+                    MachineOpcode::MOVrm32 => 4,
+                    MachineOpcode::MOVmr32 => 4,
+                    MachineOpcode::MOVmi32 => 4,
+                    MachineOpcode::MOVmr64 => 8,
+                    MachineOpcode::MOVmi64 => 8,
+                    MachineOpcode::MOVSXDr64m32 => 4,
+                    MachineOpcode::LEAr64m => 8,
+                    MachineOpcode::ADDrr32 => 4,
+                    MachineOpcode::ADDrr64 => 4,
+                    MachineOpcode::ADDri32 => 4,
+                    MachineOpcode::ADDr64i32 => 4,
+                    MachineOpcode::ADDSDrr => 4,
+                    MachineOpcode::ADDSDrm => 4,
+                    MachineOpcode::SUBrr32 => 4,
+                    MachineOpcode::SUBri32 => 4,
+                    MachineOpcode::SUBr64i32 => 4,
+                    MachineOpcode::SUBSDrr => 4,
+                    MachineOpcode::SUBSDrm => 4,
+                    MachineOpcode::IMULrr32 => 4,
+                    MachineOpcode::IMULrri32 => 4,
+                    MachineOpcode::IMULrr64i32 => 4,
+                    MachineOpcode::MULSDrr => 4,
+                    MachineOpcode::MULSDrm => 4,
+                    MachineOpcode::CDQ => 4,
+                    MachineOpcode::IDIV => 4,
+                    MachineOpcode::DIVSDrr => 4,
+                    MachineOpcode::DIVSDrm => 8,
+                    MachineOpcode::SHLr64i8 => 4,
+                    MachineOpcode::SHLr32i8 => 4,
+                    MachineOpcode::SQRTSDrr => 4,
+                    MachineOpcode::MOVrr32 => 4,
+                    MachineOpcode::MOVri32 => 4,
+                    MachineOpcode::MOVrr64 => 4,
+                    MachineOpcode::MOVri64 => 4,
+                    MachineOpcode::MOVrm64 => 8,
+                    MachineOpcode::PUSH64 => 4,
+                    MachineOpcode::POP64 => 4,
+                    MachineOpcode::RET => 4,
+                    MachineOpcode::CALL => 4,
+                    MachineOpcode::CMPrr => 4,
+                    MachineOpcode::CMPri => 4,
+                    MachineOpcode::UCOMISDrr => 4,
+                    MachineOpcode::JE => 4,
+                    MachineOpcode::JBE => 4,
+                    MachineOpcode::JB => 4,
+                    MachineOpcode::JLE => 4,
+                    MachineOpcode::JL => 4,
+                    MachineOpcode::JA => 4,
+                    MachineOpcode::JAE => 4,
+                    MachineOpcode::JG => 4,
+                    MachineOpcode::JGE => 4,
+                    MachineOpcode::JMP => 4,
+                    _ => unreachable!(),
+                };
+                let word = byte2word(w);
+                self.run_on_mem_operand(operand, fo, word)
+            }
+            e => unimplemented!("{:?}", e),
+        };
     }
 
     fn run_on_inst_mov_rx(&mut self, i: &MachineInst) {

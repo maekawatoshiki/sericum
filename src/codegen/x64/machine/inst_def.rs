@@ -314,6 +314,28 @@ mod inst {
                 TargetRegister::RegClass(RegisterClassKind::GR64),
             )])
         };
+        pub static ref JE: TargetInstDef = {
+            TargetInstDef::new("je", TargetOpcode::JE).set_uses(vec![TargetOperand::Block])
+        };
+        pub static ref JLE: TargetInstDef = {
+            TargetInstDef::new("jle", TargetOpcode::JLE).set_uses(vec![TargetOperand::Block])
+        };
+        pub static ref JMP: TargetInstDef = {
+            TargetInstDef::new("jmp", TargetOpcode::JMP).set_uses(vec![TargetOperand::Block])
+        };
+        pub static ref CMPri: TargetInstDef = {
+            TargetInstDef::new("cmp", TargetOpcode::CMPri)
+                .set_uses(vec![TargetOperand::Any, TargetOperand::Any])
+        };
+        pub static ref CMPrr: TargetInstDef = {
+            TargetInstDef::new("cmp", TargetOpcode::CMPrr)
+                .set_uses(vec![TargetOperand::Any, TargetOperand::Any])
+        };
+        pub static ref CALL: TargetInstDef = {
+            TargetInstDef::new("call", TargetOpcode::CALL) // TODO: defs and uses info
+                // .set_uses(vec![TargetOperand::Any, TargetOperand::Any])
+                // .set_imp_use(vec![]
+        };
         pub static ref RET: TargetInstDef = TargetInstDef::new("ret", TargetOpcode::RET);
     }
 }
@@ -464,6 +486,12 @@ impl TargetOpcode {
             Self::IDIV => Some(&*inst::IDIV),
             Self::PUSH64 => Some(&*inst::PUSH64),
             Self::POP64 => Some(&*inst::POP64),
+            Self::JMP => Some(&*inst::JMP),
+            Self::JE => Some(&*inst::JE),
+            Self::JLE => Some(&*inst::JLE),
+            Self::CMPri => Some(&*inst::CMPri),
+            Self::CMPrr => Some(&*inst::CMPrr),
+            Self::CALL => Some(&*inst::CALL),
             Self::RET => Some(&*inst::RET),
             _ => None,
         }

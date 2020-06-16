@@ -1,5 +1,5 @@
 use super::super::dag::mc_convert::mov_rx;
-use super::inst::MachineOpcode;
+use super::inst::{MachineOpcode, MachineOperand};
 use crate::codegen::common::machine::{function::MachineFunction, module::MachineModule};
 use crate::{ir::types::Types, traits::pass::ModulePassTrait};
 
@@ -41,6 +41,26 @@ impl ReplaceCopyWithProperMInst {
                 }
 
                 let mov = mov_rx(tys, &f.regs_info, &inst.operand[0]).unwrap();
+                if inst.def.len() > 0
+                    && inst.operand[0].is_register()
+                    && f.regs_info.arena_ref()[*inst.operand[0].as_register()]
+                        .reg_class
+                        .size_in_bits()
+                        < f.regs_info.arena_ref()[inst.def[0]]
+                            .reg_class
+                            .size_in_bits()
+                {
+                    use crate::codegen::common::machine::register::*;
+                    inst.operand[0] = MachineOperand::Register(
+                        f.regs_info.get_phys_reg(
+                            inst.operand[0]
+                                .as_register()
+                                .as_phys_reg()
+                                .super_reg()
+                                .unwrap(),
+                        ),
+                    );
+                }
                 inst.opcode = mov;
             }
         }
