@@ -762,8 +762,14 @@ impl JITCompiler {
 
     fn compile_movsxd_r64m32(&mut self, fo: &FrameObjectsInfo, inst: &MachineInst) {
         let r0 = phys_reg_to_dynasm_reg(inst.def[0].as_phys_reg());
-        let m1 = fo.offset(inst.operand[0].as_frame_index().idx).unwrap();
-        dynasm!(self.asm; movsxd Rq(r0), [rbp - m1]);
+        match &inst.operand[0] {
+            MachineOperand::Mem(MachineMemOperand::BaseFi(base, fi)) => {
+                let r1 = phys_reg_to_dynasm_reg(base.as_phys_reg());
+                let m2 = fi.idx;
+                dynasm!(self.asm; movsxd Rq(r0), [Rq(r1) - fo.offset(m2).unwrap()]);
+            }
+            _ => unimplemented!(),
+        }
     }
 
     fn compile_movsxd_r64r32(&mut self, inst: &MachineInst) {

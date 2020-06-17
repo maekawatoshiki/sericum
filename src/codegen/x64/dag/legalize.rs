@@ -250,17 +250,25 @@ impl Legalize {
     ) -> Raw<DAGNode> {
         if node.ty == Type::Int64
             && node.operand[0].kind == NodeKind::IR(IRNodeKind::Load)
+            && node.operand[0].ty == Type::Int32
             && node.operand[0].operand[0].kind == NodeKind::IR(IRNodeKind::FIAddr)
         {
+            let rbp = heap.alloc_phys_reg(regs_info, GR64::RBP);
+            let mem = heap.alloc(DAGNode::new_mem(
+                MemNodeKind::BaseFi,
+                vec![rbp, node.operand[0].operand[0].operand[0]],
+            ));
             return heap.alloc(DAGNode::new(
                 NodeKind::MI(MINodeKind::MOVSXDr64m32),
-                vec![node.operand[0].operand[0].operand[0]],
+                vec![mem],
                 node.ty.clone(),
             ));
         }
 
         // TODO: Need instruction that converts Int32 to Int64
-        if node.ty == Type::Int64 && node.operand[0].ty == Type::Int32
+        if node.ty == Type::Int64
+            && !node.operand[0].is_constant()
+            && node.operand[0].ty == Type::Int32
         // && node.operand[0].operand[0].kind == NodeKind::IR(IRNodeKind::FIAddr)
         {
             let op = self.run_on_node(tys, regs_info, heap, node.operand[0]);

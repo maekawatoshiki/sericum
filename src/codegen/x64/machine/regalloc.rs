@@ -93,7 +93,6 @@ impl RegisterAllocator {
 
             // Spill virtual registers in the order of small spill weight
             for &reg2spill in &interfering {
-                println!("SPILL");
                 if matrix
                     .virt_reg_interval
                     .get(&reg2spill)
