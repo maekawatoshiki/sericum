@@ -74,7 +74,7 @@ impl MachineAsmPrinter {
     ) {
         self.output.push_str("  ");
 
-        println!("{:?}", inst.opcode);
+        // println!("{:?}", inst.opcode);
         self.output.push_str(inst.opcode.inst_def().unwrap().name);
         self.output.push(' ');
 

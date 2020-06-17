@@ -218,6 +218,7 @@ impl JITCompiler {
                     MachineOpcode::MOVmr64 => self.compile_mov_mr64(&frame_objects, inst),
                     MachineOpcode::MOVmi32 => self.compile_mov_mi32(&frame_objects, inst),
                     MachineOpcode::MOVSXDr64m32 => self.compile_movsxd_r64m32(&frame_objects, inst),
+                    MachineOpcode::MOVSXDr64r32 => self.compile_movsxd_r64r32(inst),
                     MachineOpcode::MOVSDrm64 => self.compile_movsd_rm64(inst),
                     MachineOpcode::MOVSDrm => self.compile_movsd_rm(&frame_objects, inst),
                     MachineOpcode::MOVSDmr => self.compile_movsd_mr(&frame_objects, inst),
@@ -763,6 +764,12 @@ impl JITCompiler {
         let r0 = phys_reg_to_dynasm_reg(inst.def[0].as_phys_reg());
         let m1 = fo.offset(inst.operand[0].as_frame_index().idx).unwrap();
         dynasm!(self.asm; movsxd Rq(r0), [rbp - m1]);
+    }
+
+    fn compile_movsxd_r64r32(&mut self, inst: &MachineInst) {
+        let r0 = phys_reg_to_dynasm_reg(inst.def[0].as_phys_reg());
+        let r1 = phys_reg_to_dynasm_reg(inst.operand[0].as_register().as_phys_reg());
+        dynasm!(self.asm; movsxd Rq(r0), Rd(r1));
     }
 
     fn compile_call(&mut self, module: &MachineModule, _fo: &FrameObjectsInfo, inst: &MachineInst) {

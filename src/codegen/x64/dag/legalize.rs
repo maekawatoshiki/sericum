@@ -263,8 +263,12 @@ impl Legalize {
         if node.ty == Type::Int64 && node.operand[0].ty == Type::Int32
         // && node.operand[0].operand[0].kind == NodeKind::IR(IRNodeKind::FIAddr)
         {
-            return self.run_on_node(tys, regs_info, heap, node.operand[0]);
-            // return node
+            let op = self.run_on_node(tys, regs_info, heap, node.operand[0]);
+            return heap.alloc(DAGNode::new(
+                NodeKind::MI(MINodeKind::MOVSXDr64r32),
+                vec![op],
+                node.ty,
+            ));
         }
 
         self.run_on_node_operand(tys, regs_info, heap, node);

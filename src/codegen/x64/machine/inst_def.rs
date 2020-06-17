@@ -31,8 +31,13 @@ mod inst {
             ])
         };
         pub static ref MOVSXDr64m32: TargetInstDef = {
-            TargetInstDef::new("mosxd", TargetOpcode::MOVSXDr64m32)
+            TargetInstDef::new("movsxd", TargetOpcode::MOVSXDr64m32)
                 .set_uses(vec![TargetOperand::FrameIndex])
+                .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR64)])
+        };
+        pub static ref MOVSXDr64r32: TargetInstDef = {
+            TargetInstDef::new("movsxd", TargetOpcode::MOVSXDr64r32)
+                .set_uses(vec![TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR32))])
                 .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR64)])
         };
         pub static ref LEAr64m: TargetInstDef = {
@@ -370,6 +375,7 @@ pub enum TargetOpcode {
     MOVmi64,
 
     MOVSXDr64m32, // out = movsxd [rbp - fi.off]
+    MOVSXDr64r32, // r64 = movsxd r32
 
     // out = lea [rbp  - fi.off              ] | out = lea rbp,  fi,   none,  none
     // out = lea [rbp  - fi.off + const.off  ] | out = lea rbp,  fi,   none,  off
@@ -450,6 +456,7 @@ impl TargetOpcode {
             Self::MOVSDrm => Some(&*inst::MOVSDrm),
             Self::MOVSDrr => Some(&*inst::MOVSDrr),
             Self::MOVSXDr64m32 => Some(&*inst::MOVSXDr64m32),
+            Self::MOVSXDr64r32 => Some(&*inst::MOVSXDr64r32),
             Self::LEAr64m => Some(&*inst::LEAr64m),
             Self::ADDrr32 => Some(&*inst::ADDrr32),
             Self::ADDrr64 => Some(&*inst::ADDrr64),

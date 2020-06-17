@@ -294,6 +294,14 @@ mod x86_64 {
 
         // println!("IR: {}", m.dump(f_id));
 
+        // use cilk::codegen::x64::asm::print::MachineAsmPrinter;
+        // use cilk::codegen::x64::standard_conversion_into_machine_module;
+        // let machine_module = standard_conversion_into_machine_module(&mut m);
+        // let mut printer = MachineAsmPrinter::new();
+        // // println!("{:?}", machine_module);
+        // printer.run_on_module(&machine_module);
+        // println!("{}", printer.output);
+
         let mut jit = exec::jit::JITExecutor::new(&mut m);
         let func = jit
             .find_function_by_name("compiled_brainfuxk_code")
