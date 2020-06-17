@@ -375,11 +375,7 @@ impl<'a> ConversionInfo<'a> {
             NodeKind::IR(IRNodeKind::CopyToLiveOut) => {
                 self.convert_dag_to_machine_inst(node.operand[0])
             }
-            e => {
-                println!("{:?}", e);
-                println!("{:?}, {:?}", *node.operand[0], *node.operand[0]);
-                None
-            }
+            e => panic!("{:?}", e),
         };
 
         if machine_inst_id.is_some() {
@@ -479,10 +475,12 @@ impl<'a> ConversionInfo<'a> {
         let call_inst = self.push_inst(
             MachineInst::new_simple(MachineOpcode::CALL, vec![callee], self.cur_bb)
                 .with_imp_uses(arg_regs)
-                .with_imp_def(self.cur_func.regs_info.get_phys_reg(GR64::RSP))
-                .with_def(match node.ty {
-                    Type::Void => vec![],
-                    _ => vec![ret_reg],
+                .with_imp_defs({
+                    let mut defs = vec![self.cur_func.regs_info.get_phys_reg(GR64::RSP)];
+                    if node.ty != Type::Void {
+                        defs.push(ret_reg)
+                    }
+                    defs
                 }),
         );
 

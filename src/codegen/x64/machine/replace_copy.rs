@@ -1,5 +1,5 @@
 use super::super::dag::mc_convert::mov_rx;
-use super::inst::{MachineOpcode, MachineOperand};
+use super::inst::MachineOpcode;
 use crate::codegen::common::machine::{function::MachineFunction, module::MachineModule};
 use crate::{ir::types::Types, traits::pass::ModulePassTrait};
 

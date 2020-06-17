@@ -145,6 +145,7 @@ impl MISelector {
             (ir.Load a): Int64 { GR64 a => (mi.MOVrm64 [Base a]) }
             (ir.Load a): Int32 { GR64 a => (mi.MOVrm32 [Base a]) }
             (ir.Load a): F64   { GR64 a => (mi.MOVSDrm [Base a]) }
+            (ir.Load a)        { GR64 a => (mi.MOVrm64 [Base a]) } // load pointer
             (ir.Store a, b) {
                 (ir.FIAddr c) a {
                     f64mem c {

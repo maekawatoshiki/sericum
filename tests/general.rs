@@ -545,7 +545,7 @@ fibo:
 .L3:
   mov rsp, rbp
   pop rbp
-  ret
+  ret 
   .globl main
 main:
 .L4:
@@ -553,7 +553,7 @@ main:
   mov edi, 10
   call fibo
   pop rbp
-  ret
+  ret 
 ",
             printer.output
         );
