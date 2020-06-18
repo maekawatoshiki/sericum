@@ -354,6 +354,7 @@ impl<'a> ConversionInfo<'a> {
         }
 
         for (i, arg) in args.into_iter().enumerate() {
+            println!(">>> {:?}", arg);
             let ty = arg.get_type(&self.cur_func.regs_info).unwrap();
 
             if !matches!(
@@ -389,6 +390,7 @@ impl<'a> ConversionInfo<'a> {
                 }
             };
 
+            println!("{:?}", inst);
             self.push_inst(inst);
         }
 

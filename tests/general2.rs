@@ -421,7 +421,36 @@ mod riscv64 {
                 c = load (%a);
                 d = load (%c);
                 ret (%d);
-                // ret (i32 0);
+        });
+        compile_and_run(
+            "
+    #include <assert.h>
+    extern int test();
+    int main() {
+        assert(test() == 3);
+    }
+            ",
+            &mut m,
+        );
+    }
+
+    #[test]
+    fn asm_pointer2() {
+        let mut m = Module::new("cilk");
+        cilk_ir!(m; define [i32] test2 [(ptr i32)] {
+            entry:
+                store (i32 3), (%arg.0);
+                ret (i32 0);
+        });
+        cilk_ir!(m; define [i32] test [] {
+            entry:
+                a = alloca_ (ptr i32);
+                b = alloca i32;
+                store (%b), (%a);
+                __  = call test2 [(%b)];
+                c = load (%a);
+                d = load (%c);
+                ret (%d);
         });
         compile_and_run(
             "

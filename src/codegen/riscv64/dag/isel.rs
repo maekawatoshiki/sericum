@@ -99,6 +99,11 @@ impl MISelector {
                         GPR b => (mi.SD b, [FiReg c, %s0])
                     }
                 }
+                GPR a {
+                    imm32 b => (mi.SW (mi.LI b), [ImmReg $0, a])
+                    GPR: Int32 b => (mi.SW b, [ImmReg $0, a])
+                    GPR b => (mi.SD b, [ImmReg $0, a])
+                }
             }
             (ir.FIAddr a) {
                 mem a => (mi.ADDI %s0, a)

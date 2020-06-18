@@ -22,7 +22,7 @@ type TS = proc_macro2::TokenStream;
 enum Node {
     Patterns(Vec<Node>),
     InstPattern(TS, Vec<Node>, Option<TS>, TS, Box<Node>), // inst, operands, ret ty, parent, body
-    OperandPattern(String, TS, Box<Node>),                 // operand kind, parent, body
+    OperandPattern(String, Option<TS>, TS, Box<Node>),     // operand kind, ty, parent, body
     Inst(TS, Vec<Node>),
     // Operand(String),
     Register(String),
@@ -89,7 +89,15 @@ impl<'a> PatternParser<'a> {
     }
 
     pub fn parse_operand_pat(&mut self, toplevel: bool) -> Node {
-        let ty = self.reader.get_ident().unwrap();
+        let kind = self.reader.get_ident().unwrap();
+        let ty = if self.reader.skip_punct(':') {
+            let ty = ident_tok(&self.reader.get_ident().unwrap());
+            Some(quote! {
+                Type::#ty
+            })
+        } else {
+            None
+        };
         let parent = if !toplevel {
             let node = ident_tok(self.reader.get_ident().unwrap().as_str());
             quote! { #node }
@@ -97,7 +105,7 @@ impl<'a> PatternParser<'a> {
             quote! { node }
         };
         let body = self.parse_body();
-        Node::OperandPattern(ty, quote! { #parent }, Box::new(body))
+        Node::OperandPattern(kind, ty, quote! { #parent }, Box::new(body))
     }
 
     pub fn parse_inst_kind(&mut self) -> TS {
@@ -206,8 +214,8 @@ impl TokenStreamConstructor {
             Node::InstPattern(inst, operands, ty, parent, body) => {
                 self.run_on_inst_patterns(inst, operands, ty, parent, body)
             }
-            Node::OperandPattern(kind, parent, body) => {
-                self.run_on_operand_pattern(kind, parent, body)
+            Node::OperandPattern(kind, ty, parent, body) => {
+                self.run_on_operand_pattern(kind, ty, parent, body)
             }
             Node::Inst(inst, operands) => self.run_on_inst(inst, operands),
             Node::Register(_name) => unimplemented!(),
@@ -266,7 +274,13 @@ impl TokenStreamConstructor {
         }
     }
 
-    fn run_on_operand_pattern(&mut self, kind: String, parent: TS, body: Box<Node>) -> TS {
+    fn run_on_operand_pattern(
+        &mut self,
+        kind: String,
+        ty: Option<TS>,
+        parent: TS,
+        body: Box<Node>,
+    ) -> TS {
         let body = self.run_sub(*body);
         match kind.as_str() {
             "imm8" => {
@@ -311,11 +325,17 @@ impl TokenStreamConstructor {
             }
             reg_class => {
                 let reg_class = ident_tok(reg_class);
-                quote! {
-                    if #parent.is_maybe_register()
-                      && matches!(ty2rc(&#parent.ty), Some(RegisterClassKind::#reg_class)) {
-                            #body
-                    }
+                if let Some(ty) = ty {
+                    quote! { if #parent.is_maybe_register()
+                        && matches!(ty2rc(&#parent.ty), Some(RegisterClassKind::#reg_class))
+                        && #parent.ty == #ty {
+                                #body
+                    } }
+                } else {
+                    quote! { if #parent.is_maybe_register()
+                        && matches!(ty2rc(&#parent.ty), Some(RegisterClassKind::#reg_class)) {
+                                #body
+                    }}
                 }
             }
         }
