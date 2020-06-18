@@ -465,6 +465,52 @@ mod riscv64 {
     }
 
     #[test]
+    fn asm_array() {
+        let mut m = Module::new("cilk");
+        cilk_ir!(m; define [i32] test [] {
+            entry:
+                a = alloca_ ([8; i32]);
+                x = gep (%a), [(i32 0), (i32 1)];
+                store (i32 3), (%x);
+                y = load (%x);
+                ret (%y);
+        });
+        compile_and_run(
+            "
+    #include <assert.h>
+    extern int test();
+    int main() {
+        assert(test() == 3);
+    }
+            ",
+            &mut m,
+        );
+    }
+
+    #[test]
+    fn asm_array2() {
+        let mut m = Module::new("cilk");
+        cilk_ir!(m; define [i32] test [(i32)] {
+            entry:
+                a = alloca_ ([8; i32]);
+                x = gep (%a), [(i32 0), (%arg.0)];
+                store (i32 3), (%x);
+                y = load (%x);
+                ret (%y);
+        });
+        compile_and_run(
+            "
+    #include <assert.h>
+    extern int test(int);
+    int main() {
+        assert(test(1) == 3);
+    }
+            ",
+            &mut m,
+        );
+    }
+
+    #[test]
     fn asm_fact() {
         let mut m = Module::new("cilk");
         cilk_ir!(m; define [i32] fact [(i32)] {

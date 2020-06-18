@@ -5,7 +5,6 @@ use crate::codegen::common::machine::{
     function::{InstIter, MachineFunction},
     module::MachineModule,
 };
-use crate::ir::types::Types;
 
 pub struct MachineAsmPrinter {
     pub output: String,
@@ -24,35 +23,32 @@ impl MachineAsmPrinter {
         self.output.push_str("  .text\n");
 
         for (_, func) in &m.functions {
-            self.run_on_function(&m.types, &func)
+            self.run_on_function(&func)
         }
     }
 
-    fn run_on_function(&mut self, tys: &Types, f: &MachineFunction) {
+    fn run_on_function(&mut self, f: &MachineFunction) {
         if f.is_internal {
             return;
         }
-
-        let fo = FrameObjectsInfo::new(tys, f);
 
         self.output
             .push_str(format!("  .globl {}\n", f.name).as_str()); // TODO
 
         self.output.push_str(format!("{}:\n", f.name).as_str());
 
-        self.run_on_basic_blocks(f, &fo);
+        self.run_on_basic_blocks(f);
     }
 
     fn run_on_basic_blocks(
         &mut self,
         // tys: &Types,
         f: &MachineFunction,
-        fo: &FrameObjectsInfo,
     ) {
         for (id, _, inst_iter) in f.body.mbb_iter() {
             self.output
                 .push_str(format!("{}:\n", self.bb_id_to_label_id(&id)).as_str());
-            self.run_on_basic_block(inst_iter, fo);
+            self.run_on_basic_block(inst_iter, &f.frame_objects.as_ref().unwrap());
         }
         self.cur_bb_id_base += f.body.basic_blocks.order.len();
     }
@@ -110,6 +106,9 @@ impl MachineAsmPrinter {
         match operand {
             MachineOperand::Branch(id) => self.output.push_str(self.bb_id_to_label_id(id).as_str()),
             MachineOperand::Constant(MachineConstant::Int32(i)) => {
+                self.output.push_str(format!("{}", i).as_str())
+            }
+            MachineOperand::Constant(MachineConstant::Int8(i)) => {
                 self.output.push_str(format!("{}", i).as_str())
             }
             MachineOperand::Register(r) => self.output.push_str(r.as_phys_reg().name()),

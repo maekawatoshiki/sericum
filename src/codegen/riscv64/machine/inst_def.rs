@@ -25,6 +25,12 @@ mod inst {
                 TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GPR)),
             ])
             .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GPR)]);
+        pub static ref ADD: TargetInstDef = TargetInstDef::new("add", TargetOpcode::ADD)
+            .set_uses(vec![
+                TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GPR)),
+                TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GPR)),
+            ])
+            .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GPR)]);
         pub static ref MULW: TargetInstDef = TargetInstDef::new("mulw", TargetOpcode::MULW)
             .set_uses(vec![
                 TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GPR)),
@@ -41,6 +47,12 @@ mod inst {
             .set_uses(vec![
                 TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GPR)),
                 TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GPR)),
+            ])
+            .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GPR)]);
+        pub static ref SLLI: TargetInstDef = TargetInstDef::new("slli", TargetOpcode::SLLI)
+            .set_uses(vec![
+                TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GPR)),
+                TargetOperand::Immediate(TargetImmediate::I8)
             ])
             .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GPR)]);
         pub static ref MV: TargetInstDef = TargetInstDef::new("mv", TargetOpcode::LI)
@@ -75,6 +87,11 @@ mod inst {
                 TargetOperand::Immediate(TargetImmediate::I32),
                 TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GPR))
             ]);
+        pub static ref SEXT_W: TargetInstDef = TargetInstDef::new("sext.w", TargetOpcode::SEXT_W)
+            .set_uses(vec![TargetOperand::Register(TargetRegister::RegClass(
+                RegisterClassKind::GPR
+            )),])
+            .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GPR)]);
         pub static ref CALL: TargetInstDef = TargetInstDef::new("call", TargetOpcode::CALL);
         pub static ref BEQ: TargetInstDef =
             TargetInstDef::new("beq", TargetOpcode::BEQ).set_uses(vec![
@@ -98,6 +115,7 @@ mod inst {
 }
 
 #[derive(Debug, Clone, PartialEq, Copy)]
+#[allow(non_camel_case_types)]
 pub enum TargetOpcode {
     // CALL,
 
@@ -106,34 +124,21 @@ pub enum TargetOpcode {
     Setle,
     Setlt,
 
-    ADDI,  // Add Integer
-    ADDIW, // Add Integer Word
-    ADDW,  // Add Word
-    MULW,  // Mul Word
-    DIVW,  // Div Word
-    REMW,  // Rem Word
-    MV,    // Move
-    LI,    // Load Immediate
-    LW,    // Load Word
-    LD,    // Load Double
-    SW,    // Store Word
-    SD,    // Store Double
-    // BrccEq,
-    // BrccLe,
-    // BrccLt,
-    // CMPrr,
-    // CMPri,
-    // UCOMISDrr,
-    // JE,
-    // JBE,
-    // JB,
-    // JLE,
-    // JL,
-    // JA,
-    // JAE,
-    // JG,
-    // JGE,
-    // JMP,
+    ADDI,   // Add Integer
+    ADDIW,  // Add Integer Word
+    ADDW,   // Add Word
+    ADD,    // Add
+    MULW,   // Mul Word
+    DIVW,   // Div Word
+    REMW,   // Rem Word
+    SLLI,   // Shift Left Logical Immediate
+    MV,     // Move
+    LI,     // Load Immediate
+    LW,     // Load Word
+    LD,     // Load Double
+    SW,     // Store Word
+    SD,     // Store Double
+    SEXT_W, // Sign-extend Word
     CALL,
     BEQ,
     BLE,
@@ -154,15 +159,18 @@ impl TargetOpcode {
             Self::ADDI => Some(&*inst::ADDI),
             Self::ADDIW => Some(&*inst::ADDIW),
             Self::ADDW => Some(&*inst::ADDW),
+            Self::ADD => Some(&*inst::ADD),
             Self::MULW => Some(&*inst::MULW),
             Self::DIVW => Some(&*inst::DIVW),
             Self::REMW => Some(&*inst::REMW),
+            Self::SLLI => Some(&*inst::SLLI),
             Self::MV => Some(&*inst::MV),
             Self::LI => Some(&*inst::LI),
             Self::LW => Some(&*inst::LW),
             Self::LD => Some(&*inst::LD),
             Self::SW => Some(&*inst::SW),
             Self::SD => Some(&*inst::SD),
+            Self::SEXT_W => Some(&*inst::SEXT_W),
             Self::CALL => Some(&*inst::CALL),
             Self::BEQ => Some(&*inst::BEQ),
             Self::BLE => Some(&*inst::BLE),

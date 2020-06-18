@@ -68,7 +68,7 @@ impl Legalize {
             // NodeKind::IR(IRNodeKind::Store) => self.run_on_node_store(tys, regs_info, heap, node),
             // NodeKind::IR(IRNodeKind::Add) => self.run_on_node_add(tys, regs_info, heap, node),
             // NodeKind::IR(IRNodeKind::Mul) => self.run_on_node_mul(tys, regs_info, heap, node),
-            // NodeKind::IR(IRNodeKind::Sext) => self.run_on_node_sext(tys, regs_info, heap, node),
+            NodeKind::IR(IRNodeKind::Sext) => self.run_on_node_sext(tys, regs_info, heap, node),
             // NodeKind::IR(IRNodeKind::Brcc) => self.run_on_node_brcc(tys, regs_info, heap, node),
             // NodeKind::IR(IRNodeKind::FPBrcc) => self.run_on_node_fpbrcc(tys, regs_info, heap, node),
             NodeKind::IR(IRNodeKind::Sub) => self.run_on_node_sub(tys, regs_info, heap, node),
@@ -274,35 +274,39 @@ impl Legalize {
     //     node
     // }
     //
-    // fn run_on_node_sext(
-    //     &mut self,
-    //     tys: &Types,
-    //     regs_info: &RegistersInfo,
-    //     heap: &mut DAGHeap,
-    //     node: Raw<DAGNode>,
-    // ) -> Raw<DAGNode> {
-    //     if node.ty == Type::Int64
-    //         && node.operand[0].kind == NodeKind::IR(IRNodeKind::Load)
-    //         && node.operand[0].operand[0].kind == NodeKind::IR(IRNodeKind::FIAddr)
-    //     {
-    //         return heap.alloc(DAGNode::new(
-    //             NodeKind::MI(MINodeKind::MOVSXDr64m32),
-    //             vec![node.operand[0].operand[0].operand[0]],
-    //             node.ty.clone(),
-    //         ));
-    //     }
-    //
-    //     // TODO: Need instruction that converts Int32 to Int64
-    //     if node.ty == Type::Int64 && node.operand[0].ty == Type::Int32
-    //     // && node.operand[0].operand[0].kind == NodeKind::IR(IRNodeKind::FIAddr)
-    //     {
-    //         return self.run_on_node(tys, regs_info, heap, node.operand[0]);
-    //         // return node
-    //     }
-    //
-    //     self.run_on_node_operand(tys, regs_info, heap, node);
-    //     node
-    // }
+    fn run_on_node_sext(
+        &mut self,
+        tys: &Types,
+        regs_info: &RegistersInfo,
+        heap: &mut DAGHeap,
+        node: Raw<DAGNode>,
+    ) -> Raw<DAGNode> {
+        // if node.ty == Type::Int64
+        //     && node.operand[0].kind == NodeKind::IR(IRNodeKind::Load)
+        //     && node.operand[0].operand[0].kind == NodeKind::IR(IRNodeKind::FIAddr)
+        // {
+        //     return heap.alloc(DAGNode::new(
+        //         NodeKind::MI(MINodeKind::MOVSXDr64m32),
+        //         vec![node.operand[0].operand[0].operand[0]],
+        //         node.ty.clone(),
+        //     ));
+        // }
+
+        if node.ty == Type::Int64
+            && !node.operand[0].is_constant()
+            && node.operand[0].ty == Type::Int32
+        {
+            let op = self.run_on_node(tys, regs_info, heap, node.operand[0]);
+            return heap.alloc(DAGNode::new(
+                NodeKind::MI(MINodeKind::SEXT_W),
+                vec![op],
+                node.ty,
+            ));
+        }
+
+        self.run_on_node_operand(tys, regs_info, heap, node);
+        node
+    }
     //
     // fn run_on_node_brcc(
     //     &mut self,

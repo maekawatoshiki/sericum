@@ -85,7 +85,7 @@ impl FrameObjectsInfo {
         let mut sz = 0;
         for FrameIndexInfo { idx, ty } in &f.local_mgr.locals {
             sz += ty.size_in_byte(tys) as i32;
-            offset_map.insert(*idx, -(total_size as i32 - saved_regs_sz as i32) - sz);
+            offset_map.insert(*idx, -(saved_regs_sz as i32) - sz);
         }
 
         let stack_down = Self::calc_max_adjust_stack_down(f) as i32;

@@ -42,7 +42,7 @@ impl PrologueEpilogueInserter {
             return;
         }
 
-        let frame_info = FrameObjectsInfo::new(tys, cur_func);
+        let frame_objects = FrameObjectsInfo::new(tys, cur_func);
         let mut saved_regs = cur_func
             .body
             .appeared_phys_regs()
@@ -54,9 +54,10 @@ impl PrologueEpilogueInserter {
             saved_regs.push(GPR::RA.as_phys_reg())
         }
         Self::remove_adjust_stack_inst(cur_func);
-        let adjust = frame_info.total_size();
+        let adjust = frame_objects.total_size();
         self.insert_prologue(cur_func, &saved_regs, adjust);
         self.insert_epilogue(cur_func, &saved_regs, adjust);
+        cur_func.frame_objects = Some(frame_objects);
     }
 
     fn remove_adjust_stack_inst(cur_func: &mut MachineFunction) {

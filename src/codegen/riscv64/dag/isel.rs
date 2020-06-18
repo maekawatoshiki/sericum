@@ -70,6 +70,11 @@ impl MISelector {
                     imm12 b => (mi.ADDIW a, b)
                     imm32 b => (mi.ADDW  a, (mi.LI b))
                     GPR   b => (mi.ADDW  a, b) } }
+            (ir.Add a, b) {
+                GPR a {
+                    imm12 b => (mi.ADDI a, b)
+                    imm32 b => (mi.ADD  a, (mi.LI b))
+                    GPR   b => (mi.ADD  a, b) } }
             (ir.Mul a, b): Int32 {
                 GPR a {
                     imm32 b => (mi.MULW a, (mi.LI b))
@@ -83,6 +88,11 @@ impl MISelector {
                     imm32 b => (mi.REMW a, (mi.LI b))
                     GPR   b => (mi.REMW a, b) } }
             (ir.Br a) => (mi.J a)
+            (ir.Shl a, b) {
+                GPR a {
+                    imm6 b => (mi.SLLI a, b)
+                }
+            }
             (ir.Load a): Int32 {
                 (ir.FIAddr b) a { mem32 b => (mi.LW [FiReg b, %s0]) }
                 GPR a => (mi.LW [ImmReg $0, a])

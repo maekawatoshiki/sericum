@@ -12,7 +12,6 @@ use std::ops::{Index, IndexMut};
 pub type MachineFunctionId = Id<MachineFunction>;
 
 // TODO: Documents in detail
-#[derive(Clone)]
 pub struct MachineFunction {
     /// Function name
     pub name: String,
@@ -30,6 +29,8 @@ pub struct MachineFunction {
     pub local_mgr: LocalVariables,
 
     pub regs_info: RegistersInfo,
+
+    pub frame_objects: Option<FrameObjectsInfo>,
 }
 
 #[derive(Clone, Debug)]
@@ -131,6 +132,7 @@ impl MachineFunction {
             },
             local_mgr: f.local_mgr,
             regs_info: f.regs_info,
+            frame_objects: None,
         }
     }
 
