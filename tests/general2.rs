@@ -128,6 +128,7 @@ mod riscv64 {
         codegen::riscv64::{
             asm::print::MachineAsmPrinter, standard_conversion_into_machine_module,
         },
+        ir::builder::FuncRef,
         ir::{builder, types, value},
         module::Module,
         *, // for macro
@@ -402,6 +403,32 @@ mod riscv64 {
     int main() {
         assert(test(2) == 1);
         assert(test(3) == 2);
+    }
+            ",
+            &mut m,
+        );
+    }
+
+    #[test]
+    fn asm_pointer() {
+        let mut m = Module::new("cilk");
+        cilk_ir!(m; define [i32] test [] {
+            entry:
+                a = alloca_ (ptr i32);
+                b = alloca i32;
+                store (%b), (%a);
+                store (i32 3), (%b);
+                c = load (%a);
+                d = load (%c);
+                ret (%d);
+                // ret (i32 0);
+        });
+        compile_and_run(
+            "
+    #include <assert.h>
+    extern int test();
+    int main() {
+        assert(test() == 3);
     }
             ",
             &mut m,

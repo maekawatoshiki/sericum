@@ -63,6 +63,14 @@ impl TokenStreamReader {
         }
     }
 
+    pub fn get_literal(&mut self) -> Option<String> {
+        let may_ident = self.get();
+        match may_ident {
+            Some(TokenTree::Literal(i)) => i.span().source_text(),
+            _ => None,
+        }
+    }
+
     pub fn get(&mut self) -> Option<TokenTree> {
         if self.buf.len() > 0 {
             return self.buf.pop_front();

@@ -290,7 +290,7 @@ impl<'a> ConversionInfo<'a> {
             }
             e => {
                 println!("{:?}", e);
-                println!("{:?}, {:?}", *node.operand[0], *node.operand[0]);
+                // println!("{:?}, {:?}", *node.operand[0], *node.operand[1]);
                 None
             }
         };
@@ -471,6 +471,10 @@ impl<'a> ConversionInfo<'a> {
                     *self.normal_operand(node.operand[0]).as_frame_index(),
                     *self.normal_operand(node.operand[1]).as_register(),
                 )),
+                MemNodeKind::ImmReg => MachineOperand::Mem(MachineMemOperand::ImmReg(
+                        self.normal_operand(node.operand[0]).as_constant().as_i32(),
+                        *self.normal_operand(node.operand[1]).as_register()
+                ))
                 // MemNodeKind::Base => MachineOperand::Mem(MachineMemOperand::Base(
                 //     *self.normal_operand(node.operand[0]).as_register(),
                 // )),

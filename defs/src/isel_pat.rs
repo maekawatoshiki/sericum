@@ -26,6 +26,7 @@ enum Node {
     Inst(TS, Vec<Node>),
     // Operand(String),
     Register(String),
+    Immediate(i32),
     Addressing(String, Vec<Node>),
     Ident(String),
     User(TS),
@@ -139,6 +140,9 @@ impl<'a> PatternParser<'a> {
         if self.reader.skip_punct('%') {
             let reg_str = self.reader.get_ident().unwrap();
             Node::Register(reg_str)
+        } else if self.reader.skip_punct('$') {
+            let imm = self.reader.get_literal().unwrap();
+            Node::Immediate(imm.parse::<i32>().unwrap())
         } else if self.reader.cur_is_group('[') {
             let group = self.reader.get().unwrap();
             let mut reader = TokenStreamReader::new(group_stream(group).into_iter());
@@ -207,6 +211,7 @@ impl TokenStreamConstructor {
             }
             Node::Inst(inst, operands) => self.run_on_inst(inst, operands),
             Node::Register(_name) => unimplemented!(),
+            Node::Immediate(_) => unimplemented!(),
             Node::Addressing(_name, _operands) => unimplemented!(),
             Node::Ident(_name) => unimplemented!(),
             Node::User(code) => quote! { return #code },
@@ -275,9 +280,9 @@ impl TokenStreamConstructor {
             }
             _ if kind.as_str().starts_with("imm") => {
                 let bit = kind.as_str()["imm".len()..].parse::<u32>().unwrap();
-                quote! { if #parent.is_constant() 
-                    && #parent.ty.is_integer() 
-                    && #parent.as_constant().bits_within(#bit).unwrap() { #body } }
+                quote! { if #parent.is_constant()
+                && #parent.ty.is_integer()
+                && #parent.as_constant().bits_within(#bit).unwrap() { #body } }
             }
             // TODO
             "mem" => quote! { if #parent.is_frame_index() {  #body } },
@@ -351,6 +356,21 @@ impl TokenStreamConstructor {
                     operands_ts = quote! {
                         #operands_ts #name,
                     };
+                }
+                Node::Immediate(i) => {
+                    let imm = ident_tok(&format!("imm_{}", unique_name()));
+                    def_operands_ts = quote! {
+                        #def_operands_ts
+                        let #imm = heap.alloc(DAGNode::new(
+                                NodeKind::Operand(OperandNodeKind::Constant(
+                                        ConstantKind::Int32(#i))),
+                                vec![],
+                                Type::Int32
+                        ));
+                    };
+                    operands_ts = quote! {
+                        #operands_ts #imm,
+                    }
                 }
                 Node::Addressing(name, operands) => {
                     let name = ident_tok(name.as_str());

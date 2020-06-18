@@ -83,96 +83,26 @@ impl MISelector {
                     imm32 b => (mi.REMW a, (mi.LI b))
                     GPR   b => (mi.REMW a, b) } }
             (ir.Br a) => (mi.J a)
-            // (ir.Mul a, b) {
-            //     GR32 a {
-            //         GR32  b => (mi.IMULrr32  a, b)
-            //         imm32 b => (mi.IMULrri32 a, b) }
-            //     GR64 a {
-            //         imm32 b => (mi.IMULrr64i32 a, b) }
-            //     XMM a {
-            //         (ir.Load c) b {
-            //             (ir.FIAddr d) c {
-            //                 f64mem d => (mi.MULSDrm a, [BaseFi %rbp, d]) } }
-            //         imm_f64 b => (mi.MULSDrr a, (mi.MOVSDrm64 b))
-            //         XMM    b => (mi.MULSDrr a, b)
-            //     }
-            // }
-            // (ir.Div a, b) {
-            //     XMM a {
-            //         (ir.Load c) b {
-            //             (ir.FIAddr d) c {
-            //                 f64mem d => (mi.DIVSDrm a, [BaseFi %rbp, d]) } }
-            //         imm_f64 b => (mi.DIVSDrr a, (mi.MOVSDrm64 b))
-            //         XMM    b => (mi.DIVSDrr a, b)
-            //     }
-            //     imm_f64 a {
-            //         XMM b => (mi.DIVSDrr (mi.MOVSDrm64 a), b)
-            //     }
-            // }
-            // (ir.Shl a, b) {
-            //     GR64 a {
-            //         imm8 b => (mi.SHLr64i8 a, b) }
-            //     GR32 a {
-            //         imm8 b => (mi.SHLr32i8 a, b) }
-            // }
-            (ir.Load a) {
-                (ir.FIAddr b) a {
-                    mem32 b => (mi.LW [FiReg b, %s0])
-                }
+            (ir.Load a): Int32 {
+                (ir.FIAddr b) a { mem32 b => (mi.LW [FiReg b, %s0]) }
+                GPR a => (mi.LW [ImmReg $0, a])
             }
+            // 64bit load
+            (ir.Load a) { GPR a => (mi.LD [ImmReg $0, a]) }
             (ir.Store a, b) {
                 (ir.FIAddr c) a {
                     mem32 c {
                         imm32 b => (mi.SW (mi.LI b), [FiReg c, %s0])
                         GPR   b => (mi.SW         b, [FiReg c, %s0])
                     }
+                    mem64 c {
+                        GPR b => (mi.SD b, [FiReg c, %s0])
+                    }
                 }
             }
-            // (ir.Load a) {
-            //     (ir.FIAddr b) a {
-            //         f64mem b => (mi.MOVSDrm [BaseFi %rbp, b])
-            //         mem32  b => (mi.MOVrm32 [BaseFi %rbp, b])
-            //         mem64  b => (mi.MOVrm64 [BaseFi %rbp, b])
-            //     }
-            //     // a is pointer
-            //     GR64  a => {
-            //         let a = self.run_on_node(tys, regs_info, heap, a);
-            //         let ty = tys.get_element_ty(a.ty, None).unwrap();
-            //         let mem = heap.alloc(DAGNode::new_mem(MemNodeKind::Base, vec![a]));
-            //         match ty {
-            //             Type::Int32 => heap.alloc(DAGNode::new(NodeKind::MI(MINodeKind::MOVrm32),
-            //                     vec![mem], Type::Int32)),
-            //             Type::Int64 | Type::Pointer(_) | Type::Array(_) =>
-            //                 heap.alloc(DAGNode::new(NodeKind::MI(MINodeKind::MOVrm64),
-            //                     vec![mem], node.ty)),
-            //             Type::F64 => heap.alloc(DAGNode::new(NodeKind::MI(MINodeKind::MOVSDrm),
-            //                     vec![mem], Type::F64)),
-            //             _ => unimplemented!()
-            //         }
-            //     }
-            // }
-            // (ir.Store a, b) {
-            //     (ir.FIAddr c) a {
-            //         f64mem c {
-            //             imm_f64 b => (mi.MOVSDmr [BaseFi %rbp, c], (mi.MOVSDrm64 b))
-            //         }
-            //         mem32  c {
-            //             GR32  b => (mi.MOVmr32 [BaseFi %rbp, c], b)
-            //             imm32 b => (mi.MOVmi32 [BaseFi %rbp, c], b) }
-            //         mem64  c {
-            //             GR64  b => (mi.MOVmr64 [BaseFi %rbp, c], b) }
-            //     }
-            //     GR64   a {
-            //         imm32 b => (mi.MOVmi32 [Base a], b)
-            //         GR32  b => (mi.MOVmr32 [Base a], b)
-            //         GR64  b => (mi.MOVmr64 [Base a], b)
-            //         imm_f64 b => (mi.MOVSDmr [Base a], (mi.MOVSDrm64 b))
-            //         XMM    b => (mi.MOVSDmr [Base a], b)
-            //     }
-            // }
-            // (ir.FIAddr a) {
-            //     mem a => (mi.LEAr64m [BaseFi %rbp, a])
-            // }
+            (ir.FIAddr a) {
+                mem a => (mi.ADDI %s0, a)
+            }
             // (ir.CopyFromReg a) => (mi.Copy a)
         );
 
