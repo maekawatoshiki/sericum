@@ -236,6 +236,7 @@ impl<'a> ScheduleByBlock<'a> {
                     match cond_kind!(node.operand[0]) {
                         CondKind::Eq => MachineOpcode::BEQ,
                         CondKind::Le => MachineOpcode::BLE,
+                        CondKind::Lt => MachineOpcode::BLT,
                         // CondKind::Lt => MachineOpcode::JL,
                         // CondKind::Ge => MachineOpcode::JGE,
                         // CondKind::Gt => MachineOpcode::JG,
