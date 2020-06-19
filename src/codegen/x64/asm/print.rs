@@ -62,6 +62,7 @@ impl MachineAsmPrinter {
     fn run_on_inst(&mut self, inst: &MachineInst, fo: &FrameObjectsInfo) {
         self.output.push_str("  ");
 
+        println!("{:?}", inst.opcode);
         let inst_def = inst.opcode.inst_def().unwrap();
 
         self.output.push_str(inst_def.name);

@@ -325,6 +325,9 @@ mod inst {
         pub static ref JLE: TargetInstDef = {
             TargetInstDef::new("jle", TargetOpcode::JLE).set_uses(vec![TargetOperand::Block])
         };
+        pub static ref JL: TargetInstDef = {
+            TargetInstDef::new("jl", TargetOpcode::JL).set_uses(vec![TargetOperand::Block])
+        };
         pub static ref JMP: TargetInstDef = {
             TargetInstDef::new("jmp", TargetOpcode::JMP).set_uses(vec![TargetOperand::Block])
         };
@@ -496,6 +499,7 @@ impl TargetOpcode {
             Self::JMP => Some(&*inst::JMP),
             Self::JE => Some(&*inst::JE),
             Self::JLE => Some(&*inst::JLE),
+            Self::JL => Some(&*inst::JL),
             Self::CMPri => Some(&*inst::CMPri),
             Self::CMPrr => Some(&*inst::CMPrr),
             Self::CALL => Some(&*inst::CALL),

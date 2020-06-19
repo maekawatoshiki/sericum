@@ -142,10 +142,10 @@ impl MISelector {
                     mem64  b => (mi.MOVrm64 [BaseFi %rbp, b])
                 }
             }
-            (ir.Load a): Int64 { GR64 a => (mi.MOVrm64 [Base a]) }
-            (ir.Load a): Int32 { GR64 a => (mi.MOVrm32 [Base a]) }
-            (ir.Load a): F64   { GR64 a => (mi.MOVSDrm [Base a]) }
-            (ir.Load a)        { GR64 a => (mi.MOVrm64 [Base a]) } // load pointer
+            (ir.Load a): Int64    { GR64 a => (mi.MOVrm64 [Base a]) }
+            (ir.Load a): Int32    { GR64 a => (mi.MOVrm32 [Base a]) }
+            (ir.Load a): F64      { GR64 a => (mi.MOVSDrm [Base a]) }
+            (ir.Load a): Pointer! { GR64 a => (mi.MOVrm64 [Base a]) }
             (ir.Store a, b) {
                 (ir.FIAddr c) a {
                     f64mem c {
@@ -165,9 +165,9 @@ impl MISelector {
                     XMM    b => (mi.MOVSDmr [Base a], b)
                 }
             }
-            (ir.FIAddr a) {
-                mem a => (mi.LEAr64m [BaseFi %rbp, a])
-            }
+            (ir.FIAddr a) { mem a => (mi.LEAr64m [BaseFi %rbp, a]) }
+            (ir.Br dst) => (mi.JMP dst)
+            (ir.CopyFromReg a) => (mi.Copy a)
             // (ir.CopyFromReg a) => (mi.Copy a)
         );
 

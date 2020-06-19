@@ -64,6 +64,15 @@ impl<'a> PatternParser<'a> {
         self.parse_operand_pat(toplevel)
     }
 
+    fn parse_type(&mut self) -> TS {
+        let ty_name = ident_tok(&self.reader.get_ident().unwrap());
+        if self.reader.skip_punct('!') {
+            quote! { Type::#ty_name(_) }
+        } else {
+            quote! { Type::#ty_name }
+        }
+    }
+
     pub fn parse_inst_pat(&mut self, toplevel: bool) -> Node {
         let group = self.reader.get().unwrap();
         let mut reader = TokenStreamReader::new(group_stream(group).into_iter());
@@ -71,10 +80,7 @@ impl<'a> PatternParser<'a> {
         let inst_kind = parser.parse_inst_kind();
         let operands = parser.parse_inst_operands();
         let ty = if self.reader.skip_punct(':') {
-            let ty = ident_tok(&self.reader.get_ident().unwrap());
-            Some(quote! {
-                Type::#ty
-            })
+            Some(self.parse_type())
         } else {
             None
         };
@@ -91,10 +97,7 @@ impl<'a> PatternParser<'a> {
     pub fn parse_operand_pat(&mut self, toplevel: bool) -> Node {
         let kind = self.reader.get_ident().unwrap();
         let ty = if self.reader.skip_punct(':') {
-            let ty = ident_tok(&self.reader.get_ident().unwrap());
-            Some(quote! {
-                Type::#ty
-            })
+            Some(self.parse_type())
         } else {
             None
         };
@@ -262,7 +265,7 @@ impl TokenStreamConstructor {
             }
         }
         if let Some(ty) = ty {
-            quote! { if #parent.kind == #inst && #parent.ty == #ty {
+            quote! { if #parent.kind == #inst && matches!(#parent.ty, #ty) {
                 #def_operands
                 #body
             }}
@@ -328,7 +331,7 @@ impl TokenStreamConstructor {
                 if let Some(ty) = ty {
                     quote! { if #parent.is_maybe_register()
                         && matches!(ty2rc(&#parent.ty), Some(RegisterClassKind::#reg_class))
-                        && #parent.ty == #ty {
+                        && matches!(#parent.ty, #ty) {
                                 #body
                     } }
                 } else {
