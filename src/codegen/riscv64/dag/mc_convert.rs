@@ -13,7 +13,7 @@ use id_arena::*;
 use rustc_hash::FxHashMap;
 use std::cell::RefCell;
 
-pub struct ConversionInfo<'a> {
+pub struct ScheduleByBlock<'a> {
     // types: &'a Types,
     cur_func: &'a DAGFunction,
     machine_inst_arena: &'a mut InstructionArena,
@@ -43,16 +43,10 @@ pub fn convert_function(/*types: &Types,*/ dag_func: DAGFunction) -> MachineFunc
     }
 
     for (dag, machine) in &bb_map {
-        mbbs.arena[*machine].pred = dag_func.dag_basic_block_arena[*dag]
-            .pred
-            .iter()
-            .map(|bb| *bb_map.get(bb).unwrap())
-            .collect();
-        mbbs.arena[*machine].succ = dag_func.dag_basic_block_arena[*dag]
-            .succ
-            .iter()
-            .map(|bb| *bb_map.get(bb).unwrap())
-            .collect();
+        let dbb = &dag_func.dag_basic_block_arena[*dag];
+        let mbb = &mut mbbs.arena[*machine];
+        mbb.pred = dbb.pred.iter().map(|bb| *bb_map.get(bb).unwrap()).collect();
+        mbb.succ = dbb.succ.iter().map(|bb| *bb_map.get(bb).unwrap()).collect();
     }
 
     let mut machine_inst_arena = InstructionArena::new();
@@ -63,7 +57,12 @@ pub fn convert_function(/*types: &Types,*/ dag_func: DAGFunction) -> MachineFunc
         let bb_id = *bb_map.get(dag_bb_id).unwrap();
         let mut iseq = vec![];
 
-        ConversionInfo {
+        let entry = match node.entry {
+            Some(entry) => entry,
+            None => continue,
+        };
+
+        ScheduleByBlock {
             // types,
             cur_func: &dag_func,
             machine_inst_arena: &mut machine_inst_arena,
@@ -73,7 +72,7 @@ pub fn convert_function(/*types: &Types,*/ dag_func: DAGFunction) -> MachineFunc
             bb_map: &bb_map,
             node2minst: &mut node2minst,
         }
-        .convert_dag(node.entry.unwrap());
+        .convert(entry);
 
         mbbs.arena[bb_id].iseq = RefCell::new(iseq);
     }
@@ -81,13 +80,13 @@ pub fn convert_function(/*types: &Types,*/ dag_func: DAGFunction) -> MachineFunc
     MachineFunction::new(dag_func, mbbs, machine_inst_arena)
 }
 
-impl<'a> ConversionInfo<'a> {
-    pub fn convert_dag(&mut self, node: Raw<DAGNode>) -> Option<RegisterId> {
+impl<'a> ScheduleByBlock<'a> {
+    pub fn convert(&mut self, node: Raw<DAGNode>) -> Option<RegisterId> {
         if let Some(reg_id) = self.node_to_reg.get(&node) {
             return *reg_id;
         }
 
-        let reg_id = match self.convert_dag_to_machine_inst(node) {
+        let reg_id = match self.convert_node_to_inst(node) {
             Some(id) => {
                 let inst = &self.machine_inst_arena[id];
                 inst.get_def_reg()
@@ -97,19 +96,17 @@ impl<'a> ConversionInfo<'a> {
         self.node_to_reg.insert(node, reg_id);
 
         some_then!(next, node.next, {
-            self.convert_dag(next);
+            self.convert(next);
         });
 
         reg_id
     }
 
-    fn convert_dag_to_machine_inst(&mut self, node: Raw<DAGNode>) -> Option<MachineInstId> {
+    fn convert_node_to_inst(&mut self, node: Raw<DAGNode>) -> Option<MachineInstId> {
         if let Some(machine_inst_id) = self.node2minst.get(&node) {
             return Some(*machine_inst_id);
         }
 
-        #[rustfmt::skip]
-        macro_rules! bb {($id:expr)=>{ $id.as_basic_block() };}
         #[rustfmt::skip]
         macro_rules! cond_kind {($id:expr)=>{ $id.as_cond_kind() };}
 
@@ -142,17 +139,6 @@ impl<'a> ConversionInfo<'a> {
                 Some(self.push_inst(inst))
             }
             NodeKind::IR(IRNodeKind::Entry) => None,
-            // NodeKind::IR(IRNodeKinds:CopyFromReg) => {
-            //     let val = self.normal_operand(node.operand[0]);
-            //     let rc = self.cur_func.regs_info.arena_ref()[*val.as_register()].reg_class;
-            //     Some(self.push_inst(MachineInst::new(
-            //         &self.cur_func.regs_info,
-            //         MachineOpcode::Copy,
-            //         vec![val],
-            //         Some(rc),
-            //         self.cur_bb,
-            //     )))
-            // }
             NodeKind::IR(IRNodeKind::CopyToReg) => {
                 let val = self.normal_operand(node.operand[1]);
                 let dst = match &node.operand[0].kind {
@@ -173,7 +159,7 @@ impl<'a> ConversionInfo<'a> {
                 while i < node.operand.len() {
                     operands.push(self.normal_operand(node.operand[i]));
                     operands.push(MachineOperand::Branch(
-                        self.get_machine_bb(bb!(node.operand[i + 1])),
+                        self.get_machine_bb(node.operand[i + 1].as_basic_block()),
                     ));
                     i += 2;
                 }
@@ -244,7 +230,7 @@ impl<'a> ConversionInfo<'a> {
                     })
                     .collect::<Vec<_>>();
                 operands.push(MachineOperand::Branch(
-                    self.get_machine_bb(bb!(node.operand[3])),
+                    self.get_machine_bb(node.operand[3].as_basic_block()),
                 ));
                 Some(self.push_inst(MachineInst::new_simple(
                     match cond_kind!(node.operand[0]) {
@@ -285,9 +271,7 @@ impl<'a> ConversionInfo<'a> {
             //     )))
             // }
             NodeKind::IR(IRNodeKind::Ret) => Some(self.convert_ret(&*node)),
-            NodeKind::IR(IRNodeKind::CopyToLiveOut) => {
-                self.convert_dag_to_machine_inst(node.operand[0])
-            }
+            NodeKind::IR(IRNodeKind::CopyToLiveOut) => self.convert_node_to_inst(node.operand[0]),
             e => {
                 println!("{:?}", e);
                 // println!("{:?}, {:?}", *node.operand[0], *node.operand[1]);
@@ -504,7 +488,7 @@ impl<'a> ConversionInfo<'a> {
                 // )),
             },
             NodeKind::None => MachineOperand::None,
-            _ => MachineOperand::Register(self.convert_dag(node).unwrap()),
+            _ => MachineOperand::Register(self.convert(node).unwrap()),
         }
     }
 
