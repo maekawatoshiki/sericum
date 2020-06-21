@@ -8,25 +8,16 @@ use syn::parse::{Parse, ParseStream};
 use syn::{parse_macro_input, token, Error, LitInt, Token};
 
 pub fn run(item: TokenStream) -> TokenStream {
-    let pat = parse_macro_input!(item as Patterns);
-    let ts = construct_pattern_match(pat);
+    let patterns = parse_macro_input!(item as Patterns);
+    let ts = construct(patterns);
     TokenStream::from(ts)
 }
 
 type TS = proc_macro2::TokenStream;
+type Pattern = Box<dyn PatternMatchConstructible>;
 
-#[derive(Debug)]
 struct Patterns(pub Vec<Pattern>);
 
-#[derive(Debug)]
-enum Pattern {
-    Patterns(Patterns),
-    Inst(InstPattern),
-    Operand(OperandPattern),
-    Selected(Selected),
-}
-
-#[derive(Debug)]
 enum Selected {
     Inst(Inst),
     Register(String),
@@ -37,63 +28,56 @@ enum Selected {
     None,
 }
 
-#[derive(Debug)]
 struct InstPattern {
     opcode: Opcode,
     operands: Vec<Selected>,
     ty: Option<TS>,
     parent: TS,
-    body: Box<Pattern>,
+    body: Pattern,
 }
 
-#[derive(Debug)]
 struct OperandPattern {
     name: String,
     ty: Option<TS>,
     parent: TS,
-    body: Box<Pattern>,
+    body: Pattern,
 }
 
-#[derive(Debug)]
 struct Addressing(pub Ident, pub Vec<Selected>);
 
-#[derive(Debug)]
 struct Opcode(pub TS);
 
-#[derive(Debug)]
 struct Inst {
     opcode: Opcode,
     operands: Vec<Selected>,
+}
+
+fn parse_pattern(input: ParseStream) -> Result<Pattern, Error> {
+    if input.parse::<Token![=>]>().is_ok() {
+        return Ok(Box::new(input.parse::<Selected>()?));
+    }
+
+    if input.peek(token::Paren) {
+        // (
+        return Ok(Box::new(input.parse::<InstPattern>()?));
+    }
+
+    if let Ok(group) = input.parse::<Group>() {
+        // {
+        let patterns: Patterns = syn::parse2(group.stream())?;
+        return Ok(Box::new(patterns));
+    }
+
+    Ok(Box::new(input.parse::<OperandPattern>()?))
 }
 
 impl Parse for Patterns {
     fn parse(input: ParseStream) -> Result<Self, Error> {
         let mut patterns = vec![];
         while !input.is_empty() {
-            patterns.push(input.parse::<Pattern>()?);
+            patterns.push(parse_pattern(input)?);
         }
         Ok(Patterns(patterns))
-    }
-}
-
-impl Parse for Pattern {
-    fn parse(input: ParseStream) -> Result<Self, Error> {
-        if input.parse::<Token![=>]>().is_ok() {
-            return Ok(Pattern::Selected(input.parse::<Selected>()?));
-        }
-
-        if input.peek(token::Paren) {
-            // (
-            return Ok(Pattern::Inst(input.parse::<InstPattern>()?));
-        }
-
-        if let Ok(group) = input.parse::<Group>() {
-            // {
-            let patterns: Patterns = syn::parse2(group.stream())?;
-            return Ok(Pattern::Patterns(patterns));
-        }
-
-        Ok(Pattern::Operand(input.parse::<OperandPattern>()?))
     }
 }
 
@@ -103,7 +87,7 @@ impl Parse for InstPattern {
         let inst: Inst = syn::parse2(group.stream())?;
         let ty = parse_type(input)?;
         let parent = parse_parent(input)?;
-        let body = Box::new(input.parse::<Pattern>()?);
+        let body = parse_pattern(input)?;
         Ok(InstPattern {
             opcode: inst.opcode,
             operands: inst.operands,
@@ -119,7 +103,7 @@ impl Parse for OperandPattern {
         let name = input.parse::<Ident>()?.to_string();
         let ty = parse_type(input)?;
         let parent = parse_parent(input)?;
-        let body = Box::new(input.parse::<Pattern>()?);
+        let body = parse_pattern(input)?;
         Ok(OperandPattern {
             name,
             ty,
@@ -226,9 +210,9 @@ fn parse_parent(input: ParseStream) -> Result<TS, Error> {
     })
 }
 
-//// construction of pattern matching code for instruction selection
+//// construct pattern matching code for instruction selection
 
-fn construct_pattern_match(pats: Patterns) -> TS {
+fn construct(pats: Patterns) -> TS {
     let t = pats.construct();
     quote! {
         (|| -> Raw<DAGNode> {
@@ -245,18 +229,6 @@ fn construct_pattern_match(pats: Patterns) -> TS {
 
 trait PatternMatchConstructible {
     fn construct(&self) -> TS;
-}
-
-impl PatternMatchConstructible for Pattern {
-    fn construct(&self) -> TS {
-        // TODO: refine
-        match self {
-            Self::Inst(x) => x.construct(),
-            Self::Operand(x) => x.construct(),
-            Self::Patterns(x) => x.construct(),
-            Self::Selected(x) => x.construct(),
-        }
-    }
 }
 
 impl PatternMatchConstructible for Patterns {
