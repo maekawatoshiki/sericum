@@ -31,6 +31,12 @@ mod inst {
                 TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GPR)),
             ])
             .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GPR)]);
+        pub static ref MUL: TargetInstDef = TargetInstDef::new("mul", TargetOpcode::MUL)
+            .set_uses(vec![
+                TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GPR)),
+                TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GPR)),
+            ])
+            .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GPR)]);
         pub static ref MULW: TargetInstDef = TargetInstDef::new("mulw", TargetOpcode::MULW)
             .set_uses(vec![
                 TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GPR)),
@@ -105,6 +111,12 @@ mod inst {
                 TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GPR)),
                 TargetOperand::Block
             ]);
+        pub static ref BLT: TargetInstDef =
+            TargetInstDef::new("blt", TargetOpcode::BLT).set_uses(vec![
+                TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GPR)),
+                TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GPR)),
+                TargetOperand::Block
+            ]);
         pub static ref J: TargetInstDef =
             TargetInstDef::new("j", TargetOpcode::J).set_uses(vec![TargetOperand::Block]);
         pub static ref JR: TargetInstDef =
@@ -128,6 +140,7 @@ pub enum TargetOpcode {
     ADDIW,  // Add Integer Word
     ADDW,   // Add Word
     ADD,    // Add
+    MUL,    // Mul
     MULW,   // Mul Word
     DIVW,   // Div Word
     REMW,   // Rem Word
@@ -142,6 +155,7 @@ pub enum TargetOpcode {
     CALL,
     BEQ,
     BLE,
+    BLT,
     J,
     JR,
 
@@ -161,6 +175,7 @@ impl TargetOpcode {
             Self::ADDW => Some(&*inst::ADDW),
             Self::ADD => Some(&*inst::ADD),
             Self::MULW => Some(&*inst::MULW),
+            Self::MUL => Some(&*inst::MUL),
             Self::DIVW => Some(&*inst::DIVW),
             Self::REMW => Some(&*inst::REMW),
             Self::SLLI => Some(&*inst::SLLI),
@@ -174,6 +189,7 @@ impl TargetOpcode {
             Self::CALL => Some(&*inst::CALL),
             Self::BEQ => Some(&*inst::BEQ),
             Self::BLE => Some(&*inst::BLE),
+            Self::BLT => Some(&*inst::BLT),
             Self::J => Some(&*inst::J),
             Self::JR => Some(&*inst::JR),
             _ => None,
