@@ -48,6 +48,10 @@ impl ConstDataArena {
 }
 
 impl DataId {
+    pub fn arena_id(&self) -> usize {
+        self.arena_id
+    }
+
     pub fn id(&self) -> usize {
         self.id
     }

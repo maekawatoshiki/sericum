@@ -44,11 +44,12 @@ impl PrologueEpilogueInserter {
             return;
         }
 
-        let frame_info = FrameObjectsInfo::new(tys, cur_func);
-        let adjust = frame_info.total_size();
+        let frame_objects = FrameObjectsInfo::new(tys, cur_func);
+        let adjust = frame_objects.total_size();
         Self::remove_adjust_stack_inst(cur_func);
         self.insert_prologue(tys, cur_func, adjust);
         self.insert_epilogue(cur_func, adjust);
+        cur_func.frame_objects = Some(frame_objects);
     }
 
     fn remove_adjust_stack_inst(cur_func: &mut MachineFunction) {

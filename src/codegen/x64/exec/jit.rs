@@ -171,12 +171,14 @@ impl JITCompiler {
 
     pub fn compile_module(&mut self, module: &MachineModule) {
         // Place constant data in memory
-        for (id, c) in module.const_data.id_and_data() {
-            let x = unsafe { ::std::mem::transmute::<f64, u64>(c.as_f64()) }; // TODO: now support only for f64
-            let h = (x >> 32) as i32;
-            let l = (x & 0xffff_ffff) as i32;
-            let label = self.get_label(id);
-            dynasm!(self.asm; =>label; .dword l, h);
+        for (_id, f) in &module.functions {
+            for (id, c) in f.const_data.id_and_data() {
+                let x = unsafe { ::std::mem::transmute::<f64, u64>(c.as_f64()) }; // TODO: now support only for f64
+                let h = (x >> 32) as i32;
+                let l = (x & 0xffff_ffff) as i32;
+                let label = self.get_label(id);
+                dynasm!(self.asm; =>label; .dword l, h);
+            }
         }
 
         for (f_id, _) in &module.functions {

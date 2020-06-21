@@ -1,6 +1,7 @@
 // use super::super::dag::function::*;
 use super::super::machine::register::*;
 use crate::codegen::arch::machine::{frame_object::*, inst::*};
+use crate::codegen::common::machine::const_data::ConstDataArena;
 use crate::codegen::common::{dag::function::*, machine::basic_block::*};
 use crate::ir::types::*;
 use crate::traits::function::FunctionTrait;
@@ -31,6 +32,8 @@ pub struct MachineFunction {
     pub regs_info: RegistersInfo,
 
     pub frame_objects: Option<FrameObjectsInfo>,
+
+    pub const_data: ConstDataArena,
 }
 
 #[derive(Clone, Debug)]
@@ -133,6 +136,7 @@ impl MachineFunction {
             local_mgr: f.local_mgr,
             regs_info: f.regs_info,
             frame_objects: None,
+            const_data: ConstDataArena::new(),
         }
     }
 

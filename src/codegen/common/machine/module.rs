@@ -1,4 +1,3 @@
-use crate::codegen::common::machine::const_data::ConstDataArena;
 use crate::codegen::common::machine::function::*;
 use crate::ir::types::*;
 use id_arena::*;
@@ -7,7 +6,6 @@ use std::fmt;
 pub struct MachineModule {
     pub name: String,
     pub functions: Arena<MachineFunction>,
-    pub const_data: ConstDataArena,
     pub types: Types,
 }
 
@@ -16,7 +14,6 @@ impl MachineModule {
         Self {
             name,
             functions,
-            const_data: ConstDataArena::new(),
             types,
         }
     }

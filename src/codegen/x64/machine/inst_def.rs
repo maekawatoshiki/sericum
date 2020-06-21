@@ -171,7 +171,7 @@ mod inst {
                 .add_tie(DefOrUseReg::Def(0), DefOrUseReg::Use(0))
         };
         pub static ref MULSDrr: TargetInstDef = {
-            TargetInstDef::new("mul", TargetOpcode::MULSDrr)
+            TargetInstDef::new("mulsd", TargetOpcode::MULSDrr)
                 .set_uses(vec![
                     TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::XMM)),
                     TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::XMM)),
@@ -319,6 +319,9 @@ mod inst {
                 TargetRegister::RegClass(RegisterClassKind::GR64),
             )])
         };
+        pub static ref JG: TargetInstDef = {
+            TargetInstDef::new("jg", TargetOpcode::JG).set_uses(vec![TargetOperand::Block])
+        };
         pub static ref JE: TargetInstDef = {
             TargetInstDef::new("je", TargetOpcode::JE).set_uses(vec![TargetOperand::Block])
         };
@@ -327,6 +330,18 @@ mod inst {
         };
         pub static ref JL: TargetInstDef = {
             TargetInstDef::new("jl", TargetOpcode::JL).set_uses(vec![TargetOperand::Block])
+        };
+        pub static ref JB: TargetInstDef = {
+            TargetInstDef::new("jb", TargetOpcode::JB).set_uses(vec![TargetOperand::Block])
+        };
+        pub static ref JBE: TargetInstDef = {
+            TargetInstDef::new("jbe", TargetOpcode::JB).set_uses(vec![TargetOperand::Block])
+        };
+        pub static ref JA: TargetInstDef = {
+            TargetInstDef::new("ja", TargetOpcode::JA).set_uses(vec![TargetOperand::Block])
+        };
+        pub static ref JAE: TargetInstDef = {
+            TargetInstDef::new("jae", TargetOpcode::JAE).set_uses(vec![TargetOperand::Block])
         };
         pub static ref JMP: TargetInstDef = {
             TargetInstDef::new("jmp", TargetOpcode::JMP).set_uses(vec![TargetOperand::Block])
@@ -338,6 +353,13 @@ mod inst {
         pub static ref CMPrr: TargetInstDef = {
             TargetInstDef::new("cmp", TargetOpcode::CMPrr)
                 .set_uses(vec![TargetOperand::Any, TargetOperand::Any])
+        };
+        pub static ref UCOMISDrr: TargetInstDef = {
+            TargetInstDef::new("ucomisd", TargetOpcode::UCOMISDrr)
+                .set_uses(vec![
+                    TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::XMM)),
+                    TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::XMM))
+                ])
         };
         pub static ref CALL: TargetInstDef = {
             TargetInstDef::new("call", TargetOpcode::CALL) // TODO: defs and uses info
@@ -497,13 +519,19 @@ impl TargetOpcode {
             Self::PUSH64 => Some(&*inst::PUSH64),
             Self::POP64 => Some(&*inst::POP64),
             Self::JMP => Some(&*inst::JMP),
+            Self::JG => Some(&*inst::JG),
             Self::JE => Some(&*inst::JE),
             Self::JLE => Some(&*inst::JLE),
             Self::JL => Some(&*inst::JL),
+            Self::JB => Some(&*inst::JB),
+            Self::JBE => Some(&*inst::JBE),
+            Self::JA => Some(&*inst::JA),
+            Self::JAE => Some(&*inst::JAE),
             Self::CMPri => Some(&*inst::CMPri),
             Self::CMPrr => Some(&*inst::CMPrr),
             Self::CALL => Some(&*inst::CALL),
             Self::RET => Some(&*inst::RET),
+            Self::UCOMISDrr => Some(&*inst::UCOMISDrr),
             _ => None,
         }
     }

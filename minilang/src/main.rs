@@ -4,59 +4,6 @@ mod parser;
 
 fn main() {
     // let input = r#"
-    // function main(): i32 {
-    //     var a: i32; a = 10000;
-    //     var c: i32; c = 8400;
-    //     var b: i32;
-    //     var d: i32;
-    //     var e: i32;
-    //     var g: i32;
-    //     var f: [8401] i32;
-    //
-    //     b = 0;
-    //     while b < c {
-    //         f[b] = a / 5;
-    //         b = b + 1;
-    //     }
-    //
-    //     e = 0;
-    //     c = 8400;
-    //     while 0 < c {
-    //         d = 0;
-    //         b = c - 1;
-    //         while 0 < b {
-    //             g = b * 2- 1;
-    //             d = d * b + f[b] * a;
-    //             f[b] = d % g;
-    //             d = d / g;
-    //             b = b - 1;
-    //         }
-    //
-    //         println_i32(e + d / a);
-    //
-    //         e = d % a;
-    //         c = c - 14;
-    //     }
-    //
-    //     return 0;
-    // }
-    // "#;
-    // let input = r#"
-    // struct A {
-    //     first: [8][8] i32,
-    //     second: i32
-    // }
-    // function f(): i32 {
-    //     println_i32(2);
-    //     return  0;
-    // }
-    // function main(): i32 {
-    //     f();
-    //     return 0;
-    // }
-    // "#;
-
-    // let input = r#"
     // function m(c_x: f64, c_y: f64, n: i32): i32 {
     //     var x_n: f64; x_n = 0.0;
     //     var y_n: f64; y_n = 0.0;
@@ -101,43 +48,6 @@ fn main() {
     //     return 0;
     // }
     //     "#;
-
-    // let input = "
-    // function main(): i32 {
-    //     println_f64( sin(3.14 / 2.0) );
-    //     println_f64( cos(3.14 / 2.0) );
-    //     println_f64( sqrt(2.0) );
-    //     return 0;
-    // }
-    // ";
-
-    // let input = "
-    // struct Vec {
-    //     x: f64,
-    //     y: f64,
-    //     z: f64
-    // }
-    // function main(): i32 {
-    //     var v: * struct Vec;
-    //     v = malloc(24);
-    //     (*v).x = 2.3;
-    //     return 0;
-    // }
-    // ";
-
-    // let input = r#"
-    // function main(): i32 {
-    //     var i: i32;
-    //     var k: i32;
-    //     i = 0; while i < 10 {
-    //         k = 0; while k < 10 {
-    //             k = k + 1;
-    //         }
-    //         i = i + 1;
-    //     }
-    //     return 0;
-    // }
-    // "#;
 
     let input = r#"
     struct Vec {
@@ -428,6 +338,14 @@ fn main() {
     let mut jit = cilk::codegen::x64::exec::jit::JITExecutor::new(&mut codegen.module);
     let func = jit.find_function_by_name("main").unwrap();
     println!("Result: {:?}", jit.run(func, vec![]));
+
+    // use cilk::codegen::x64::asm::print::MachineAsmPrinter;
+    // use cilk::codegen::x64::standard_conversion_into_machine_module;
+    // let machine_module = standard_conversion_into_machine_module(&mut codegen.module);
+    // let mut printer = MachineAsmPrinter::new();
+    // // println!("{:?}", machine_module);
+    // printer.run_on_module(&machine_module);
+    // println!("{}", printer.output);
 }
 
 #[test]

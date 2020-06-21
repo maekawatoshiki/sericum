@@ -2,10 +2,10 @@ use super::super::frame_object::FrameObjectsInfo;
 use super::super::machine::inst::*;
 use crate::codegen::common::machine::{
     basic_block::MachineBasicBlockId,
+    const_data::DataId,
     function::{InstIter, MachineFunction},
     module::MachineModule,
 };
-use crate::ir::types::Types;
 
 pub struct MachineAsmPrinter {
     pub output: String,
@@ -25,23 +25,32 @@ impl MachineAsmPrinter {
         self.output.push_str("  .intel_syntax noprefix\n");
 
         for (_, func) in &m.functions {
-            self.run_on_function(&m.types, &func)
+            self.run_on_function(&func)
         }
     }
 
-    fn run_on_function(&mut self, tys: &Types, f: &MachineFunction) {
+    fn run_on_function(&mut self, f: &MachineFunction) {
         if f.is_internal {
             return;
         }
 
-        let fo = FrameObjectsInfo::new(tys, f);
+        for (id, data) in f.const_data.id_and_data() {
+            self.output
+                .push_str(format!(".Lconst{}{}:\n", id.arena_id(), id.id()).as_str());
+            self.output.push_str(
+                format!("  .quad {}\n", unsafe {
+                    ::std::mem::transmute::<f64, u64>(data.as_f64())
+                })
+                .as_str(),
+            )
+        }
 
         self.output
             .push_str(format!("  .globl {}\n", f.name).as_str()); // TODO
 
         self.output.push_str(format!("{}:\n", f.name).as_str());
 
-        self.run_on_basic_blocks(f, &fo);
+        self.run_on_basic_blocks(f, f.frame_objects.as_ref().unwrap());
     }
 
     fn run_on_basic_blocks(&mut self, f: &MachineFunction, fo: &FrameObjectsInfo) {
@@ -126,6 +135,9 @@ impl MachineAsmPrinter {
 
     fn run_on_mem_operand(&mut self, op: &MachineOperand, fo: &FrameObjectsInfo, word: &str) {
         match op {
+            MachineOperand::Mem(MachineMemOperand::Address(AddressKind::Label(id))) => {
+                self.output.push_str(self.data_id_to_label_id(id).as_str())
+            }
             MachineOperand::Mem(MachineMemOperand::BaseFi(base, fi)) => {
                 let base = base.as_phys_reg();
                 let offset = fo.offset(fi.idx).unwrap();
@@ -180,6 +192,14 @@ impl MachineAsmPrinter {
 
     fn bb_id_to_label_id(&self, bb_id: &MachineBasicBlockId) -> String {
         format!(".L{}", bb_id.index() + self.cur_bb_id_base)
+    }
+
+    fn data_id_to_label_id(&self, data_id: &DataId) -> String {
+        format!(
+            "qword ptr [rip + .Lconst{}{}]",
+            data_id.arena_id(),
+            data_id.id()
+        )
     }
 }
 
