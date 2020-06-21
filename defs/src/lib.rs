@@ -6,11 +6,11 @@ use proc_macro::TokenStream;
 extern crate proc_macro_error;
 extern crate proc_quote;
 extern crate rand;
+extern crate syn;
 
 use proc_macro_error::*;
 
 mod isel_pat;
-mod parser;
 mod register;
 
 #[proc_macro]

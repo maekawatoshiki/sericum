@@ -10,6 +10,7 @@ edition = "2018"
 proc-quote = "0.3.0"
 proc-macro-error = "1.0.0"
 rand = "0.7.3"
+syn = "1.0.32"
 
 [lib]
 proc-macro = true

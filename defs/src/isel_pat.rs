@@ -1,239 +1,269 @@
-use crate::parser::*;
 use proc_macro::TokenStream;
 use proc_macro_error::{
-    proc_macro2::{
-        // Delimiter, Group, Punct, Spacing, TokenTree
-        Ident,
-        Span,
-    },
+    proc_macro2::{Group, Ident, Span},
     *,
 };
 use proc_quote::quote;
+use syn::parse::{Parse, ParseStream};
+use syn::{parse_macro_input, token, Error, LitInt, Token};
 
 pub fn run(item: TokenStream) -> TokenStream {
-    let mut reader = TokenStreamReader::new(item.into_iter());
-    let pats = PatternParser::new(&mut reader).parse();
-    TokenStream::from(TokenStreamConstructor::new().run(pats))
+    let pat = parse_macro_input!(item as Patterns);
+    let ts = construct_pattern_match(pat);
+    TokenStream::from(ts)
 }
 
 type TS = proc_macro2::TokenStream;
 
-#[derive(Debug, Clone)]
-enum Node {
-    Patterns(Vec<Node>),
-    InstPattern(TS, Vec<Node>, Option<TS>, TS, Box<Node>), // inst, operands, ret ty, parent, body
-    OperandPattern(String, Option<TS>, TS, Box<Node>),     // operand kind, ty, parent, body
-    Inst(TS, Vec<Node>),
-    // Operand(String),
+#[derive(Debug)]
+struct Patterns(pub Vec<Pattern>);
+
+#[derive(Debug)]
+enum Pattern {
+    Patterns(Patterns),
+    Inst(InstPattern),
+    Operand(OperandPattern),
+    Selected(Selected),
+}
+
+#[derive(Debug)]
+enum Selected {
+    Inst(Inst),
     Register(String),
     Immediate(i32),
-    Addressing(String, Vec<Node>),
-    Ident(String),
+    Addressing(Addressing),
+    Ident(Ident),
     User(TS),
     None,
 }
 
-struct PatternParser<'a> {
-    pub reader: &'a mut TokenStreamReader,
+#[derive(Debug)]
+struct InstPattern {
+    opcode: Opcode,
+    operands: Vec<Selected>,
+    ty: Option<TS>,
+    parent: TS,
+    body: Box<Pattern>,
 }
 
-struct TokenStreamConstructor {}
+#[derive(Debug)]
+struct OperandPattern {
+    name: String,
+    ty: Option<TS>,
+    parent: TS,
+    body: Box<Pattern>,
+}
 
-impl<'a> PatternParser<'a> {
-    pub fn new(reader: &'a mut TokenStreamReader) -> Self {
-        Self { reader }
-    }
+#[derive(Debug)]
+struct Addressing(pub Ident, pub Vec<Selected>);
 
-    pub fn parse(&mut self) -> Node {
-        let body = self.parse_pats(true);
-        body
-    }
+#[derive(Debug)]
+struct Opcode(pub TS);
 
-    pub fn parse_pats(&mut self, toplevel: bool) -> Node {
-        let mut pats = vec![];
-        while self.reader.peak().is_some() {
-            pats.push(self.parse_pat(toplevel));
+#[derive(Debug)]
+struct Inst {
+    opcode: Opcode,
+    operands: Vec<Selected>,
+}
+
+impl Parse for Patterns {
+    fn parse(input: ParseStream) -> Result<Self, Error> {
+        let mut patterns = vec![];
+        while !input.is_empty() {
+            patterns.push(input.parse::<Pattern>()?);
         }
-        Node::Patterns(pats)
+        Ok(Patterns(patterns))
     }
+}
 
-    pub fn parse_pat(&mut self, toplevel: bool) -> Node {
-        if self.reader.cur_is_group('(') {
-            return self.parse_inst_pat(toplevel);
+impl Parse for Pattern {
+    fn parse(input: ParseStream) -> Result<Self, Error> {
+        if input.parse::<Token![=>]>().is_ok() {
+            return Ok(Pattern::Selected(input.parse::<Selected>()?));
         }
-        self.parse_operand_pat(toplevel)
-    }
 
-    fn parse_type(&mut self) -> TS {
-        let ty_name = ident_tok(&self.reader.get_ident().unwrap());
-        if self.reader.skip_punct('!') {
-            quote! { Type::#ty_name(_) }
-        } else {
-            quote! { Type::#ty_name }
+        if input.peek(token::Paren) {
+            // (
+            return Ok(Pattern::Inst(input.parse::<InstPattern>()?));
         }
-    }
 
-    pub fn parse_inst_pat(&mut self, toplevel: bool) -> Node {
-        let group = self.reader.get().unwrap();
-        let mut reader = TokenStreamReader::new(group_stream(group).into_iter());
-        let mut parser = PatternParser::new(&mut reader);
-        let inst_kind = parser.parse_inst_kind();
-        let operands = parser.parse_inst_operands();
-        let ty = if self.reader.skip_punct(':') {
-            Some(self.parse_type())
-        } else {
-            None
-        };
-        let parent = if !toplevel {
-            let node = ident_tok(self.reader.get_ident().unwrap().as_str());
-            quote! { #node }
-        } else {
-            quote! { node }
-        };
-        let body = self.parse_body();
-        Node::InstPattern(inst_kind, operands, ty, parent, Box::new(body))
-    }
+        if let Ok(group) = input.parse::<Group>() {
+            // {
+            let patterns: Patterns = syn::parse2(group.stream())?;
+            return Ok(Pattern::Patterns(patterns));
+        }
 
-    pub fn parse_operand_pat(&mut self, toplevel: bool) -> Node {
-        let kind = self.reader.get_ident().unwrap();
-        let ty = if self.reader.skip_punct(':') {
-            Some(self.parse_type())
-        } else {
-            None
-        };
-        let parent = if !toplevel {
-            let node = ident_tok(self.reader.get_ident().unwrap().as_str());
-            quote! { #node }
-        } else {
-            quote! { node }
-        };
-        let body = self.parse_body();
-        Node::OperandPattern(kind, ty, quote! { #parent }, Box::new(body))
+        Ok(Pattern::Operand(input.parse::<OperandPattern>()?))
     }
+}
 
-    pub fn parse_inst_kind(&mut self) -> TS {
-        let ir_or_mi = self.reader.get_ident().unwrap();
-        assert!(self.reader.skip_punct('.'));
-        let name = ident_tok(self.reader.get_ident().unwrap().as_str());
-        let inst = match ir_or_mi.as_str() {
+impl Parse for InstPattern {
+    fn parse(input: ParseStream) -> Result<Self, Error> {
+        let group = input.parse::<Group>()?;
+        let inst: Inst = syn::parse2(group.stream())?;
+        let ty = parse_type(input)?;
+        let parent = parse_parent(input)?;
+        let body = Box::new(input.parse::<Pattern>()?);
+        Ok(InstPattern {
+            opcode: inst.opcode,
+            operands: inst.operands,
+            ty,
+            parent,
+            body,
+        })
+    }
+}
+
+impl Parse for OperandPattern {
+    fn parse(input: ParseStream) -> Result<Self, Error> {
+        let name = input.parse::<Ident>()?.to_string();
+        let ty = parse_type(input)?;
+        let parent = parse_parent(input)?;
+        let body = Box::new(input.parse::<Pattern>()?);
+        Ok(OperandPattern {
+            name,
+            ty,
+            parent,
+            body,
+        })
+    }
+}
+
+impl Parse for Opcode {
+    fn parse(input: ParseStream) -> Result<Self, Error> {
+        let ir_or_mi: Ident = input.parse()?;
+        assert!(input.parse::<Token![.]>().is_ok());
+        let name: Ident = input.parse()?;
+        let opcode = match ir_or_mi.to_string().as_str() {
             "ir" => quote! { NodeKind::IR(IRNodeKind::#name) },
             "mi" => quote! { NodeKind::MI(MINodeKind::#name) },
-            _ => abort!(0, "expected 'ir' or 'mi'"),
+            _ => return Err(Error::new(ir_or_mi.span(), "expected 'ir' or 'mi'")),
         };
-        inst
+        Ok(Opcode(opcode))
     }
+}
 
-    pub fn parse_inst_operands(&mut self) -> Vec<Node> {
-        let mut operands = vec![];
-        loop {
-            if self.reader.cur_is_group('(') {
-                operands.push(self.parse_inst());
-            } else {
-                operands.push(self.parse_operand())
-            }
-            if !self.reader.skip_punct(',') {
-                break;
-            }
+impl Parse for Selected {
+    fn parse(input: ParseStream) -> Result<Self, Error> {
+        if input.peek(token::Paren) {
+            let group = input.parse::<Group>()?;
+            return Ok(Selected::Inst(syn::parse2(group.stream())?));
         }
-        operands
-    }
 
-    pub fn parse_inst(&mut self) -> Node {
-        let group = self.reader.get().unwrap();
-        let mut reader = TokenStreamReader::new(group_stream(group).into_iter());
-        let mut parser = PatternParser::new(&mut reader);
-        let inst_kind = parser.parse_inst_kind();
-        let operands = parser.parse_inst_operands();
-        Node::Inst(inst_kind, operands)
-    }
+        if let Ok(_) = input.parse::<Token![%]>() {
+            let reg_str = input.parse::<Ident>()?.to_string();
+            return Ok(Selected::Register(reg_str));
+        }
 
-    pub fn parse_operand(&mut self) -> Node {
-        if self.reader.skip_punct('%') {
-            let reg_str = self.reader.get_ident().unwrap();
-            Node::Register(reg_str)
-        } else if self.reader.skip_punct('$') {
-            let imm = self.reader.get_literal().unwrap();
-            Node::Immediate(imm.parse::<i32>().unwrap())
-        } else if self.reader.cur_is_group('[') {
-            let group = self.reader.get().unwrap();
-            let mut reader = TokenStreamReader::new(group_stream(group).into_iter());
-            let mut parser = PatternParser::new(&mut reader);
-            let addressing_name = parser.reader.get_ident().unwrap();
-            Node::Addressing(addressing_name, parser.parse_inst_operands())
-        } else {
-            let name = self.reader.get_ident().unwrap();
-            match name.as_str() {
-                "none" => Node::None,
-                _ => Node::Ident(name),
-            }
+        if let Ok(_) = input.parse::<Token![$]>() {
+            let imm = input.parse::<LitInt>()?.to_string().parse::<i32>().unwrap();
+            return Ok(Selected::Immediate(imm));
+        }
+
+        if input.peek(token::Brace) {
+            let group = input.parse::<Group>()?;
+            return Ok(Selected::User(group.stream()));
+        }
+
+        if let Ok(group) = input.parse::<Group>() {
+            let addressing: Addressing = syn::parse2(group.stream())?;
+            return Ok(Selected::Addressing(addressing));
+        }
+
+        let name = input.parse::<Ident>()?;
+        Ok(match name.to_string().as_str() {
+            "none" => Selected::None,
+            _ => Selected::Ident(name),
+        })
+    }
+}
+
+impl Parse for Inst {
+    fn parse(input: ParseStream) -> Result<Self, Error> {
+        let opcode: Opcode = input.parse()?;
+        let operands = parse_inst_operands(input)?;
+        Ok(Inst { opcode, operands })
+    }
+}
+
+impl Parse for Addressing {
+    fn parse(input: ParseStream) -> Result<Self, Error> {
+        let name = input.parse::<Ident>()?;
+        let operands = parse_inst_operands(input)?;
+        Ok(Addressing(name, operands))
+    }
+}
+
+fn parse_inst_operands(input: ParseStream) -> Result<Vec<Selected>, Error> {
+    let mut operands = vec![];
+    loop {
+        operands.push(input.parse::<Selected>()?);
+        if input.parse::<Token![,]>().is_err() {
+            break;
         }
     }
+    Ok(operands)
+}
 
-    pub fn parse_body(&mut self) -> Node {
-        if self.reader.cur_is_group('{') {
-            let group = self.reader.get().unwrap();
-            let mut reader = TokenStreamReader::new(group_stream(group).into_iter());
-            let mut parser = PatternParser::new(&mut reader);
-            parser.parse_pats(false)
-        } else if self.reader.skip_punct('=') && self.reader.skip_punct('>') {
-            let group = self.reader.peak().unwrap();
-            let user_code = tok_is_group(&group, '{');
-            if user_code {
-                let body = proc_macro2::TokenStream::from(group_stream(self.reader.get().unwrap()));
-                Node::User(quote! { { #body } })
-            } else {
-                self.parse_inst()
-            }
-        } else {
-            abort!(0, "expected ':' or '=>'")
+fn parse_type(input: ParseStream) -> Result<Option<TS>, Error> {
+    if !input.peek(Token![:]) {
+        return Ok(None);
+    }
+    assert!(input.parse::<Token![:]>().is_ok());
+    let ty: Ident = input.parse()?;
+    Ok(Some(if input.peek(Token![!]) {
+        assert!(input.parse::<Token![!]>().is_ok());
+        quote! { Type::#ty(_) }
+    } else {
+        quote! { Type::#ty }
+    }))
+}
+
+fn parse_parent(input: ParseStream) -> Result<TS, Error> {
+    Ok(match input.parse::<Ident>() {
+        Ok(parent) => quote! { #parent },
+        Err(_) => quote! { node },
+    })
+}
+
+//// construction of pattern matching code for instruction selection
+
+fn construct_pattern_match(pats: Patterns) -> TS {
+    let t = pats.construct();
+    quote! {
+        (|| -> Raw<DAGNode> {
+            #t
+            node.operand = node
+                .operand
+                .iter()
+                .map(|op| self.run_on_node(tys, regs_info, heap, *op))
+                .collect();
+            node
+        }) ()
+    }
+}
+
+trait PatternMatchConstructible {
+    fn construct(&self) -> TS;
+}
+
+impl PatternMatchConstructible for Pattern {
+    fn construct(&self) -> TS {
+        // TODO: refine
+        match self {
+            Self::Inst(x) => x.construct(),
+            Self::Operand(x) => x.construct(),
+            Self::Patterns(x) => x.construct(),
+            Self::Selected(x) => x.construct(),
         }
     }
 }
 
-impl TokenStreamConstructor {
-    pub fn new() -> Self {
-        Self {}
-    }
-
-    pub fn run(&mut self, node: Node) -> TS {
-        let output = self.run_sub(node);
-        quote! {
-            (|| -> Raw<DAGNode> {
-                #output
-
-                node.operand = node
-                    .operand
-                    .iter()
-                    .map(|op| self.run_on_node(tys, regs_info, heap, *op))
-                    .collect();
-                node
-            }) ()
-        }
-    }
-
-    pub fn run_sub(&mut self, node: Node) -> TS {
-        match node {
-            Node::Patterns(pats) => self.run_on_patterns(pats),
-            Node::InstPattern(inst, operands, ty, parent, body) => {
-                self.run_on_inst_patterns(inst, operands, ty, parent, body)
-            }
-            Node::OperandPattern(kind, ty, parent, body) => {
-                self.run_on_operand_pattern(kind, ty, parent, body)
-            }
-            Node::Inst(inst, operands) => self.run_on_inst(inst, operands),
-            Node::Register(_name) => unimplemented!(),
-            Node::Immediate(_) => unimplemented!(),
-            Node::Addressing(_name, _operands) => unimplemented!(),
-            Node::Ident(_name) => unimplemented!(),
-            Node::User(code) => quote! { return #code },
-            Node::None => unimplemented!(),
-        }
-    }
-
-    fn run_on_patterns(&mut self, pats: Vec<Node>) -> TS {
+impl PatternMatchConstructible for Patterns {
+    fn construct(&self) -> TS {
         let mut output = quote! {};
-        for pat in pats {
-            let ts = self.run_sub(pat);
+        for pat in &self.0 {
+            let ts = pat.construct();
             output = quote! {
                 #output
                 #ts
@@ -241,21 +271,17 @@ impl TokenStreamConstructor {
         }
         output
     }
+}
 
-    fn run_on_inst_patterns(
-        &mut self,
-        inst: TS,
-        operands: Vec<Node>,
-        ty: Option<TS>,
-        parent: TS,
-        body: Box<Node>,
-    ) -> TS {
-        let body = self.run_sub(*body);
+impl PatternMatchConstructible for InstPattern {
+    fn construct(&self) -> TS {
+        let body = self.body.construct();
         let mut def_operands = quote! {};
-        for (i, operand) in operands.into_iter().enumerate() {
+        let inst = &self.opcode.0;
+        let parent = &self.parent;
+        for (i, operand) in self.operands.iter().enumerate() {
             match operand {
-                Node::Ident(name) => {
-                    let name = ident_tok(name.as_str());
+                Selected::Ident(name) => {
                     def_operands = quote! {
                         #def_operands
                         let #name = #parent.operand[#i];
@@ -264,7 +290,7 @@ impl TokenStreamConstructor {
                 _ => unimplemented!(),
             }
         }
-        if let Some(ty) = ty {
+        if let Some(ty) = &self.ty {
             quote! { if #parent.kind == #inst && matches!(#parent.ty, #ty) {
                 #def_operands
                 #body
@@ -276,16 +302,13 @@ impl TokenStreamConstructor {
             }}
         }
     }
+}
 
-    fn run_on_operand_pattern(
-        &mut self,
-        kind: String,
-        ty: Option<TS>,
-        parent: TS,
-        body: Box<Node>,
-    ) -> TS {
-        let body = self.run_sub(*body);
-        match kind.as_str() {
+impl PatternMatchConstructible for OperandPattern {
+    fn construct(&self) -> TS {
+        let body = self.body.construct();
+        let parent = &self.parent;
+        match self.name.as_str() {
             "imm8" => {
                 quote! { if #parent.is_constant() && matches!(#parent.ty, Type::Int8) { #body } }
             }
@@ -295,8 +318,8 @@ impl TokenStreamConstructor {
             "imm_f64" => {
                 quote! { if #parent.is_constant() && matches!(#parent.ty, Type::F64) {  #body } }
             }
-            _ if kind.as_str().starts_with("imm") => {
-                let bit = kind.as_str()["imm".len()..].parse::<u32>().unwrap();
+            _ if self.name.as_str().starts_with("imm") => {
+                let bit = self.name.as_str()["imm".len()..].parse::<u32>().unwrap();
                 quote! { if #parent.is_constant()
                 && #parent.ty.is_integer()
                 && #parent.as_constant().bits_within(#bit).unwrap() { #body } }
@@ -304,7 +327,7 @@ impl TokenStreamConstructor {
             // TODO
             "mem" => quote! { if #parent.is_frame_index() {  #body } },
             "mem32" | "mem64" => {
-                let bits = match kind.as_str() {
+                let bits = match self.name.as_str() {
                     "mem32" => 32usize,
                     "mem64" => 64usize,
                     _ => unimplemented!(),
@@ -316,7 +339,7 @@ impl TokenStreamConstructor {
                 }
             }
             "f64mem" => {
-                let ty = match kind.as_str() {
+                let ty = match self.name.as_str() {
                     "f64mem" => quote! { Type::F64 },
                     _ => unimplemented!(),
                 };
@@ -327,8 +350,8 @@ impl TokenStreamConstructor {
                 }
             }
             reg_class => {
-                let reg_class = ident_tok(reg_class);
-                if let Some(ty) = ty {
+                let reg_class = str2ident(reg_class);
+                if let Some(ty) = &self.ty {
                     quote! { if #parent.is_maybe_register()
                         && matches!(ty2rc(&#parent.ty), Some(RegisterClassKind::#reg_class))
                         && matches!(#parent.ty, #ty) {
@@ -343,101 +366,113 @@ impl TokenStreamConstructor {
             }
         }
     }
+}
 
-    fn run_on_inst(&mut self, inst: TS, operands: Vec<Node>) -> TS {
-        let (defs, ops) = self.selected_operands(operands);
+impl PatternMatchConstructible for Selected {
+    fn construct(&self) -> TS {
+        match self {
+            Self::Inst(x) => x.construct(),
+            Self::User(code) => quote! { return #code },
+            _ => unimplemented!(),
+        }
+    }
+}
+
+impl PatternMatchConstructible for Inst {
+    fn construct(&self) -> TS {
+        let opcode = &self.opcode.0;
+        let (defs, ops) = selected_operands(&self.operands);
         quote! {
             #defs
             return heap.alloc(DAGNode::new(
-                    #inst,
+                    #opcode,
                     vec![#ops],
                     node.ty));
         }
     }
-
-    // def, operands
-    fn selected_operands(&mut self, operands: Vec<Node>) -> (TS, TS) {
-        let mut def_operands_ts = quote! {};
-        let mut operands_ts = quote! {};
-        for operand in operands {
-            match operand {
-                Node::Ident(name) => {
-                    let name = ident_tok(name.as_str());
-                    def_operands_ts = quote! {
-                        #def_operands_ts
-                        let #name = self.run_on_node(tys, regs_info, heap, #name);
-                    };
-                    operands_ts = quote! { #operands_ts #name, };
-                }
-                Node::Register(name) => {
-                    let name_s = name.as_str();
-                    let name = ident_tok(name.as_str());
-                    def_operands_ts = quote! {
-                        #def_operands_ts
-                        let #name = heap.alloc_phys_reg(regs_info, str2reg(#name_s).unwrap());
-                    };
-                    operands_ts = quote! {
-                        #operands_ts #name,
-                    };
-                }
-                Node::Immediate(i) => {
-                    let imm = ident_tok(&format!("imm_{}", unique_name()));
-                    def_operands_ts = quote! {
-                        #def_operands_ts
-                        let #imm = heap.alloc(DAGNode::new(
-                                NodeKind::Operand(OperandNodeKind::Constant(
-                                        ConstantKind::Int32(#i))),
-                                vec![],
-                                Type::Int32
-                        ));
-                    };
-                    operands_ts = quote! {
-                        #operands_ts #imm,
-                    }
-                }
-                Node::Addressing(name, operands) => {
-                    let name = ident_tok(name.as_str());
-                    let (defs, ops) = self.selected_operands(operands);
-                    let mem = ident_tok(&format!("mem_{}", unique_name()));
-                    def_operands_ts = quote! {
-                        #def_operands_ts
-                        #defs
-                        let #mem = heap.alloc(DAGNode::new_mem(
-                                MemNodeKind::#name, vec![#ops])); // TODO: Uniquify mem__
-                    };
-                    operands_ts = quote! {
-                        #operands_ts #mem,
-                    }
-                }
-                Node::Inst(inst, operands) => {
-                    let (defs, ops) = self.selected_operands(operands);
-                    let iname = ident_tok(&format!("inst_{}", unique_name()));
-                    def_operands_ts = quote! {
-                        #def_operands_ts
-                        #defs
-                        let #iname = heap.alloc(DAGNode::new(
-                            #inst,
-                            vec![#ops],
-                            #inst.as_mi().get_def_type()));
-                    };
-                    operands_ts = quote! {
-                        #operands_ts #iname,
-                    }
-                }
-                Node::None => {
-                    operands_ts = quote! {
-                        #operands_ts
-                        heap.alloc_none(),
-                    };
-                }
-                _ => unimplemented!(),
-            }
-        }
-        (def_operands_ts, operands_ts)
-    }
 }
 
-fn ident_tok(s: &str) -> Ident {
+fn selected_operands(operands: &Vec<Selected>) -> (TS, TS) {
+    let mut def_operands_ts = quote! {};
+    let mut operands_ts = quote! {};
+    for operand in operands {
+        match operand {
+            Selected::Ident(name) => {
+                def_operands_ts = quote! {
+                    #def_operands_ts
+                    let #name = self.run_on_node(tys, regs_info, heap, #name);
+                };
+                operands_ts = quote! { #operands_ts #name, };
+            }
+            Selected::Register(name) => {
+                let name_s = name.as_str();
+                let name = str2ident(name.as_str());
+                def_operands_ts = quote! {
+                    #def_operands_ts
+                    let #name = heap.alloc_phys_reg(regs_info, str2reg(#name_s).unwrap());
+                };
+                operands_ts = quote! {
+                    #operands_ts #name,
+                };
+            }
+            Selected::Immediate(i) => {
+                let imm = str2ident(&format!("imm_{}", unique_name()));
+                def_operands_ts = quote! {
+                    #def_operands_ts
+                    let #imm = heap.alloc(DAGNode::new(
+                            NodeKind::Operand(OperandNodeKind::Constant(
+                                    ConstantKind::Int32(#i))),
+                            vec![],
+                            Type::Int32
+                    ));
+                };
+                operands_ts = quote! {
+                    #operands_ts #imm,
+                }
+            }
+            Selected::Addressing(addressing) => {
+                let name = &addressing.0;
+                let (defs, ops) = selected_operands(&addressing.1);
+                let mem = str2ident(&format!("mem_{}", unique_name()));
+                def_operands_ts = quote! {
+                    #def_operands_ts
+                    #defs
+                    let #mem = heap.alloc(DAGNode::new_mem(
+                            MemNodeKind::#name, vec![#ops])); // TODO: Uniquify mem__
+                };
+                operands_ts = quote! {
+                    #operands_ts #mem,
+                }
+            }
+            Selected::Inst(inst) => {
+                let (defs, ops) = selected_operands(&inst.operands);
+                let opcode = &inst.opcode.0;
+                let iname = str2ident(&format!("inst_{}", unique_name()));
+                def_operands_ts = quote! {
+                    #def_operands_ts
+                    #defs
+                    let #iname = heap.alloc(DAGNode::new(
+                        #opcode,
+                        vec![#ops],
+                        #opcode.as_mi().get_def_type()));
+                };
+                operands_ts = quote! {
+                    #operands_ts #iname,
+                }
+            }
+            Selected::None => {
+                operands_ts = quote! {
+                    #operands_ts
+                    heap.alloc_none(),
+                };
+            }
+            _ => unimplemented!(),
+        }
+    }
+    (def_operands_ts, operands_ts)
+}
+
+fn str2ident(s: &str) -> Ident {
     Ident::new(s, Span::call_site())
 }
 

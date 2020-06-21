@@ -168,7 +168,6 @@ impl MISelector {
             (ir.FIAddr a) { mem a => (mi.LEAr64m [BaseFi %rbp, a]) }
             (ir.Br dst) => (mi.JMP dst)
             (ir.CopyFromReg a) => (mi.Copy a)
-            // (ir.CopyFromReg a) => (mi.Copy a)
         );
 
         self.selected.insert(node, selected);
