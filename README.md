@@ -25,9 +25,9 @@ Do not expect too much stuff!
 **Requirement: Rust nightly**
 
 ```sh
-cargo test --feature x86_64 # build for x86_64
-cargo test brainfuxk --feature x86_64 -- --nocapture # this is fun. just try it.
-cargo test --feature riscv64 # build for riscv64. very few features are implemented.
+cargo test --features x86_64 # build for x86_64
+cargo test brainfuxk --features x86_64 -- --nocapture # this is fun. just try it.
+cargo test --features riscv64 # build for riscv64. very few features are implemented.
 ```
 
 # Example
