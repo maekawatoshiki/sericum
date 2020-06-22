@@ -3,6 +3,10 @@ name = "cilk"
 version = "0.2.0"
 authors = ["uint256_t"]
 edition = "2018"
+license-file = "LICENSE"
+description = "(Toy) Compiler Infrastructure inspired by LLVM"
+readme = "README.md"
+repository = "https://github.com/maekawatoshiki/cilk"
 
 [dependencies]
 rustc-hash = "1.1.0"
