@@ -1,6 +1,6 @@
 [package]
 name = "cilk"
-version = "0.2.0"
+version = "0.2.1"
 authors = ["uint256_t"]
 edition = "2018"
 license-file = "LICENSE"
