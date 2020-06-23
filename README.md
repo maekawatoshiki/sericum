@@ -10,12 +10,7 @@ Do not expect too much stuff!
 
 # To Do
 
-- Optimization
-    - Easy
-        1. Spill registers not to the stack but to callee saved registers such as ebx. (llc does so)
-        2. Take into consideration the physical registers' allocation order.
-    - Hard 
-        1. ....
+- Implement optimizations for IR
 - Refine code 
 - Write documents in detail
 - Write tests (because I recently removed most of them)
@@ -36,16 +31,20 @@ cargo test --features riscv64 # build for riscv64. very few features are impleme
 
 ```rust
 use cilk::{
-    codegen::x64::{exec},
-    exec::interpreter::interp,
-    ir::{builder::Builder, module::Module, value::{Value, ImmediateValue}, types::Type},
+    codegen::x64::exec,
+    ir::{
+      builder::{FunctionIdWithModule, Builder}, 
+      module::Module, 
+      value::{Value, ImmediateValue}, 
+      types::Type
+    },
 };
 
 let mut m = Module::new("cilk");
 let fibo = m.create_function(
     "fibo", Type::Int32, vec![Type::Int32]
 );
-let mut builder = Builder::new(&mut m, fibo);
+let mut builder = Builder::new(FunctionIdWithModule::new(&mut m, fibo));
 
 {
 let entry = builder.append_basic_block();
@@ -100,11 +99,6 @@ println!("Function dump:\n{}", m.dump(fibo));
 //                     
 // }                               
 
-// In this branch, this may not work correctly.
-let mut interp = interp::Interpreter::new(&m);
-let ret = interp.run_function(fibo, vec![interp::ConcreteValue::Int32(10)]);
-println!("fibo(10) = {:?}", ret); // fibo(10) = Int32(55)
-
 // JIT suppports for only x86_64
 
 let mut jit = exec::jit::JITExecutor::new(&m);
@@ -113,10 +107,10 @@ println!( "fibo(10) = {:?}",
           jit.run(func, vec![exec::jit::GenericValue::Int32(10)])); // fibo(10) = 55
 ```
 
-- Useful macro to describe IR is available
+- Useful macro is available to describe IR
 
 ```rust
-let fibo = cilk_ir!(m; define [i32] f (i32) {
+let fibo = cilk_ir!(m; define [i32] f [(i32)] {
     entry:
         cond = icmp le (%arg.0), (i32 2);
         br (%cond) l1, l2;
