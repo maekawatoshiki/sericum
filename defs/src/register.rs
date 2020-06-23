@@ -19,7 +19,7 @@ enum DefKind {
     Order,
 }
 
-// class GR32 (64, Int64) : GR64 {
+// class GR32 (32, Int32) < GR64 {
 //      EAX,
 //      ECX,
 //      ...,
@@ -79,7 +79,7 @@ impl Parse for RegisterClass {
     fn parse(input: ParseStream) -> Result<Self, Error> {
         let name = input.parse::<Ident>()?;
         let BitAndType(bit, ty) = syn::parse2::<BitAndType>(input.parse::<Group>()?.stream())?;
-        let super_rc = match input.parse::<Token![:]>() {
+        let super_rc = match input.parse::<Token![<]>() {
             Ok(_) => Some(input.parse::<Ident>()?),
             Err(_) => None,
         };
@@ -129,32 +129,73 @@ impl Parse for BitAndType {
     }
 }
 
+trait DefinitionConstructible {
+    fn construct(&self) -> TS;
+}
+
+impl DefinitionConstructible for Registers {
+    fn construct(&self) -> TS {
+        let mut constants = quote! {};
+        let mut class_definition = quote! {};
+        let mut regs_total_num = 0;
+
+        for class in &self.class {
+            let name = str2ident(format!("{}_NUM", class.name.to_string()).as_str());
+            let num = class.body.0.len() as isize;
+            constants = quote! {
+                #constants
+                const #name: isize = #num;
+            };
+            regs_total_num += num as usize;
+
+            let class = &class.construct();
+            class_definition = quote! {
+                #class_definition
+                #class
+            };
+        }
+
+        constants = quote! {
+            #constants
+            pub const PHYS_REGISTERS_NUM: usize = #regs_total_num;
+        };
+
+        quote! {
+            #constants
+            #class_definition
+        }
+    }
+}
+
+impl DefinitionConstructible for RegisterClass {
+    fn construct(&self) -> TS {
+        // body, name
+        let list = self
+            .body
+            .0
+            .iter()
+            .fold(quote! {}, |acc, x| quote! { #acc #x, });
+        let name = &self.name;
+        quote! {
+            #[derive(Debug, Clone, Copy, Hash, PartialEq)]
+            pub enum #name {
+                #list
+            }
+        }
+    }
+}
+
+// impl DefinitionConstructible for RegisterOrder {
+//     fn construct(&self) -> TS {}
+// }
+
 // RegisterClass GR32 (i32) {
 //    EAX, EBX, .... }
-pub fn run(_item: TokenStream) -> TokenStream {
-    let expanded = quote! {
+pub fn run(item: TokenStream) -> TokenStream {
+    let regs = parse_macro_input!(item as Registers);
+    TokenStream::from(regs.construct())
+}
 
-    #[derive(Debug, Clone, Copy, Hash, PartialEq)]
-    pub enum GR32 {
-        EAX ,
-        ECX ,
-        EDX ,
-        EBX ,
-        ESP ,
-        EBP ,
-        ESI ,
-        EDI ,
-        R8D ,
-        R9D ,
-        R10D,
-        R11D,
-        R12D,
-        R13D,
-        R14D,
-        R15D
-    }
-
-    };
-
-    TokenStream::from(expanded)
+fn str2ident(s: &str) -> Ident {
+    Ident::new(s, Span::call_site())
 }

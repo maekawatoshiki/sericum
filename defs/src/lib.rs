@@ -14,7 +14,7 @@ mod isel_pat;
 mod register;
 
 #[proc_macro]
-pub fn define_registers(item: TokenStream) -> TokenStream {
+pub fn registers(item: TokenStream) -> TokenStream {
     register::run(item)
 }
 

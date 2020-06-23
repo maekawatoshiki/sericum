@@ -4,11 +4,6 @@ use id_arena::Arena;
 use rustc_hash::FxHashMap;
 use std::cell::RefCell;
 
-const GR32_NUM: isize = 16;
-const GR64_NUM: isize = GR32_NUM;
-const XMM_NUM: isize = 16;
-pub const PHYS_REGISTERS_NUM: usize = (GR32_NUM + GR64_NUM + XMM_NUM) as usize;
-
 macro_rules! to_phys {
     ($($r:path),*) => {
         vec![$(($r.as_phys_reg())),*]
@@ -191,50 +186,22 @@ impl RegisterClassKind {
 }
 
 // TODO: The definition of GR32 is now hard coded in ROOT/defs/src/register.rs
-use defs::define_registers;
-define_registers!(
-    RegisterClass GR32 (i32) {
+use defs::registers;
+registers! {
+    class GR32 (32, Int32) < GR64 {
+        EAX, ECX, EDX, EBX, ESP, EBP, ESI, EDI,
+        R8D, R9D, R10D, R11D, R12D, R13D, R14D, R15D
     }
-);
 
-#[derive(Debug, Clone, Copy, Hash, PartialEq)]
-pub enum GR64 {
-    RAX,
-    RCX,
-    RDX,
-    RBX,
-    RSP,
-    RBP,
-    RSI,
-    RDI,
-    R8,
-    R9,
-    R10,
-    R11,
-    R12,
-    R13,
-    R14,
-    R15,
-}
+    class GR64 (64, Int64) {
+        RAX, RCX, RDX, RBX, RSP, RBP, RSI, RDI,
+        R8, R9, R10, R11, R12, R13, R14, R15
+    }
 
-#[derive(Debug, Clone, Copy, Hash, PartialEq)]
-pub enum XMM {
-    XMM0,
-    XMM1,
-    XMM2,
-    XMM3,
-    XMM4,
-    XMM5,
-    XMM6,
-    XMM7,
-    XMM8,
-    XMM9,
-    XMM10,
-    XMM11,
-    XMM12,
-    XMM13,
-    XMM14,
-    XMM15,
+    class XMM (128, F64) {
+        XMM0, XMM1, XMM2, XMM3, XMM4, XMM5, XMM6, XMM7,
+        XMM8, XMM9, XMM10, XMM11, XMM12, XMM13, XMM14, XMM15
+    }
 }
 
 impl TargetRegisterTrait for PhysReg {
