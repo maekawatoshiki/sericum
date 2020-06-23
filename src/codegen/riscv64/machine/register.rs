@@ -45,30 +45,10 @@ macro_rules! to_phys {
 }
 
 impl RegisterClassKind {
-    pub fn get_reg_order(&self) -> RegisterOrder {
-        RegisterOrder::general_purpose(*self)
-    }
-
-    pub fn get_arg_reg_order(&self) -> RegisterOrder {
-        RegisterOrder::arguments(*self)
-    }
-
-    pub fn get_nth_arg_reg(&self, nth: usize) -> Option<PhysReg> {
-        self.get_arg_reg_order_vec().get(nth).map(|r| *r)
-    }
-
     pub fn size_in_bits(&self) -> usize {
         match self {
             Self::GPR => 64,
         }
-    }
-
-    pub fn size_in_byte(&self) -> usize {
-        self.size_in_bits() / 8
-    }
-
-    pub fn shares_same_register_file(&self, rc: RegisterClassKind) -> bool {
-        self.register_file_base_class() == rc.register_file_base_class()
     }
 
     pub fn register_file_base_class(&self) -> RegisterClassKind {
