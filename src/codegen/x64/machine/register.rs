@@ -10,35 +10,6 @@ macro_rules! to_phys {
     };
 }
 
-// TODO: TEMPORARY FUNCTIONS. WILL BE REMOVED.
-pub fn ty2rc(ty: &Type) -> Option<RegisterClassKind> {
-    match ty {
-        Type::Void => None,
-        Type::Int32 => Some(RegisterClassKind::GR32),
-        Type::Int64 => Some(RegisterClassKind::GR64),
-        Type::F64 => Some(RegisterClassKind::XMM),
-        Type::Pointer(_) => Some(RegisterClassKind::GR64),
-        Type::Array(_) => None,
-        e => unimplemented!("{:?}", e),
-    }
-}
-
-pub fn rc2ty(rc: RegisterClassKind) -> Type {
-    match rc {
-        RegisterClassKind::GR32 => Type::Int32,
-        RegisterClassKind::GR64 => Type::Int64,
-        RegisterClassKind::XMM => Type::F64,
-    }
-}
-
-// Remember to fix PhysReg::reg_class() when appending a variant
-#[derive(Debug, Clone, Copy, Hash, PartialEq)]
-pub enum RegisterClassKind {
-    GR32 = 0,
-    GR64 = GR32_NUM,
-    XMM = GR32_NUM + GR64_NUM,
-}
-
 impl PhysReg {
     pub fn reg_class(&self) -> RegisterClassKind {
         // TODO
@@ -188,17 +159,17 @@ impl RegisterClassKind {
 // TODO: The definition of GR32 is now hard coded in ROOT/defs/src/register.rs
 use defs::registers;
 registers! {
-    class GR32 (32, Int32) < GR64 {
+    class GR32 (32, Int32, [Int32]) < GR64 {
         EAX, ECX, EDX, EBX, ESP, EBP, ESI, EDI,
         R8D, R9D, R10D, R11D, R12D, R13D, R14D, R15D
     }
 
-    class GR64 (64, Int64) {
+    class GR64 (64, Int64, [Int64, Pointer!]) {
         RAX, RCX, RDX, RBX, RSP, RBP, RSI, RDI,
         R8, R9, R10, R11, R12, R13, R14, R15
     }
 
-    class XMM (128, F64) {
+    class XMM (128, F64, [F64]) {
         XMM0, XMM1, XMM2, XMM3, XMM4, XMM5, XMM6, XMM7,
         XMM8, XMM9, XMM10, XMM11, XMM12, XMM13, XMM14, XMM15
     }
