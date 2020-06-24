@@ -15,11 +15,6 @@ struct Registers {
     order: Vec<RegisterOrder>,
 }
 
-enum DefKind {
-    Class,
-    Order,
-}
-
 // class GR32 (32, Int32, [Int32, Int64, Pointer!]) < GR64 {
 //      EAX,
 //      ECX,
@@ -32,13 +27,13 @@ struct RegisterClass {
     bit: i32,
     rc2ty: TS,
     tys2rc: Vec<TS>,
+    ret_regs: RegisterList,
     super_rc: Option<Ident>,
     body: RegisterList,
 }
 
-struct BitAndTypes(pub i32, pub TS, pub Vec<TS>);
+struct RCInfo(pub i32, pub TS, pub Vec<TS>, pub RegisterList);
 struct Types(pub Vec<TS>);
-
 struct RegisterList(pub Vec<Ident>);
 
 // order gp GR32 { EAX, ... }
@@ -84,8 +79,8 @@ impl Parse for Registers {
 impl Parse for RegisterClass {
     fn parse(input: ParseStream) -> Result<Self, Error> {
         let name = input.parse::<Ident>()?;
-        let BitAndTypes(bit, rc2ty, tys2rc) =
-            syn::parse2::<BitAndTypes>(input.parse::<Group>()?.stream())?;
+        let RCInfo(bit, rc2ty, tys2rc, ret_regs) =
+            syn::parse2::<RCInfo>(input.parse::<Group>()?.stream())?;
         let super_rc = match input.parse::<Token![<]>() {
             Ok(_) => Some(input.parse::<Ident>()?),
             Err(_) => None,
@@ -96,6 +91,7 @@ impl Parse for RegisterClass {
             bit,
             rc2ty,
             tys2rc,
+            ret_regs,
             super_rc,
             body,
         })
@@ -128,14 +124,16 @@ impl Parse for RegisterList {
     }
 }
 
-impl Parse for BitAndTypes {
+impl Parse for RCInfo {
     fn parse(input: ParseStream) -> Result<Self, Error> {
         let bit = input.parse::<LitInt>()?.to_string().parse::<i32>().unwrap();
         assert!(input.parse::<Token![,]>().is_ok());
         let rc2ty = parse_ty(input)?;
         assert!(input.parse::<Token![,]>().is_ok());
         let tys2rc = syn::parse2::<Types>(input.parse::<Group>()?.stream())?.0;
-        Ok(Self(bit, rc2ty, tys2rc))
+        assert!(input.parse::<Token![,]>().is_ok());
+        let ret_regs = syn::parse2::<RegisterList>(input.parse::<Group>()?.stream())?;
+        Ok(Self(bit, rc2ty, tys2rc, ret_regs))
     }
 }
 
@@ -179,6 +177,7 @@ impl DefinitionConstructible for Registers {
         let mut physregs_name = quote![];
         let mut str2reg = quote! {};
         let mut reg_class_kind_size_in_bits = quote! {};
+        let mut ret_val_regs = quote! {};
         let mut regs_total_num = 0;
         let mut reg_sub_super: HashMap<String, SubSuper> = HashMap::new();
         let mut reg_set: Vec<Vec<String>> = Vec::new();
@@ -242,6 +241,11 @@ impl DefinitionConstructible for Registers {
             reg_class_kind_size_in_bits = quote! {
                 #reg_class_kind_size_in_bits
                 Self::#class_name => #bit,
+            };
+            let r = &class.ret_regs.0[0];
+            ret_val_regs = quote! {
+                #ret_val_regs
+                Self::#class_name => #class_name::#r.as_phys_reg(),
             };
 
             for t in &class.tys2rc {
@@ -320,6 +324,55 @@ impl DefinitionConstructible for Registers {
                 #class_definition
                 #class
             };
+        }
+
+        let mut arg_orders = quote! {};
+        let mut gp_orders = quote! {};
+        for order in &self.order {
+            match &order.kind {
+                RegisterOrderKind::Argument => {
+                    let mut arg_order = quote! {};
+                    let class = &order.class;
+                    for r in &order.body.0 {
+                        arg_order = quote! {
+                            #arg_order
+                            #class::#r.as_phys_reg(),
+                        };
+                    }
+
+                    arg_order = quote! {
+                        RegisterClassKind::#class => vec![
+                            #arg_order
+                        ]
+                    };
+
+                    arg_orders = quote! {
+                        #arg_orders
+                        #arg_order,
+                    };
+                }
+                RegisterOrderKind::GeneralPurpose => {
+                    let mut gp_order = quote! {};
+                    let class = &order.class;
+                    for r in &order.body.0 {
+                        gp_order = quote! {
+                            #gp_order
+                            #class::#r.as_phys_reg(),
+                        };
+                    }
+
+                    gp_order = quote! {
+                        RegisterClassKind::#class => vec![
+                            #gp_order
+                        ]
+                    };
+
+                    gp_orders = quote! {
+                        #gp_orders
+                        #gp_order,
+                    };
+                }
+            }
         }
 
         constants = quote! {
@@ -518,6 +571,24 @@ impl DefinitionConstructible for Registers {
                         #reg_file
                     }
                 }
+
+                pub fn return_value_register(&self) -> PhysReg {
+                    match self {
+                        #ret_val_regs
+                    }
+                }
+
+                pub fn get_arg_reg_order_vec(&self) -> Vec<PhysReg> {
+                    match self {
+                        #arg_orders
+                    }
+                }
+
+                pub fn get_gp_reg_order_vec(&self) -> Vec<PhysReg> {
+                    match self {
+                        #gp_orders
+                    }
+                }
             }
         };
 
@@ -555,10 +626,6 @@ impl DefinitionConstructible for RegisterClass {
         }
     }
 }
-
-// impl DefinitionConstructible for RegisterOrder {
-//     fn construct(&self) -> TS {}
-// }
 
 // RegisterClass GR32 (i32) {
 //    EAX, EBX, .... }
