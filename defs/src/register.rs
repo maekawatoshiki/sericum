@@ -6,7 +6,7 @@ use proc_macro_error::{
 use proc_quote::quote;
 use std::collections::HashMap;
 use syn::parse::{Parse, ParseStream};
-use syn::{parse_macro_input, token, Error, LitInt, Token};
+use syn::{parse_macro_input, Error, LitInt, Token};
 
 type TS = proc_macro2::TokenStream;
 
