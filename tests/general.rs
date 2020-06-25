@@ -884,4 +884,46 @@ main:
         let func = jit.find_function_by_name("func").unwrap();
         assert_eq!(jit.run(func, vec![]), exec::jit::GenericValue::Int32(15));
     }
+
+    #[test]
+    fn cse1() {
+        let mut m = module::Module::new("cilk");
+
+        cilk_ir!(m; define [i32] func [(i32)] {
+        entry:
+            a = alloca i32;
+            store (i32 1), (%a);
+            v = load (%a);
+            c = icmp eq (%arg.0), (i32 1);
+            br (%c) label1, label2;
+        label1:
+            x = add (%v), (i32 2);
+            store (%x), (%a);
+            br label3;
+        label2:
+            x = add (%v), (i32 2);
+            store (%x), (%a);
+            br label3;
+        label3:
+            x = add (%v), (i32 2);
+            store (%x), (%a);
+            x = add (%v), (i32 2);
+            ret (%x);
+        });
+        println!("{:?}", m);
+
+        ir::cse::CommonSubexprElimination::new().run_on_module(&mut m);
+        println!("{:?}", m);
+
+        let mut jit = exec::jit::JITExecutor::new(&mut m);
+        let func = jit.find_function_by_name("func").unwrap();
+        assert_eq!(
+            jit.run(func, vec![exec::jit::GenericValue::Int32(1)]),
+            exec::jit::GenericValue::Int32(3)
+        );
+        assert_eq!(
+            jit.run(func, vec![exec::jit::GenericValue::Int32(0)]),
+            exec::jit::GenericValue::Int32(3)
+        );
+    }
 }

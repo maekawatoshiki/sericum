@@ -14,6 +14,8 @@ pub struct CommonSubexprElimination {}
 
 struct GlobalCommonSubexprEliminationOnFunction<'a> {
     func: &'a mut Function,
+    bb_avails: AvailsInBB,
+    dom_frontiers: FxHashSet<BasicBlockId>,
     removal_list: Vec<InstructionId>,
 }
 
@@ -30,6 +32,8 @@ impl CommonSubexprElimination {
 
             GlobalCommonSubexprEliminationOnFunction {
                 func,
+                bb_avails: AvailsInBB::default(),
+                dom_frontiers: FxHashSet::default(),
                 removal_list: vec![],
             }
             .run()
@@ -38,6 +42,7 @@ impl CommonSubexprElimination {
 }
 
 type Subexprs = FxHashMap<Opcode, FxHashMap<Vec<Operand>, InstructionId>>;
+type AvailsInBB = FxHashMap<BasicBlockId, Subexprs>;
 
 impl<'a> GlobalCommonSubexprEliminationOnFunction<'a> {
     pub fn run_sub(
@@ -97,8 +102,107 @@ impl<'a> GlobalCommonSubexprEliminationOnFunction<'a> {
             }
         }
 
+        self.bb_avails.insert(root, commons.clone());
+
         for &child in dom_tree.tree.get(&root).unwrap_or(&FxHashSet::default()) {
+            if self.func.basic_block_ref(child).pred.len() > 1 {
+                self.dom_frontiers.insert(child);
+            }
             self.run_sub(dom_tree, child, commons.clone())
+        }
+    }
+
+    fn run_sub2(&mut self, root: &BasicBlockId, ebb_start: &BasicBlockId) {
+        let bb = &self.func.basic_blocks.arena[*root];
+
+        fn find_common<'a>(
+            commons: &'a Subexprs,
+            arena: &Arena<Instruction>,
+            inst_id: &InstructionId,
+        ) -> Option<&'a InstructionId> {
+            let inst = &arena[*inst_id];
+            let opcode = inst.opcode;
+            commons
+                .get(&opcode)
+                .map_or(None, |map| map.get(&inst.operands))
+        };
+        fn is_common<'a>(
+            preds: &Vec<BasicBlockId>,
+            avails: &AvailsInBB,
+            arena: &Arena<Instruction>,
+            inst_id: &InstructionId,
+        ) -> Option<Vec<(InstructionId, BasicBlockId)>> {
+            let mut incomings = vec![];
+            for pred in preds {
+                let e = &avails[pred];
+                if let Some(inst_id) = find_common(e, arena, inst_id) {
+                    incomings.push((*inst_id, *pred));
+                } else {
+                    break;
+                }
+            }
+            if preds.len() == incomings.len() {
+                Some(incomings)
+            } else {
+                None
+            }
+        };
+
+        let mut phis = vec![];
+        for inst_id in bb.iseq.borrow().iter().map(|v| v.as_instruction().id) {
+            if self.removal_list.contains(&inst_id) {
+                continue;
+            }
+            if let Some(incomings) = is_common(
+                &self.func.basic_block_ref(*ebb_start).pred,
+                &self.bb_avails,
+                &self.func.inst_table,
+                &inst_id,
+            ) {
+                let incomings: Vec<Operand> = incomings
+                    .into_iter()
+                    .map(|(inst_id, bb_id)| {
+                        vec![
+                            Operand::Value(Value::Instruction(InstructionValue {
+                                func_id: self.func.id.unwrap(),
+                                id: inst_id,
+                                ty: self.func.inst_table[inst_id].ty,
+                            })),
+                            Operand::BasicBlock(bb_id),
+                        ]
+                    })
+                    .flatten()
+                    .collect();
+                let ty = incomings[0].as_value().as_instruction().ty;
+                let phi = Instruction::new(Opcode::Phi, incomings, ty, *ebb_start);
+                phis.push((inst_id, phi));
+            }
+        }
+
+        for (inst2replace, phi) in phis {
+            let ty = phi.ty;
+            let id = self.func.alloc_inst(phi);
+            let val = Value::Instruction(InstructionValue {
+                func_id: self.func.id.unwrap(),
+                id,
+                ty,
+            });
+            self.func.basic_blocks.arena[*ebb_start]
+                .iseq_ref_mut()
+                .insert(0, val);
+            Instruction::replace_all_uses(
+                &mut self.func.inst_table,
+                inst2replace,
+                Operand::Value(val),
+            );
+            self.removal_list.push(inst2replace);
+        }
+
+        for succ in self.func.basic_block_ref(*root).succ.clone() {
+            if self.dom_frontiers.contains(&succ) {
+                continue;
+            }
+            self.run_sub2(&succ, ebb_start);
         }
     }
 
@@ -110,6 +214,10 @@ impl<'a> GlobalCommonSubexprEliminationOnFunction<'a> {
             self.func.basic_blocks.order[0],
             FxHashMap::default(),
         );
+
+        for df in self.dom_frontiers.clone() {
+            self.run_sub2(&df, &df)
+        }
 
         debug!(println!(
             "function '{}': {} insts removed",
