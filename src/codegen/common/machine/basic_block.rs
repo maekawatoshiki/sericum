@@ -25,10 +25,10 @@ pub struct MachineBasicBlock {
     pub liveness: Rc<RefCell<LivenessInfo>>,
 
     /// Predecessors
-    pub pred: Vec<MachineBasicBlockId>,
+    pub pred: FxHashSet<MachineBasicBlockId>,
 
     /// Successors
-    pub succ: Vec<MachineBasicBlockId>,
+    pub succ: FxHashSet<MachineBasicBlockId>,
 
     /// Instruction list
     pub iseq: RefCell<Vec<MachineInstId>>,
@@ -44,11 +44,11 @@ pub struct LivenessInfo {
 }
 
 impl BasicBlockTrait for MachineBasicBlock {
-    fn get_preds(&self) -> &Vec<Id<Self>> {
+    fn get_preds(&self) -> &FxHashSet<Id<Self>> {
         &self.pred
     }
 
-    fn get_succs(&self) -> &Vec<Id<Self>> {
+    fn get_succs(&self) -> &FxHashSet<Id<Self>> {
         &self.succ
     }
 }
@@ -94,8 +94,8 @@ impl MachineBasicBlocks {
             ..
         } = src_block;
         for &succ in &src_succ {
-            self.arena[succ].pred.remove_item(src).unwrap();
-            self.arena[succ].pred.push(*dst);
+            self.arena[succ].pred.remove(src);
+            self.arena[succ].pred.insert(*dst);
         }
         let dst_block = &mut self.arena[*dst];
         dst_block.succ = src_succ;
@@ -103,11 +103,11 @@ impl MachineBasicBlocks {
             .iseq
             .borrow_mut()
             .append(&mut src_iseq.borrow_mut());
-        dst_block.liveness.borrow_mut().merge(::std::mem::replace(
-            &mut *src_liveness.borrow_mut(),
-            LivenessInfo::new(),
-        ));
-        self.order.remove_item(src);
+        dst_block
+            .liveness
+            .borrow_mut()
+            .merge(Rc::try_unwrap(src_liveness).unwrap().into_inner());
+        self.order.retain(|bb| bb != src);
     }
 }
 
@@ -115,8 +115,8 @@ impl MachineBasicBlock {
     pub fn new() -> Self {
         Self {
             iseq: RefCell::new(vec![]),
-            pred: vec![],
-            succ: vec![],
+            pred: FxHashSet::default(),
+            succ: FxHashSet::default(),
             liveness: Rc::new(RefCell::new(LivenessInfo::new())),
         }
     }

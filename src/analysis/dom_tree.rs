@@ -83,7 +83,7 @@ impl<'a, BBS: BasicBlocksTrait> DominatorTreeConstructor<'a, BBS> {
             let mut s = pred;
 
             for v in self.basic_blocks.get_arena()[node].get_preds() {
-                let s_ = if cmp!(self.dfnum; (v) <= (node)) {
+                let s_ = if self.dfnum[v] <= self.dfnum[&node] {
                     *v
                 } else {
                     let n = self.ancestor_with_lowest_semi(*v);

@@ -420,8 +420,9 @@ impl<'a> Mem2RegOnFunction<'a> {
                 }
 
                 pred = Some(cur);
-                cur = bb.succ[0];
-                for &succ in &bb.succ[1..] {
+                let mut succ_iter = bb.succ.iter();
+                cur = *succ_iter.next().unwrap();
+                for &succ in succ_iter {
                     worklist.push((succ, pred, incoming.clone()));
                 }
             }

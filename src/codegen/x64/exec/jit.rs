@@ -138,9 +138,9 @@ impl JITCompiler {
 
         let f_entry = self.get_label(id);
         dynasm!(self.asm
-                ; push rbp
+                ; sub rsp, 8
                 ; call =>f_entry
-                ; pop rbp
+                ; add rsp, 8
                 ; ret);
 
         self.asm.commit();

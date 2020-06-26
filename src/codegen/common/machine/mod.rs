@@ -1,4 +1,5 @@
 pub mod basic_block;
+pub mod branch_folding;
 pub mod builder;
 pub mod const_data;
 pub mod function;

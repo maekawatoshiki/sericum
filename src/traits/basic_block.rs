@@ -1,8 +1,9 @@
 use id_arena::{Arena, Id};
+use rustc_hash::FxHashSet;
 
 pub trait BasicBlockTrait: Sized {
-    fn get_preds(&self) -> &Vec<Id<Self>>;
-    fn get_succs(&self) -> &Vec<Id<Self>>;
+    fn get_preds(&self) -> &FxHashSet<Id<Self>>;
+    fn get_succs(&self) -> &FxHashSet<Id<Self>>;
 }
 
 pub trait BasicBlocksTrait: Sized {

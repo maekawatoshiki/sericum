@@ -19,10 +19,10 @@ pub struct BasicBlock {
     pub liveness: RefCell<LivenessInfo>,
 
     /// Predecessors
-    pub pred: Vec<BasicBlockId>,
+    pub pred: FxHashSet<BasicBlockId>,
 
     /// Successors
-    pub succ: Vec<BasicBlockId>,
+    pub succ: FxHashSet<BasicBlockId>,
 
     /// Instruction list
     pub iseq: RefCell<Vec<Value>>,
@@ -48,8 +48,8 @@ impl BasicBlock {
     pub fn new() -> Self {
         Self {
             iseq: RefCell::new(Vec::new()),
-            pred: vec![],
-            succ: vec![],
+            pred: FxHashSet::default(),
+            succ: FxHashSet::default(),
             liveness: RefCell::new(LivenessInfo::new()),
         }
     }
@@ -75,11 +75,11 @@ impl BasicBlock {
 }
 
 impl BasicBlockTrait for BasicBlock {
-    fn get_preds(&self) -> &Vec<Id<Self>> {
+    fn get_preds(&self) -> &FxHashSet<Id<Self>> {
         &self.pred
     }
 
-    fn get_succs(&self) -> &Vec<Id<Self>> {
+    fn get_succs(&self) -> &FxHashSet<Id<Self>> {
         &self.succ
     }
 }

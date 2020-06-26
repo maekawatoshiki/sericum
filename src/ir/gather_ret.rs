@@ -31,12 +31,21 @@ impl GatherReturns {
 
 impl<'a> GatherReturnsOnFunction<'a> {
     pub fn run(&mut self) {
-        let ret_void = self.func.get_return_type() == Type::Void;
+        if self.func.basic_blocks.order.len() == 0 {
+            return;
+        }
 
+        let ret_void = self.func.get_return_type() == Type::Void;
+        let entry = self.func.basic_blocks.order[0];
         let mut returns = vec![];
         let mut return_at_last_block = false;
         for (i, &id) in self.func.basic_blocks.order.iter().enumerate() {
-            let iseq = self.func.basic_blocks.arena[id].iseq.borrow();
+            let block = &self.func.basic_blocks.arena[id];
+            if id != entry && block.pred.len() == 0 {
+                // unreachable block
+                continue;
+            }
+            let iseq = block.iseq.borrow();
             let val = match iseq.last() {
                 Some(val) => val,
                 None => continue,

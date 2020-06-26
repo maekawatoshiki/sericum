@@ -127,7 +127,7 @@ impl<'a> GlobalCommonSubexprEliminationOnFunction<'a> {
                 .map_or(None, |map| map.get(&inst.operands))
         };
         fn is_common<'a>(
-            preds: &Vec<BasicBlockId>,
+            preds: &FxHashSet<BasicBlockId>,
             avails: &AvailsInBB,
             arena: &Arena<Instruction>,
             inst_id: &InstructionId,

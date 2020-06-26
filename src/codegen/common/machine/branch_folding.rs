@@ -27,8 +27,30 @@ impl BranchFolding {
             if f.is_internal {
                 continue;
             }
+            self.remove_unreachable(f);
             self.remove_empty_block(f);
             self.merge_blocks(f);
+        }
+    }
+
+    fn remove_unreachable(&mut self, f: &mut MachineFunction) {
+        let mut worklist = vec![];
+        let mut remove = vec![];
+        for (i, &id) in f.body.basic_blocks.get_order().iter().enumerate() {
+            let block = &f.body.basic_blocks.get_arena()[id];
+            if block.pred.len() > 0 || i == 0 {
+                continue;
+            }
+            remove.push(id);
+            for &succ in &block.succ {
+                worklist.push((id, succ));
+            }
+        }
+        for (bb, succ) in worklist {
+            f.body.basic_blocks.arena[succ].pred.remove(&bb);
+        }
+        for bb in remove {
+            f.body.basic_blocks.order.retain(|&b| b != bb);
         }
     }
 
@@ -40,13 +62,11 @@ impl BranchFolding {
                     continue;
                 }
 
-                let mergeable_into_succ = (block.succ.len() == 1
-                    || (block.succ.len() > 1 && block.succ.windows(2).all(|s| s[0] == s[1])))
-                    && {
-                        let succ_preds = &f.body.basic_blocks.get_arena()[block.succ[0]].pred;
-                        (succ_preds.len() == 1 && succ_preds[0] == id)
-                            || (succ_preds.len() > 1 && succ_preds.iter().all(|s| s == &id))
-                    };
+                let mergeable_into_succ = block.succ.len() == 1 && {
+                    let succ_preds =
+                        &f.body.basic_blocks.get_arena()[*block.succ.iter().next().unwrap()].pred;
+                    succ_preds.len() == 1 && *succ_preds.iter().next().unwrap() == id
+                };
 
                 if mergeable_into_succ {
                     blocks_to_merge.push(id);
@@ -68,7 +88,11 @@ impl BranchFolding {
                 for id in remove {
                     f.remove_inst(id);
                 }
-                let succ = f.body.basic_blocks.get_arena()[block].succ[0];
+                let succ = *f.body.basic_blocks.get_arena()[block]
+                    .succ
+                    .iter()
+                    .next()
+                    .unwrap();
                 for &inst_id in &*f.body.basic_blocks.get_arena()[succ].iseq_ref() {
                     f.body.inst_arena[inst_id].parent = block;
                 }
@@ -98,23 +122,20 @@ impl BranchFolding {
 
             for &bb in &preds {
                 let cur = &mut f.body.basic_blocks.arena[bb];
-                cur.succ.remove_item(&block_to_remove).unwrap();
-                cur.succ.push(new_dst);
+                cur.succ.remove(&block_to_remove);
+                cur.succ.insert(new_dst);
             }
 
             for &bb in &succs {
                 let cur = &mut f.body.basic_blocks.arena[bb];
-                cur.pred.remove_item(&block_to_remove).unwrap();
-                cur.pred.append(&mut preds.clone());
+                cur.pred.remove(&block_to_remove);
+                cur.pred = &cur.pred | &preds;
             }
 
             for &bb in &preds {
                 let cur = &mut f.body.basic_blocks.arena[bb];
                 for inst_id in cur.iseq_ref().iter().rev() {
                     let inst = &mut f.body.inst_arena[*inst_id];
-                    if !inst.opcode.is_terminator() {
-                        break;
-                    }
                     inst.replace_operand_block(block_to_remove, new_dst);
                 }
             }
@@ -123,7 +144,7 @@ impl BranchFolding {
         debug!(println!("{} blocks removed", worklist.len()));
 
         for (remove, _) in worklist {
-            f.body.basic_blocks.order.remove_item(&remove).unwrap();
+            f.body.basic_blocks.order.retain(|&bb| bb != remove);
         }
     }
 }

@@ -5,7 +5,10 @@ pub mod frame_object;
 pub mod machine;
 
 use crate::{
-    codegen::common::{dag::combine, machine::module::MachineModule},
+    codegen::common::{
+        dag::combine,
+        machine::{branch_folding, module::MachineModule},
+    },
     ir,
     ir::module::Module,
     ir::types::*,
@@ -87,7 +90,7 @@ pub fn standard_conversion_into_machine_module(module: &mut Module) -> MachineMo
 
     let mut pass_mgr = ModulePassManager::new();
     pass_mgr.add_pass(machine::phi_elimination::PhiElimination::new());
-    pass_mgr.add_pass(machine::branch_folding::BranchFolding::new());
+    pass_mgr.add_pass(branch_folding::BranchFolding::new());
     pass_mgr.add_pass(machine::two_addr::TwoAddressConverter::new());
     pass_mgr.add_pass(machine::regalloc::RegisterAllocator::new());
     pass_mgr.add_pass(machine::pro_epi_inserter::PrologueEpilogueInserter::new());

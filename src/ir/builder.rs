@@ -236,8 +236,8 @@ impl<F: FuncRef> Builder<F> {
 
         let cur_bb_id = self.cur_bb.unwrap();
         self.with_function(|f| {
-            f.basic_block_ref_mut(cur_bb_id).succ.push(dst_id);
-            f.basic_block_ref_mut(dst_id).pred.push(cur_bb_id);
+            f.basic_block_ref_mut(cur_bb_id).succ.insert(dst_id);
+            f.basic_block_ref_mut(dst_id).pred.insert(cur_bb_id);
         });
 
         inst
@@ -258,11 +258,11 @@ impl<F: FuncRef> Builder<F> {
 
         self.with_function(|f| {
             let cur_bb = f.basic_block_ref_mut(cur_bb_id);
-            cur_bb.succ.push(bb1);
-            cur_bb.succ.push(bb2);
+            cur_bb.succ.insert(bb1);
+            cur_bb.succ.insert(bb2);
 
-            f.basic_block_ref_mut(bb1).pred.push(cur_bb_id);
-            f.basic_block_ref_mut(bb2).pred.push(cur_bb_id);
+            f.basic_block_ref_mut(bb1).pred.insert(cur_bb_id);
+            f.basic_block_ref_mut(bb2).pred.insert(cur_bb_id);
         });
 
         inst

@@ -2,7 +2,7 @@
 use crate::codegen::arch::dag::node::DAGNode;
 use crate::{ir::types::Types, util::allocator::*};
 use id_arena::*;
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 use std::fmt;
 
 pub type DAGBasicBlockId = Id<DAGBasicBlock>;
@@ -10,10 +10,10 @@ pub type DAGBasicBlockId = Id<DAGBasicBlock>;
 #[derive(Clone)]
 pub struct DAGBasicBlock {
     /// Predecessors
-    pub pred: Vec<DAGBasicBlockId>,
+    pub pred: FxHashSet<DAGBasicBlockId>,
 
     /// Successors
-    pub succ: Vec<DAGBasicBlockId>,
+    pub succ: FxHashSet<DAGBasicBlockId>,
 
     /// Entry node
     pub entry: Option<Raw<DAGNode>>,
@@ -23,8 +23,8 @@ impl DAGBasicBlock {
     pub fn new() -> Self {
         Self {
             entry: None,
-            pred: vec![],
-            succ: vec![],
+            pred: FxHashSet::default(),
+            succ: FxHashSet::default(),
         }
     }
 
