@@ -49,7 +49,7 @@ pub struct JITCompiler {
 impl JITExecutor {
     pub fn new(module: &mut ir::module::Module) -> Self {
         let machine_module = standard_conversion_into_machine_module(module);
-        println!("{:?}", machine_module);
+        // println!("{:?}", machine_module);
 
         // use crate::codegen::x64::asm::print::MachineAsmPrinter;
         // let mut printer = MachineAsmPrinter::new();
@@ -123,7 +123,6 @@ impl JITCompiler {
         id: MachineFunctionId,
         args: Vec<GenericValue>,
     ) -> GenericValue {
-        let f_entry = self.get_label(id);
         let entry = self.asm.offset();
 
         for (idx, arg) in args.iter().enumerate() {
@@ -137,16 +136,16 @@ impl JITCompiler {
             }
         }
 
+        let f_entry = self.get_label(id);
         dynasm!(self.asm
-                ; sub rsp, 8
+                ; push rbp
                 ; call =>f_entry
-                ; add rsp, 8
+                ; pop rbp
                 ; ret);
 
         self.asm.commit();
         let executor = self.asm.reader();
         let buf = executor.lock();
-        let f: extern "C" fn() -> u64 = unsafe { ::std::mem::transmute(buf.ptr(entry)) };
 
         match module
             .types
@@ -156,12 +155,16 @@ impl JITCompiler {
             .unwrap()
             .ret_ty
         {
-            Type::Int32 => GenericValue::Int32(f() as i32),
+            Type::Int32 => {
+                let f: extern "C" fn() -> i32 = unsafe { ::std::mem::transmute(buf.ptr(entry)) };
+                GenericValue::Int32(f())
+            }
             Type::F64 => {
                 let f: extern "C" fn() -> f64 = unsafe { ::std::mem::transmute(buf.ptr(entry)) };
                 GenericValue::F64(f() as f64)
             }
             Type::Void => {
+                let f: extern "C" fn() = unsafe { ::std::mem::transmute(buf.ptr(entry)) };
                 f();
                 GenericValue::None
             }
@@ -195,7 +198,7 @@ impl JITCompiler {
 
         let f_entry = self.get_label(id);
 
-        let frame_objects = FrameObjectsInfo::new(&module.types, f);
+        let frame_objects = f.frame_objects.as_ref().unwrap();
 
         dynasm!(self.asm
             ; =>f_entry

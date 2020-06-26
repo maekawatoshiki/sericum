@@ -51,6 +51,7 @@ impl FrameObjectsInfo {
     pub fn new(tys: &Types, f: &MachineFunction) -> Self {
         let mut offset_map = FxHashMap::default();
         let mut offset = 0;
+        let has_call = f.body.has_call(); // push rbp -> 16 byte aligned
 
         for (i, param_ty) in tys
             .base
@@ -75,7 +76,11 @@ impl FrameObjectsInfo {
         }
 
         let stack_down = Self::calc_max_adjust_stack_down(f);
-        offset = roundup(offset as i32 + stack_down as i32, 16) as usize;
+        // assert!(stack_down == 0);
+        offset = roundup(
+            offset as i32 + stack_down as i32 + if has_call { 0 } else { 8 },
+            16,
+        ) as usize;
 
         Self {
             offset_map,

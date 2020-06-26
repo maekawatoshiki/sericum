@@ -80,4 +80,8 @@ impl MachineOpcode {
                 | MachineOpcode::JB
         )
     }
+
+    pub fn is_unconditional_jmp(&self) -> bool {
+        matches!(self, MachineOpcode::JMP)
+    }
 }

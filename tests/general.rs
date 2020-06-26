@@ -543,7 +543,7 @@ fibo:
   mov eax, ecx
   jmp .L3
 .L3:
-  mov rsp, rbp
+  add rsp, 16
   pop rbp
   ret 
   .globl main
@@ -906,12 +906,15 @@ main:
             br label3;
         label3:
             x = add (%v), (i32 2);
+            br label4;
+        label4:
             store (%x), (%a);
             x = add (%v), (i32 2);
             ret (%x);
         });
         println!("{:?}", m);
 
+        ir::mem2reg::Mem2Reg::new().run_on_module(&mut m);
         ir::cse::CommonSubexprElimination::new().run_on_module(&mut m);
         println!("{:?}", m);
 

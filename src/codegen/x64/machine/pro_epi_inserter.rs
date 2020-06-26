@@ -142,11 +142,14 @@ impl PrologueEpilogueInserter {
 
             let mut iseq = vec![];
 
-            if adjust > 0 && has_call {
-                // mov rsp, rbp
+            if has_call && adjust > 0 {
+                // add rsp, adjust
                 let i = MachineInst::new_simple(
-                    MachineOpcode::MOVrr64,
-                    vec![MachineOperand::phys_reg(&cur_func.regs_info, GR64::RBP)],
+                    MachineOpcode::ADDr64i32,
+                    vec![
+                        MachineOperand::phys_reg(&cur_func.regs_info, GR64::RSP),
+                        MachineOperand::imm_i32(adjust),
+                    ],
                     bb_id,
                 )
                 .with_def(vec![cur_func.regs_info.get_phys_reg(GR64::RSP)]);

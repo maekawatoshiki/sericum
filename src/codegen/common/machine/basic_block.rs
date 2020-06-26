@@ -84,6 +84,31 @@ impl MachineBasicBlocks {
         }
         set
     }
+
+    pub fn merge(&mut self, dst: &MachineBasicBlockId, src: &MachineBasicBlockId) {
+        let src_block = ::std::mem::replace(&mut self.arena[*src], MachineBasicBlock::new());
+        let MachineBasicBlock {
+            liveness: src_liveness,
+            succ: src_succ,
+            iseq: src_iseq,
+            ..
+        } = src_block;
+        for &succ in &src_succ {
+            self.arena[succ].pred.remove_item(src).unwrap();
+            self.arena[succ].pred.push(*dst);
+        }
+        let dst_block = &mut self.arena[*dst];
+        dst_block.succ = src_succ;
+        dst_block
+            .iseq
+            .borrow_mut()
+            .append(&mut src_iseq.borrow_mut());
+        dst_block.liveness.borrow_mut().merge(::std::mem::replace(
+            &mut *src_liveness.borrow_mut(),
+            LivenessInfo::new(),
+        ));
+        self.order.remove_item(src);
+    }
 }
 
 impl MachineBasicBlock {
@@ -264,6 +289,21 @@ impl LivenessInfo {
         }
 
         self.live_out.insert(reg)
+    }
+
+    // merge src into self
+    pub fn merge(&mut self, src: LivenessInfo) {
+        for def in src.def {
+            self.add_def(def);
+        }
+        for live_in in src.live_in {
+            self.add_live_in(live_in);
+        }
+        for live_out in src.live_out {
+            self.add_live_out(live_out);
+        }
+        self.has_call |= src.has_call;
+        self.phys_def.unite(&src.phys_def);
     }
 
     pub fn clear(&mut self) {
