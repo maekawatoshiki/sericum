@@ -1,6 +1,7 @@
 use crate::codegen::common::machine::{function::MachineFunction, module::MachineModule};
 use crate::traits::basic_block::BasicBlocksTrait;
 use crate::traits::pass::ModulePassTrait;
+use rustc_hash::FxHashSet;
 
 // Must run after phi elimination
 pub struct BranchFolding {}
@@ -58,10 +59,6 @@ impl BranchFolding {
         loop {
             let mut blocks_to_merge = vec![];
             for (id, block) in f.body.basic_blocks.id_and_block() {
-                if block.succ.len() == 0 || block.pred.len() == 0 {
-                    continue;
-                }
-
                 let mergeable_into_succ = block.succ.len() == 1 && {
                     let succ_preds =
                         &f.body.basic_blocks.get_arena()[*block.succ.iter().next().unwrap()].pred;
@@ -70,13 +67,16 @@ impl BranchFolding {
 
                 if mergeable_into_succ {
                     blocks_to_merge.push(id);
-                    break;
                 }
             }
             if blocks_to_merge.len() == 0 {
                 break;
             }
+            let mut removed = FxHashSet::default();
             for block in blocks_to_merge {
+                if removed.contains(&block) {
+                    continue;
+                }
                 let block_ = &f.body.basic_blocks.get_arena()[block];
                 let mut remove = vec![];
                 for &inst_id in block_.iseq_ref().iter().rev() {
@@ -98,6 +98,7 @@ impl BranchFolding {
                 }
                 // merge succ into block
                 f.body.basic_blocks.merge(&block, &succ);
+                removed.insert(succ);
             }
         }
     }

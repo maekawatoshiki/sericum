@@ -860,6 +860,44 @@ main:
     }
 
     #[test]
+    fn branch_folding() {
+        let mut m = module::Module::new("cilk");
+
+        cilk_ir!(m; define [i32] func [(i32)] {
+        entry:
+            a = add (%arg.0), (i32 1);
+            br l1;
+        l1:
+            a = add (%a), (i32 1);
+            br l2;
+        l2:
+            a = add (%a), (i32 1);
+            br l3;
+        l3:
+            a = add (%a), (i32 1);
+            a = add (%a), (i32 1);
+            a = add (%a), (i32 1);
+            br l4;
+        l4:
+            a = add (%a), (i32 1);
+            br l5;
+        l5:
+            ret (%a);
+        });
+        println!("{:?}", m);
+
+        ir::cse::CommonSubexprElimination::new().run_on_module(&mut m);
+        println!("{:?}", m);
+
+        let mut jit = exec::jit::JITExecutor::new(&mut m);
+        let func = jit.find_function_by_name("func").unwrap();
+        assert_eq!(
+            jit.run(func, vec![exec::jit::GenericValue::Int32(1)]),
+            exec::jit::GenericValue::Int32(8)
+        );
+    }
+
+    #[test]
     fn cse0() {
         let mut m = module::Module::new("cilk");
 
