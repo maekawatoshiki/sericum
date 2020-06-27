@@ -34,7 +34,6 @@ pub struct LiveInterval {
 pub struct LiveRange {
     // TODO: segments should be sorted by LiveSegment.start
     pub segments: Vec<LiveSegment>,
-    pub remove: Vec<LiveSegment>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -192,10 +191,7 @@ impl LiveRegMatrix {
 
         let range = &self.virt_reg_interval.get(&vreg).unwrap().range;
         self.phys_reg_range.get_or_create(reg).remove_range(range);
-        assert_eq!(
-            self.phys_reg_range.get_or_create(reg).interferes(range),
-            false
-        );
+        assert!(!self.phys_reg_range.get_or_create(reg).interferes(range));
 
         Some(reg)
     }
@@ -320,17 +316,11 @@ impl LiveInterval {
 
 impl LiveRange {
     pub fn new(segments: Vec<LiveSegment>) -> Self {
-        Self {
-            segments,
-            remove: Vec::new(),
-        }
+        Self { segments }
     }
 
     pub fn new_empty() -> Self {
-        Self {
-            segments: vec![],
-            remove: Vec::new(),
-        }
+        Self { segments: vec![] }
     }
 
     pub fn adjust_end_to_start(&mut self) {
@@ -408,7 +398,7 @@ impl LiveRange {
             if seg.end == self.segments[pt].end {
                 self.segments.remove(pt);
             } else if seg.end <= self.segments[pt].end {
-                self.segments[pt].end = seg.end;
+                self.segments[pt].start = seg.end;
             } else if self.segments[pt].end < seg.end {
                 let start = self.segments[pt].end;
                 self.segments.remove(pt);

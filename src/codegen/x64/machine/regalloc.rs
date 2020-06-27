@@ -91,7 +91,7 @@ impl RegisterAllocator {
                 x.partial_cmp(&y).unwrap()
             });
 
-            // Spill virtual registers in the order of small spill weight
+            // Spill virtual registers in the order of low spill weight
             for &reg2spill in &interfering {
                 if matrix
                     .virt_reg_interval
@@ -139,6 +139,11 @@ impl RegisterAllocator {
                 .unwrap();
             x.cmp(&y)
         });
+        // queue.sort_by(|x, y| {
+        //     let x = matrix.virt_reg_interval.get(x).unwrap().spill_weight;
+        //     let y = matrix.virt_reg_interval.get(y).unwrap().spill_weight;
+        //     x.partial_cmp(&y).unwrap()
+        // });
         self.queue = queue.into_iter().collect();
     }
 
