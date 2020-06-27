@@ -40,7 +40,7 @@ mod x86_64 {
         }
 
         let output_name = unique_file_name("out");
-        let compilation = process::Command::new("gcc")
+        let compilation = process::Command::new("clang")
             .args(&[
                 parent_name.as_str(),
                 target_name.as_str(),

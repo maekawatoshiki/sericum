@@ -74,6 +74,7 @@ impl PrologueEpilogueInserter {
         let mut builder = Builder::new(cur_func);
         builder.set_insert_point_at_entry_block();
 
+        println!("ad {}", adjust);
         if has_call || adjust > 0 {
             // push rbp
             let push_rbp = MachineInst::new_simple(

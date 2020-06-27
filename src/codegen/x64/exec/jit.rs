@@ -49,7 +49,7 @@ pub struct JITCompiler {
 impl JITExecutor {
     pub fn new(module: &mut ir::module::Module) -> Self {
         let machine_module = standard_conversion_into_machine_module(module);
-        // println!("{:?}", machine_module);
+        println!("{:?}", machine_module);
 
         // use crate::codegen::x64::asm::print::MachineAsmPrinter;
         // let mut printer = MachineAsmPrinter::new();

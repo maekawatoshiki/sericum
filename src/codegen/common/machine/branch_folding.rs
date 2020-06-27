@@ -58,9 +58,12 @@ impl BranchFolding {
     }
 
     fn merge_blocks(&mut self, f: &mut MachineFunction) {
+        let mut worklist = f.body.basic_blocks.order.clone();
+
         loop {
             let mut blocks_to_merge = vec![];
-            for (id, block) in f.body.basic_blocks.id_and_block() {
+            for &id in &worklist {
+                let block = &f.body.basic_blocks.arena[id];
                 let mergeable_into_succ = block.succ.len() == 1 && {
                     let succ_preds =
                         &f.body.basic_blocks.get_arena()[*block.succ.iter().next().unwrap()].pred;
@@ -75,7 +78,7 @@ impl BranchFolding {
                 break;
             }
             let mut removed = FxHashSet::default();
-            for block in blocks_to_merge {
+            for &block in &blocks_to_merge {
                 if removed.contains(&block) {
                     continue;
                 }
@@ -102,6 +105,7 @@ impl BranchFolding {
                 f.body.basic_blocks.merge(&block, &succ);
                 removed.insert(succ);
             }
+            worklist = blocks_to_merge;
         }
     }
 

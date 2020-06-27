@@ -568,7 +568,7 @@ fn assemble_and_run(c_lib: &str, s_target: &str, md5hash: &str) {
     }
 
     let lib_output_name = unique_file_name("o");
-    let compilation = process::Command::new("gcc")
+    let compilation = process::Command::new("clang")
         .args(&[
             lib_name.as_str(),
             "-O3",
@@ -582,7 +582,7 @@ fn assemble_and_run(c_lib: &str, s_target: &str, md5hash: &str) {
         .unwrap();
     assert!(compilation.success());
     let output_name = unique_file_name("out");
-    let compilation = process::Command::new("gcc")
+    let compilation = process::Command::new("clang")
         .args(&[
             lib_name.as_str(),
             target_name.as_str(),

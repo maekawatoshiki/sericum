@@ -76,9 +76,14 @@ impl FrameObjectsInfo {
         }
 
         let stack_down = Self::calc_max_adjust_stack_down(f);
-        // assert!(stack_down == 0);
         offset = roundup(
-            offset as i32 + stack_down as i32 + if has_call { 0 } else { 8 },
+            offset as i32
+                + stack_down as i32
+                + if has_call || (offset + stack_down == 0) {
+                    0
+                } else {
+                    8
+                },
             16,
         ) as usize;
 
