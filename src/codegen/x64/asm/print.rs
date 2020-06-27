@@ -71,7 +71,7 @@ impl MachineAsmPrinter {
     fn run_on_inst(&mut self, inst: &MachineInst, fo: &FrameObjectsInfo) {
         self.output.push_str("  ");
 
-        println!("{:?}", inst.opcode);
+        // println!("{:?}", inst.opcode);
         let inst_def = inst.opcode.inst_def().unwrap();
 
         self.output.push_str(inst_def.name);
@@ -123,7 +123,7 @@ impl MachineAsmPrinter {
                 .output
                 .push_str(format!("{}", fo.offset(i.idx).unwrap()).as_str()),
             MachineOperand::Mem(MachineMemOperand::Address(AddressKind::FunctionName(name))) => {
-                self.output.push_str(name.as_str())
+                self.output.push_str(name.replace('.', "_").as_str())
             }
             MachineOperand::Mem(_) => {
                 let word = opcode2word(opcode);

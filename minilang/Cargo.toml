@@ -10,3 +10,4 @@ edition = "2018"
 cilk = { path = "../", features = ["x86_64"] }
 peg = "0.6.2"
 md5 = "0.7.0"
+rand = "0.7.3"

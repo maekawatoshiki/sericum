@@ -1,54 +1,74 @@
 extern crate cilk;
 mod codegen;
 mod parser;
+use std::{
+    fs,
+    io::{BufWriter, Read, Write},
+    process,
+};
+use {rand, rand::Rng};
 
 fn main() {
-    // let input = r#"
-    // function m(c_x: f64, c_y: f64, n: i32): i32 {
-    //     var x_n: f64; x_n = 0.0;
-    //     var y_n: f64; y_n = 0.0;
-    //     var x_n_1: f64; var y_n_1: f64;
-    //     var i: i32;
-    //     i = 0;
-    //     while i < n {
-    //         x_n_1 = x_n*x_n - y_n*y_n + c_x;
-    //         y_n_1 = x_n * y_n * 2.0 + c_y;
-    //         if 4.0 < x_n_1*x_n_1 + y_n_1*y_n_1 {
-    //             return n;
-    //         } else {
-    //             x_n = x_n_1;
-    //             y_n = y_n_1;
-    //         }
-    //         i = i + 1;
-    //     }
-    //     return 0;
-    // }
-    // function main(): i32 {
-    //     var x_max: f64; x_max = 1.0;
-    //     var x_min: f64; x_min = 0.0 - 2.0;
-    //     var y_max: f64; y_max = 1.0;
-    //     var y_min: f64; y_min = 0.0 - 1.0;
-    //     var dx: f64; dx = 0.05;
-    //     var dy: f64; dy = 0.05;
-    //     var y: f64; var x: f64;
-    //     y = y_max;
-    //     while y_min < y {
-    //         x = x_min;
-    //         while x < x_max {
-    //             if m(x, y, 300) == 0 {
-    //                 printch_i32(65);
-    //             } else {
-    //                 printch_i32(32);
-    //             }
-    //             x = x + dx;
-    //         }
-    //         printch_i32(10);
-    //         y = y - dy;
-    //     }
-    //     return 0;
-    // }
-    //     "#;
+    let input = r#"
+    function m(c_x: f64, c_y: f64, n: i32): i32 {
+        var x_n: f64; x_n = 0.0;
+        var y_n: f64; y_n = 0.0;
+        var x_n_1: f64; var y_n_1: f64;
+        var i: i32;
+        i = 0;
+        while i < n {
+            x_n_1 = x_n*x_n - y_n*y_n + c_x;
+            y_n_1 = x_n * y_n * 2.0 + c_y;
+            if 4.0 < x_n_1*x_n_1 + y_n_1*y_n_1 {
+                return n;
+            } else {
+                x_n = x_n_1;
+                y_n = y_n_1;
+            }
+            i = i + 1;
+        }
+        return 0;
+    }
+    function main(): i32 {
+        var x_max: f64; x_max = 1.0;
+        var x_min: f64; x_min = 0.0 - 2.0;
+        var y_max: f64; y_max = 1.0;
+        var y_min: f64; y_min = 0.0 - 1.0;
+        var dx: f64; dx = 0.05;
+        var dy: f64; dy = 0.05;
+        var y: f64; var x: f64;
+        y = y_max;
+        while y_min < y {
+            x = x_min;
+            while x < x_max {
+                if m(x, y, 300) == 0 {
+                    printch_i32(65);
+                } else {
+                    printch_i32(32);
+                }
+                x = x + dx;
+            }
+            printch_i32(10);
+            y = y - dy;
+        }
+        return 0;
+    }
+        "#;
+    let mut codegen = codegen::CodeGenerator::new();
+    codegen.run(input);
 
+    cilk::ir::mem2reg::Mem2Reg::new().run_on_module(&mut codegen.module);
+    cilk::ir::cse::CommonSubexprElimination::new().run_on_module(&mut codegen.module);
+
+    println!("{:?}", codegen.module);
+
+    let mut jit = cilk::codegen::x64::exec::jit::JITExecutor::new(&mut codegen.module);
+    let func = jit.find_function_by_name("main").unwrap();
+    println!("Result: {:?}", jit.run(func, vec![]));
+}
+
+#[test]
+fn ray_tracing() {
     let input = r#"
     struct Vec {
       x: f64,
@@ -335,17 +355,32 @@ fn main() {
 
     println!("{:?}", codegen.module);
 
-    let mut jit = cilk::codegen::x64::exec::jit::JITExecutor::new(&mut codegen.module);
-    let func = jit.find_function_by_name("main").unwrap();
-    println!("Result: {:?}", jit.run(func, vec![]));
+    // let mut jit = cilk::codegen::x64::exec::jit::JITExecutor::new(&mut codegen.module);
+    // let func = jit.find_function_by_name("main").unwrap();
+    // println!("Result: {:?}", jit.run(func, vec![]));
 
-    // use cilk::codegen::x64::asm::print::MachineAsmPrinter;
-    // use cilk::codegen::x64::standard_conversion_into_machine_module;
-    // let machine_module = standard_conversion_into_machine_module(&mut codegen.module);
-    // let mut printer = MachineAsmPrinter::new();
-    // // println!("{:?}", machine_module);
-    // printer.run_on_module(&machine_module);
-    // println!("{}", printer.output);
+    use cilk::codegen::x64::asm::print::MachineAsmPrinter;
+    use cilk::codegen::x64::standard_conversion_into_machine_module;
+    let machine_module = standard_conversion_into_machine_module(&mut codegen.module);
+    let mut printer = MachineAsmPrinter::new();
+    // println!("{:?}", machine_module);
+    printer.run_on_module(&machine_module);
+    assemble_and_run(
+        "
+    #include <stdio.h>
+    #include <math.h>
+extern char *cilk_malloc_i32(int x) { return malloc(x); }
+extern double cilk_floor_f64(double x) { return floor(x); }
+extern int cilk_fabs_f64(double x) { return fabs(x); }
+extern int cilk_cos_f64(double x) { return cos(x); }
+extern double cilk_i32_to_f64_i32(int x) { return (double) x; }
+extern int cilk_f64_to_i32_f64(double x) { return (int) x; }
+extern int cilk_print_i32(int x) { printf(\"%d\", x); }
+extern int cilk_printch_i32(int x) { putchar(x); }
+        ",
+        printer.output.as_str(),
+        "8b3272fe6057ba7c5d493aaad6128973",
+    );
 }
 
 #[test]
@@ -504,4 +539,73 @@ fn pi2() {
         ),
         "c8111cd6ad957f35f8c9ceda93d7e961"
     );
+}
+
+#[allow(dead_code)]
+fn assemble_and_run(c_lib: &str, s_target: &str, md5hash: &str) {
+    fn unique_file_name(extension: &str) -> String {
+        const CHARSET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ\
+                            abcdefghijklmnopqrstuvwxyz\
+                            0123456789";
+        const LEN: usize = 16;
+        let mut rng = rand::thread_rng();
+        let name: String = (0..LEN)
+            .map(|_| {
+                let idx = rng.gen_range(0, CHARSET.len());
+                CHARSET[idx] as char
+            })
+            .collect();
+        format!("/tmp/{}.{}", name, extension)
+    }
+
+    let lib_name = unique_file_name("c");
+    let target_name = unique_file_name("s");
+    {
+        let mut parent = BufWriter::new(fs::File::create(lib_name.as_str()).unwrap());
+        let mut target = BufWriter::new(fs::File::create(target_name.as_str()).unwrap());
+        parent.write_all(c_lib.as_bytes()).unwrap();
+        target.write_all(s_target.as_bytes()).unwrap();
+    }
+
+    let lib_output_name = unique_file_name("o");
+    let compilation = process::Command::new("gcc")
+        .args(&[
+            lib_name.as_str(),
+            "-O3",
+            "-c",
+            "-o",
+            lib_output_name.as_str(),
+        ])
+        .stderr(::std::process::Stdio::null())
+        .stdout(::std::process::Stdio::null())
+        .status()
+        .unwrap();
+    assert!(compilation.success());
+    let output_name = unique_file_name("out");
+    let compilation = process::Command::new("gcc")
+        .args(&[
+            lib_name.as_str(),
+            target_name.as_str(),
+            "-lm",
+            "-o",
+            output_name.as_str(),
+        ])
+        .stderr(::std::process::Stdio::null())
+        .stdout(::std::process::Stdio::null())
+        .status()
+        .unwrap();
+    assert!(compilation.success());
+
+    let execution = process::Command::new(output_name.as_str())
+        .stdout(::std::process::Stdio::piped())
+        .spawn()
+        .unwrap();
+    let mut s = String::new();
+    execution.stdout.unwrap().read_to_string(&mut s).unwrap();
+    assert_eq!(format!("{:?}", md5::compute(s)).as_str(), md5hash);
+
+    fs::remove_file(output_name).unwrap();
+    fs::remove_file(lib_output_name).unwrap();
+    fs::remove_file(lib_name).unwrap();
+    fs::remove_file(target_name).unwrap();
 }
