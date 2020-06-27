@@ -42,6 +42,31 @@ impl BasicBlocks {
             order: vec![],
         }
     }
+
+    pub fn merge(&mut self, dst: &BasicBlockId, src: &BasicBlockId) {
+        let src_block = ::std::mem::replace(&mut self.arena[*src], BasicBlock::new());
+        let BasicBlock {
+            liveness: src_liveness,
+            succ: src_succ,
+            iseq: src_iseq,
+            ..
+        } = src_block;
+        for &succ in &src_succ {
+            self.arena[succ].pred.remove(src);
+            self.arena[succ].pred.insert(*dst);
+        }
+        let dst_block = &mut self.arena[*dst];
+        dst_block.succ = src_succ;
+        dst_block
+            .iseq
+            .borrow_mut()
+            .append(&mut src_iseq.borrow_mut());
+        dst_block
+            .liveness
+            .borrow_mut()
+            .merge(src_liveness.into_inner());
+        self.order.retain(|bb| bb != src);
+    }
 }
 
 impl BasicBlock {
@@ -115,5 +140,12 @@ impl LivenessInfo {
             live_in: FxHashSet::default(),
             live_out: FxHashSet::default(),
         }
+    }
+
+    // merge src into self
+    pub fn merge(&mut self, src: LivenessInfo) {
+        self.def = &self.def | &src.def;
+        self.live_in = &self.live_in | &src.live_in;
+        self.live_out = &self.live_out | &src.live_out;
     }
 }

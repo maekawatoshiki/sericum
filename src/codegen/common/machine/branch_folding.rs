@@ -39,12 +39,14 @@ impl BranchFolding {
         let mut remove = vec![];
         for (i, &id) in f.body.basic_blocks.get_order().iter().enumerate() {
             let block = &f.body.basic_blocks.get_arena()[id];
-            if block.pred.len() > 0 || i == 0 {
+            if i == 0 {
                 continue;
             }
-            remove.push(id);
-            for &succ in &block.succ {
-                worklist.push((id, succ));
+            if block.pred.len() == 0 {
+                remove.push(id);
+                for &succ in &block.succ {
+                    worklist.push((id, succ));
+                }
             }
         }
         for (bb, succ) in worklist {
