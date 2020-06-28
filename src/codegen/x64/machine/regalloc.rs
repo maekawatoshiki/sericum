@@ -92,6 +92,7 @@ impl RegisterAllocator {
             });
 
             // Spill virtual registers in the order of low spill weight
+            let mut allocatable = false;
             for &reg2spill in &interfering {
                 if matrix
                     .virt_reg_interval
@@ -105,14 +106,15 @@ impl RegisterAllocator {
                 let r = matrix.unassign_reg(reg2spill).unwrap();
                 let new_regs = Spiller::new(cur_func, &mut matrix).spill(tys, reg2spill);
                 for &new_reg in &new_regs {
-                    self.queue.push_back(new_reg);
+                    self.queue.push_front(new_reg);
                 }
                 if !matrix.interferes(vreg, r) {
-                    self.queue.push_back(vreg);
+                    allocatable = true;
                     break;
                 }
             }
-            self.sort_queue(&matrix); // for better allocation. not necessary
+            assert!(allocatable); // TODO
+            self.queue.push_front(vreg);
         }
 
         self.rewrite_vregs(cur_func, &matrix);
@@ -142,7 +144,7 @@ impl RegisterAllocator {
         // queue.sort_by(|x, y| {
         //     let x = matrix.virt_reg_interval.get(x).unwrap().spill_weight;
         //     let y = matrix.virt_reg_interval.get(y).unwrap().spill_weight;
-        //     x.partial_cmp(&y).unwrap()
+        //     y.partial_cmp(&x).unwrap()
         // });
         self.queue = queue.into_iter().collect();
     }
