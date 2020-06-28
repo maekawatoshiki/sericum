@@ -56,7 +56,7 @@ impl FrameObjectsInfo {
             .to_phys_set()
             .len()
             * 8
-            + f.body.has_call() as usize * 8;
+            + f.body.has_call() as usize * 8/*=ra*/;
         let mut total_size = saved_regs_sz;
 
         // TODO: Implement

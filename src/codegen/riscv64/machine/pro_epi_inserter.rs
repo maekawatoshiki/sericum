@@ -38,10 +38,6 @@ impl PrologueEpilogueInserter {
     }
 
     pub fn run_on_function(&mut self, tys: &Types, cur_func: &mut MachineFunction) {
-        if cur_func.is_internal {
-            return;
-        }
-
         let frame_objects = FrameObjectsInfo::new(tys, cur_func);
         let mut saved_regs = cur_func
             .body
@@ -83,16 +79,21 @@ impl PrologueEpilogueInserter {
         saved_regs: &[PhysReg],
         adjust: i32,
     ) {
+        let big_stack_down = adjust > 1000;
         let mut builder = Builder::new(cur_func);
         builder.set_insert_point_at_entry_block();
 
-        //addi sp,sp,-32
+        //addi sp,sp,-X
         let sp = builder.function.regs_info.get_phys_reg(GPR::SP);
         let addi = MachineInst::new_simple(
             MachineOpcode::ADDI,
             vec![
                 MachineOperand::Register(sp),
-                MachineOperand::Constant(MachineConstant::Int32(-adjust)),
+                MachineOperand::Constant(MachineConstant::Int32(if big_stack_down {
+                    saved_regs.len() as i32 * -8
+                } else {
+                    -adjust
+                })),
             ],
             builder.get_cur_bb().unwrap(),
         )
@@ -107,7 +108,15 @@ impl PrologueEpilogueInserter {
                 MachineOpcode::SD,
                 vec![
                     MachineOperand::Register(r),
-                    MachineOperand::Mem(MachineMemOperand::ImmReg(adjust - 8 - i as i32 * 8, sp)),
+                    MachineOperand::Mem(MachineMemOperand::ImmReg(
+                        if big_stack_down {
+                            24 - 8 - i as i32 * 8
+                        // 0
+                        } else {
+                            adjust - 8 - i as i32 * 8
+                        },
+                        sp,
+                    )),
                 ],
                 builder.get_cur_bb().unwrap(),
             );
@@ -119,12 +128,36 @@ impl PrologueEpilogueInserter {
                 MachineOpcode::ADDI,
                 vec![
                     MachineOperand::Register(sp),
-                    MachineOperand::Constant(MachineConstant::Int32(adjust)),
+                    MachineOperand::Constant(MachineConstant::Int32(if big_stack_down {
+                        saved_regs.len() as i32 * 8
+                    } else {
+                        adjust
+                    })),
                 ],
                 builder.get_cur_bb().unwrap(),
             )
             .with_def(vec![builder.function.regs_info.get_phys_reg(GPR::S0)]);
             builder.insert(addi);
+        }
+
+        if big_stack_down {
+            let s1 = builder.function.regs_info.get_phys_reg(GPR::S1);
+            let li = MachineInst::new_simple(
+                MachineOpcode::LI,
+                vec![MachineOperand::imm_i32(
+                    -(adjust - saved_regs.len() as i32 * 8),
+                )],
+                builder.get_cur_bb().unwrap(),
+            )
+            .with_def(vec![s1]);
+            let add = MachineInst::new_simple(
+                MachineOpcode::ADD,
+                vec![MachineOperand::Register(sp), MachineOperand::Register(s1)],
+                builder.get_cur_bb().unwrap(),
+            )
+            .with_def(vec![builder.function.regs_info.get_phys_reg(GPR::SP)]);
+            builder.insert(li);
+            builder.insert(add);
         }
 
         // self.insert_arg_copy(&tys.base.borrow(), &mut builder);
@@ -144,6 +177,7 @@ impl PrologueEpilogueInserter {
         saved_regs: &[PhysReg],
         adjust: i32,
     ) {
+        let big_stack_down = adjust > 1000;
         let mut bb_iseq = vec![];
         // let has_call = cur_func.body.has_call();
 
@@ -162,14 +196,40 @@ impl PrologueEpilogueInserter {
 
             let mut iseq = vec![];
 
-            // let s0 = cur_func.regs_info.get_phys_reg(GPR::S0);
             let sp = cur_func.regs_info.get_phys_reg(GPR::SP);
+
+            if big_stack_down {
+                let s1 = cur_func.regs_info.get_phys_reg(GPR::S1);
+                let li = MachineInst::new_simple(
+                    MachineOpcode::LI,
+                    vec![MachineOperand::imm_i32(
+                        adjust - saved_regs.len() as i32 * 8,
+                    )],
+                    bb_id,
+                )
+                .with_def(vec![s1]);
+                let add = MachineInst::new_simple(
+                    MachineOpcode::ADD,
+                    vec![MachineOperand::Register(sp), MachineOperand::Register(s1)],
+                    bb_id,
+                )
+                .with_def(vec![cur_func.regs_info.get_phys_reg(GPR::SP)]);
+                iseq.push(cur_func.body.inst_arena.alloc(&cur_func.regs_info, li));
+                iseq.push(cur_func.body.inst_arena.alloc(&cur_func.regs_info, add));
+            }
+
+            // let s0 = cur_func.regs_info.get_phys_reg(GPR::S0);
             for (i, r) in saved_regs.iter().enumerate().rev() {
                 let r = cur_func.regs_info.get_phys_reg(*r);
                 let ld = MachineInst::new_simple(
                     MachineOpcode::LD,
                     vec![MachineOperand::Mem(MachineMemOperand::ImmReg(
-                        adjust - 8 - 8 * i as i32,
+                        // adjust - 8 - 8 * i as i32,
+                        if big_stack_down {
+                            24 - 8 - i as i32 * 8
+                        } else {
+                            adjust - 8 - i as i32 * 8
+                        },
                         sp,
                     ))],
                     bb_id,
@@ -182,7 +242,11 @@ impl PrologueEpilogueInserter {
                 MachineOpcode::ADDI,
                 vec![
                     MachineOperand::Register(sp),
-                    MachineOperand::Constant(MachineConstant::Int32(adjust)),
+                    MachineOperand::Constant(MachineConstant::Int32(if big_stack_down {
+                        saved_regs.len() as i32 * 8
+                    } else {
+                        adjust
+                    })),
                 ],
                 bb_id,
             )

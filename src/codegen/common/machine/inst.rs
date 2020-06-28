@@ -408,6 +408,10 @@ impl MachineOperand {
         }
     }
 
+    pub fn is_basic_block(&self) -> bool {
+        matches!(self, MachineOperand::Branch(_))
+    }
+
     pub fn is_register(&self) -> bool {
         matches!(self, MachineOperand::Register(_))
     }

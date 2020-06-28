@@ -5,6 +5,7 @@ pub mod pro_epi_inserter;
 pub mod reg_coalescer;
 pub mod regalloc;
 pub mod replace_copy;
+pub mod validate_frame_index;
 // pub mod replace_data;
 // pub mod spiller;
 pub mod inst_def;

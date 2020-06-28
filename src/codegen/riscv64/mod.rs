@@ -94,6 +94,7 @@ pub fn standard_conversion_into_machine_module(module: &mut Module) -> MachineMo
     pass_mgr.add_pass(branch_folding::BranchFolding::new());
     // pass_mgr.add_pass(machine::two_addr::TwoAddressConverter::new());
     pass_mgr.add_pass(machine::regalloc::RegisterAllocator::new());
+    pass_mgr.add_pass(machine::validate_frame_index::ValidateFrameIndex::new());
     pass_mgr.add_pass(machine::pro_epi_inserter::PrologueEpilogueInserter::new());
     pass_mgr.add_pass(machine::replace_copy::ReplaceCopyWithProperMInst::new());
     // pass_mgr.add_pass(machine::replace_data::ReplaceConstFPWithMemoryRef::new());

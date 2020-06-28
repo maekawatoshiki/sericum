@@ -274,7 +274,7 @@ impl<'a> ScheduleByBlock<'a> {
             NodeKind::IR(IRNodeKind::Ret) => Some(self.convert_ret(&*node)),
             NodeKind::IR(IRNodeKind::CopyToLiveOut) => self.convert_node_to_inst(node.operand[0]),
             e => {
-                println!("{:?}", e);
+                dbg!(e);
                 // println!("{:?}, {:?}", *node.operand[0], *node.operand[1]);
                 None
             }
@@ -339,7 +339,6 @@ impl<'a> ScheduleByBlock<'a> {
         }
 
         for (i, arg) in args.into_iter().enumerate() {
-            println!(">>> {:?}", arg);
             let ty = arg.get_type(&self.cur_func.regs_info).unwrap();
 
             if !matches!(
@@ -353,7 +352,7 @@ impl<'a> ScheduleByBlock<'a> {
             let inst = match reg_class.get_nth_arg_reg(i) {
                 Some(arg_reg) => {
                     let r = self.cur_func.regs_info.get_phys_reg(arg_reg);
-                    arg_regs.push(r.clone());
+                    arg_regs.push(r);
                     self.move2reg(r, arg)
                 }
                 None => {
@@ -375,7 +374,6 @@ impl<'a> ScheduleByBlock<'a> {
                 }
             };
 
-            println!("{:?}", inst);
             self.push_inst(inst);
         }
 

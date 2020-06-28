@@ -122,7 +122,7 @@ impl MachineAsmPrinter {
                 .output
                 .push_str(format!("{}({})", imm, r.as_phys_reg().name()).as_str()),
             MachineOperand::Mem(MachineMemOperand::Address(AddressKind::FunctionName(name))) => {
-                self.output.push_str(name.as_str())
+                self.output.push_str(name.replace('.', "_").as_str())
             }
             _ => unimplemented!(),
         };

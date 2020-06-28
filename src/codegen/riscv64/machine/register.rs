@@ -16,7 +16,8 @@ registers! {
     order arg GPR { A0, A1, A2, A3, A4, A5, A6, A7 }
 
     order gp GPR { T0, T1, T2, A0, A1, A2, A3, A4,
-                    A5, A6, A7, T3, T4, T5, T6 }
+                    A5, A6, A7, T3, T4, T5, T6, S2,
+                    S3, S4, S5, S6, S7, S8, S9, S10, S11 } // S1 is reserved
 }
 
 macro_rules! to_phys {

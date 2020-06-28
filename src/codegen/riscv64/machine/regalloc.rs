@@ -242,7 +242,7 @@ impl RegisterAllocator {
                 MachineOpcode::SD,
                 vec![
                     src,
-                    MachineOperand::Mem(MachineMemOperand::FiReg(frinfo.clone(), s0)),
+                    MachineOperand::Mem(MachineMemOperand::FiReg(frinfo, s0)),
                 ],
                 None,
                 call_inst_parent,
