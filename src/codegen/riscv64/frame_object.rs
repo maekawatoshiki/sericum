@@ -6,6 +6,8 @@ use rustc_hash::FxHashMap;
 use std::cmp;
 use std::fmt;
 
+const ALIGN: i32 = 16;
+
 #[derive(Debug, Clone)]
 pub struct LocalVariables {
     pub locals: Vec<FrameIndexInfo>,
@@ -16,6 +18,7 @@ pub struct LocalVariables {
 pub struct FrameObjectsInfo {
     offset_map: FxHashMap<FrameIndexKind, i32>, // frame index -> offset
     pub total_size: usize,
+    pub callee_saved_regs_byte: usize, // unaligned
 }
 
 #[derive(Clone, PartialEq, Copy)]
@@ -49,7 +52,7 @@ impl LocalVariables {
 impl FrameObjectsInfo {
     pub fn new(tys: &Types, f: &MachineFunction) -> Self {
         let mut offset_map = FxHashMap::default();
-        let saved_regs_sz: usize = f
+        let callee_saved_regs_byte: usize = f
             .body
             .appeared_phys_regs()
             .containing_callee_saved_regs()
@@ -57,7 +60,7 @@ impl FrameObjectsInfo {
             .len()
             * 8
             + f.body.has_call() as usize * 8/*=ra*/;
-        let mut total_size = saved_regs_sz;
+        let mut total_size = 0;
 
         // TODO: Implement
         // for (i, param_ty) in tys
@@ -80,29 +83,36 @@ impl FrameObjectsInfo {
             total_size += ty.size_in_byte(tys);
         }
 
-        total_size = roundup(total_size as i32, 16) as usize;
+        total_size = roundup(total_size as i32, ALIGN) as usize;
 
         let mut sz = 0;
         for FrameIndexInfo { idx, ty } in &f.local_mgr.locals {
             sz += ty.size_in_byte(tys) as i32;
-            offset_map.insert(*idx, -(saved_regs_sz as i32) - sz);
+            offset_map.insert(*idx, -sz);
         }
 
         let stack_down = Self::calc_max_adjust_stack_down(f) as i32;
-        total_size = roundup(total_size as i32 + stack_down, 16) as usize;
+        total_size = roundup(total_size as i32 + stack_down, ALIGN) as usize;
 
         Self {
             offset_map,
             total_size,
+            callee_saved_regs_byte,
         }
     }
 
     pub fn offset(&self, kind: FrameIndexKind) -> Option<i32> {
-        self.offset_map.get(&kind).map(|x| *x as i32)
+        self.offset_map
+            .get(&kind)
+            .map(|x| *x as i32 - roundup(self.callee_saved_regs_byte as i32, ALIGN))
     }
 
     pub fn total_size(&self) -> i32 {
-        self.total_size as i32
+        self.total_size as i32 + roundup(self.callee_saved_regs_byte as i32, ALIGN)
+    }
+
+    pub fn aligned_callee_saved_regs_byte(&self) -> i32 {
+        roundup(self.callee_saved_regs_byte as i32, ALIGN)
     }
 
     fn calc_max_adjust_stack_down(f: &MachineFunction) -> usize {

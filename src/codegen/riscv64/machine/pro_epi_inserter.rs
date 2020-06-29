@@ -50,9 +50,8 @@ impl PrologueEpilogueInserter {
             saved_regs.push(GPR::RA.as_phys_reg())
         }
         Self::remove_adjust_stack_inst(cur_func);
-        let adjust = frame_objects.total_size();
-        self.insert_prologue(cur_func, &saved_regs, adjust);
-        self.insert_epilogue(cur_func, &saved_regs, adjust);
+        self.insert_prologue(cur_func, &saved_regs, &frame_objects);
+        self.insert_epilogue(cur_func, &saved_regs, &frame_objects);
         cur_func.frame_objects = Some(frame_objects);
     }
 
@@ -77,9 +76,11 @@ impl PrologueEpilogueInserter {
         &mut self,
         /* tys: &Types, */ cur_func: &mut MachineFunction,
         saved_regs: &[PhysReg],
-        adjust: i32,
+        frame_objects: &FrameObjectsInfo,
     ) {
-        let big_stack_down = adjust > 1000;
+        let adjust = frame_objects.total_size();
+        let callee_saved_regs_adjust = frame_objects.aligned_callee_saved_regs_byte();
+        let big_stack_down = !bits_within(adjust, 12);
         let mut builder = Builder::new(cur_func);
         builder.set_insert_point_at_entry_block();
 
@@ -90,7 +91,7 @@ impl PrologueEpilogueInserter {
             vec![
                 MachineOperand::Register(sp),
                 MachineOperand::Constant(MachineConstant::Int32(if big_stack_down {
-                    saved_regs.len() as i32 * -8
+                    -callee_saved_regs_adjust
                 } else {
                     -adjust
                 })),
@@ -110,10 +111,9 @@ impl PrologueEpilogueInserter {
                     MachineOperand::Register(r),
                     MachineOperand::Mem(MachineMemOperand::ImmReg(
                         if big_stack_down {
-                            24 - 8 - i as i32 * 8
-                        // 0
+                            callee_saved_regs_adjust - 8 * (i as i32 + 1)
                         } else {
-                            adjust - 8 - i as i32 * 8
+                            adjust - 8 * (i as i32 + 1)
                         },
                         sp,
                     )),
@@ -129,7 +129,7 @@ impl PrologueEpilogueInserter {
                 vec![
                     MachineOperand::Register(sp),
                     MachineOperand::Constant(MachineConstant::Int32(if big_stack_down {
-                        saved_regs.len() as i32 * 8
+                        callee_saved_regs_adjust
                     } else {
                         adjust
                     })),
@@ -145,7 +145,7 @@ impl PrologueEpilogueInserter {
             let li = MachineInst::new_simple(
                 MachineOpcode::LI,
                 vec![MachineOperand::imm_i32(
-                    -(adjust - saved_regs.len() as i32 * 8),
+                    -(adjust - callee_saved_regs_adjust),
                 )],
                 builder.get_cur_bb().unwrap(),
             )
@@ -175,9 +175,11 @@ impl PrologueEpilogueInserter {
         &mut self,
         cur_func: &mut MachineFunction,
         saved_regs: &[PhysReg],
-        adjust: i32,
+        frame_objects: &FrameObjectsInfo,
     ) {
-        let big_stack_down = adjust > 1000;
+        let adjust = frame_objects.total_size();
+        let callee_saved_regs_adjust = frame_objects.aligned_callee_saved_regs_byte();
+        let big_stack_down = !bits_within(adjust, 12);
         let mut bb_iseq = vec![];
         // let has_call = cur_func.body.has_call();
 
@@ -202,9 +204,7 @@ impl PrologueEpilogueInserter {
                 let s1 = cur_func.regs_info.get_phys_reg(GPR::S1);
                 let li = MachineInst::new_simple(
                     MachineOpcode::LI,
-                    vec![MachineOperand::imm_i32(
-                        adjust - saved_regs.len() as i32 * 8,
-                    )],
+                    vec![MachineOperand::imm_i32(adjust - callee_saved_regs_adjust)],
                     bb_id,
                 )
                 .with_def(vec![s1]);
@@ -224,11 +224,10 @@ impl PrologueEpilogueInserter {
                 let ld = MachineInst::new_simple(
                     MachineOpcode::LD,
                     vec![MachineOperand::Mem(MachineMemOperand::ImmReg(
-                        // adjust - 8 - 8 * i as i32,
                         if big_stack_down {
-                            24 - 8 - i as i32 * 8
+                            callee_saved_regs_adjust - 8 * (i as i32 + 1)
                         } else {
-                            adjust - 8 - i as i32 * 8
+                            adjust - 8 * (i as i32 + 1)
                         },
                         sp,
                     ))],
@@ -243,7 +242,7 @@ impl PrologueEpilogueInserter {
                 vec![
                     MachineOperand::Register(sp),
                     MachineOperand::Constant(MachineConstant::Int32(if big_stack_down {
-                        saved_regs.len() as i32 * 8
+                        callee_saved_regs_adjust
                     } else {
                         adjust
                     })),
@@ -368,3 +367,7 @@ impl PrologueEpilogueInserter {
 //         self.builder.insert(inst)
 //     }
 // }
+
+fn bits_within(x: i32, y: u32) -> bool {
+    (x << (32 - y)) >> (32 - y) == x
+}
