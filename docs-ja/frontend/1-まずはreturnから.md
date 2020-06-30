@@ -114,6 +114,7 @@ use cilk::ir::{
     types::Type,
     value::Value,
 };
+use cilk::codegen::arch::exec::jit::JITExecutor;
 
 fn main() {
     let mut module = Module::new("cilk");
