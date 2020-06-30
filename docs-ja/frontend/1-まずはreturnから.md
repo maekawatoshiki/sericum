@@ -48,3 +48,52 @@ features に x86_64 が指定してありますが，riscv64 を指定するこ�
 
 一度ここでコンパイルしてみましょう．``cargo run`` でハローワールドが表示されれば成功です．まだcilkの機能は全く使っていません．
 
+## IRを生成する
+
+それではいよいよ，実際にIRを生成していきます．
+
+### IRの構造
+
+ちょっとその前に一言だけ．cilkのIRはLLVM IRに大きく影響を受けており，とても似通っています．
+Module > Function > Basic Block > Instruction という階層構造も同じです．APIもなるべく似せるようにしています．
+
+### IRを見てみよう
+
+まずは ./src/main.rs に書かれているものを消して下さい．そして以下を追加．
+
+```rs
+extern crate cilk;
+use cilk::ir::{
+    builder::{Builder, FunctionIdWithModule},
+    module::Module,
+    types::Type,
+    value::Value,
+};
+
+fn main() {
+    let mut module = Module::new("cilk");
+    let func_id = module.create_function("main", Type::Int32, vec![]);
+    let mut builder = Builder::new(FunctionIdWithModule::new(&mut module, func_id));
+    let entry = builder.append_basic_block();
+    builder.set_insert_point(entry);
+    builder.build_ret(Value::new_imm_int32(42));
+
+    println!("{:?}", module);
+}
+```
+
+そして実行
+
+```sh
+cargo run 
+```
+
+以下のようなIRが表示されたら成功です!
+
+```c
+Module (name: cilk)
+define i32 main() {
+label.0:	// pred(), succ(), def(), in(), out()
+    ret i32 42
+}
+```
