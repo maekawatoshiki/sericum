@@ -245,6 +245,15 @@ impl RegisterAllocator {
         let call_inst_parent = cur_func.body.inst_arena[call_inst_id].parent;
 
         for (frinfo, reg) in slots_to_save_regs.into_iter().zip(regs_to_save.into_iter()) {
+            let one_segment = reg.is_virt_reg();
+            // && matrix
+            //     .virt_reg_interval
+            //     .get(&reg.as_virt_reg())
+            //     .unwrap()
+            //     .range
+            //     .segments
+            //     .len()
+            //     == 1;
             let dst = MachineOperand::FrameIndex(frinfo.clone());
             let src = MachineOperand::Register(reg);
             let rbp = cur_func.regs_info.get_phys_reg(GR64::RBP);
@@ -258,6 +267,48 @@ impl RegisterAllocator {
                 None,
                 call_inst_parent,
             ));
+            let x = matrix.get_program_point(call_inst_id).unwrap();
+            let z = matrix.program_points.prev_of(x);
+            matrix.id2pp.insert(store_inst_id, z);
+
+            let reg = if one_segment {
+                *matrix
+                    .virt_reg_interval
+                    .get_mut(&reg.as_virt_reg())
+                    .unwrap()
+                    .end_point_mut()
+                    .unwrap() = x;
+                let rc = cur_func.regs_info.arena_ref()[reg].reg_class;
+                let newr = cur_func.regs_info.new_virt_reg(rc);
+                let mut uses_to_replace = vec![];
+                let mut last_use = x;
+                cur_func.regs_info.arena_ref_mut()[reg]
+                    .uses
+                    .retain(|use_id| {
+                        let y = matrix.get_program_point(*use_id).unwrap();
+                        if last_use < y {
+                            last_use = y
+                        };
+                        if x < y {
+                            uses_to_replace.push(*use_id);
+                            return false;
+                        }
+                        true
+                    });
+                matrix.add_vreg_entity(newr);
+                matrix.virt_reg_interval.add(
+                    newr.as_virt_reg(),
+                    LiveRange::new(vec![LiveSegment::new(x, last_use)]),
+                );
+                for id in uses_to_replace {
+                    let inst = &mut cur_func.body.inst_arena[id];
+                    inst.replace_operand_register(&cur_func.regs_info, reg, newr);
+                }
+                // cur_func.regs_info.arena_ref_mut()[newr].uses=use
+                newr
+            } else {
+                reg
+            };
 
             let src = MachineOperand::Mem(MachineMemOperand::BaseFi(rbp, frinfo));
             let load_inst_id = cur_func.alloc_inst(

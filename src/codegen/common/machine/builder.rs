@@ -138,10 +138,14 @@ impl<'a> BuilderTrait for BuilderWithLiveInfoEdit<'a> {
                         .add_segment(LiveSegment::new(pp, pp));
                 } else {
                     self.matrix.add_vreg_entity(def);
-                    self.matrix.add_live_interval(
-                        def_.virt_reg,
-                        LiveRange::new(vec![LiveSegment::new(pp, pp)]),
-                    );
+                    if let Some(i) = self.matrix.virt_reg_interval.get_mut(&def_.virt_reg) {
+                        i.range.add_segment(LiveSegment::new(pp, pp))
+                    } else {
+                        self.matrix.add_live_interval(
+                            def_.virt_reg,
+                            LiveRange::new(vec![LiveSegment::new(pp, pp)]),
+                        );
+                    }
                 }
             }
         }
