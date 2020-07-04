@@ -602,6 +602,7 @@ fn assemble_and_run(c_lib: &str, s_target: &str, md5hash: &str) {
         .unwrap();
     let mut s = String::new();
     execution.stdout.unwrap().read_to_string(&mut s).unwrap();
+    // println!("{:?}", s);
     assert_eq!(format!("{:?}", md5::compute(s)).as_str(), md5hash);
 
     fs::remove_file(output_name).unwrap();

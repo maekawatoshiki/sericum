@@ -43,26 +43,45 @@ impl<'a> LiveIntervalSplitter<'a> {
         if self.func.regs_info.arena_ref()[*reg].defs.len() > 1 {
             return None;
         }
-        // all uses must be in one basic block
         {
-            let after_store_parent = self.func.body.inst_arena[*after_store].parent;
-            let before_load_parent = self.func.body.inst_arena[*before_load].parent;
-            assert!(self.func.regs_info.arena_ref()[*reg].defs.len() == 1);
-            let mut last_parent = None;
-            for &use_id in &self.func.regs_info.arena_ref()[*reg].uses {
-                let parent = self.func.body.inst_arena[use_id].parent;
-                if last_parent.is_none() {
-                    last_parent = Some(parent);
-                    continue;
+            for (id, bb) in self.func.body.basic_blocks.id_and_block() {
+                let liveness = bb.liveness_ref();
+                if liveness.def.contains(reg) && loops.get_loop_for(id).is_some() {
+                    return None;
                 }
-                if let Some(last_parent) = last_parent {
-                    if last_parent != parent {
-                        return None;
-                    }
+                if liveness.live_in.contains(reg) && loops.get_loop_for(id).is_some() {
+                    return None;
+                }
+                if liveness.live_out.contains(reg) && loops.get_loop_for(id).is_some() {
+                    return None;
                 }
             }
         }
-        debug!(println!("split {:?}", reg));
+        // all uses must be in one basic block
+        {
+            // let after_store_parent = self.func.body.inst_arena[*after_store].parent;
+            // let before_load_parent = self.func.body.inst_arena[*before_load].parent;
+            let def_id = *self.func.regs_info.arena_ref()[*reg]
+                .defs
+                .iter()
+                .next()
+                .unwrap();
+            let def_parent = self.func.body.inst_arena[def_id].parent;
+            assert!(self.func.regs_info.arena_ref()[*reg].defs.len() == 1);
+            let mut s = FxHashSet::default();
+            for &use_id in &self.func.regs_info.arena_ref()[*reg].uses {
+                assert!(
+                    self.matrix.get_program_point(def_id).unwrap()
+                        < self.matrix.get_program_point(use_id).unwrap()
+                );
+                let parent = self.func.body.inst_arena[use_id].parent;
+                s.insert(parent);
+                if s.len() > 1 {
+                    return None;
+                }
+            }
+        }
+        debug!(println!("split {:?}, {:?}", reg, self.func.name));
 
         let after_store_pp = self.matrix.get_program_point(*after_store).unwrap();
         let before_load_pp = self.matrix.get_program_point(*before_load).unwrap();
@@ -107,36 +126,45 @@ impl<'a> LiveIntervalSplitter<'a> {
         assert!(self.func.regs_info.arena_ref_mut()[*reg].uses.len() > 0);
         let new_reg = self.func.regs_info.new_virt_reg_from(&reg);
         self.matrix.add_vreg_entity(new_reg);
+        // assert!(new_reg_uses.len() > 0);
         for &id in &new_reg_uses {
             let inst = &mut self.func.body.inst_arena[id];
             inst.replace_operand_register(&self.func.regs_info, *reg, new_reg);
         }
-        self.func.regs_info.arena_ref_mut()[new_reg].uses = new_reg_uses;
 
         let parent = self.func.body.inst_arena[*before_load].parent;
 
-        // println!("!!");
-        // fn f(
-        //     reg: &RegisterId,
-        //     new_reg: RegisterId,
-        //     bb_id: MachineBasicBlockId,
-        //     bbs: &MachineBasicBlocks,
-        // ) {
-        //     println!("{:?}", bb_id);
-        //     let bb = &bbs.arena[bb_id];
-        //     let liveness = &mut bb.liveness_ref_mut();
-        //     if liveness.live_in.remove(reg) {
-        //         liveness.add_live_in(new_reg);
-        //     }
-        //     if liveness.live_out.remove(reg) {
-        //         liveness.add_live_out(new_reg);
-        //     }
-        //     println!("--");
-        //     for s in &bb.succ {
-        //         f(reg, new_reg, *s, bbs);
-        //     }
-        // }
-        // f(reg, new_reg, parent, &self.func.body.basic_blocks);
+        println!("!!");
+        fn f(
+            reg: &RegisterId,
+            new_reg: RegisterId,
+            bb_id: MachineBasicBlockId,
+            start: MachineBasicBlockId,
+            bbs: &MachineBasicBlocks,
+        ) {
+            let bb = &bbs.arena[bb_id];
+            let liveness = &mut bb.liveness_ref_mut();
+            let mut a = false;
+            println!("a");
+            if bb_id != start && liveness.live_in.remove(reg) {
+                println!("in{:?}", bb_id);
+                a = true;
+                liveness.add_live_in(new_reg);
+            }
+            if liveness.live_out.remove(reg) {
+                println!("out{:?}", bb_id);
+                a = true;
+                liveness.add_live_out(new_reg);
+            }
+            println!("next");
+            if !a {
+                return;
+            }
+            for s in &bb.succ {
+                f(reg, new_reg, *s, start, bbs);
+            }
+        }
+        // f(reg, new_reg, parent, parent, &self.func.body.basic_blocks);
 
         let src = MachineOperand::Mem(MachineMemOperand::BaseFi(rbp, *slot));
         let load_id = self.func.alloc_inst(
@@ -147,7 +175,7 @@ impl<'a> LiveIntervalSplitter<'a> {
             )
             .with_def(vec![new_reg]),
         );
-        let load_pp = self.matrix.program_points.next_of(before_load_pp);
+        let load_pp = self.matrix.program_points.prev_of(before_load_pp);
         self.matrix.id2pp.insert(load_id, load_pp);
         {
             let liveness = &mut *self.func.body.basic_blocks.arena[parent].liveness_ref_mut();
@@ -157,6 +185,11 @@ impl<'a> LiveIntervalSplitter<'a> {
             new_reg.as_virt_reg(),
             LiveRange::new(vec![LiveSegment::new(load_pp, new_reg_end_point)]),
         );
+        // self.matrix
+        //     .virt_reg_interval
+        //     .get_mut(&new_reg.as_virt_reg())
+        //     .unwrap()
+        //     .is_spillable = true;
 
         // TODO: insert or remove reg&new_reg from basic block livein&liveout
 

@@ -65,6 +65,8 @@ impl RegisterAllocator {
 
         // TODO: preserve_phys_reg_uses_across_call
         self.preserve_reg_uses_across_call(tys, cur_func, &mut matrix);
+        matrix = LivenessAnalysis::new().analyze_function(cur_func);
+        calc_spill_weight(cur_func, &mut matrix);
 
         self.queue = matrix.collect_virt_regs().into_iter().collect();
         self.sort_queue(&matrix); // for better allocation. not necessary
@@ -118,6 +120,7 @@ impl RegisterAllocator {
                     break;
                 }
             }
+            println!("!");
             assert!(allocatable); // TODO
             self.queue.push_front(vreg);
         }
@@ -227,6 +230,30 @@ impl RegisterAllocator {
             {
                 regs_that_may_interfere.remove(def);
             }
+            for &def in &liveness.def {
+                if def.is_phys_reg() {
+                    continue;
+                }
+                for def_id in &cur_func.regs_info.arena_ref()[def].defs {
+                    if matrix.get_program_point(call_inst_id) <= matrix.get_program_point(*def_id) {
+                        regs_that_may_interfere.remove(&def);
+                    }
+                }
+            }
+            for livein in (&liveness.live_in - &liveness.live_out) {
+                if livein.is_phys_reg() {
+                    continue;
+                }
+                let mut a = false;
+                for use_id in &cur_func.regs_info.arena_ref()[livein].uses {
+                    if matrix.get_program_point(call_inst_id) <= matrix.get_program_point(*use_id) {
+                        a = true;
+                    }
+                }
+                if !a {
+                    regs_that_may_interfere.remove(&livein);
+                }
+            }
             let range = LiveRange::new(vec![LiveSegment::new(call_inst_pp, call_inst_pp)]);
             for r in &regs_that_may_interfere {
                 if (r.is_virt_reg() && matrix.interferes_with_range(r.as_virt_reg(), &range))
@@ -253,25 +280,23 @@ impl RegisterAllocator {
         let loops = LoopsConstructor::new(&dom_tree, &cur_func.body.basic_blocks).analyze();
 
         for (frinfo, reg) in slots_to_save_regs.into_iter().zip(regs_to_save.into_iter()) {
-            if let Some(x) = LiveIntervalSplitter::new(cur_func, matrix).split(
-                tys,
-                &loops,
-                &reg,
-                &frinfo,
-                &call_inst_id,
-                &call_inst_id,
-            ) {
-                &cur_func.body.basic_blocks.arena[cur_func.body.inst_arena[call_inst_id].parent]
-                    .liveness_ref_mut()
-                    .add_def(x);
-                // *matrix = LivenessAnalysis::new().analyze_function(cur_func);
-                // calc_spill_weight(cur_func, matrix);
-                //
-                // // debug!(println!("before coalesing {:?}", cur_func));
-                //
-                // coalesce_function(matrix, cur_func);
-                continue;
-            }
+            // if let Some(x) = LiveIntervalSplitter::new(cur_func, matrix).split(
+            //     tys,
+            //     &loops,
+            //     &reg,
+            //     &frinfo,
+            //     &call_inst_id,
+            //     &call_inst_id,
+            // ) {
+            //     // &cur_func.body.basic_blocks.arena[cur_func.body.inst_arena[call_inst_id].parent]
+            //     //     .liveness_ref_mut()
+            //     //     .add_def(x);
+            //
+            //     // debug!(println!("before coalesing {:?}", cur_func));
+            //
+            //     // coalesce_function(matrix, cur_func);
+            //     continue;
+            // }
 
             let dst = MachineOperand::FrameIndex(frinfo.clone());
             let src = MachineOperand::Register(reg);
