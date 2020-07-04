@@ -415,7 +415,8 @@ impl LiveRange {
                 self.segments[pt - 1].end = seg.start;
             } else if self.segments[pt - 1].end < seg.end {
                 self.segments[pt - 1].end = seg.start;
-                self.remove_segment(seg);
+                assert!(self.segments[pt].start < seg.end);
+                self.remove_segment(&LiveSegment::new(self.segments[pt].start, seg.end));
             } else {
                 panic!()
             }
@@ -459,6 +460,10 @@ impl LiveRange {
         }
         false
     }
+
+    pub fn contains_point(&self, pp: &ProgramPoint) -> bool {
+        self.segments.iter().any(|s| s.contains_point(pp))
+    }
 }
 
 impl LiveSegment {
@@ -468,6 +473,10 @@ impl LiveSegment {
 
     pub fn interferes(&self, seg: &LiveSegment) -> bool {
         self.start < seg.end && self.end > seg.start
+    }
+
+    pub fn contains_point(&self, pp: &ProgramPoint) -> bool {
+        self.start <= *pp && *pp < self.end
     }
 }
 
@@ -483,30 +492,96 @@ impl ProgramPoints {
     }
 
     pub fn prev_of(&mut self, pp: ProgramPoint) -> ProgramPoint {
-        let mut end: Raw<_> = pp.base;
-        let start = end.prev;
+        let mut next: Raw<_> = pp.base;
+        let prev = pp.base.prev;
 
-        if start.is_none() {
+        if prev.is_none() {
             unimplemented!()
         }
 
-        let mut start: Raw<_> = start.unwrap();
+        let mut prev: Raw<_> = prev.unwrap();
+        let one_block = next.bb() == prev.bb();
+
+        if !one_block {
+            let new_pp = self.new_program_point(ProgramPointBase::new(
+                Some(prev),
+                Some(next),
+                prev.bb(),
+                prev.idx() + IDX_STEP,
+            ));
+            prev.next = Some(new_pp.base);
+            next.prev = Some(new_pp.base);
+            return new_pp;
+        }
+        let one_block = next.bb() == prev.bb();
+
+        if !one_block {
+            let new_pp = self.new_program_point(ProgramPointBase::new(
+                Some(prev),
+                Some(next),
+                prev.bb(),
+                prev.idx() + IDX_STEP,
+            ));
+            prev.next = Some(new_pp.base);
+            next.prev = Some(new_pp.base);
+            return new_pp;
+        }
 
         // need to renumber program points belonging to the same block as pp
-        if end.idx() - start.idx() < 2 {
-            // panic!();
-            start.renumber_in_bb();
+        if next.idx() - prev.idx() < 2 {
+            prev.renumber_in_bb();
             return self.prev_of(pp);
         }
 
         let new_pp = self.new_program_point(ProgramPointBase::new(
-            Some(start),
-            Some(end),
-            start.bb(),
-            (end.idx() + start.idx()) / 2,
+            Some(prev),
+            Some(next),
+            prev.bb(),
+            (next.idx() + prev.idx()) / 2,
         ));
-        start.next = Some(new_pp.base);
-        end.prev = Some(new_pp.base);
+        prev.next = Some(new_pp.base);
+        next.prev = Some(new_pp.base);
+
+        new_pp
+    }
+
+    pub fn next_of(&mut self, pp: ProgramPoint) -> ProgramPoint {
+        let mut prev: Raw<_> = pp.base;
+        let next = pp.base.next;
+
+        if next.is_none() {
+            unimplemented!()
+        }
+
+        let mut next: Raw<_> = next.unwrap();
+        let one_block = next.bb() == prev.bb();
+
+        if !one_block {
+            let new_pp = self.new_program_point(ProgramPointBase::new(
+                Some(prev),
+                Some(next),
+                prev.bb(),
+                prev.idx() + IDX_STEP,
+            ));
+            prev.next = Some(new_pp.base);
+            next.prev = Some(new_pp.base);
+            return new_pp;
+        }
+
+        // need to renumber program points belonging to the same block as that of pp
+        if next.idx() - prev.idx() < 2 {
+            prev.renumber_in_bb();
+            return self.next_of(pp);
+        }
+
+        let new_pp = self.new_program_point(ProgramPointBase::new(
+            Some(prev),
+            Some(next),
+            prev.bb(),
+            (prev.idx() + next.idx()) / 2,
+        ));
+        next.prev = Some(new_pp.base);
+        prev.next = Some(new_pp.base);
 
         new_pp
     }

@@ -94,6 +94,11 @@ impl RegistersInfo {
         }
     }
 
+    pub fn new_virt_reg_from(&self, reg: &RegisterId) -> RegisterId {
+        let rc = self.arena_ref()[*reg].reg_class;
+        self.new_virt_reg(rc)
+    }
+
     pub fn get_phys_reg<T: TargetRegisterTrait>(&self, r: T) -> RegisterId {
         let i = r.as_phys_reg().retrieve();
         self.phys_regs_list[i]

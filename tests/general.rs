@@ -532,13 +532,11 @@ fibo:
   mov dword ptr [rbp - 4], ecx
   call fibo
   mov ecx, dword ptr [rbp - 4]
-  mov edx, eax
   mov edi, ecx
   sub edi, 2
-  mov dword ptr [rbp - 4], edx
+  mov dword ptr [rbp - 4], eax
   call fibo
-  mov edx, dword ptr [rbp - 4]
-  mov ecx, edx
+  mov ecx, dword ptr [rbp - 4]
   add ecx, eax
   mov eax, ecx
   jmp .L3
