@@ -58,7 +58,7 @@ impl<'a> LiveIntervalSplitter<'a> {
                 }
             }
         }
-        debug!(println!("split {:?}, {:?}", reg, self.func.name));
+        // debug!(println!("split {:?}, {:?}", reg, self.func.name));
 
         let after_store_pp = self.matrix.get_program_point(*after_store).unwrap();
         let before_load_pp = self.matrix.get_program_point(*before_load).unwrap();
@@ -139,46 +139,36 @@ impl<'a> LiveIntervalSplitter<'a> {
             )
             .with_def(vec![new_reg]),
         );
-        let load_pp = self.matrix.program_points.prev_of(before_load_pp);
+        let load_pp = self.matrix.program_points.next_of(before_load_pp);
         self.matrix.id2pp.insert(load_id, load_pp);
         {
             let liveness = &mut *self.func.body.basic_blocks.arena[parent].liveness_ref_mut();
             liveness.add_def(new_reg);
         }
 
-        // TODO: insert or remove reg&new_reg from basic block livein&liveout
-
         let mut builder = BuilderWithLiveInfoEdit::new(self.matrix, self.func);
 
         builder.set_insert_point_before_inst(*after_store);
-        builder.insert(store_id);
+        builder.insert2(store_id, store_pp);
 
         builder.set_insert_point_after_inst(*before_load);
-        builder.insert(load_id);
+        builder.insert2(load_id, load_pp);
         self.matrix
             .virt_reg_interval
             .get_mut(&new_reg.as_virt_reg())
             .unwrap()
             .range = LiveRange::new(vec![LiveSegment::new(load_pp, new_reg_end_point)]);
-        println!(
-            "RR {:?}",
-            self.matrix
-                .virt_reg_interval
-                .get(&new_reg.as_virt_reg())
-                .unwrap()
-                .range
-        );
-        // let weight = self
-        //     .matrix
-        //     .virt_reg_interval
-        //     .get(&reg.as_virt_reg())
-        //     .unwrap()
-        //     .spill_weight;
-        // self.matrix
-        //     .virt_reg_interval
-        //     .get_mut(&new_reg.as_virt_reg())
-        //     .unwrap()
-        //     .spill_weight = weight;
+        let weight = self
+            .matrix
+            .virt_reg_interval
+            .get(&reg.as_virt_reg())
+            .unwrap()
+            .spill_weight;
+        self.matrix
+            .virt_reg_interval
+            .get_mut(&new_reg.as_virt_reg())
+            .unwrap()
+            .spill_weight = weight;
 
         Some(new_reg)
     }

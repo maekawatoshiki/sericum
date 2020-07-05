@@ -365,6 +365,7 @@ impl<'a> ScheduleByBlock<'a> {
 
     fn convert_call_dag(&mut self, node: &DAGNode) -> MachineInstId {
         let mut arg_regs = vec![self.cur_func.regs_info.get_phys_reg(GR64::RSP)]; // call uses RSP
+        let mut kill_regs = vec![];
         let mut off = 0;
 
         let mut args = vec![];
@@ -387,6 +388,7 @@ impl<'a> ScheduleByBlock<'a> {
                 Some(arg_reg) => {
                     let r = self.cur_func.regs_info.get_phys_reg(arg_reg);
                     arg_regs.push(r.clone());
+                    kill_regs.push(r);
                     self.move2reg(r, arg)
                 }
                 None => {
@@ -429,6 +431,7 @@ impl<'a> ScheduleByBlock<'a> {
         let call_inst = self.append_inst(
             MachineInst::new_simple(MachineOpcode::CALL, vec![callee], self.cur_bb)
                 .with_imp_uses(arg_regs)
+                .with_kills(kill_regs)
                 .with_imp_defs({
                     let mut defs = vec![self.cur_func.regs_info.get_phys_reg(GR64::RSP)];
                     if node.ty != Type::Void {

@@ -402,21 +402,33 @@ impl LiveRange {
             } else if self.segments[pt].end < seg.end {
                 let start = self.segments[pt].end;
                 self.segments.remove(pt);
+                assert!(start < seg.end);
                 self.remove_segment(&LiveSegment::new(start, seg.end));
             } else {
                 panic!()
             }
         } else {
-            if seg.end < self.segments[pt - 1].end {
+            if self.segments[pt - 1].end < seg.start {
+                if self.segments[pt].start <= seg.end {
+                    self.remove_segment(&LiveSegment::new(self.segments[pt].start, seg.end));
+                    return;
+                }
+                assert!(seg.end < self.segments[pt].start);
+            } else if seg.end < self.segments[pt - 1].end {
                 let end = self.segments[pt - 1].end;
                 self.segments[pt - 1].end = seg.start;
                 self.add_segment(LiveSegment::new(seg.end, end));
             } else if self.segments[pt - 1].end == seg.end {
                 self.segments[pt - 1].end = seg.start;
             } else if self.segments[pt - 1].end < seg.end {
+                assert!(seg.start < self.segments[pt - 1].end);
                 self.segments[pt - 1].end = seg.start;
-                assert!(self.segments[pt].start < seg.end);
-                self.remove_segment(&LiveSegment::new(self.segments[pt].start, seg.end));
+                if self.segments[pt].start < seg.end {
+                    // assert!(self.segments[pt].start < seg.end);
+                    self.remove_segment(&LiveSegment::new(self.segments[pt].start, seg.end));
+                } else {
+                    // seg.end <= self.segments[pt].start
+                }
             } else {
                 panic!()
             }
@@ -488,7 +500,8 @@ impl ProgramPoints {
     }
 
     pub fn new_program_point(&mut self, ppb: ProgramPointBase) -> ProgramPoint {
-        ProgramPoint::new(self.allocator.alloc(ppb))
+        let p = ProgramPoint::new(self.allocator.alloc(ppb));
+        p
     }
 
     pub fn prev_of(&mut self, pp: ProgramPoint) -> ProgramPoint {
@@ -644,6 +657,7 @@ impl ProgramPointBase {
     // }
 
     pub fn renumber_in_bb(&self) {
+        // panic!();
         let mut cur = *self;
         while let Some(mut next) = cur.next {
             if cur.bb != next.bb {
@@ -787,7 +801,8 @@ impl LivenessAnalysis {
         let mut vreg2entity: FxHashMap<VirtReg, RegisterId> = FxHashMap::default();
         let mut program_points = ProgramPoints::new();
 
-        let mut last_pp: Option<ProgramPoint> = None;
+        let mut last_pp: ProgramPoint =
+            program_points.new_program_point(ProgramPointBase::new(None, None, 0, 0));
         let mut bb_idx = 0;
 
         // TODO: Refine code
@@ -800,10 +815,7 @@ impl LivenessAnalysis {
 
             #[rustfmt::skip]
             macro_rules! cur_pp { () => {{
-                last_pp = Some(program_points.new_program_point(
-                        ProgramPointBase::new(None, None, bb_idx, index))
-                        .set_prev(last_pp));
-                last_pp.unwrap()
+                last_pp
             }};}
 
             for livein in &liveness.live_in {
@@ -818,6 +830,9 @@ impl LivenessAnalysis {
             }
 
             index += IDX_STEP;
+            last_pp = program_points
+                .new_program_point(ProgramPointBase::new(None, None, bb_idx, index))
+                .set_prev(Some(last_pp));
 
             for (inst_id, inst) in iiter {
                 id2pp.insert(inst_id, cur_pp!());
@@ -839,6 +854,20 @@ impl LivenessAnalysis {
                     }
                 }
 
+                // for &kill in &inst.kills {
+                //     if kill.is_phys_reg() && !is_callee_saved_reg(kill.as_phys_reg()) {
+                //         reg2range
+                //             .get_or_create(kill.as_phys_reg())
+                //             .add_segment(LiveSegment::new(cur_pp!(), cur_pp!()));
+                //     } else if kill.is_virt_reg() {
+                //         vreg2entity.insert(kill.as_virt_reg(), *kill);
+                //         vreg2range
+                //             .entry(kill.as_virt_reg())
+                //             .or_insert_with(|| LiveRange::new_empty())
+                //             .add_segment(LiveSegment::new(cur_pp!(), cur_pp!()));
+                //     }
+                // }
+
                 for def in inst.collect_defined_regs() {
                     if def.is_phys_reg() && !is_callee_saved_reg(def.as_phys_reg()) {
                         reg2range
@@ -854,6 +883,9 @@ impl LivenessAnalysis {
                 }
 
                 index += IDX_STEP;
+                last_pp = program_points
+                    .new_program_point(ProgramPointBase::new(None, None, bb_idx, index))
+                    .set_prev(Some(last_pp));
             }
 
             for liveout in &liveness.live_out {
@@ -870,9 +902,12 @@ impl LivenessAnalysis {
             }
 
             bb_idx += 1;
+            last_pp = program_points
+                .new_program_point(ProgramPointBase::new(None, None, bb_idx, 0))
+                .set_prev(Some(last_pp));
         }
 
-        // println!("{:?}", vreg2range);
+        // println!("{:#?}", reg2range.0);
 
         LiveRegMatrix::new(
             vreg2entity,

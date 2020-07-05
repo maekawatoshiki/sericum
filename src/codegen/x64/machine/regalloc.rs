@@ -69,12 +69,29 @@ impl RegisterAllocator {
         self.queue = matrix.collect_virt_regs().into_iter().collect();
         self.sort_queue(&matrix); // for better allocation. not necessary
         while let Some(vreg) = self.queue.pop_front() {
+            // if vreg.retrieve() == 8 {
+            //     println!("00!!!");
+            // }
+
             let mut allocated = false;
             let order = AllocationOrder::new(&matrix, cur_func)
                 .get_order(vreg)
                 .unwrap();
+            // println!("END");
             for reg in order {
                 if matrix.interferes(vreg, reg) {
+                    // println!("{:?}: {:#?}", reg, matrix.phys_reg_range.get(reg).unwrap());
+                    // println!(
+                    //     "{:?}: {:#?}",
+                    //     vreg,
+                    //     matrix.virt_reg_interval.get(&vreg).unwrap().range
+                    // );
+                    // println!("failed assign {:?} for {:?}", reg, vreg);
+                    // for (_, _, i) in cur_func.body.mbb_iter() {
+                    //     for (id, inst) in i {
+                    //         println!("{:?} - {:?}", inst, matrix.get_program_point(id).unwrap());
+                    //     }
+                    // }
                     continue;
                 }
 
@@ -255,7 +272,6 @@ impl RegisterAllocator {
         let loops = LoopsConstructor::new(&dom_tree, &cur_func.body.basic_blocks).analyze();
 
         for (frinfo, reg) in slots_to_save_regs.into_iter().zip(regs_to_save.into_iter()) {
-            // if a {
             if let Some(x) = LiveIntervalSplitter::new(cur_func, matrix).split(
                 tys,
                 &loops,
@@ -264,21 +280,8 @@ impl RegisterAllocator {
                 &call_inst_id,
                 &call_inst_id,
             ) {
-                // *matrix = LivenessAnalysis::new().analyze_function(cur_func);
-                println!(
-                    "> {:?}",
-                    matrix
-                        .virt_reg_interval
-                        .get(&x.as_virt_reg())
-                        .unwrap()
-                        .range
-                );
-                // calc_spill_weight(cur_func, matrix);
-                // coalesce_function(matrix, cur_func);
                 continue;
             }
-            //     continue;
-            // }
 
             let dst = MachineOperand::FrameIndex(frinfo.clone());
             let src = MachineOperand::Register(reg);
@@ -359,6 +362,7 @@ impl<'a> AllocationOrder<'a> {
             .iter()
             .find_map(|&use_| {
                 let inst = &self.func.body.inst_arena[use_];
+                // println!(" I {:?}", inst);
                 if inst.opcode.is_copy_like() {
                     return self.func.regs_info.arena_ref()[inst.def[0]].phys_reg;
                 }

@@ -505,6 +505,7 @@ mod x86_64 {
         });
 
         let machine_module = standard_conversion_into_machine_module(&mut m);
+        // println!("{:?}", machine_module);
         use cilk::codegen::x64::asm::print::MachineAsmPrinter;
         let mut printer = MachineAsmPrinter::new();
         printer.run_on_module(&machine_module);
@@ -519,20 +520,19 @@ fibo:
   push rbp
   mov rbp, rsp
   sub rsp, 16
-  mov ecx, edi
-  cmp ecx, 2
+  mov eax, edi
+  cmp eax, 2
   jle .L1
   jmp .L2
 .L1:
   mov eax, 1
   jmp .L3
 .L2:
-  mov edi, ecx
+  mov edi, eax
   sub edi, 1
-  mov dword ptr [rbp - 4], ecx
+  mov dword ptr [rbp - 4], eax
   call fibo
-  mov ecx, dword ptr [rbp - 4]
-  mov edi, ecx
+  mov edi, dword ptr [rbp - 4]
   sub edi, 2
   mov dword ptr [rbp - 4], eax
   call fibo

@@ -22,6 +22,7 @@ pub struct MachineInst {
     pub tie: FxHashMap<RegisterId, RegisterId>, // def -> use
     pub imp_use: Vec<RegisterId>,
     pub imp_def: Vec<RegisterId>,
+    pub kills: Vec<RegisterId>,
     pub parent: MachineBasicBlockId,
 }
 
@@ -82,6 +83,7 @@ impl MachineInst {
             tie: FxHashMap::default(),
             imp_def: vec![],
             imp_use: vec![],
+            kills: vec![],
             parent,
         }
     }
@@ -99,6 +101,7 @@ impl MachineInst {
             tie: FxHashMap::default(),
             imp_def: vec![],
             imp_use: vec![],
+            kills: vec![],
             parent,
         }
     }
@@ -117,6 +120,7 @@ impl MachineInst {
             tie: FxHashMap::default(),
             imp_def: vec![],
             imp_use: vec![],
+            kills: vec![],
             parent,
         }
     }
@@ -136,6 +140,7 @@ impl MachineInst {
             tie: FxHashMap::default(),
             imp_def,
             imp_use,
+            kills: vec![],
             parent,
         }
     }
@@ -164,6 +169,11 @@ impl MachineInst {
 
     pub fn with_imp_defs(mut self, mut rs: Vec<RegisterId>) -> Self {
         self.imp_def.append(&mut rs);
+        self
+    }
+
+    pub fn with_kills(mut self, mut rs: Vec<RegisterId>) -> Self {
+        self.kills.append(&mut rs);
         self
     }
 
