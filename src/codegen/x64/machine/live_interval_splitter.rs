@@ -43,6 +43,7 @@ impl<'a> LiveIntervalSplitter<'a> {
         if self.func.regs_info.arena_ref()[*reg].defs.len() > 1 {
             return None;
         }
+        // reg's defs and uses are not in any loop
         {
             for (id, bb) in self.func.body.basic_blocks.id_and_block() {
                 let liveness = bb.liveness_ref();
@@ -53,30 +54,6 @@ impl<'a> LiveIntervalSplitter<'a> {
                     return None;
                 }
                 if liveness.live_out.contains(reg) && loops.get_loop_for(id).is_some() {
-                    return None;
-                }
-            }
-        }
-        // all uses must be in one basic block
-        {
-            // let after_store_parent = self.func.body.inst_arena[*after_store].parent;
-            // let before_load_parent = self.func.body.inst_arena[*before_load].parent;
-            let def_id = *self.func.regs_info.arena_ref()[*reg]
-                .defs
-                .iter()
-                .next()
-                .unwrap();
-            let def_parent = self.func.body.inst_arena[def_id].parent;
-            assert!(self.func.regs_info.arena_ref()[*reg].defs.len() == 1);
-            let mut s = FxHashSet::default();
-            for &use_id in &self.func.regs_info.arena_ref()[*reg].uses {
-                assert!(
-                    self.matrix.get_program_point(def_id).unwrap()
-                        < self.matrix.get_program_point(use_id).unwrap()
-                );
-                let parent = self.func.body.inst_arena[use_id].parent;
-                s.insert(parent);
-                if s.len() > 1 {
                     return None;
                 }
             }
@@ -109,24 +86,16 @@ impl<'a> LiveIntervalSplitter<'a> {
             before_load_pp,
             reg_intvl.end_point().unwrap(),
         ));
-        reg_intvl
-            .range
-            .add_segment(LiveSegment::new(reg_intvl.start_point().unwrap(), store_pp));
 
         let mut new_reg_uses = FxHashSet::default();
-        self.func.regs_info.arena_ref_mut()[*reg]
-            .uses
-            .retain(|&id| {
-                let x = self.matrix.get_program_point(id).unwrap() <= store_pp;
-                if !x {
-                    new_reg_uses.insert(id);
-                }
-                x
-            });
+        for &id in &self.func.regs_info.arena_ref_mut()[*reg].uses {
+            if self.matrix.get_program_point(id).unwrap() > store_pp {
+                new_reg_uses.insert(id);
+            }
+        }
         assert!(self.func.regs_info.arena_ref_mut()[*reg].uses.len() > 0);
         let new_reg = self.func.regs_info.new_virt_reg_from(&reg);
         self.matrix.add_vreg_entity(new_reg);
-        // assert!(new_reg_uses.len() > 0);
         for &id in &new_reg_uses {
             let inst = &mut self.func.body.inst_arena[id];
             inst.replace_operand_register(&self.func.regs_info, *reg, new_reg);
@@ -134,7 +103,6 @@ impl<'a> LiveIntervalSplitter<'a> {
 
         let parent = self.func.body.inst_arena[*before_load].parent;
 
-        println!("!!");
         fn f(
             reg: &RegisterId,
             new_reg: RegisterId,
@@ -145,18 +113,14 @@ impl<'a> LiveIntervalSplitter<'a> {
             let bb = &bbs.arena[bb_id];
             let liveness = &mut bb.liveness_ref_mut();
             let mut a = false;
-            println!("a");
             if bb_id != start && liveness.live_in.remove(reg) {
-                println!("in{:?}", bb_id);
                 a = true;
                 liveness.add_live_in(new_reg);
             }
             if liveness.live_out.remove(reg) {
-                println!("out{:?}", bb_id);
                 a = true;
                 liveness.add_live_out(new_reg);
             }
-            println!("next");
             if !a {
                 return;
             }
@@ -164,7 +128,7 @@ impl<'a> LiveIntervalSplitter<'a> {
                 f(reg, new_reg, *s, start, bbs);
             }
         }
-        // f(reg, new_reg, parent, parent, &self.func.body.basic_blocks);
+        f(reg, new_reg, parent, parent, &self.func.body.basic_blocks);
 
         let src = MachineOperand::Mem(MachineMemOperand::BaseFi(rbp, *slot));
         let load_id = self.func.alloc_inst(
@@ -181,25 +145,40 @@ impl<'a> LiveIntervalSplitter<'a> {
             let liveness = &mut *self.func.body.basic_blocks.arena[parent].liveness_ref_mut();
             liveness.add_def(new_reg);
         }
-        self.matrix.virt_reg_interval.add(
-            new_reg.as_virt_reg(),
-            LiveRange::new(vec![LiveSegment::new(load_pp, new_reg_end_point)]),
-        );
-        // self.matrix
-        //     .virt_reg_interval
-        //     .get_mut(&new_reg.as_virt_reg())
-        //     .unwrap()
-        //     .is_spillable = true;
 
         // TODO: insert or remove reg&new_reg from basic block livein&liveout
 
-        let mut builder = Builder::new(self.func);
+        let mut builder = BuilderWithLiveInfoEdit::new(self.matrix, self.func);
 
         builder.set_insert_point_before_inst(*after_store);
         builder.insert(store_id);
 
         builder.set_insert_point_after_inst(*before_load);
         builder.insert(load_id);
+        self.matrix
+            .virt_reg_interval
+            .get_mut(&new_reg.as_virt_reg())
+            .unwrap()
+            .range = LiveRange::new(vec![LiveSegment::new(load_pp, new_reg_end_point)]);
+        println!(
+            "RR {:?}",
+            self.matrix
+                .virt_reg_interval
+                .get(&new_reg.as_virt_reg())
+                .unwrap()
+                .range
+        );
+        // let weight = self
+        //     .matrix
+        //     .virt_reg_interval
+        //     .get(&reg.as_virt_reg())
+        //     .unwrap()
+        //     .spill_weight;
+        // self.matrix
+        //     .virt_reg_interval
+        //     .get_mut(&new_reg.as_virt_reg())
+        //     .unwrap()
+        //     .spill_weight = weight;
 
         Some(new_reg)
     }
