@@ -44,13 +44,13 @@ pub struct LiveSegment {
 
 #[derive(Clone, Copy)]
 pub struct ProgramPoint {
-    base: Raw<ProgramPointBase>,
+    pub base: Raw<ProgramPointBase>,
 }
 
 #[derive(Debug, Clone, Copy)]
 pub struct ProgramPointBase {
-    prev: Option<Raw<ProgramPointBase>>,
-    next: Option<Raw<ProgramPointBase>>,
+    pub prev: Option<Raw<ProgramPointBase>>,
+    pub next: Option<Raw<ProgramPointBase>>,
     bb: usize,
     idx: usize,
 }
@@ -323,6 +323,16 @@ impl LiveRange {
         Self { segments: vec![] }
     }
 
+    pub fn unused_range(&self, pps: &ProgramPoints) -> LiveRange {
+        let mut r = LiveRange::new_empty();
+        let mut last_pp = pps.lookup(0, 0).unwrap();
+        for seg in &self.segments {
+            r.add_segment(LiveSegment::new(last_pp, seg.start));
+            last_pp = seg.end;
+        }
+        r
+    }
+
     pub fn adjust_end_to_start(&mut self) {
         let start = match self.segments.iter().min_by(|x, y| x.start.cmp(&y.start)) {
             Some(seg) => seg.start,
@@ -394,6 +404,13 @@ impl LiveRange {
                 x
             });
 
+        if !found && pt == 0 {
+            if self.segments[0].start < seg.end {
+                self.remove_segment(&LiveSegment::new(self.segments[0].start, seg.end));
+            }
+            return;
+        }
+
         if found {
             if seg.end == self.segments[pt].end {
                 self.segments.remove(pt);
@@ -408,7 +425,10 @@ impl LiveRange {
                 panic!()
             }
         } else {
-            if self.segments[pt - 1].end < seg.start {
+            if self.segments[pt - 1].end <= seg.start {
+                if pt >= self.segments.len() {
+                    return;
+                }
                 if self.segments[pt].start <= seg.end {
                     self.remove_segment(&LiveSegment::new(self.segments[pt].start, seg.end));
                     return;
@@ -423,7 +443,7 @@ impl LiveRange {
             } else if self.segments[pt - 1].end < seg.end {
                 assert!(seg.start < self.segments[pt - 1].end);
                 self.segments[pt - 1].end = seg.start;
-                if self.segments[pt].start < seg.end {
+                if pt < self.segments.len() && self.segments[pt].start < seg.end {
                     // assert!(self.segments[pt].start < seg.end);
                     self.remove_segment(&LiveSegment::new(self.segments[pt].start, seg.end));
                 } else {
@@ -597,6 +617,14 @@ impl ProgramPoints {
         prev.next = Some(new_pp.base);
 
         new_pp
+    }
+
+    pub fn lookup(&self, bb: usize, idx: usize) -> Option<ProgramPoint> {
+        self.allocator
+            .allocated_ref()
+            .iter()
+            .find(|pp| pp.bb() == bb && pp.idx() == idx)
+            .map(|&ppb| ProgramPoint::new(ppb))
     }
 }
 

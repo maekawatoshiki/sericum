@@ -34,7 +34,12 @@ impl<T> RawAllocator<T> {
 
     pub fn alloc(&mut self, val: T) -> Raw<T> {
         let raw = Box::into_raw(Box::new(val));
+        self.allocated.insert(Raw(raw));
         Raw(raw)
+    }
+
+    pub fn allocated_ref(&self) -> &FxHashSet<Raw<T>> {
+        &self.allocated
     }
 }
 

@@ -37,7 +37,6 @@ pub struct RegisterInfo {
     pub virt_reg: VirtReg,
     pub phys_reg: Option<PhysReg>,
     pub reg_class: RegisterClassKind,
-    pub tied: Option<RegisterId>,
     pub uses: FxHashSet<MachineInstId>,
     pub defs: FxHashSet<MachineInstId>,
 }
@@ -84,7 +83,6 @@ impl RegistersInfo {
             virt_reg,
             phys_reg: None,
             reg_class,
-            tied: None,
             uses: FxHashSet::default(),
             defs: FxHashSet::default(),
         });
@@ -125,7 +123,6 @@ impl RegisterInfo {
             virt_reg: VirtReg(0),
             phys_reg: Some(r.as_phys_reg()),
             reg_class: r.as_phys_reg().reg_class(),
-            tied: None,
             uses: FxHashSet::default(),
             defs: FxHashSet::default(),
         }

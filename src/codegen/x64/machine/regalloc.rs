@@ -7,10 +7,7 @@ use super::calc_spill_weight::calc_spill_weight;
 use super::live_interval_splitter::LiveIntervalSplitter;
 use super::reg_coalescer::coalesce_function;
 use super::{inst::*, spiller::Spiller};
-use crate::analysis::{
-    dom_tree::DominatorTreeConstructor,
-    loops::{Loops, LoopsConstructor},
-};
+use crate::analysis::{dom_tree::DominatorTreeConstructor, loops::LoopsConstructor};
 use crate::codegen::common::machine::{builder::*, function::*, liveness::*, module::*};
 use crate::{ir::types::Types, traits::pass::ModulePassTrait};
 use rustc_hash::FxHashSet;
@@ -59,27 +56,35 @@ impl RegisterAllocator {
 
         // debug!(println!("before coalesing {:?}", cur_func));
 
-        coalesce_function(&mut matrix, cur_func);
-
         // debug!(println!("after coalesing {:?}", cur_func));
 
         // TODO: preserve_phys_reg_uses_across_call
-        self.preserve_reg_uses_across_call(tys, cur_func, &mut matrix, true);
+        self.preserve_reg_uses_across_call(tys, cur_func, &mut matrix);
+        coalesce_function(&mut matrix, cur_func);
 
         self.queue = matrix.collect_virt_regs().into_iter().collect();
         self.sort_queue(&matrix); // for better allocation. not necessary
-        while let Some(vreg) = self.queue.pop_front() {
-            // if vreg.retrieve() == 8 {
-            //     println!("00!!!");
-            // }
-
+        let mut f = 0;
+        'a: while let Some(vreg) = self.queue.pop_front() {
             let mut allocated = false;
             let order = AllocationOrder::new(&matrix, cur_func)
                 .get_order(vreg)
                 .unwrap();
             // println!("END");
+            let mut unused_range = LiveRange::new_empty();
             for reg in order {
                 if matrix.interferes(vreg, reg) {
+                    if unused_range.segments.len() == 0 {
+                        for s in matrix
+                            .phys_reg_range
+                            .get(reg)
+                            .unwrap()
+                            .unused_range(&matrix.program_points)
+                            .segments
+                        {
+                            unused_range.add_segment(s);
+                        }
+                    }
                     // println!("{:?}: {:#?}", reg, matrix.phys_reg_range.get(reg).unwrap());
                     // println!(
                     //     "{:?}: {:#?}",
@@ -103,6 +108,52 @@ impl RegisterAllocator {
 
             if allocated {
                 continue;
+            }
+
+            if f < 40 {
+                let mut vr = matrix.virt_reg_interval.get(&vreg).unwrap().range.clone();
+                println!("vreg  {:#?}", vr);
+                println!("un  {:#?}", unused_range);
+                vr.remove_range(&unused_range);
+                println!("vreg empty {:#?}", vr);
+                let dom_tree =
+                    DominatorTreeConstructor::new(&cur_func.body.basic_blocks).construct();
+                let loops = LoopsConstructor::new(&dom_tree, &cur_func.body.basic_blocks).analyze();
+                let mut last = vreg;
+                for v in &vr.segments {
+                    let reg = RegisterId {
+                        id: (*cur_func.regs_info.arena_ref())
+                            .0
+                            .iter()
+                            .find(|(id, r)| r.virt_reg == last)
+                            .unwrap()
+                            .0,
+                        kind: VirtOrPhys::Virt(last),
+                    };
+                    let inst_id = *matrix
+                        .id2pp
+                        .iter()
+                        .find(|(id, pp)| **pp == v.start)
+                        .unwrap()
+                        .0;
+                    let parent = cur_func.body.inst_arena[inst_id].parent;
+                    if loops.get_loop_for(parent).is_none() {
+                        if let Some(x) = LiveIntervalSplitter::new(cur_func, &mut matrix)
+                            .split2(tys, &loops, &reg, &inst_id)
+                        {
+                            println!("split");
+                            if last == vreg {
+                                self.queue.push_front(last);
+                            }
+                            self.queue.push_front(x.as_virt_reg());
+                            last = x.as_virt_reg();
+                            f += 1;
+                        }
+                    }
+                }
+                if last != vreg {
+                    continue 'a;
+                }
             }
 
             let mut interfering = matrix.collect_interfering_assigned_regs(vreg);
@@ -206,7 +257,6 @@ impl RegisterAllocator {
         matrix: &mut LiveRegMatrix,
         occupied: &mut FxHashSet<FrameIndexKind>,
         call_inst_id: MachineInstId,
-        a: bool,
     ) {
         // TODO: Refine code. It's hard to understand.
         fn find_unused_slot(
@@ -272,7 +322,7 @@ impl RegisterAllocator {
         let loops = LoopsConstructor::new(&dom_tree, &cur_func.body.basic_blocks).analyze();
 
         for (frinfo, reg) in slots_to_save_regs.into_iter().zip(regs_to_save.into_iter()) {
-            if let Some(x) = LiveIntervalSplitter::new(cur_func, matrix).split(
+            if let Some(_) = LiveIntervalSplitter::new(cur_func, matrix).split(
                 tys,
                 &loops,
                 &reg,
@@ -325,7 +375,6 @@ impl RegisterAllocator {
         tys: &Types,
         cur_func: &mut MachineFunction,
         matrix: &mut LiveRegMatrix,
-        a: bool,
     ) {
         let mut call_inst_id = vec![];
 
@@ -346,7 +395,7 @@ impl RegisterAllocator {
             .collect::<FxHashSet<_>>();
 
         for inst_id in call_inst_id {
-            self.insert_inst_to_save_reg(tys, cur_func, matrix, &mut occupied.clone(), inst_id, a);
+            self.insert_inst_to_save_reg(tys, cur_func, matrix, &mut occupied.clone(), inst_id);
         }
     }
 }
