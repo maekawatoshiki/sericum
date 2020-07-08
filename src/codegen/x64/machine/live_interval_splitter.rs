@@ -3,14 +3,11 @@ use super::super::{
     frame_object::*,
     machine::register::*,
 };
-use super::{inst::*, spiller::Spiller};
-use crate::analysis::loops::{Loops, LoopsConstructor};
-use crate::codegen::common::machine::{
-    basic_block::*, builder::*, function::*, liveness::*, module::*,
-};
-use crate::{ir::types::Types, traits::pass::ModulePassTrait};
+use super::inst::*;
+use crate::analysis::loops::Loops;
+use crate::codegen::common::machine::{basic_block::*, builder::*, function::*, liveness::*};
+use crate::ir::types::Types;
 use rustc_hash::FxHashSet;
-use std::collections::VecDeque;
 
 pub struct LiveIntervalSplitter<'a> {
     func: &'a mut MachineFunction,
@@ -22,8 +19,7 @@ impl<'a> LiveIntervalSplitter<'a> {
         Self { func, matrix }
     }
 
-    // [a, i1), [i2, b)
-    // before i1,
+    // TODO: REFINE CODE
     pub fn split(
         &mut self,
         tys: &Types,
@@ -39,7 +35,7 @@ impl<'a> LiveIntervalSplitter<'a> {
         }
         // tied registers
         if self.func.regs_info.arena_ref()[*reg].defs.len() == 2 {
-            let mut defs = &self.func.regs_info.arena_ref()[*reg].defs;
+            let defs = &self.func.regs_info.arena_ref()[*reg].defs;
             let mut defs = defs.iter();
             let id1 = *defs.next().unwrap();
             let id2 = *defs.next().unwrap();
@@ -60,22 +56,15 @@ impl<'a> LiveIntervalSplitter<'a> {
         if self.func.regs_info.arena_ref()[*reg].defs.len() > 2 {
             return None;
         }
-        // reg's defs and uses are not in any loop
+        // splitting not in any loop
         {
-            for (id, bb) in self.func.body.basic_blocks.id_and_block() {
-                let liveness = bb.liveness_ref();
-                if liveness.def.contains(reg) && loops.get_loop_for(id).is_some() {
-                    return None;
-                }
-                if liveness.live_in.contains(reg) && loops.get_loop_for(id).is_some() {
-                    return None;
-                }
-                if liveness.live_out.contains(reg) && loops.get_loop_for(id).is_some() {
-                    return None;
-                }
+            let p1 = self.func.body.inst_arena[*before_load].parent;
+            let p2 = self.func.body.inst_arena[*after_store].parent;
+            if loops.get_loop_for(p1).is_some() || loops.get_loop_for(p2).is_some() {
+                return None;
             }
         }
-        // debug!(println!("split {:?}, {:?}", reg, self.func.name));
+        debug!(println!("split {:?}, {:?}", reg, self.func.name));
 
         let after_store_pp = self.matrix.get_program_point(*after_store).unwrap();
         let before_load_pp = self.matrix.get_program_point(*before_load).unwrap();
@@ -190,135 +179,135 @@ impl<'a> LiveIntervalSplitter<'a> {
         Some(new_reg)
     }
 
-    pub fn split2(
-        &mut self,
-        tys: &Types,
-        loops: &Loops<MachineBasicBlock>,
-        reg: &RegisterId,
-        before_copy: &MachineInstId,
-    ) -> Option<RegisterId> {
-        // virtual registers only
-        if reg.is_phys_reg() {
-            return None;
-        }
-        // tied registers
-        if self.func.regs_info.arena_ref()[*reg].defs.len() == 2 {
-            let mut defs = &self.func.regs_info.arena_ref()[*reg].defs;
-            let mut defs = defs.iter();
-            let id1 = *defs.next().unwrap();
-            let id2 = *defs.next().unwrap();
-            let mut pp1 = self.matrix.get_program_point(id1).unwrap();
-            let mut pp2 = self.matrix.get_program_point(id2).unwrap();
-            if pp1 > pp2 {
-                ::std::mem::swap(&mut pp1, &mut pp2)
-            }
-            if pp1.base.next.unwrap() != pp2.base {
-                return None;
-            }
-        }
-        // no multiple defines
-        if self.func.regs_info.arena_ref()[*reg].defs.len() > 2 {
-            return None;
-        }
-        // reg's defs and uses are not in any loop
-        {
-            let parent = self.func.body.inst_arena[*before_copy].parent;
-            if loops.get_loop_for(parent).is_some() {
-                return None;
-            }
-        }
-        // debug!(println!("split {:?}, {:?}", reg, self.func.name));
-
-        let before_copy_pp = self.matrix.get_program_point(*before_copy).unwrap();
-
-        let new_reg = self.func.regs_info.new_virt_reg_from(&reg);
-        let parent = self.func.body.inst_arena[*before_copy].parent;
-        let src = MachineOperand::Register(*reg);
-        let copy_id = self.func.alloc_inst(
-            MachineInst::new_simple(MachineOpcode::Copy, vec![src], parent).with_def(vec![new_reg]),
-        );
-        let copy_pp = self.matrix.program_points.next_of(before_copy_pp);
-        self.matrix.id2pp.insert(copy_id, copy_pp);
-
-        let reg_intvl = self
-            .matrix
-            .virt_reg_interval
-            .get_mut(&reg.as_virt_reg())
-            .unwrap();
-        println!("{:?} {:?}", reg_intvl.start_point().unwrap(), copy_pp);
-        assert!(reg_intvl.start_point().unwrap() <= copy_pp);
-        let new_reg_end_point = reg_intvl.end_point().unwrap();
-        reg_intvl
-            .range
-            .remove_segment(&LiveSegment::new(copy_pp, reg_intvl.end_point().unwrap()));
-
-        let mut new_reg_uses = FxHashSet::default();
-        for &id in &self.func.regs_info.arena_ref_mut()[*reg].uses {
-            if self.matrix.get_program_point(id).unwrap() > copy_pp {
-                new_reg_uses.insert(id);
-            }
-        }
-        assert!(self.func.regs_info.arena_ref_mut()[*reg].uses.len() > 0);
-        self.matrix.add_vreg_entity(new_reg);
-        for &id in &new_reg_uses {
-            let inst = &mut self.func.body.inst_arena[id];
-            inst.replace_operand_register(&self.func.regs_info, *reg, new_reg);
-        }
-
-        let parent = self.func.body.inst_arena[*before_copy].parent;
-
-        fn f(
-            reg: &RegisterId,
-            new_reg: RegisterId,
-            bb_id: MachineBasicBlockId,
-            start: MachineBasicBlockId,
-            bbs: &MachineBasicBlocks,
-        ) {
-            let bb = &bbs.arena[bb_id];
-            let liveness = &mut bb.liveness_ref_mut();
-            let mut a = false;
-            if bb_id != start && liveness.live_in.remove(reg) {
-                a = true;
-                liveness.add_live_in(new_reg);
-            }
-            if liveness.live_out.remove(reg) {
-                a = true;
-                liveness.add_live_out(new_reg);
-            }
-            if !a {
-                return;
-            }
-            for s in &bb.succ {
-                f(reg, new_reg, *s, start, bbs);
-            }
-        }
-        f(reg, new_reg, parent, parent, &self.func.body.basic_blocks);
-
-        {
-            let liveness = &mut *self.func.body.basic_blocks.arena[parent].liveness_ref_mut();
-            liveness.add_def(new_reg);
-        }
-
-        let mut builder = BuilderWithLiveInfoEdit::new(self.matrix, self.func);
-
-        builder.set_insert_point_after_inst(*before_copy);
-        builder.insert2(copy_id, copy_pp);
-        self.matrix.virt_reg_interval.add(
-            new_reg.as_virt_reg(),
-            LiveRange::new(vec![LiveSegment::new(copy_pp, new_reg_end_point)]),
-        );
-        let weight = self
-            .matrix
-            .virt_reg_interval
-            .get(&reg.as_virt_reg())
-            .unwrap()
-            .spill_weight;
-        self.matrix
-            .virt_reg_interval
-            .get_mut(&new_reg.as_virt_reg())
-            .unwrap()
-            .spill_weight = weight;
-
-        Some(new_reg)
-    }
+    // pub fn split2(
+    //     &mut self,
+    //     tys: &Types,
+    //     loops: &Loops<MachineBasicBlock>,
+    //     reg: &RegisterId,
+    //     before_copy: &MachineInstId,
+    // ) -> Option<RegisterId> {
+    //     // virtual registers only
+    //     if reg.is_phys_reg() {
+    //         return None;
+    //     }
+    //     // tied registers
+    //     if self.func.regs_info.arena_ref()[*reg].defs.len() == 2 {
+    //         let mut defs = &self.func.regs_info.arena_ref()[*reg].defs;
+    //         let mut defs = defs.iter();
+    //         let id1 = *defs.next().unwrap();
+    //         let id2 = *defs.next().unwrap();
+    //         let mut pp1 = self.matrix.get_program_point(id1).unwrap();
+    //         let mut pp2 = self.matrix.get_program_point(id2).unwrap();
+    //         if pp1 > pp2 {
+    //             ::std::mem::swap(&mut pp1, &mut pp2)
+    //         }
+    //         if pp1.base.next.unwrap() != pp2.base {
+    //             return None;
+    //         }
+    //     }
+    //     // no multiple defines
+    //     if self.func.regs_info.arena_ref()[*reg].defs.len() > 2 {
+    //         return None;
+    //     }
+    //     // reg's defs and uses are not in any loop
+    //     {
+    //         let parent = self.func.body.inst_arena[*before_copy].parent;
+    //         if loops.get_loop_for(parent).is_some() {
+    //             return None;
+    //         }
+    //     }
+    //     // debug!(println!("split {:?}, {:?}", reg, self.func.name));
+    //
+    //     let before_copy_pp = self.matrix.get_program_point(*before_copy).unwrap();
+    //
+    //     let new_reg = self.func.regs_info.new_virt_reg_from(&reg);
+    //     let parent = self.func.body.inst_arena[*before_copy].parent;
+    //     let src = MachineOperand::Register(*reg);
+    //     let copy_id = self.func.alloc_inst(
+    //         MachineInst::new_simple(MachineOpcode::Copy, vec![src], parent).with_def(vec![new_reg]),
+    //     );
+    //     let copy_pp = self.matrix.program_points.next_of(before_copy_pp);
+    //     self.matrix.id2pp.insert(copy_id, copy_pp);
+    //
+    //     let reg_intvl = self
+    //         .matrix
+    //         .virt_reg_interval
+    //         .get_mut(&reg.as_virt_reg())
+    //         .unwrap();
+    //     println!("{:?} {:?}", reg_intvl.start_point().unwrap(), copy_pp);
+    //     assert!(reg_intvl.start_point().unwrap() <= copy_pp);
+    //     let new_reg_end_point = reg_intvl.end_point().unwrap();
+    //     reg_intvl
+    //         .range
+    //         .remove_segment(&LiveSegment::new(copy_pp, reg_intvl.end_point().unwrap()));
+    //
+    //     let mut new_reg_uses = FxHashSet::default();
+    //     for &id in &self.func.regs_info.arena_ref_mut()[*reg].uses {
+    //         if self.matrix.get_program_point(id).unwrap() > copy_pp {
+    //             new_reg_uses.insert(id);
+    //         }
+    //     }
+    //     assert!(self.func.regs_info.arena_ref_mut()[*reg].uses.len() > 0);
+    //     self.matrix.add_vreg_entity(new_reg);
+    //     for &id in &new_reg_uses {
+    //         let inst = &mut self.func.body.inst_arena[id];
+    //         inst.replace_operand_register(&self.func.regs_info, *reg, new_reg);
+    //     }
+    //
+    //     let parent = self.func.body.inst_arena[*before_copy].parent;
+    //
+    //     fn f(
+    //         reg: &RegisterId,
+    //         new_reg: RegisterId,
+    //         bb_id: MachineBasicBlockId,
+    //         start: MachineBasicBlockId,
+    //         bbs: &MachineBasicBlocks,
+    //     ) {
+    //         let bb = &bbs.arena[bb_id];
+    //         let liveness = &mut bb.liveness_ref_mut();
+    //         let mut a = false;
+    //         if bb_id != start && liveness.live_in.remove(reg) {
+    //             a = true;
+    //             liveness.add_live_in(new_reg);
+    //         }
+    //         if liveness.live_out.remove(reg) {
+    //             a = true;
+    //             liveness.add_live_out(new_reg);
+    //         }
+    //         if !a {
+    //             return;
+    //         }
+    //         for s in &bb.succ {
+    //             f(reg, new_reg, *s, start, bbs);
+    //         }
+    //     }
+    //     f(reg, new_reg, parent, parent, &self.func.body.basic_blocks);
+    //
+    //     {
+    //         let liveness = &mut *self.func.body.basic_blocks.arena[parent].liveness_ref_mut();
+    //         liveness.add_def(new_reg);
+    //     }
+    //
+    //     let mut builder = BuilderWithLiveInfoEdit::new(self.matrix, self.func);
+    //
+    //     builder.set_insert_point_after_inst(*before_copy);
+    //     builder.insert2(copy_id, copy_pp);
+    //     self.matrix.virt_reg_interval.add(
+    //         new_reg.as_virt_reg(),
+    //         LiveRange::new(vec![LiveSegment::new(copy_pp, new_reg_end_point)]),
+    //     );
+    //     let weight = self
+    //         .matrix
+    //         .virt_reg_interval
+    //         .get(&reg.as_virt_reg())
+    //         .unwrap()
+    //         .spill_weight;
+    //     self.matrix
+    //         .virt_reg_interval
+    //         .get_mut(&new_reg.as_virt_reg())
+    //         .unwrap()
+    //         .spill_weight = weight;
+    //
+    //     Some(new_reg)
+    // }
 }

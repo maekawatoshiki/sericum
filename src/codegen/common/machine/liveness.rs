@@ -395,6 +395,10 @@ impl LiveRange {
     }
 
     pub fn remove_segment(&mut self, seg: &LiveSegment) {
+        if self.segments.len() == 0 {
+            return;
+        }
+
         let mut found = true;
         let pt = self
             .segments

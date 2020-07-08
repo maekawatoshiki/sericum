@@ -64,39 +64,23 @@ impl RegisterAllocator {
 
         self.queue = matrix.collect_virt_regs().into_iter().collect();
         self.sort_queue(&matrix); // for better allocation. not necessary
-        let mut f = 0;
-        'a: while let Some(vreg) = self.queue.pop_front() {
+        while let Some(vreg) = self.queue.pop_front() {
             let mut allocated = false;
             let order = AllocationOrder::new(&matrix, cur_func)
                 .get_order(vreg)
                 .unwrap();
-            // println!("END");
             let mut unused_range = LiveRange::new_empty();
             for reg in order {
                 if matrix.interferes(vreg, reg) {
-                    if unused_range.segments.len() == 0 {
-                        for s in matrix
-                            .phys_reg_range
-                            .get(reg)
-                            .unwrap()
-                            .unused_range(&matrix.program_points)
-                            .segments
-                        {
-                            unused_range.add_segment(s);
-                        }
+                    for s in matrix
+                        .phys_reg_range
+                        .get(reg)
+                        .unwrap()
+                        .unused_range(&matrix.program_points)
+                        .segments
+                    {
+                        unused_range.add_segment(s);
                     }
-                    // println!("{:?}: {:#?}", reg, matrix.phys_reg_range.get(reg).unwrap());
-                    // println!(
-                    //     "{:?}: {:#?}",
-                    //     vreg,
-                    //     matrix.virt_reg_interval.get(&vreg).unwrap().range
-                    // );
-                    // println!("failed assign {:?} for {:?}", reg, vreg);
-                    // for (_, _, i) in cur_func.body.mbb_iter() {
-                    //     for (id, inst) in i {
-                    //         println!("{:?} - {:?}", inst, matrix.get_program_point(id).unwrap());
-                    //     }
-                    // }
                     continue;
                 }
 
@@ -108,52 +92,6 @@ impl RegisterAllocator {
 
             if allocated {
                 continue;
-            }
-
-            if f < 40 {
-                let mut vr = matrix.virt_reg_interval.get(&vreg).unwrap().range.clone();
-                println!("vreg  {:#?}", vr);
-                println!("un  {:#?}", unused_range);
-                vr.remove_range(&unused_range);
-                println!("vreg empty {:#?}", vr);
-                let dom_tree =
-                    DominatorTreeConstructor::new(&cur_func.body.basic_blocks).construct();
-                let loops = LoopsConstructor::new(&dom_tree, &cur_func.body.basic_blocks).analyze();
-                let mut last = vreg;
-                for v in &vr.segments {
-                    let reg = RegisterId {
-                        id: (*cur_func.regs_info.arena_ref())
-                            .0
-                            .iter()
-                            .find(|(id, r)| r.virt_reg == last)
-                            .unwrap()
-                            .0,
-                        kind: VirtOrPhys::Virt(last),
-                    };
-                    let inst_id = *matrix
-                        .id2pp
-                        .iter()
-                        .find(|(id, pp)| **pp == v.start)
-                        .unwrap()
-                        .0;
-                    let parent = cur_func.body.inst_arena[inst_id].parent;
-                    if loops.get_loop_for(parent).is_none() {
-                        if let Some(x) = LiveIntervalSplitter::new(cur_func, &mut matrix)
-                            .split2(tys, &loops, &reg, &inst_id)
-                        {
-                            println!("split");
-                            if last == vreg {
-                                self.queue.push_front(last);
-                            }
-                            self.queue.push_front(x.as_virt_reg());
-                            last = x.as_virt_reg();
-                            f += 1;
-                        }
-                    }
-                }
-                if last != vreg {
-                    continue 'a;
-                }
             }
 
             let mut interfering = matrix.collect_interfering_assigned_regs(vreg);
@@ -190,7 +128,6 @@ impl RegisterAllocator {
             self.queue.push_front(vreg);
         }
 
-        // self.preserve_reg_uses_across_call(tys, cur_func, &mut matrix, false);
         self.rewrite_vregs(cur_func, &matrix);
 
         coalesce_function(&mut matrix, cur_func); // spilling may cause another coalesce needs
