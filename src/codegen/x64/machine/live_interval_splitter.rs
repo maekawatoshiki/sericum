@@ -109,32 +109,32 @@ impl<'a> LiveIntervalSplitter<'a> {
 
         let parent = self.func.body.inst_arena[*before_load].parent;
 
-        fn f(
+        fn update_live_info(
             reg: &RegisterId,
             new_reg: RegisterId,
-            bb_id: MachineBasicBlockId,
             start: MachineBasicBlockId,
+            bb_id: MachineBasicBlockId,
             bbs: &MachineBasicBlocks,
         ) {
             let bb = &bbs.arena[bb_id];
             let liveness = &mut bb.liveness_ref_mut();
-            let mut a = false;
+            let mut updated = false;
             if bb_id != start && liveness.live_in.remove(reg) {
-                a = true;
+                updated = true;
                 liveness.add_live_in(new_reg);
             }
             if liveness.live_out.remove(reg) {
-                a = true;
+                updated = true;
                 liveness.add_live_out(new_reg);
             }
-            if !a {
+            if !updated {
                 return;
             }
             for s in &bb.succ {
-                f(reg, new_reg, *s, start, bbs);
+                update_live_info(reg, new_reg, start, *s, bbs);
             }
         }
-        f(reg, new_reg, parent, parent, &self.func.body.basic_blocks);
+        update_live_info(reg, new_reg, parent, parent, &self.func.body.basic_blocks);
 
         let src = MachineOperand::Mem(MachineMemOperand::BaseFi(rbp, *slot));
         let load_id = self.func.alloc_inst(
@@ -147,6 +147,10 @@ impl<'a> LiveIntervalSplitter<'a> {
         );
         let load_pp = self.matrix.program_points.next_of(before_load_pp);
         self.matrix.id2pp.insert(load_id, load_pp);
+        self.matrix.virt_reg_interval.add(
+            new_reg.as_virt_reg(),
+            LiveRange::new(vec![LiveSegment::new(load_pp, new_reg_end_point)]),
+        );
         {
             let liveness = &mut *self.func.body.basic_blocks.arena[parent].liveness_ref_mut();
             liveness.add_def(new_reg);
@@ -155,15 +159,12 @@ impl<'a> LiveIntervalSplitter<'a> {
         let mut builder = BuilderWithLiveInfoEdit::new(self.matrix, self.func);
 
         builder.set_insert_point_before_inst(*after_store);
-        builder.insert2(store_id, store_pp);
+        builder.insert(store_id);
 
         builder.set_insert_point_after_inst(*before_load);
-        builder.insert2(load_id, load_pp);
-        self.matrix
-            .virt_reg_interval
-            .get_mut(&new_reg.as_virt_reg())
-            .unwrap()
-            .range = LiveRange::new(vec![LiveSegment::new(load_pp, new_reg_end_point)]);
+        builder.insert(load_id);
+
+        // TODO: We need a suitable way to calculate spill weight
         let weight = self
             .matrix
             .virt_reg_interval

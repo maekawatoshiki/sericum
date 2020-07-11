@@ -97,40 +97,51 @@ impl<'a> BuilderTrait for BuilderWithLiveInfoEdit<'a> {
         let insert_pt = self.insert_point;
         self.insert_point += 1;
 
-        let pp = self.calc_program_point(insert_pt);
-
         let inst_id = inst.into_id(&mut self.function);
-        self.matrix.id2pp.insert(inst_id, pp);
+        let pp = match self.matrix.id2pp.get(&inst_id) {
+            Some(pp) => *pp,
+            None => {
+                let pp = self.calc_program_point(insert_pt);
+                self.matrix.id2pp.insert(inst_id, pp);
+                pp
+            }
+        };
 
         {
             // update registers' use&def list. TODO: refine code
             let inst = &self.function.body.inst_arena[inst_id];
             for use_ in inst.collect_used_regs() {
-                if use_.is_phys_reg() {
-                    let range = self.matrix.phys_reg_range.get_mut(use_.as_phys_reg());
+                let use_ = &self.function.regs_info.arena_ref()[*use_];
+
+                if let Some(use_) = use_.phys_reg {
+                    let range = self.matrix.phys_reg_range.get_mut(use_);
                     if range.is_none() {
                         continue;
                     }
-                    let range = range.unwrap();
-                    let end_point = range.end_point_mut().unwrap();
-                    if *end_point <= pp {
-                        *end_point = pp
+                    if let Some(s) = range.unwrap().find_nearest_starting_segment_mut(&pp) {
+                        if s.end < pp {
+                            s.end = pp;
+                        }
                     }
                 } else {
-                    let end_point = self
+                    if let Some(s) = self
                         .matrix
                         .virt_reg_interval
-                        .get_mut(&use_.as_virt_reg())
+                        .get_mut(&use_.virt_reg)
                         .unwrap()
-                        .end_point_mut()
-                        .unwrap();
-                    if *end_point <= pp {
-                        *end_point = pp
+                        .range
+                        .find_nearest_starting_segment_mut(&pp)
+                    {
+                        if s.end < pp {
+                            s.end = pp;
+                        }
                     }
                 }
             }
+
             for &def in inst.collect_defined_regs() {
                 let def_ = &self.function.regs_info.arena_ref()[def];
+
                 if let Some(phys_reg) = def_.phys_reg {
                     self.matrix
                         .phys_reg_range

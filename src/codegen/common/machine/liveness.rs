@@ -492,6 +492,18 @@ impl LiveRange {
     pub fn contains_point(&self, pp: &ProgramPoint) -> bool {
         self.segments.iter().any(|s| s.contains_point(pp))
     }
+
+    pub fn find_nearest_starting_segment_mut(
+        &mut self,
+        pp: &ProgramPoint,
+    ) -> Option<&mut LiveSegment> {
+        for s in self.segments.iter_mut().rev() {
+            if &s.start < pp {
+                return Some(s);
+            }
+        }
+        None
+    }
 }
 
 impl LiveSegment {
