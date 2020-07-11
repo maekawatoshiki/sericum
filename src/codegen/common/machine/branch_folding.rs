@@ -114,7 +114,8 @@ impl BranchFolding {
         let mut worklist = vec![];
 
         for (id, block) in f.body.basic_blocks.id_and_block() {
-            if block.iseq_ref().len() > 1 {
+            let v: &Vec<_> = &*block.iseq_ref();
+            if v.len() > 1 {
                 continue;
             }
             let inst = &f.body.inst_arena[block.iseq_ref()[0]];

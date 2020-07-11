@@ -59,7 +59,7 @@ impl MachineAsmPrinter {
                 .push_str(format!("{}:\n", self.bb_id_to_label_id(&id)).as_str());
             self.run_on_basic_block(inst_iter, fo);
         }
-        self.cur_bb_id_base += f.body.basic_blocks.order.len();
+        self.cur_bb_id_base += f.body.basic_blocks.arena.len();
     }
 
     fn run_on_basic_block<'a>(&mut self, inst_iter: InstIter<'a>, fo: &FrameObjectsInfo) {

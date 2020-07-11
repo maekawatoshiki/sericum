@@ -64,6 +64,7 @@ impl RegisterAllocator {
 
         self.queue = matrix.collect_virt_regs().into_iter().collect();
         self.sort_queue(&matrix); // for better allocation. not necessary
+
         while let Some(vreg) = self.queue.pop_front() {
             let mut allocated = false;
             let order = AllocationOrder::new(&matrix, cur_func)
@@ -234,14 +235,10 @@ impl RegisterAllocator {
             }
         }
 
-        // debug!(println!("REG TO SAVE: {:?}", regs_to_save));
-
         let mut slots_to_save_regs = vec![];
         for r in &regs_to_save {
             slots_to_save_regs.push(find_unused_slot(cur_func, occupied, *r));
         }
-
-        // debug!(println!("NEW SLOTS: {:?}", slots_to_save_regs));
 
         let call_inst_parent = cur_func.body.inst_arena[call_inst_id].parent;
 

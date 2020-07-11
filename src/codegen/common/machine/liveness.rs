@@ -418,15 +418,13 @@ impl LiveRange {
         if found {
             if seg.end == self.segments[pt].end {
                 self.segments.remove(pt);
-            } else if seg.end <= self.segments[pt].end {
+            } else if seg.end < self.segments[pt].end {
                 self.segments[pt].start = seg.end;
             } else if self.segments[pt].end < seg.end {
                 let start = self.segments[pt].end;
                 self.segments.remove(pt);
                 assert!(start < seg.end);
                 self.remove_segment(&LiveSegment::new(start, seg.end));
-            } else {
-                panic!()
             }
         } else {
             if self.segments[pt - 1].end <= seg.start {
@@ -446,15 +444,9 @@ impl LiveRange {
                 self.segments[pt - 1].end = seg.start;
             } else if self.segments[pt - 1].end < seg.end {
                 assert!(seg.start < self.segments[pt - 1].end);
+                let end = self.segments[pt - 1].end;
                 self.segments[pt - 1].end = seg.start;
-                if pt < self.segments.len() && self.segments[pt].start < seg.end {
-                    // assert!(self.segments[pt].start < seg.end);
-                    self.remove_segment(&LiveSegment::new(self.segments[pt].start, seg.end));
-                } else {
-                    // seg.end <= self.segments[pt].start
-                }
-            } else {
-                panic!()
+                self.remove_segment(&LiveSegment::new(end, seg.end));
             }
         }
     }
