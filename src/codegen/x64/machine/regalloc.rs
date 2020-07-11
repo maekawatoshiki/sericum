@@ -69,18 +69,8 @@ impl RegisterAllocator {
             let order = AllocationOrder::new(&matrix, cur_func)
                 .get_order(vreg)
                 .unwrap();
-            let mut unused_range = LiveRange::new_empty();
             for reg in order {
                 if matrix.interferes(vreg, reg) {
-                    for s in matrix
-                        .phys_reg_range
-                        .get(reg)
-                        .unwrap()
-                        .unused_range(&matrix.program_points)
-                        .segments
-                    {
-                        unused_range.add_segment(s);
-                    }
                     continue;
                 }
 
