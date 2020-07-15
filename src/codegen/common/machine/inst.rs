@@ -256,6 +256,22 @@ impl MachineInst {
         replaced_operands_idx
     }
 
+    pub fn replace_nth_operand_with(
+        &mut self,
+        regs_info: &RegistersInfo,
+        nth: usize,
+        to: MachineOperand,
+    ) {
+        let op = &mut self.operand[nth];
+        for &r in op.registers() {
+            regs_info.arena_ref_mut()[r].remove_use(self.id.unwrap());
+        }
+        for &r in to.registers() {
+            regs_info.arena_ref_mut()[r].add_use(self.id.unwrap());
+        }
+        *op = to;
+    }
+
     pub fn tie_regs(&mut self, def: RegisterId, use_: RegisterId) {
         self.tie.insert(def, use_);
     }

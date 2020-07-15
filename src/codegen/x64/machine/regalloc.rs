@@ -54,11 +54,6 @@ impl RegisterAllocator {
         let mut matrix = LivenessAnalysis::new().analyze_function(cur_func);
         calc_spill_weight(cur_func, &mut matrix);
 
-        // debug!(println!("before coalesing {:?}", cur_func));
-
-        // debug!(println!("after coalesing {:?}", cur_func));
-
-        // TODO: preserve_phys_reg_uses_across_call
         self.preserve_reg_uses_across_call(tys, cur_func, &mut matrix);
         coalesce_function(&mut matrix, cur_func);
 
