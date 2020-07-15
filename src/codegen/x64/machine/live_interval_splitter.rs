@@ -39,16 +39,32 @@ impl<'a> LiveIntervalSplitter<'a> {
             let mut defs = defs.iter();
             let id1 = *defs.next().unwrap();
             let id2 = *defs.next().unwrap();
-            // println!(
-            //     "{:?} {:?}",
-            //     self.func.body.inst_arena[id1], self.func.body.inst_arena[id2]
-            // );
-            let mut pp1 = self.matrix.get_program_point(id1).unwrap();
-            let mut pp2 = self.matrix.get_program_point(id2).unwrap();
-            if pp1 > pp2 {
-                ::std::mem::swap(&mut pp1, &mut pp2)
-            }
-            if pp1.base.next.unwrap() != pp2.base {
+            println!("hereeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee");
+            if (self.func.body.inst_arena.arena[id1]
+                .opcode
+                .inst_def()
+                .is_some()
+                && self.func.body.inst_arena.arena[id1]
+                    .opcode
+                    .inst_def()
+                    .unwrap()
+                    .tie
+                    .len()
+                    > 0)
+                || (self.func.body.inst_arena.arena[id2]
+                    .opcode
+                    .inst_def()
+                    .is_some()
+                    && self.func.body.inst_arena.arena[id2]
+                        .opcode
+                        .inst_def()
+                        .unwrap()
+                        .tie
+                        .len()
+                        > 0)
+            {
+                println!("GTTTTTTTTTTTTTTTTTTTTTTTTTT");
+            } else {
                 return None;
             }
         }
@@ -106,6 +122,10 @@ impl<'a> LiveIntervalSplitter<'a> {
             let inst = &mut self.func.body.inst_arena[id];
             inst.replace_operand_register(&self.func.regs_info, *reg, new_reg);
         }
+        println!(
+            "{:?} a",
+            self.func.regs_info.arena_ref_mut()[*reg].uses.len()
+        );
 
         let parent = self.func.body.inst_arena[*before_load].parent;
 

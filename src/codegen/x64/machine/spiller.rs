@@ -224,6 +224,7 @@ impl<'a> Spiller<'a> {
     }
 
     pub fn spill(&mut self, tys: &Types, vreg: VirtReg) -> Vec<VirtReg> {
+        println!("spill {:?}", vreg);
         let reg_id = *self.matrix.get_entity_by_vreg(vreg).unwrap();
         let slot = self
             .func

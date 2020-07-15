@@ -280,9 +280,6 @@ impl RegisterAllocator {
                 )
                 .with_def(vec![reg]),
             );
-            // cur_func.regs_info.arena_ref_mut()[reg]
-            //     .uses
-            //     .remove(&load_inst_id);
 
             let mut builder = BuilderWithLiveInfoEdit::new(matrix, cur_func);
 

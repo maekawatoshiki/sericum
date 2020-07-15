@@ -193,15 +193,7 @@ impl MachineInst {
     pub fn set_use_to_regs(&self, regs_info: &RegistersInfo, old_id: Option<MachineInstId>) {
         let id = self.id.unwrap();
 
-        for reg in self
-            .operand
-            .iter()
-            .filter_map(|o| match o {
-                MachineOperand::Register(_) | MachineOperand::Mem(_) => Some(o),
-                _ => None,
-            })
-            .flat_map(|o| o.registers())
-        {
+        for reg in self.operand.iter().flat_map(|o| o.registers()) {
             let reg = &mut regs_info.arena_ref_mut()[*reg];
             some_then!(id, old_id, reg.remove_use(id));
             reg.add_use(id);

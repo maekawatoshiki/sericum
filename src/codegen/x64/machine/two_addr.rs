@@ -47,18 +47,26 @@ impl TwoAddressConverter {
                     continue;
                 }
 
-                for (def, use_) in &inst.tie {
-                    tied.push((*inst_id, *def, *use_));
+                for (def, use_) in inst.tie.clone() {
+                    tied.push((*inst_id, def, use_));
 
-                    // Tied registers are assigned to one register (def register).
+                    // Tied virtual registers are assigned to one physical register (def register).
                     // e.g.
                     //   before: v1 = add v2, 1 (tied: v1 and v2)
                     //   after:  v1 = add v1, 1
-                    *inst
-                        .operand
-                        .iter_mut()
-                        .find(|op| op.is_register() && op.as_register() == use_)
-                        .unwrap() = MachineOperand::Register(*def);
+                    // *inst
+                    //     .operand
+                    //     .iter_mut()
+                    //     .find(|op| op.is_register() && *op.as_register() == use_)
+                    //     .unwrap() = MachineOperand::Register(def);
+                    // inst.replace_operand_register(&f.regs_info, use_, def);
+                }
+
+                for (d, u) in &inst.opcode.inst_def().unwrap().tie {
+                    let u_ = *inst.operand[u.as_use()].as_register();
+                    let d_ = inst.def[d.as_def()];
+                    inst.operand[u.as_use()] = MachineOperand::Register(d_);
+                    f.regs_info.arena_ref_mut()[d_].add_use(*inst_id);
                 }
 
                 // Delete the map of all the tied registers because they are assigned to one
@@ -74,23 +82,34 @@ impl TwoAddressConverter {
             // after:  v1 = copy v2
             //         v1 = add v1, 1
 
-            // TODO: hard to understand what's going on
-            let old_inst = mem::replace(
-                &mut f.body.inst_arena[inst_id],
-                MachineInst::new_simple(
-                    MachineOpcode::Copy,
-                    vec![MachineOperand::Register(use_)],
-                    inst_bb,
-                )
-                .with_def(vec![def]),
-            );
-
-            let inst = f.alloc_inst(old_inst);
-            f.body.inst_arena[inst_id].set_id(&f.regs_info, inst_id);
+            let copy = MachineInst::new_simple(
+                MachineOpcode::Copy,
+                vec![MachineOperand::Register(use_)],
+                inst_bb,
+            )
+            .with_def(vec![def]);
 
             let mut builder = Builder::new(f);
-            builder.set_insert_point_after_inst(inst_id).unwrap();
-            builder.insert(inst);
+            builder.set_insert_point_before_inst(inst_id).unwrap();
+            builder.insert(copy);
+
+            // TODO: hard to understand what's going on
+            // let old_inst = mem::replace(
+            //     &mut f.body.inst_arena[inst_id],
+            //     MachineInst::new_simple(
+            //         MachineOpcode::Copy,
+            //         vec![MachineOperand::Register(use_)],
+            //         inst_bb,
+            //     )
+            //     .with_def(vec![def]),
+            // );
+            //
+            // let inst = f.alloc_inst(old_inst);
+            // f.body.inst_arena[inst_id].set_id(&f.regs_info, inst_id);
+            //
+            // let mut builder = Builder::new(f);
+            // builder.set_insert_point_after_inst(inst_id).unwrap();
+            // builder.insert(inst);
         }
     }
 }
