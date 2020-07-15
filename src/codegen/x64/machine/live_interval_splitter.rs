@@ -39,7 +39,6 @@ impl<'a> LiveIntervalSplitter<'a> {
             let mut defs = defs.iter();
             let id1 = *defs.next().unwrap();
             let id2 = *defs.next().unwrap();
-            println!("hereeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee");
             if (self.func.body.inst_arena.arena[id1]
                 .opcode
                 .inst_def()

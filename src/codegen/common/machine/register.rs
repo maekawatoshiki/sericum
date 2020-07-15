@@ -1,4 +1,5 @@
 use crate::codegen::arch::machine::{inst::MachineInstId, register::*};
+use crate::util::count::Count;
 use id_arena::{Arena, Id};
 use rustc_hash::FxHashSet;
 use std::fmt::Debug;
@@ -37,8 +38,8 @@ pub struct RegisterInfo {
     pub virt_reg: VirtReg,
     pub phys_reg: Option<PhysReg>,
     pub reg_class: RegisterClassKind,
-    pub uses: FxHashSet<MachineInstId>,
-    pub defs: FxHashSet<MachineInstId>,
+    pub uses: Count<MachineInstId>, // FxHashSet<MachineInstId>,
+    pub defs: Count<MachineInstId>, // FxHashSet<MachineInstId>,
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
@@ -83,8 +84,8 @@ impl RegistersInfo {
             virt_reg,
             phys_reg: None,
             reg_class,
-            uses: FxHashSet::default(),
-            defs: FxHashSet::default(),
+            uses: Count::new(),
+            defs: Count::new(),
         });
         RegisterId {
             id,
@@ -123,13 +124,13 @@ impl RegisterInfo {
             virt_reg: VirtReg(0),
             phys_reg: Some(r.as_phys_reg()),
             reg_class: r.as_phys_reg().reg_class(),
-            uses: FxHashSet::default(),
-            defs: FxHashSet::default(),
+            uses: Count::new(),
+            defs: Count::new(),
         }
     }
 
     pub fn add_def(&mut self, id: MachineInstId) {
-        self.defs.insert(id);
+        self.defs.add(id);
     }
 
     pub fn remove_def(&mut self, id: MachineInstId) {
@@ -137,7 +138,7 @@ impl RegisterInfo {
     }
 
     pub fn add_use(&mut self, id: MachineInstId) {
-        self.uses.insert(id);
+        self.uses.add(id);
     }
 
     pub fn remove_use(&mut self, id: MachineInstId) {

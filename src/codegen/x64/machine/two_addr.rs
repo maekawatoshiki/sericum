@@ -65,6 +65,7 @@ impl TwoAddressConverter {
                 for (d, u) in &inst.opcode.inst_def().unwrap().tie {
                     let u_ = *inst.operand[u.as_use()].as_register();
                     let d_ = inst.def[d.as_def()];
+                    f.regs_info.arena_ref_mut()[u_].remove_use(*inst_id);
                     inst.operand[u.as_use()] = MachineOperand::Register(d_);
                     f.regs_info.arena_ref_mut()[d_].add_use(*inst_id);
                 }
