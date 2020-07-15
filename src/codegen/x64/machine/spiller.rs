@@ -10,6 +10,7 @@ use crate::codegen::common::machine::{
     liveness::{LiveRange, LiveRegMatrix, LiveSegment},
 };
 use crate::ir::types::Types;
+use rustc_hash::FxHashSet;
 
 pub struct Spiller<'a> {
     func: &'a mut MachineFunction,
@@ -35,16 +36,38 @@ impl<'a> Spiller<'a> {
             x.cmp(&y)
         });
 
+        // a = c
         // a = add a, b
         //
         // new_reg = add a, b
         // mov [mem], new_reg
         //
-        // new_reg = mov a
+        // new_reg = mov c
         // new_reg = add new_reg, b
         // mov [mem], new_reg
 
-        for def_id in defs {
+        let mut ties = FxHashSet::default();
+        for &def in &defs {
+            let def_inst = &self.func.body.inst_arena[def];
+            if let Some(i) = def_inst.opcode.inst_def() {
+                if i.tie.len() > 0 {
+                    ties.insert(def_inst.def[0]);
+                }
+            }
+        }
+
+        println!("ties {:?}", ties);
+
+        let mut last = None;
+        for &def_id in &defs {
+            let def_inst = &self.func.body.inst_arena[def_id];
+            if last.is_none() && ties.contains(&def_inst.def[0]) {
+                last = Some(def_inst.operand[0].clone());
+                self.func.remove_inst(def_id);
+                continue;
+            }
+
+            let def_inst = &mut self.func.body.inst_arena[def_id];
             let reg_class = self.func.regs_info.arena_ref()[reg_id].reg_class;
             let new_reg = self.func.regs_info.new_virt_reg(reg_class);
             new_regs.push(new_reg.as_virt_reg());
@@ -54,20 +77,20 @@ impl<'a> Spiller<'a> {
                 .add(new_reg.as_virt_reg(), LiveRange::new_empty())
                 .is_spillable = false;
 
-            let def_inst = &mut self.func.body.inst_arena[def_id];
             def_inst.set_def(&self.func.regs_info, new_reg);
 
-            let mut old_src = None;
+            let mut tied = false;
             if let Some(inst_def) = def_inst.opcode.inst_def() {
                 assert!(inst_def.tie.len() <= 1); // TODO: support for more than one tied register
                 if inst_def.tie.len() == 1 {
+                    tied = true;
                     let pos = def_inst
                         .operand
                         .iter()
                         .position(|o| o.is_register() && o.as_register() == &reg_id)
                         .unwrap();
                     if inst_def.tie.iter().next().unwrap().1.as_use() == pos {
-                        old_src = Some(reg_id);
+                        // old_src = Some(reg_id);
                         def_inst.replace_operand_register(&self.func.regs_info, reg_id, new_reg);
                     }
                 }
@@ -85,11 +108,21 @@ impl<'a> Spiller<'a> {
                 ],
                 parent,
             );
-            let copy = old_src.map_or(None, |dst| {
-                let copy = MachineInst::new_simple(MachineOpcode::Copy, vec![src], parent)
-                    .with_def(vec![dst]);
-                Some(copy)
-            });
+            let copy = if tied {
+                let a = last.map_or(None, |src| {
+                    let copy = MachineInst::new_simple(MachineOpcode::Copy, vec![src], parent)
+                        .with_def(vec![new_reg]);
+                    Some(copy)
+                });
+                last = None;
+                a
+            } else {
+                None
+            };
+
+            self.func.body.basic_blocks.arena[parent]
+                .liveness_ref_mut()
+                .add_def(new_reg);
 
             let start = self.matrix.get_program_point(def_id).unwrap();
             self.matrix
@@ -100,10 +133,11 @@ impl<'a> Spiller<'a> {
                 .add_segment(LiveSegment::new(start, start));
 
             let mut builder = BuilderWithLiveInfoEdit::new(self.matrix, self.func);
-            builder.set_insert_point_after_inst(def_id).unwrap();
             if let Some(copy) = copy {
+                builder.set_insert_point_before_inst(def_id).unwrap();
                 builder.insert(copy);
             }
+            builder.set_insert_point_after_inst(def_id).unwrap();
             builder.insert(store);
         }
 
@@ -135,26 +169,20 @@ impl<'a> Spiller<'a> {
         });
 
         for use_id in uses {
+            // let use_inst = &mut self.func.body.inst_arena[use_id];
+            // if let Some(inst_def) = use_inst.opcode.inst_def() {
+            //     if inst_def.tie.len() == 1 {
+            //         continue;
+            //     }
+            // }
+
             let new_reg = self.func.regs_info.new_virt_reg(reg_class);
             new_regs.push(new_reg.as_virt_reg());
             self.matrix.add_vreg_entity(new_reg);
 
             let use_inst = &mut self.func.body.inst_arena[use_id];
             let parent = use_inst.parent;
-            let replaced_idx =
-                use_inst.replace_operand_register(&self.func.regs_info, reg_id, new_reg);
-            let mut old_dst = None;
-            if let Some(inst_def) = use_inst.opcode.inst_def() {
-                // TODO: Support for more than one tied register
-                if inst_def.tie.len() == 1
-                    && replaced_idx.len() == 1
-                    && replaced_idx[0] == 0
-                    && use_inst.def[0] == reg_id
-                {
-                    old_dst = Some(use_inst.def[0]);
-                    use_inst.set_def(&self.func.regs_info, new_reg);
-                }
-            }
+            use_inst.replace_operand_register(&self.func.regs_info, reg_id, new_reg);
 
             let rbp = self.func.regs_info.get_phys_reg(GR64::RBP);
             let src = MachineOperand::Mem(MachineMemOperand::BaseFi(rbp, slot.clone()));
@@ -165,26 +193,16 @@ impl<'a> Spiller<'a> {
             )
             .with_def(vec![new_reg]);
 
-            let copy = old_dst.map_or(None, |dst| {
-                let copy = MachineInst::new_simple(
-                    MachineOpcode::Copy,
-                    vec![MachineOperand::Register(new_reg)],
-                    parent,
-                )
-                .with_def(vec![dst]);
-                Some(copy)
-            });
-            let new_reg_needs_live_range_update = copy.is_none();
-
             {
                 let mut builder = BuilderWithLiveInfoEdit::new(self.matrix, self.func);
                 builder.set_insert_point_before_inst(use_id).unwrap();
                 builder.insert(load);
                 builder.set_insert_point_after_inst(use_id).unwrap();
-                if let Some(copy) = copy {
-                    builder.insert(copy);
-                }
             }
+
+            self.func.body.basic_blocks.arena[parent]
+                .liveness_ref_mut()
+                .add_def(new_reg);
 
             let use_pp = self.matrix.get_program_point(use_id).unwrap();
             let interval = self
@@ -192,8 +210,10 @@ impl<'a> Spiller<'a> {
                 .virt_reg_interval
                 .get_mut(&new_reg.as_virt_reg())
                 .unwrap();
-            if new_reg_needs_live_range_update {
-                *interval.end_point_mut().unwrap() = use_pp;
+            if let Some(s) = interval.range.find_nearest_starting_segment_mut(&use_pp) {
+                if s.end < use_pp {
+                    s.end = use_pp;
+                }
             }
             interval.is_spillable = false;
         }
@@ -210,11 +230,19 @@ impl<'a> Spiller<'a> {
             .local_mgr
             .alloc(&rc2ty(self.func.regs_info.arena_ref()[reg_id].reg_class)); // TODO
 
-        let mut new_regs = self.insert_reload(tys, reg_id, &slot);
+        let mut new_regs = vec![];
         new_regs.append(&mut self.insert_evict(reg_id, &slot));
+        new_regs.append(&mut self.insert_reload(tys, reg_id, &slot));
 
         self.matrix.virt_reg_interval.inner_mut().remove(&vreg);
-        self.matrix.vreg2entity.remove(&vreg);
+        let r = self.matrix.vreg2entity.remove(&vreg).unwrap();
+
+        for (_, block) in self.func.body.basic_blocks.id_and_block() {
+            let mut liveness_ref = block.liveness_ref_mut();
+            liveness_ref.def.remove(&r);
+            liveness_ref.live_in.remove(&r);
+            liveness_ref.live_out.remove(&r);
+        }
 
         new_regs
     }

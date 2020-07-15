@@ -249,11 +249,7 @@ impl MachineInst {
         let mut processed = FxHashSet::default();
         // TODO: This loop may run once at most
         for (i, o) in self.operand.iter_mut().enumerate() {
-            let mut rs = match o {
-                MachineOperand::Register(_) | MachineOperand::Mem(_) => o.registers_mut(),
-                _ => continue,
-            };
-            for r in &mut rs {
+            for r in &mut o.registers_mut() {
                 if !processed.insert(**r) {
                     continue;
                 }
