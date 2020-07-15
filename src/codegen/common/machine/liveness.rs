@@ -8,7 +8,7 @@ use std::fmt;
 const IDX_STEP: usize = 16;
 
 pub struct LiveRegMatrix {
-    pub vreg2entity: FxHashMap<VirtReg, RegisterId>,
+    pub virt_regs: FxHashMap<VirtReg, RegisterId>,
     pub id2pp: FxHashMap<MachineInstId, ProgramPoint>,
     pub virt_reg_interval: VirtRegInterval,
     pub phys_reg_range: PhysRegRange,
@@ -61,14 +61,14 @@ pub struct ProgramPoints {
 
 impl LiveRegMatrix {
     pub fn new(
-        vreg2entity: FxHashMap<VirtReg, RegisterId>,
+        virt_regs: FxHashMap<VirtReg, RegisterId>,
         id2pp: FxHashMap<MachineInstId, ProgramPoint>,
         virt_reg_interval: VirtRegInterval,
         phys_reg_range: PhysRegRange,
         program_points: ProgramPoints,
     ) -> Self {
         Self {
-            vreg2entity,
+            virt_regs,
             id2pp,
             virt_reg_interval,
             phys_reg_range,
@@ -77,11 +77,11 @@ impl LiveRegMatrix {
     }
 
     // pub fn contains_vreg_entity(&self, vreg: &MachineRegister) -> bool {
-    //     self.vreg2entity.contains_key(&vreg.get_vreg())
+    //     self.virt_regs.contains_key(&vreg.get_vreg())
     // }
 
-    pub fn add_vreg_entity(&mut self, reg: RegisterId) {
-        self.vreg2entity.insert(reg.as_virt_reg(), reg);
+    pub fn add_virt_reg(&mut self, reg: RegisterId) {
+        self.virt_regs.insert(reg.as_virt_reg(), reg);
     }
 
     pub fn add_live_interval(&mut self, vreg: VirtReg, range: LiveRange) -> &mut LiveInterval {
@@ -198,8 +198,8 @@ impl LiveRegMatrix {
 
     /// v2 merges into v1 and remove v2 from matrix
     pub fn merge_virt_regs(&mut self, regs_info: &RegistersInfo, v1: VirtReg, v2: VirtReg) {
-        let v2_e = self.vreg2entity.remove(&v2).unwrap();
-        let v1_e = *self.vreg2entity.get(&v1).unwrap();
+        let v2_e = self.virt_regs.remove(&v2).unwrap();
+        let v1_e = *self.virt_regs.get(&v1).unwrap();
         let mut arena = regs_info.arena_ref_mut();
         for use_ in arena[v2_e].uses.clone() {
             arena[v1_e].add_use(use_)
@@ -214,7 +214,7 @@ impl LiveRegMatrix {
 
     /// r2 merges into r1 and remove r2 from matrix
     pub fn merge_regs(&mut self, r1: PhysReg, r2: VirtReg) {
-        self.vreg2entity.remove(&r2);
+        self.virt_regs.remove(&r2);
         let r2_i = self.virt_reg_interval.remove(&r2).unwrap();
         let r1_i = self.phys_reg_range.get_mut(r1).unwrap();
         r1_i.unite_range(r2_i.range);
@@ -229,7 +229,7 @@ impl LiveRegMatrix {
     }
 
     pub fn get_entity_by_vreg(&self, vreg: VirtReg) -> Option<&RegisterId> {
-        self.vreg2entity.get(&vreg)
+        self.virt_regs.get(&vreg)
     }
 }
 
@@ -834,7 +834,7 @@ impl LivenessAnalysis {
         let mut vreg2range: FxHashMap<VirtReg, LiveRange> = FxHashMap::default();
         let mut reg2range: PhysRegRange = PhysRegRange(FxHashMap::default());
         let mut id2pp: FxHashMap<MachineInstId, ProgramPoint> = FxHashMap::default();
-        let mut vreg2entity: FxHashMap<VirtReg, RegisterId> = FxHashMap::default();
+        let mut virt_regs: FxHashMap<VirtReg, RegisterId> = FxHashMap::default();
         let mut program_points = ProgramPoints::new();
 
         let mut last_pp: ProgramPoint =
@@ -896,7 +896,7 @@ impl LivenessAnalysis {
                 //             .get_or_create(kill.as_phys_reg())
                 //             .add_segment(LiveSegment::new(cur_pp!(), cur_pp!()));
                 //     } else if kill.is_virt_reg() {
-                //         vreg2entity.insert(kill.as_virt_reg(), *kill);
+                //         virt_regs.insert(kill.as_virt_reg(), *kill);
                 //         vreg2range
                 //             .entry(kill.as_virt_reg())
                 //             .or_insert_with(|| LiveRange::new_empty())
@@ -910,7 +910,7 @@ impl LivenessAnalysis {
                             .get_or_create(def.as_phys_reg())
                             .add_segment(LiveSegment::new(cur_pp!(), cur_pp!()));
                     } else if def.is_virt_reg() {
-                        vreg2entity.insert(def.as_virt_reg(), *def);
+                        virt_regs.insert(def.as_virt_reg(), *def);
                         vreg2range
                             .entry(def.as_virt_reg())
                             .or_insert_with(|| LiveRange::new_empty())
@@ -946,7 +946,7 @@ impl LivenessAnalysis {
         // println!("{:#?}", reg2range.0);
 
         LiveRegMatrix::new(
-            vreg2entity,
+            virt_regs,
             id2pp,
             VirtRegInterval(
                 vreg2range

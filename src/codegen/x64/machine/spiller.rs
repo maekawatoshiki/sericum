@@ -56,7 +56,7 @@ impl<'a> Spiller<'a> {
             }
         }
 
-        println!("ties {:?}", ties);
+        // println!("ties {:?}", ties);
 
         let mut last = None;
         for &def_id in &defs {
@@ -68,10 +68,9 @@ impl<'a> Spiller<'a> {
             }
 
             let def_inst = &mut self.func.body.inst_arena[def_id];
-            let reg_class = self.func.regs_info.arena_ref()[reg_id].reg_class;
-            let new_reg = self.func.regs_info.new_virt_reg(reg_class);
+            let new_reg = self.func.regs_info.new_virt_reg_from(&reg_id);
             new_regs.push(new_reg.as_virt_reg());
-            self.matrix.add_vreg_entity(new_reg);
+            self.matrix.add_virt_reg(new_reg);
             self.matrix
                 .virt_reg_interval
                 .add(new_reg.as_virt_reg(), LiveRange::new_empty())
@@ -109,13 +108,12 @@ impl<'a> Spiller<'a> {
                 parent,
             );
             let copy = if tied {
-                let a = last.map_or(None, |src| {
-                    let copy = MachineInst::new_simple(MachineOpcode::Copy, vec![src], parent)
-                        .with_def(vec![new_reg]);
-                    Some(copy)
-                });
-                last = None;
-                a
+                ::std::mem::replace(&mut last, None).map_or(None, |src| {
+                    Some(
+                        MachineInst::new_simple(MachineOpcode::Copy, vec![src], parent)
+                            .with_def(vec![new_reg]),
+                    )
+                })
             } else {
                 None
             };
@@ -153,8 +151,6 @@ impl<'a> Spiller<'a> {
         slot: &FrameIndexInfo,
     ) -> Vec<VirtReg> {
         let mut new_regs = vec![];
-        let reg_class = self.func.regs_info.arena_ref()[reg_id].reg_class;
-
         let mut uses = self.func.regs_info.arena_ref()[reg_id]
             .uses
             .clone()
@@ -169,16 +165,9 @@ impl<'a> Spiller<'a> {
         });
 
         for use_id in uses {
-            // let use_inst = &mut self.func.body.inst_arena[use_id];
-            // if let Some(inst_def) = use_inst.opcode.inst_def() {
-            //     if inst_def.tie.len() == 1 {
-            //         continue;
-            //     }
-            // }
-
-            let new_reg = self.func.regs_info.new_virt_reg(reg_class);
+            let new_reg = self.func.regs_info.new_virt_reg_from(&reg_id);
             new_regs.push(new_reg.as_virt_reg());
-            self.matrix.add_vreg_entity(new_reg);
+            self.matrix.add_virt_reg(new_reg);
 
             let use_inst = &mut self.func.body.inst_arena[use_id];
             let parent = use_inst.parent;
@@ -193,16 +182,15 @@ impl<'a> Spiller<'a> {
             )
             .with_def(vec![new_reg]);
 
+            self.func.body.basic_blocks.arena[parent]
+                .liveness_ref_mut()
+                .add_def(new_reg);
+
             {
                 let mut builder = BuilderWithLiveInfoEdit::new(self.matrix, self.func);
                 builder.set_insert_point_before_inst(use_id).unwrap();
                 builder.insert(load);
-                builder.set_insert_point_after_inst(use_id).unwrap();
             }
-
-            self.func.body.basic_blocks.arena[parent]
-                .liveness_ref_mut()
-                .add_def(new_reg);
 
             let use_pp = self.matrix.get_program_point(use_id).unwrap();
             let interval = self
@@ -210,12 +198,11 @@ impl<'a> Spiller<'a> {
                 .virt_reg_interval
                 .get_mut(&new_reg.as_virt_reg())
                 .unwrap();
-            if let Some(s) = interval.range.find_nearest_starting_segment_mut(&use_pp) {
-                if s.end < use_pp {
-                    s.end = use_pp;
-                }
-            }
             interval.is_spillable = false;
+            if let Some(s) = interval.range.find_nearest_starting_segment_mut(&use_pp) {
+                assert!(s.end < use_pp);
+                s.end = use_pp;
+            }
         }
 
         self.func.regs_info.arena_ref_mut()[reg_id].uses.clear();
@@ -224,26 +211,18 @@ impl<'a> Spiller<'a> {
     }
 
     pub fn spill(&mut self, tys: &Types, vreg: VirtReg) -> Vec<VirtReg> {
-        println!("spill {:?}", vreg);
         let reg_id = *self.matrix.get_entity_by_vreg(vreg).unwrap();
         let slot = self
             .func
             .local_mgr
             .alloc(&rc2ty(self.func.regs_info.arena_ref()[reg_id].reg_class)); // TODO
 
-        let mut new_regs = vec![];
-        new_regs.append(&mut self.insert_evict(reg_id, &slot));
+        let mut new_regs = self.insert_evict(reg_id, &slot);
         new_regs.append(&mut self.insert_reload(tys, reg_id, &slot));
 
+        let r = self.matrix.virt_regs.remove(&vreg).unwrap();
+        self.func.body.basic_blocks.remove_reg_from_live_info(&r);
         self.matrix.virt_reg_interval.inner_mut().remove(&vreg);
-        let r = self.matrix.vreg2entity.remove(&vreg).unwrap();
-
-        for (_, block) in self.func.body.basic_blocks.id_and_block() {
-            let mut liveness_ref = block.liveness_ref_mut();
-            liveness_ref.def.remove(&r);
-            liveness_ref.live_in.remove(&r);
-            liveness_ref.live_out.remove(&r);
-        }
 
         new_regs
     }

@@ -303,24 +303,7 @@ impl RegisterAllocator {
             }
         }
 
-        println!("!!!");
-        let mut vs: Vec<_> = matrix.collect_virt_regs().into_iter().collect();
-        vs.sort_by(|x, y| {
-            let x = matrix
-                .virt_reg_interval
-                .get(x)
-                .unwrap()
-                .start_point()
-                .unwrap();
-            let y = matrix
-                .virt_reg_interval
-                .get(y)
-                .unwrap()
-                .start_point()
-                .unwrap();
-            x.cmp(&y)
-        });
-        for v in vs {
+        for v in matrix.collect_virt_regs() {
             let mut count = 0;
             for &c in &call_inst_id {
                 let c = matrix.get_program_point(c).unwrap();
@@ -328,19 +311,16 @@ impl RegisterAllocator {
                     count += 1;
                 }
             }
-            count *= 2;
-            let a = {
+            count *= 2/*=load+store*/;
+            let spill_makes_less_mem_access = {
                 let arena = cur_func.regs_info.arena_ref();
-                let rinfo = &arena[*matrix.vreg2entity.get(&v).unwrap()];
-                // count > 0 && rinfo.defs.len() == 1 && rinfo.uses.len() == 2
+                let rinfo = &arena[*matrix.virt_regs.get(&v).unwrap()];
                 (rinfo.defs.len() + rinfo.uses.len()) < count
             };
-            if a {
+            if spill_makes_less_mem_access {
                 Spiller::new(cur_func, matrix).spill(tys, v);
             }
         }
-        // *matrix = LivenessAnalysis::new().analyze_function(cur_func);
-        // calc_spill_weight(cur_func, matrix);
 
         let occupied = cur_func
             .local_mgr

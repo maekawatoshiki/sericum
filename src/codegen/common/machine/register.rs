@@ -144,6 +144,12 @@ impl RegisterInfo {
     pub fn remove_use(&mut self, id: MachineInstId) {
         self.uses.remove(&id);
     }
+
+    pub fn is_early_clobber(&self) -> bool {
+        (&self.defs.iter().collect::<FxHashSet<_>>() & &self.uses.iter().collect::<FxHashSet<_>>())
+            .len()
+            > 0
+    }
 }
 
 impl RegisterId {

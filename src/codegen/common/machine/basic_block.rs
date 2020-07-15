@@ -109,6 +109,15 @@ impl MachineBasicBlocks {
             .merge(Rc::try_unwrap(src_liveness).unwrap().into_inner());
         self.order.retain(|bb| bb != src);
     }
+
+    pub fn remove_reg_from_live_info(&mut self, r: &RegisterId) {
+        for (_, block) in self.id_and_block() {
+            let mut liveness_ref = block.liveness_ref_mut();
+            liveness_ref.def.remove(&r);
+            liveness_ref.live_in.remove(&r);
+            liveness_ref.live_out.remove(&r);
+        }
+    }
 }
 
 impl MachineBasicBlock {
@@ -162,7 +171,7 @@ impl LivenessInfo {
     }
 
     /// Add def.
-    /// If ``self.def`` has ``reg``'s super physical register, we do't add.
+    /// If ``self.def`` has ``reg``'s super physical register, we don't.
     /// If ``self.def`` has ``reg``'s sub physical register, remove it and add ``reg``.
     pub fn add_def(&mut self, reg: RegisterId) -> bool {
         if reg.is_virt_reg() {
@@ -189,10 +198,6 @@ impl LivenessInfo {
 
         while let Some(sub) = cur.super_reg() {
             cur = sub;
-            // let key = RegisterId {
-            //     id: cur.id,
-            //     kind: VirtOrPhys::Phys(cur),
-            // };
             if self.def.iter().any(|k| k.kind == VirtOrPhys::Phys(cur)) {
                 return false;
             }
@@ -202,7 +207,7 @@ impl LivenessInfo {
     }
 
     /// Add livein.
-    /// If ``self.live_in`` has ``reg``'s super physical register, we do't add.
+    /// If ``self.live_in`` has ``reg``'s super physical register, we don't.
     /// If ``self.live_in`` has ``reg``'s sub physical register, remove it and add ``reg``.
     pub fn add_live_in(&mut self, reg: RegisterId) -> bool {
         if reg.is_virt_reg() {
@@ -229,12 +234,7 @@ impl LivenessInfo {
 
         while let Some(sub) = cur.super_reg() {
             cur = sub;
-            // let key = RegisterId {
-            //     id: reg.id,
-            //     kind: VirtOrPhys::Phys(cur),
-            // };
             if self.live_in.iter().any(|k| k.kind == VirtOrPhys::Phys(cur)) {
-                // if self.live_in.contains(&key) {
                 return false;
             }
         }
@@ -243,7 +243,7 @@ impl LivenessInfo {
     }
 
     /// Add liveout.
-    /// If ``self.live_out`` has ``reg``'s super physical register, we do't add.
+    /// If ``self.live_out`` has ``reg``'s super physical register, we don't.
     /// If ``self.live_out`` has ``reg``'s sub physical register, remove it and add ``reg``.
     pub fn add_live_out(&mut self, reg: RegisterId) -> bool {
         if reg.is_virt_reg() {
@@ -263,10 +263,6 @@ impl LivenessInfo {
 
         while let Some(sub) = cur.sub_reg() {
             cur = sub;
-            // let key = RegisterId {
-            //     id: reg.id,
-            //     kind: VirtOrPhys::Phys(cur),
-            // };
             self.live_out.retain(|k| k.kind != VirtOrPhys::Phys(cur));
         }
 
@@ -274,16 +270,11 @@ impl LivenessInfo {
 
         while let Some(sub) = cur.super_reg() {
             cur = sub;
-            // let key = RegisterId {
-            //     id: reg.id,
-            //     kind: VirtOrPhys::Phys(cur),
-            // };
             if self
                 .live_out
                 .iter()
                 .any(|k| k.kind == VirtOrPhys::Phys(cur))
             {
-                // if self.live_out.contains(&key) {
                 return false;
             }
         }

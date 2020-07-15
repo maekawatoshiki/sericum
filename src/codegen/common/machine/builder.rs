@@ -148,7 +148,7 @@ impl<'a> BuilderTrait for BuilderWithLiveInfoEdit<'a> {
                         .get_or_create(phys_reg)
                         .add_segment(LiveSegment::new(pp, pp));
                 } else {
-                    self.matrix.add_vreg_entity(def);
+                    self.matrix.add_virt_reg(def);
                     if let Some(i) = self.matrix.virt_reg_interval.get_mut(&def_.virt_reg) {
                         i.range.add_segment(LiveSegment::new(pp, pp))
                     } else {
@@ -227,7 +227,7 @@ impl<'a> BuilderWithLiveInfoEdit<'a> {
                         .get_or_create(phys_reg)
                         .add_segment(LiveSegment::new(pp, pp));
                 } else {
-                    self.matrix.add_vreg_entity(def);
+                    self.matrix.add_virt_reg(def);
                     if let Some(i) = self.matrix.virt_reg_interval.get_mut(&def_.virt_reg) {
                         i.range.add_segment(LiveSegment::new(pp, pp))
                     } else {
