@@ -2,6 +2,8 @@
 
 [![CircleCI](https://circleci.com/gh/maekawatoshiki/cilk.svg?style=shield)](https://circleci.com/gh/maekawatoshiki/cilk)
 [![](http://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
+[![cilk at crates.io](https://img.shields.io/crates/v/cilk.svg)](https://crates.io/crates/cilk)
+[![cilk at docs.rs](https://docs.rs/cilk/badge.svg)](https://docs.rs/cilk)
 
 Toy Compiler Infrastructure influenced by LLVM written in Rust.
 
