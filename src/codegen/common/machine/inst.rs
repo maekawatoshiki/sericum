@@ -51,6 +51,7 @@ pub enum MachineOperand {
 #[derive(Clone)]
 pub enum AddressKind {
     FunctionName(String),
+    GlobalName(String),
     Label(DataId),
 }
 
@@ -504,6 +505,13 @@ impl AddressKind {
             _ => panic!(),
         }
     }
+
+    pub fn as_global_name(&self) -> &String {
+        match self {
+            AddressKind::GlobalName(s) => s,
+            _ => panic!(),
+        }
+    }
 }
 
 impl MachineConstant {
@@ -688,6 +696,7 @@ impl fmt::Debug for AddressKind {
         match self {
             AddressKind::FunctionName(name) => write!(f, "addr<fn:{}>", name),
             AddressKind::Label(id) => write!(f, "label<{}>", id),
+            AddressKind::GlobalName(name) => write!(f, "global<{}>", name),
         }
     }
 }

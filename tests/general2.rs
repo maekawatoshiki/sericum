@@ -123,7 +123,7 @@ mod x86_64 {
     #[test]
     fn asm_global_var() {
         let mut m = Module::new("cilk");
-        let f = m.create_function("f", types::Type::Int32, vec![]);
+        let f = m.create_function("test", types::Type::Int32, vec![]);
         let g = m.global_vars.new_global_var_with_name(
             types::Type::Int32,
             global_val::Linkage::Common,
@@ -134,17 +134,18 @@ mod x86_64 {
         let mut builder = builder::Builder::new(builder::FunctionIdWithModule::new(&mut m, f));
         let entry = builder.append_basic_block();
         builder.set_insert_point(entry);
+        builder.build_store(value::Value::new_imm_int32(123), g);
         let r = builder.build_load(g);
         builder.build_ret(r);
 
         println!("{:?}", m);
 
-        // compile_and_run(
-        //     "#include <assert.h>
-        // extern int test(int);
-        // int main() { assert(test(10) == 55); }",
-        //     &mut m,
-        // );
+        compile_and_run(
+            "#include <assert.h>
+        extern int test();
+        int main() { assert(test() == 123); }",
+            &mut m,
+        );
     }
 }
 

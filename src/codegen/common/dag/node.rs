@@ -107,6 +107,7 @@ pub enum CondKind {
 #[derive(Debug, Clone, PartialEq)]
 pub enum AddressKind {
     FunctionName(String),
+    GlobalName(String),
 }
 
 impl Into<CondKind> for ICmpKind {
@@ -271,12 +272,23 @@ impl DAGNode {
         }
     }
 
+    pub fn as_address(&self) -> &AddressKind {
+        match &self.kind {
+            NodeKind::Operand(OperandNodeKind::Address(a)) => a,
+            _ => panic!(),
+        }
+    }
+
     pub fn is_constant(&self) -> bool {
         matches!(self.kind, NodeKind::Operand(OperandNodeKind::Constant(_)))
     }
 
     pub fn is_frame_index(&self) -> bool {
         matches!(self.kind, NodeKind::Operand(OperandNodeKind::FrameIndex(_)))
+    }
+
+    pub fn is_address(&self) -> bool {
+        matches!(self.kind, NodeKind::Operand(OperandNodeKind::Address(_)))
     }
 
     pub fn is_maybe_register(&self) -> bool {

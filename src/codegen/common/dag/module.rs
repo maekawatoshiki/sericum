@@ -1,5 +1,5 @@
 use crate::codegen::common::dag::function::*;
-use crate::ir::types::Types;
+use crate::ir::{global_val::GlobalVariables, types::Types};
 use id_arena::*;
 use std::fmt;
 
@@ -7,17 +7,10 @@ pub struct DAGModule {
     pub name: String,
     pub functions: Arena<DAGFunction>,
     pub types: Types,
+    pub global_vars: GlobalVariables,
 }
 
 impl DAGModule {
-    pub fn new(name: &str) -> Self {
-        Self {
-            name: name.to_string(),
-            functions: Arena::new(),
-            types: Types::new(),
-        }
-    }
-
     pub fn add_function(&mut self, f: DAGFunction) -> DAGFunctionId {
         self.functions.alloc(f)
     }

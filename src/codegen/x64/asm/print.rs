@@ -6,6 +6,7 @@ use crate::codegen::common::machine::{
     function::{InstIter, MachineFunction},
     module::MachineModule,
 };
+use crate::ir::types::TypeSize;
 
 pub struct MachineAsmPrinter {
     pub output: String,
@@ -23,6 +24,12 @@ impl MachineAsmPrinter {
     pub fn run_on_module(&mut self, m: &MachineModule) {
         self.output.push_str("  .text\n");
         self.output.push_str("  .intel_syntax noprefix\n");
+
+        for (_, g) in &m.global_vars.arena {
+            self.output.push_str(
+                format!("  .comm {},{},{}\n", g.name, g.ty.size_in_byte(&m.types), 4).as_str(),
+            );
+        }
 
         for (_, func) in &m.functions {
             self.run_on_function(&func)
@@ -138,6 +145,9 @@ impl MachineAsmPrinter {
             MachineOperand::Mem(MachineMemOperand::Address(AddressKind::Label(id))) => {
                 self.output.push_str(self.data_id_to_label_id(id).as_str())
             }
+            MachineOperand::Mem(MachineMemOperand::Address(AddressKind::GlobalName(name))) => self
+                .output
+                .push_str(format!("{} ptr [{}]", word, name.as_str()).as_str()),
             MachineOperand::Mem(MachineMemOperand::BaseFi(base, fi)) => {
                 let base = base.as_phys_reg();
                 let offset = fo.offset(fi.idx).unwrap();

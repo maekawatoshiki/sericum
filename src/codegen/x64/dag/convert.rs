@@ -51,6 +51,7 @@ impl<'a> ConvertToDAG<'a> {
             name: self.module.name.clone(),
             functions,
             types: self.types,
+            global_vars: self.module.global_vars.clone(),
         }
     }
 
@@ -159,8 +160,15 @@ impl<'a> ConvertToDAG<'a> {
                     Type::Void, // TODO
                 ))
             }
+            Value::Global(GlobalValue { id, ty }) => {
+                let name = self.module.global_vars.arena[*id].name.clone();
+                self.alloc_node(DAGNode::new(
+                    NodeKind::Operand(OperandNodeKind::Address(AddressKind::GlobalName(name))),
+                    vec![],
+                    *ty,
+                ))
+            }
             Value::None => self.alloc_node(DAGNode::new(NodeKind::None, vec![], Type::Void)),
-            _ => panic!(),
         }
     }
 
