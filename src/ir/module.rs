@@ -5,8 +5,11 @@ use std::fmt;
 /// A representation of Module, that has name, some functions and type definisions.
 #[derive(Clone)]
 pub struct Module {
+    /// module name
     pub name: String,
+    /// functions that a module has.
     pub functions: Arena<Function>,
+    /// type definitions in a module.
     pub types: Types,
 }
 
@@ -18,7 +21,7 @@ impl Module {
     /// * `name` ... `Module::new()` names the created module it.
     ///
     /// Initialized module is really "empty", so it has no functions yet.
-    /// See [create_function()](method.create_function.html) when you want to create some functions in module.
+    /// See [create_function()](struct.Module.html#method.create_function) when you want to create some functions in module.
     ///
     /// # Examples
     ///
@@ -42,8 +45,8 @@ impl Module {
     /// # Arguments
     ///
     /// * `name` ... function's name
-    /// * `ret_ty` ... a [Type](../types/struct.Type.html) that the function returns.
-    /// * `params_ty` ... a sequence of [Type](../types/struct.Type.html) that are passed to function as parameters.
+    /// * `ret_ty` ... a [Type](../types/enum.Type.html) that the function returns.
+    /// * `params_ty` ... a sequence of [Type](../types/enum.Type.html) that are passed to function as parameters.
     ///
     /// # Examples
     /// ```
@@ -52,7 +55,7 @@ impl Module {
     /// let mut m1 = Module::new("owner");
     /// let m2 = Module::new("other");
     ///
-    /// let _f1_id = m.create_function("f1", Type::Void, vec![]);
+    /// let _f1_id = m1.create_function("f1", Type::Void, vec![]);
     /// ```
     pub fn create_function(
         &mut self,
@@ -98,7 +101,7 @@ impl Module {
     /// let mut m1 = Module::new("owner");
     /// let m2 = Module::new("other");
     ///
-    /// let _f1_id = m.create_function("f1", Type::Void, vec![]);
+    /// let _f1_id = m1.create_function("f1", Type::Void, vec![]);
     ///
     /// // check which module has the function.
     /// assert!(m1.find_function("f1").is_some());
