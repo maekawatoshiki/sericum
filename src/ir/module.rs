@@ -1,4 +1,4 @@
-use super::{function::*, types::*, DumpToString};
+use super::{function::*, global_val::*, types::*, DumpToString};
 use id_arena::*;
 use std::fmt;
 
@@ -6,6 +6,7 @@ use std::fmt;
 pub struct Module {
     pub name: String,
     pub functions: Arena<Function>,
+    pub global_vars: GlobalVariables,
     pub types: Types,
 }
 
@@ -14,6 +15,7 @@ impl Module {
         Self {
             name: name.to_string(),
             functions: Arena::new(),
+            global_vars: GlobalVariables::new(),
             types: Types::new(),
         }
     }
