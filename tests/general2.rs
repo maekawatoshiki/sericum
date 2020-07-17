@@ -3,7 +3,7 @@ mod x86_64 {
     use cilk::{
         cilk_ir,
         codegen::x64::{asm::print::MachineAsmPrinter, standard_conversion_into_machine_module},
-        ir::{builder, types, value},
+        ir::{builder, global_val, types, value},
         module::Module,
         *, // for macro
     };
@@ -118,6 +118,33 @@ mod x86_64 {
         int main() { assert(test(10) == 55); }",
             &mut m,
         );
+    }
+
+    #[test]
+    fn asm_global_var() {
+        let mut m = Module::new("cilk");
+        let f = m.create_function("f", types::Type::Int32, vec![]);
+        let g = m.global_vars.new_global_var_with_name(
+            types::Type::Int32,
+            global_val::Linkage::Common,
+            "g",
+        );
+        let ty = m.types.new_pointer_ty(types::Type::Int32);
+        let g = value::Value::Global(value::GlobalValue { id: g, ty });
+        let mut builder = builder::Builder::new(builder::FunctionIdWithModule::new(&mut m, f));
+        let entry = builder.append_basic_block();
+        builder.set_insert_point(entry);
+        let r = builder.build_load(g);
+        builder.build_ret(r);
+
+        println!("{:?}", m);
+
+        // compile_and_run(
+        //     "#include <assert.h>
+        // extern int test(int);
+        // int main() { assert(test(10) == 55); }",
+        //     &mut m,
+        // );
     }
 }
 

@@ -160,6 +160,7 @@ impl<'a> ConvertToDAG<'a> {
                 ))
             }
             Value::None => self.alloc_node(DAGNode::new(NodeKind::None, vec![], Type::Void)),
+            _ => panic!(),
         }
     }
 

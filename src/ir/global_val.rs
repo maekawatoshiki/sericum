@@ -1,19 +1,23 @@
-use super::types::Type;
-use id_arena::Arena;
+use super::types::{Type, Types};
+use id_arena::{Arena, Id};
+use std::fmt;
+
+pub type GlobalVariableId = Id<GlobalVariable>;
 
 #[derive(Clone)]
 pub struct GlobalVariables {
-    arena: Arena<GlobalVariable>,
+    pub arena: Arena<GlobalVariable>,
+    types: Types,
 }
 
 #[derive(Debug, Clone)]
 pub struct GlobalVariable {
-    ty: Type,
-    linkage: Linkage,
-    name: Option<String>,
+    pub ty: Type,
+    pub linkage: Linkage,
+    pub name: String,
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
+#[derive(Clone, Copy, Eq, PartialEq, Hash)]
 pub enum Linkage {
     Common,
     External,
@@ -21,9 +25,10 @@ pub enum Linkage {
 }
 
 impl GlobalVariables {
-    pub fn new() -> Self {
+    pub fn new(types: Types) -> Self {
         Self {
             arena: Arena::new(),
+            types,
         }
     }
 
@@ -32,19 +37,43 @@ impl GlobalVariables {
         ty: Type,
         linkage: Linkage,
         name: &str,
-    ) -> GlobalVariable {
-        GlobalVariable {
+    ) -> GlobalVariableId {
+        self.arena.alloc(GlobalVariable {
             ty,
             linkage,
-            name: Some(name.to_string()),
-        }
+            name: name.to_string(),
+        })
     }
 
-    pub fn new_global_var(&mut self, ty: Type, linkage: Linkage) -> GlobalVariable {
-        GlobalVariable {
+    pub fn new_global_var(&mut self, ty: Type, linkage: Linkage) -> GlobalVariableId {
+        self.arena.alloc(GlobalVariable {
             ty,
             linkage,
-            name: None,
+            name: "anony".to_string(),
+        })
+    }
+}
+
+impl fmt::Debug for GlobalVariables {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        for (_, g) in &self.arena {
+            writeln!(
+                f,
+                "@{} = {:?} global {}",
+                g.name,
+                g.linkage,
+                self.types.to_string(g.ty)
+            )?;
+        }
+        fmt::Result::Ok(())
+    }
+}
+
+impl fmt::Debug for Linkage {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Self::Common => write!(f, "common"),
+            Self::External => write!(f, "external"),
         }
     }
 }

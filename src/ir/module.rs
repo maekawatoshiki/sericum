@@ -12,11 +12,12 @@ pub struct Module {
 
 impl Module {
     pub fn new(name: &str) -> Self {
+        let types = Types::new();
         Self {
             name: name.to_string(),
             functions: Arena::new(),
-            global_vars: GlobalVariables::new(),
-            types: Types::new(),
+            global_vars: GlobalVariables::new(types.clone()),
+            types,
         }
     }
 
@@ -61,6 +62,7 @@ impl Module {
 impl fmt::Debug for Module {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         writeln!(f, "Module (name: {})", self.name)?;
+        writeln!(f, "{:?}", self.global_vars)?;
         for (_, func) in &self.functions {
             writeln!(f, "{}", self.dump(func))?;
         }
