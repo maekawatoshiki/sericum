@@ -2,14 +2,17 @@ use super::{function::*, types::*, DumpToString};
 use id_arena::*;
 use std::fmt;
 
-/// A representation of Module, that has name, some functions and type definisions.
+/// A representation of Module.
+/// Module has its name, functions and type definisions.
 #[derive(Clone)]
 pub struct Module {
-    /// module name
+    /// Module name
     pub name: String,
-    /// functions that a module has.
+
+    /// Functions attached to the module
     pub functions: Arena<Function>,
-    /// type definitions in a module.
+
+    /// Type definitions in the module
     pub types: Types,
 }
 
@@ -18,10 +21,10 @@ impl Module {
     ///
     /// # Arguments
     ///
-    /// * `name` ... `Module::new()` names the created module it.
+    /// * `name` ... Module name
     ///
     /// Initialized module is really "empty", so it has no functions yet.
-    /// See [create_function()](struct.Module.html#method.create_function) when you want to create some functions in module.
+    /// Use [create_function()](struct.Module.html#method.create_function) to create a function in the module.
     ///
     /// # Examples
     ///
@@ -38,15 +41,14 @@ impl Module {
         }
     }
 
-    /// allocate a [Function](../function/struct.Function.html) and insert into the method's receiver(Module).
-    /// The owner of the created functions is also receiver,
-    /// so the function will be freed when the owner drops.
+    /// Creates a [Function](../function/struct.Function.html) and attaches it to the module.
+    /// All the functions attached to the module will be freed when the module drops.
     ///
     /// # Arguments
     ///
-    /// * `name` ... function's name
-    /// * `ret_ty` ... a [Type](../types/enum.Type.html) that the function returns.
-    /// * `params_ty` ... a sequence of [Type](../types/enum.Type.html) that are passed to function as parameters.
+    /// * `name` ... Function name
+    /// * `ret_ty` ... A [Type](../types/enum.Type.html) that the function returns
+    /// * `params_ty` ... A sequence of [Type](../types/enum.Type.html) that are passed to the function as parameters
     ///
     /// # Examples
     /// ```
@@ -66,28 +68,28 @@ impl Module {
         Function::new(self, name, ret_ty, params_ty)
     }
 
-    /// Add function to the receiver of this method.
-    /// See also [Function](../function/struct.Function.html) how this method is used.
+    /// Attach an existing function to the module.
+    /// See also [Function](../function/struct.Function.html) to understand how this method is used.
     pub fn add_function(&mut self, f: Function) -> FunctionId {
         let id = self.functions.alloc(f);
         self.function_ref_mut(id).id = Some(id);
         id
     }
 
-    /// get a reference of the function that has the id.
+    /// Get a reference to the corresponding function with the given id
     ///
     /// # Arguments
     ///
-    /// * id ... an identifier of [Function](../function/struct.Function.html) what you want to reference.
+    /// * `id` ... An identifier of [Function](../function/struct.Function.html) you want to get a reference
     pub fn function_ref(&self, id: FunctionId) -> &Function {
         &self.functions[id]
     }
 
-    /// get a mutable reference of the function that has the id.
+    /// Get a mutable reference to the corresponding function with the given id
     ///
     /// # Arguments
     ///
-    /// * id ... an identifier of [Function](../function/struct.Function.html) what you want to reference.
+    /// * `id` ... An identifier of [Function](../function/struct.Function.html) you want to get a reference
     pub fn function_ref_mut(&mut self, id: FunctionId) -> &mut Function {
         &mut self.functions[id]
     }
