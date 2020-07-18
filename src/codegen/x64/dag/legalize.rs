@@ -98,28 +98,46 @@ impl Legalize {
             let op1 = self.run_on_node(tys, regs_info, heap, add.operand[1]);
             let rbp = heap.alloc_phys_reg(regs_info, GR64::RBP);
 
-            if op0.kind == NodeKind::IR(IRNodeKind::FIAddr) && op1.is_constant() {
-                let mem = heap.alloc(DAGNode::new_mem(
-                    MemNodeKind::BaseFiOff,
-                    vec![rbp, op0.operand[0], op1],
-                ));
+            if matches!(
+                op0.kind,
+                NodeKind::IR(IRNodeKind::FIAddr) | NodeKind::IR(IRNodeKind::GlobalAddr)
+            ) && op1.is_constant()
+            {
+                let mem = heap.alloc(match op0.kind {
+                    NodeKind::IR(IRNodeKind::FIAddr) => {
+                        DAGNode::new_mem(MemNodeKind::BaseFiOff, vec![rbp, op0.operand[0], op1])
+                    }
+                    NodeKind::IR(IRNodeKind::GlobalAddr) => {
+                        DAGNode::new_mem(MemNodeKind::AddressOff, vec![op0.operand[0], op1])
+                    }
+                    _ => unreachable!(),
+                });
                 return heap.alloc(DAGNode::new(
                     NodeKind::MI(MINodeKind::MOVrm32),
                     vec![mem],
-                    node.ty.clone(),
+                    node.ty,
                 ));
             }
 
-            if op0.kind == NodeKind::IR(IRNodeKind::FIAddr)
-                && op1.kind == NodeKind::IR(IRNodeKind::Mul)
+            if matches!(
+                op0.kind,
+                NodeKind::IR(IRNodeKind::FIAddr) | NodeKind::IR(IRNodeKind::GlobalAddr)
+            ) && op1.kind == NodeKind::IR(IRNodeKind::Mul)
                 && op1.operand[1].is_constant()
             {
                 let op1_op0 = self.run_on_node(tys, regs_info, heap, op1.operand[0]);
                 let op1_op1 = op1.operand[1];
-                let mem = heap.alloc(DAGNode::new_mem(
-                    MemNodeKind::BaseFiAlignOff,
-                    vec![rbp, op0.operand[0], op1_op1, op1_op0],
-                ));
+                let mem = heap.alloc(match op0.kind {
+                    NodeKind::IR(IRNodeKind::FIAddr) => DAGNode::new_mem(
+                        MemNodeKind::BaseFiAlignOff,
+                        vec![rbp, op0.operand[0], op1_op1, op1_op0],
+                    ),
+                    NodeKind::IR(IRNodeKind::GlobalAddr) => DAGNode::new_mem(
+                        MemNodeKind::AddressAlignOff,
+                        vec![op0.operand[0], op1_op1, op1_op0],
+                    ),
+                    _ => unreachable!(),
+                });
                 return heap.alloc(DAGNode::new(
                     NodeKind::MI(MINodeKind::MOVrm32),
                     vec![mem],
@@ -168,6 +186,14 @@ impl Legalize {
                             imm32 m2 {
                                 GR32  src => (mi.MOVmr32 [BaseFiAlignOff %rbp, fi, m2, m1], src)
                                 imm32 src => (mi.MOVmi32 [BaseFiAlignOff %rbp, fi, m2, m1], src) } } } }
+                (ir.GlobalAddr g) a1 {
+                    imm32 a2 {
+                        GR32  src => (mi.MOVmr32 [AddressOff g, a2], src)
+                        imm32 src => (mi.MOVmi32 [AddressOff g, a2], src) }
+                    (ir.Mul m1, m2) a2 {
+                        imm32 m2 {
+                            GR32  src => (mi.MOVmr32 [AddressAlignOff g, m2, m1], src)
+                            imm32 src => (mi.MOVmi32 [AddressAlignOff g, m2, m1], src) } } }
                 GR64 a1 {
                     (ir.Mul m1, m2) a2 {
                         imm32 m2 {

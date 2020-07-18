@@ -123,20 +123,25 @@ mod x86_64 {
     #[test]
     fn asm_global_var() {
         let mut m = Module::new("cilk");
-        let f = m.create_function("test", types::Type::Int32, vec![]);
-        let g = m.global_vars.new_global_var_with_name(
-            types::Type::Int32,
-            global_val::Linkage::Common,
-            "g",
-        );
-        let ty = m.types.new_pointer_ty(types::Type::Int32);
-        let g = value::Value::Global(value::GlobalValue { id: g, ty });
-        let mut builder = builder::Builder::new(builder::FunctionIdWithModule::new(&mut m, f));
-        let entry = builder.append_basic_block();
-        builder.set_insert_point(entry);
-        builder.build_store(value::Value::new_imm_int32(123), g);
-        let r = builder.build_load(g);
-        builder.build_ret(r);
+        let ty = m.types.new_array_ty(types::Type::Int32, 8);
+        let g = m
+            .global_vars
+            .new_global_var_with_name(ty, global_val::Linkage::Common, "g");
+        let g = value::Value::Global(value::GlobalValue {
+            id: g,
+            ty: m.types.new_pointer_ty(ty),
+        });
+
+        cilk_ir!(m; define [i32] test [] {
+            entry:
+                x = alloca i32;
+                store (i32 1), (%x);
+                lx = load (%x);
+                p = gep (%g), [(i32 0), (%lx)];
+                store (i32 123), (%p);
+                i = load (%p);
+                ret (%i);
+        });
 
         println!("{:?}", m);
 

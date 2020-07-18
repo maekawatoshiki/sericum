@@ -72,6 +72,7 @@ pub enum IRNodeKind {
     FCmp,
 
     FIAddr,
+    GlobalAddr,
 
     CopyToReg,
     CopyFromReg,
@@ -368,6 +369,15 @@ impl DAGNode {
             next.debug(f, tys, s, id, indent)?;
         }
         fmt::Result::Ok(())
+    }
+}
+
+impl AddressKind {
+    pub fn as_global_name(&self) -> &String {
+        match self {
+            Self::GlobalName(name) => name,
+            _ => panic!(),
+        }
     }
 }
 

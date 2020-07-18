@@ -8,4 +8,6 @@ pub enum MemNodeKind {
     BaseAlignOff,
     Base,
     Address,
+    AddressOff,
+    AddressAlignOff,
 }

@@ -26,9 +26,9 @@ impl MachineAsmPrinter {
         self.output.push_str("  .intel_syntax noprefix\n");
 
         for (_, g) in &m.global_vars.arena {
-            self.output.push_str(
-                format!("  .comm {},{},{}\n", g.name, g.ty.size_in_byte(&m.types), 4).as_str(),
-            );
+            let size = g.ty.size_in_byte(&m.types);
+            self.output
+                .push_str(format!("  .comm {},{}\n", g.name, size).as_str());
         }
 
         for (_, func) in &m.functions {
@@ -148,6 +148,26 @@ impl MachineAsmPrinter {
             MachineOperand::Mem(MachineMemOperand::Address(AddressKind::GlobalName(name))) => self
                 .output
                 .push_str(format!("{} ptr [{}]", word, name.as_str()).as_str()),
+            MachineOperand::Mem(MachineMemOperand::AddressOff(
+                AddressKind::GlobalName(name),
+                off,
+            )) => self
+                .output
+                .push_str(format!("{} ptr [{} + {}]", word, name.as_str(), off).as_str()),
+            MachineOperand::Mem(MachineMemOperand::AddressAlignOff(
+                AddressKind::GlobalName(name),
+                align,
+                off,
+            )) => self.output.push_str(
+                format!(
+                    "{} ptr [{} + {}*{}]",
+                    word,
+                    name.as_str(),
+                    align,
+                    off.as_phys_reg().name()
+                )
+                .as_str(),
+            ),
             MachineOperand::Mem(MachineMemOperand::BaseFi(base, fi)) => {
                 let base = base.as_phys_reg();
                 let offset = fo.offset(fi.idx).unwrap();

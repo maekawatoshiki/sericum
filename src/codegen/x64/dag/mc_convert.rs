@@ -516,6 +516,21 @@ impl<'a> ScheduleByBlock<'a> {
                     *self.normal_operand(node.operand[1]).as_frame_index(),
                     self.normal_operand(node.operand[2]).as_constant().as_i32(),
                 )),
+                MemNodeKind::AddressOff => MachineOperand::Mem(MachineMemOperand::AddressOff(
+                    inst::AddressKind::GlobalName(
+                        node.operand[0].as_address().as_global_name().to_string(),
+                    ),
+                    self.normal_operand(node.operand[1]).as_constant().as_i32(),
+                )),
+                MemNodeKind::AddressAlignOff => {
+                    MachineOperand::Mem(MachineMemOperand::AddressAlignOff(
+                        inst::AddressKind::GlobalName(
+                            node.operand[0].as_address().as_global_name().to_string(),
+                        ),
+                        self.normal_operand(node.operand[1]).as_constant().as_i32(),
+                        *self.normal_operand(node.operand[2]).as_register(),
+                    ))
+                }
                 MemNodeKind::Address => MachineOperand::Mem(MachineMemOperand::Address(match node
                     .operand[0]
                     .as_address()
