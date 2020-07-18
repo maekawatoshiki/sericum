@@ -206,6 +206,8 @@ mod riscv64 {
                 "-o",
                 output_name.as_str(),
             ])
+            .stderr(::std::process::Stdio::null())
+            .stdout(::std::process::Stdio::null())
             .status()
             .unwrap();
         assert!(compilation.success());

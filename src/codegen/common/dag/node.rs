@@ -6,7 +6,7 @@ use crate::codegen::{
     },
     common::dag::basic_block::*,
 };
-use crate::ir::{opcode::*, types::*};
+use crate::ir::{global_val::GlobalVariableId, opcode::*, types::*};
 use crate::util::allocator::*;
 use id_arena::*;
 use rustc_hash::FxHashMap;
@@ -108,7 +108,7 @@ pub enum CondKind {
 #[derive(Debug, Clone, PartialEq)]
 pub enum AddressKind {
     FunctionName(String),
-    GlobalName(String),
+    Global(GlobalVariableId),
 }
 
 impl Into<CondKind> for ICmpKind {
@@ -373,9 +373,9 @@ impl DAGNode {
 }
 
 impl AddressKind {
-    pub fn as_global_name(&self) -> &String {
+    pub fn as_global(&self) -> &GlobalVariableId {
         match self {
-            Self::GlobalName(name) => name,
+            Self::Global(id) => id,
             _ => panic!(),
         }
     }

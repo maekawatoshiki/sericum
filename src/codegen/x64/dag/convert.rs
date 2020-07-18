@@ -161,9 +161,8 @@ impl<'a> ConvertToDAG<'a> {
                 ))
             }
             Value::Global(GlobalValue { id, ty }) => {
-                let name = self.module.global_vars.arena[*id].name.clone();
                 let g = self.alloc_node(DAGNode::new(
-                    NodeKind::Operand(OperandNodeKind::Address(AddressKind::GlobalName(name))),
+                    NodeKind::Operand(OperandNodeKind::Address(AddressKind::Global(*id))),
                     vec![],
                     *ty,
                 ));

@@ -29,7 +29,7 @@ pub fn convert_module(module: DAGModule) -> MachineModule {
     for (_, func) in module.functions {
         functions.alloc(convert_function(/*&module.types,*/ func));
     }
-    MachineModule::new(module.name, functions, module.types)
+    MachineModule::new(module.name, functions, module.types, module.global_vars)
 }
 
 pub fn convert_function(/*types: &Types,*/ dag_func: DAGFunction) -> MachineFunction {
@@ -446,6 +446,7 @@ impl<'a> ScheduleByBlock<'a> {
                 node::AddressKind::FunctionName(n) => MachineOperand::Mem(
                     MachineMemOperand::Address(inst::AddressKind::FunctionName(n.clone())),
                 ),
+                _ => unimplemented!(),
             },
             NodeKind::Operand(OperandNodeKind::BasicBlock(bb)) => {
                 MachineOperand::Branch(self.get_machine_bb(bb))
