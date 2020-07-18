@@ -321,6 +321,14 @@ impl PatternMatchConstructible for OperandPattern {
                     }
                 }
             }
+            "addr" => {
+                quote! {
+                    if #parent.is_address() {
+                        #body
+                    }
+                }
+            }
+
             reg_class => {
                 let reg_class = str2ident(reg_class);
                 if let Some(ty) = &self.ty {
