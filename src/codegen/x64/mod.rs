@@ -38,7 +38,28 @@ impl TypeSize for Type {
     fn size_in_bits(&self, tys: &Types) -> usize {
         self.size_in_byte(tys) * 8
     }
+
+    fn align_in_byte(&self, tys: &Types) -> usize {
+        match self {
+            Type::Int1 => 1,
+            Type::Int8 => 1,
+            Type::Int32 => 4,
+            Type::Int64 => 8,
+            Type::F64 => 8,
+            Type::Array(id) => tys.base.borrow().non_primitive_types[*id]
+                .as_array()
+                .align_in_byte(tys),
+            Type::Struct(id) => tys.base.borrow().non_primitive_types[*id]
+                .as_struct()
+                .align_in_byte(tys),
+            Type::Pointer(_) => 8,
+            Type::Function(_) => unimplemented!(),
+            Type::Void => 0,
+        }
+    }
 }
+
+const MAX_ALIGN: usize = 16;
 
 impl TypeSize for ArrayType {
     fn size_in_byte(&self, tys: &Types) -> usize {
@@ -48,29 +69,33 @@ impl TypeSize for ArrayType {
     fn size_in_bits(&self, tys: &Types) -> usize {
         self.size_in_byte(tys) * 8
     }
+
+    fn align_in_byte(&self, tys: &Types) -> usize {
+        let align = self.elem_ty.align_in_byte(tys);
+        ::std::cmp::min(MAX_ALIGN, align)
+    }
 }
 
 impl TypeSize for StructType {
     fn size_in_byte(&self, tys: &Types) -> usize {
         let mut size_total = 0;
-        let calc_padding = |off, align| -> usize {
-            if off % align == 0 {
-                0
-            } else {
-                align - off % align
-            }
-        };
+        let padding = |off, align| -> usize { (align - off % align) % align };
         for ty in &self.fields_ty {
-            size_total += {
-                let size = ty.size_in_byte(tys);
-                size + calc_padding(size_total, size)
-            };
+            let size = ty.size_in_byte(tys);
+            size_total += size + padding(size_total, size);
         }
         size_total
     }
 
     fn size_in_bits(&self, tys: &Types) -> usize {
         self.size_in_byte(tys) * 8
+    }
+
+    fn align_in_byte(&self, tys: &Types) -> usize {
+        match self.fields_ty.iter().max_by_key(|t| t.align_in_byte(tys)) {
+            Some(ty) => ty.align_in_byte(tys),
+            None => 0,
+        }
     }
 }
 

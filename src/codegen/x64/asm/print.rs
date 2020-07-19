@@ -30,8 +30,9 @@ impl MachineAsmPrinter {
 
         for (id, g) in &m.global_vars.arena {
             let size = g.ty.size_in_byte(&m.types);
+            let align = g.ty.align_in_byte(&m.types);
             self.output
-                .push_str(format!("  .comm {},{}\n", g.name, size).as_str());
+                .push_str(format!("  .comm {},{},{}\n", g.name, size, align).as_str());
             self.id_to_global_name.insert(id, g.name.clone());
         }
 

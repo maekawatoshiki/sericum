@@ -41,6 +41,7 @@ pub enum Type {
 pub trait TypeSize {
     fn size_in_byte(&self, tys: &Types) -> usize;
     fn size_in_bits(&self, tys: &Types) -> usize;
+    fn align_in_byte(&self, tys: &Types) -> usize;
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
