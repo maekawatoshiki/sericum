@@ -90,6 +90,7 @@ impl TypeSize for StructType {
             let align = ty.align_in_byte(tys);
             size_total += size + padding(size_total, align);
         }
+        // TODO: Need to update offset
         size_total
     }
 
