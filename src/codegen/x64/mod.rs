@@ -71,8 +71,13 @@ impl TypeSize for ArrayType {
     }
 
     fn align_in_byte(&self, tys: &Types) -> usize {
+        let size = self.size_in_byte(tys);
         let align = self.elem_ty.align_in_byte(tys);
-        ::std::cmp::min(MAX_ALIGN, align)
+        if size > MAX_ALIGN {
+            MAX_ALIGN
+        } else {
+            align
+        }
     }
 }
 
@@ -82,7 +87,8 @@ impl TypeSize for StructType {
         let padding = |off, align| -> usize { (align - off % align) % align };
         for ty in &self.fields_ty {
             let size = ty.size_in_byte(tys);
-            size_total += size + padding(size_total, size);
+            let align = ty.align_in_byte(tys);
+            size_total += size + padding(size_total, align);
         }
         size_total
     }

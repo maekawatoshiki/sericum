@@ -37,6 +37,9 @@ macro_rules! matches {
 
 #[macro_export]
 macro_rules! cilk_parse_ty {
+    ($_:expr, i8) => {
+        types::Type::Int8
+    };
     ($_:expr, i32) => {
         types::Type::Int32
     };

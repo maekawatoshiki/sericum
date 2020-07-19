@@ -152,6 +152,38 @@ mod x86_64 {
             &mut m,
         );
     }
+
+    #[test]
+    fn asm_global_var_struct() {
+        let mut m = Module::new("cilk");
+        let ty = m
+            .types
+            .new_struct_ty(vec![types::Type::Int8, types::Type::Int32]);
+        let g = m
+            .global_vars
+            .new_global_var_with_name(ty, global_val::Linkage::Common, "g");
+        let g = value::Value::Global(value::GlobalValue {
+            id: g,
+            ty: m.types.new_pointer_ty(ty),
+        });
+
+        cilk_ir!(m; define [i32] test [] {
+            entry:
+                p = gep (%g), [(i32 0), (i32 1)];
+                store (i32 123), (%p);
+                i = load (%p);
+                ret (%i);
+        });
+
+        println!("{:?}", m);
+
+        compile_and_run(
+            "#include <assert.h>
+        extern int test();
+        int main() { assert(test() == 123); }",
+            &mut m,
+        );
+    }
 }
 
 #[cfg(feature = "riscv64")]
