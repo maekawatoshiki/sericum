@@ -58,7 +58,10 @@ pub struct ArrayType {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StructType {
-    pub fields_ty: Vec<Type>,
+    fields_ty: Vec<Type>,
+    fields_offset: Vec<usize>,
+    align: usize,
+    size: usize,
 }
 
 impl Types {
@@ -97,7 +100,8 @@ impl Types {
     }
 
     pub fn new_struct_ty(&mut self, fields_ty: Vec<Type>) -> Type {
-        let id = self.new_non_primitive_ty(NonPrimitiveType::Struct(StructType::new(fields_ty)));
+        let id =
+            self.new_non_primitive_ty(NonPrimitiveType::Struct(StructType::new(self, fields_ty)));
         Type::Struct(id)
     }
 
@@ -182,29 +186,6 @@ impl Types {
 
     pub fn to_string(&self, ty: Type) -> String {
         self.base.borrow().to_string(ty)
-        // match ty {
-        //     Type::Void => "void".to_string(),
-        //     Type::Int1 => "i1".to_string(),
-        //     Type::Int32 => "i32".to_string(),
-        //     Type::Int64 => "i64".to_string(),
-        //     Type::F64 => "f64".to_string(),
-        //     Type::Pointer(id) => {
-        //         let elem_ty = self.base.borrow().non_primitive_types[id].as_pointer();
-        //         format!("{}*", self.to_string(*elem_ty))
-        //     }
-        //     Type::Array(id) => {
-        //         let arr = self.base.borrow().non_primitive_types[id].as_array();
-        //         arr.to_string(self)
-        //     }
-        //     Type::Function(id) => {
-        //         let f = self.base.borrow().non_primitive_types[id].as_function();
-        //         f.to_string(self)
-        //     }
-        //     Type::Struct(id) => {
-        //         let s = self.base.borrow().non_primitive_types[id].as_struct();
-        //         s.to_string(self)
-        //     }
-        // }
     }
 
     // pub fn get_pointer_ty(&self) -> Type {
@@ -245,10 +226,10 @@ impl TypesBase {
         Type::Function(id)
     }
 
-    pub fn new_struct_ty(&mut self, fields_ty: Vec<Type>) -> Type {
-        let id = self.new_non_primitive_ty(NonPrimitiveType::Struct(StructType::new(fields_ty)));
-        Type::Struct(id)
-    }
+    // pub fn new_struct_ty(&mut self, fields_ty: Vec<Type>) -> Type {
+    //     let id = self.new_non_primitive_ty(NonPrimitiveType::Struct(StructType::new(fields_ty)));
+    //     Type::Struct(id)
+    // }
 
     pub fn as_function_ty(&self, ty: Type) -> Option<&FunctionType> {
         match ty {
@@ -404,8 +385,43 @@ impl ArrayType {
 }
 
 impl StructType {
-    pub fn new(fields_ty: Vec<Type>) -> Self {
-        Self { fields_ty }
+    pub fn new(tys: &Types, fields_ty: Vec<Type>) -> Self {
+        let mut self_ = Self {
+            fields_ty,
+            fields_offset: vec![],
+            align: 0,
+            size: 0,
+        };
+        self_.compute_elem_offsets(tys);
+        self_
+    }
+
+    pub fn compute_elem_offsets(&mut self, tys: &Types) {
+        let mut align = 1;
+        let mut offset = 0;
+        let padding = |off, align| -> usize { (align - off % align) % align };
+        for ty in &self.fields_ty {
+            align = ::std::cmp::max(ty.align_in_byte(tys), align);
+            let size = ty.size_in_byte(tys);
+            let align = ty.align_in_byte(tys);
+            offset += padding(offset, align);
+            self.fields_offset.push(offset);
+            offset += size;
+        }
+        self.size = offset + padding(offset, align);
+        self.align = align;
+    }
+
+    pub const fn size(&self) -> usize {
+        self.size
+    }
+
+    pub const fn align(&self) -> usize {
+        self.align
+    }
+
+    pub fn get_elem_offset(&self, i: usize) -> Option<&usize> {
+        self.fields_offset.get(i)
     }
 
     pub fn to_string(&self, tys: &TypesBase) -> String {

@@ -82,27 +82,16 @@ impl TypeSize for ArrayType {
 }
 
 impl TypeSize for StructType {
-    fn size_in_byte(&self, tys: &Types) -> usize {
-        let mut size_total = 0;
-        let padding = |off, align| -> usize { (align - off % align) % align };
-        for ty in &self.fields_ty {
-            let size = ty.size_in_byte(tys);
-            let align = ty.align_in_byte(tys);
-            size_total += size + padding(size_total, align);
-        }
-        // TODO: Need to update offset
-        size_total
+    fn size_in_byte(&self, _tys: &Types) -> usize {
+        self.size()
     }
 
     fn size_in_bits(&self, tys: &Types) -> usize {
         self.size_in_byte(tys) * 8
     }
 
-    fn align_in_byte(&self, tys: &Types) -> usize {
-        match self.fields_ty.iter().max_by_key(|t| t.align_in_byte(tys)) {
-            Some(ty) => ty.align_in_byte(tys),
-            None => 0,
-        }
+    fn align_in_byte(&self, _tys: &Types) -> usize {
+        self.align()
     }
 }
 
