@@ -29,14 +29,19 @@ impl<'a> LiveIntervalSplitter<'a> {
         after_store: &MachineInstId,
         before_load: &MachineInstId,
     ) -> Option<RegisterId> {
+        let mut s = FxHashSet::default();
         fn update_live_info(
             reg: &RegisterId,
             new_reg: RegisterId,
             start: MachineBasicBlockId,
             bb_id: MachineBasicBlockId,
             bbs: &MachineBasicBlocks,
+            ss: &mut FxHashSet<MachineBasicBlockId>,
         ) {
             let bb = &bbs.arena[bb_id];
+            if !ss.insert(bb_id) {
+                return;
+            }
             let liveness = &mut bb.liveness_ref_mut();
             let live_in_removed = bb_id != start && liveness.live_in.remove(reg);
             let live_out_removed = liveness.live_out.remove(reg);
@@ -51,7 +56,7 @@ impl<'a> LiveIntervalSplitter<'a> {
                 return;
             }
             for s in &bb.succ {
-                update_live_info(reg, new_reg, start, *s, bbs);
+                update_live_info(reg, new_reg, start, *s, bbs, ss);
             }
         }
 
@@ -128,7 +133,14 @@ impl<'a> LiveIntervalSplitter<'a> {
 
         let parent = self.func.body.inst_arena[*before_load].parent;
 
-        update_live_info(reg, new_reg, parent, parent, &self.func.body.basic_blocks);
+        update_live_info(
+            reg,
+            new_reg,
+            parent,
+            parent,
+            &self.func.body.basic_blocks,
+            &mut s,
+        );
 
         let src = MachineOperand::Mem(MachineMemOperand::BaseFi(rbp, *slot));
         let load_id = self.func.alloc_inst(
