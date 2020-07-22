@@ -94,7 +94,7 @@ impl Module {
         &mut self.functions[id]
     }
 
-    /// find a function that is defined in the module by name.
+    /// Find a function that is defined in the module by name.
     ///
     /// # Examples
     /// ```
