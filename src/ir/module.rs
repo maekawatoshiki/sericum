@@ -1,4 +1,4 @@
-use super::{function::*, types::*, DumpToString};
+use super::{function::*, global_val::*, types::*, DumpToString};
 use id_arena::*;
 use std::fmt;
 
@@ -11,6 +11,8 @@ pub struct Module {
 
     /// Functions attached to the module
     pub functions: Arena<Function>,
+
+    pub global_vars: GlobalVariables,
 
     /// Type definitions in the module
     pub types: Types,
@@ -34,10 +36,12 @@ impl Module {
     /// assert_eq!(m.functions.len(), 0);
     /// ```
     pub fn new(name: &str) -> Self {
+        let types = Types::new();
         Self {
             name: name.to_string(),
             functions: Arena::new(),
-            types: Types::new(),
+            global_vars: GlobalVariables::new(types.clone()),
+            types,
         }
     }
 
@@ -127,6 +131,7 @@ impl Module {
 impl fmt::Debug for Module {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         writeln!(f, "Module (name: {})", self.name)?;
+        writeln!(f, "{:?}", self.global_vars)?;
         for (_, func) in &self.functions {
             writeln!(f, "{}", self.dump(func))?;
         }

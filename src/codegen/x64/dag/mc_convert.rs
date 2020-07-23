@@ -28,7 +28,7 @@ pub fn convert_module(module: DAGModule) -> MachineModule {
     for (_, func) in module.functions {
         functions.alloc(convert_function(&module.types, func));
     }
-    MachineModule::new(module.name, functions, module.types)
+    MachineModule::new(module.name, functions, module.types, module.global_vars)
 }
 
 pub fn convert_function(types: &Types, dag_func: DAGFunction) -> MachineFunction {
@@ -481,6 +481,10 @@ impl<'a> ScheduleByBlock<'a> {
                 node::AddressKind::FunctionName(n) => MachineOperand::Mem(
                     MachineMemOperand::Address(inst::AddressKind::FunctionName(n.clone())),
                 ),
+                _ => unreachable!()
+                // node::AddressKind::GlobalName(n) => MachineOperand::Mem(
+                //     MachineMemOperand::Address(inst::AddressKind::GlobalName(n.clone())),
+                // ),
             },
             NodeKind::Operand(OperandNodeKind::BasicBlock(id)) => {
                 MachineOperand::Branch(self.get_machine_bb(id))
@@ -512,6 +516,26 @@ impl<'a> ScheduleByBlock<'a> {
                     *self.normal_operand(node.operand[1]).as_frame_index(),
                     self.normal_operand(node.operand[2]).as_constant().as_i32(),
                 )),
+                MemNodeKind::AddressOff => MachineOperand::Mem(MachineMemOperand::AddressOff(
+                    inst::AddressKind::Global(*node.operand[0].as_address().as_global()),
+                    self.normal_operand(node.operand[1]).as_constant().as_i32(),
+                )),
+                MemNodeKind::AddressAlignOff => {
+                    MachineOperand::Mem(MachineMemOperand::AddressAlignOff(
+                        inst::AddressKind::Global(*node.operand[0].as_address().as_global()),
+                        self.normal_operand(node.operand[1]).as_constant().as_i32(),
+                        *self.normal_operand(node.operand[2]).as_register(),
+                    ))
+                }
+                MemNodeKind::Address => MachineOperand::Mem(MachineMemOperand::Address(match node
+                    .operand[0]
+                    .as_address()
+                {
+                    node::AddressKind::Global(id) => inst::AddressKind::Global(*id),
+                    node::AddressKind::FunctionName(name) => {
+                        inst::AddressKind::FunctionName(name.clone())
+                    }
+                })),
             },
             NodeKind::None => MachineOperand::None,
             _ => MachineOperand::Register(self.convert(node).unwrap()),

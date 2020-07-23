@@ -5,7 +5,7 @@ use crate::codegen::arch::machine::{
     register::{rc2ty, PhysReg, RegisterClassKind, RegisterId, RegistersInfo, TargetRegisterTrait},
 };
 use crate::codegen::common::machine::{basic_block::*, const_data::DataId};
-use crate::ir::types::*;
+use crate::ir::{global_val::GlobalVariableId, types::*};
 use id_arena::*;
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::{fmt, fmt::Debug};
@@ -51,6 +51,7 @@ pub enum MachineOperand {
 #[derive(Clone)]
 pub enum AddressKind {
     FunctionName(String),
+    Global(GlobalVariableId),
     Label(DataId),
 }
 
@@ -504,6 +505,13 @@ impl AddressKind {
             _ => panic!(),
         }
     }
+
+    pub fn as_global(&self) -> &GlobalVariableId {
+        match self {
+            AddressKind::Global(id) => id,
+            _ => panic!(),
+        }
+    }
 }
 
 impl MachineConstant {
@@ -688,6 +696,7 @@ impl fmt::Debug for AddressKind {
         match self {
             AddressKind::FunctionName(name) => write!(f, "addr<fn:{}>", name),
             AddressKind::Label(id) => write!(f, "label<{}>", id),
+            AddressKind::Global(id) => write!(f, "global<{:?}>", id),
         }
     }
 }

@@ -18,6 +18,8 @@ impl FrameObjectsInfo {
             * 8;
         let has_call = f.body.has_call(); // push rbp -> 16 byte aligned
 
+        let padding = |off, align| -> i32 { (align - off % align) % align };
+
         for (i, param_ty) in tys
             .base
             .borrow()
@@ -30,13 +32,17 @@ impl FrameObjectsInfo {
             // TODO: Correct?
             let rc = ty2rc(param_ty).unwrap();
             if rc.get_nth_arg_reg(i).is_none() {
-                offset += param_ty.size_in_byte(tys) as i32;
+                let size = param_ty.size_in_byte(tys) as i32;
+                let align = param_ty.align_in_byte(tys) as i32;
+                offset += size + padding(offset, align);
                 offset_map.insert(FrameIndexKind::Arg(i), offset);
             }
         }
 
         for FrameIndexInfo { idx, ty } in &f.local_mgr.locals {
-            offset += ty.size_in_byte(tys) as i32;
+            let size = ty.size_in_byte(tys) as i32;
+            let align = ty.align_in_byte(tys) as i32;
+            offset += size + padding(offset, align);
             offset_map.insert(*idx, offset);
         }
 

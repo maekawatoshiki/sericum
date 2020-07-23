@@ -7,13 +7,13 @@ use crate::ir::{
     value::Value,
 };
 
-pub struct GatherReturns {}
+pub struct MergeReturns {}
 
-struct GatherReturnsOnFunction<'a> {
+struct MergeReturnsOnFunction<'a> {
     func: &'a mut Function,
 }
 
-impl GatherReturns {
+impl MergeReturns {
     pub fn new() -> Self {
         Self {}
     }
@@ -24,12 +24,12 @@ impl GatherReturns {
                 continue;
             }
 
-            GatherReturnsOnFunction { func }.run();
+            MergeReturnsOnFunction { func }.run();
         }
     }
 }
 
-impl<'a> GatherReturnsOnFunction<'a> {
+impl<'a> MergeReturnsOnFunction<'a> {
     pub fn run(&mut self) {
         if self.func.basic_blocks.order.len() == 0 {
             return;

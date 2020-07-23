@@ -421,19 +421,29 @@ impl LiveRange {
             } else if seg.end < self.segments[pt].end {
                 self.segments[pt].start = seg.end;
             } else if self.segments[pt].end < seg.end {
-                let start = self.segments[pt].end;
                 self.segments.remove(pt);
-                assert!(start < seg.end);
-                self.remove_segment(&LiveSegment::new(start, seg.end));
+                if pt + 1 >= self.segments.len() {
+                    return;
+                }
+                if self.segments[pt + 1].start < seg.end {
+                    self.remove_segment(&LiveSegment::new(self.segments[pt + 1].start, seg.end));
+                }
             }
         } else {
             if self.segments[pt - 1].end <= seg.start {
                 if pt >= self.segments.len() {
                     return;
                 }
-                if self.segments[pt].start <= seg.end {
-                    self.remove_segment(&LiveSegment::new(self.segments[pt].start, seg.end));
-                    return;
+                if seg.start < self.segments[pt].start {
+                    if self.segments[pt].start < seg.end {
+                        if !self.interferes(&LiveRange::new(vec![*seg])) {
+                            self.remove_segment(&LiveSegment::new(
+                                self.segments[pt].start,
+                                seg.end,
+                            ));
+                        }
+                        return;
+                    }
                 }
                 assert!(seg.end < self.segments[pt].start);
             } else if seg.end < self.segments[pt - 1].end {
@@ -942,8 +952,6 @@ impl LivenessAnalysis {
                 .new_program_point(ProgramPointBase::new(None, None, bb_idx, 0))
                 .set_prev(Some(last_pp));
         }
-
-        // println!("{:#?}", reg2range.0);
 
         LiveRegMatrix::new(
             virt_regs,

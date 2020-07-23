@@ -13,6 +13,8 @@ pub enum MachineMemOperand {
     BaseOff(RegisterId, i32),
     Base(RegisterId),
     Address(AddressKind),
+    AddressOff(AddressKind, i32),
+    AddressAlignOff(AddressKind, i32, RegisterId),
 }
 
 impl MachineMemOperand {
@@ -21,10 +23,11 @@ impl MachineMemOperand {
             MachineMemOperand::BaseFi(r, _)
             | MachineMemOperand::BaseFiOff(r, _, _)
             | MachineMemOperand::BaseOff(r, _)
-            | MachineMemOperand::Base(r) => vec![r],
+            | MachineMemOperand::Base(r)
+            | Self::AddressAlignOff(_, _, r) => vec![r],
             MachineMemOperand::BaseAlignOff(r, _, r2)
             | MachineMemOperand::BaseFiAlignOff(r, _, _, r2) => vec![r, r2],
-            MachineMemOperand::Address(_) => vec![],
+            MachineMemOperand::Address(_) | MachineMemOperand::AddressOff(_, _) => vec![],
         }
     }
 
@@ -33,10 +36,11 @@ impl MachineMemOperand {
             MachineMemOperand::BaseFi(r, _)
             | MachineMemOperand::BaseFiOff(r, _, _)
             | MachineMemOperand::BaseOff(r, _)
-            | MachineMemOperand::Base(r) => vec![r],
+            | MachineMemOperand::Base(r)
+            | Self::AddressAlignOff(_, _, r) => vec![r],
             MachineMemOperand::BaseAlignOff(r, _, r2)
             | MachineMemOperand::BaseFiAlignOff(r, _, _, r2) => vec![r, r2],
-            MachineMemOperand::Address(_) => vec![],
+            MachineMemOperand::Address(_) | MachineMemOperand::AddressOff(_, _) => vec![],
         }
     }
 
@@ -48,7 +52,9 @@ impl MachineMemOperand {
             Self::Base(_)
             | Self::BaseAlignOff(_, _, _)
             | Self::BaseOff(_, _)
-            | Self::Address(_) => None,
+            | Self::Address(_)
+            | Self::AddressOff(_, _)
+            | Self::AddressAlignOff(_, _, _) => None,
         }
     }
 }

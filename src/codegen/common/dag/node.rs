@@ -6,7 +6,7 @@ use crate::codegen::{
     },
     common::dag::basic_block::*,
 };
-use crate::ir::{opcode::*, types::*};
+use crate::ir::{global_val::GlobalVariableId, opcode::*, types::*};
 use crate::util::allocator::*;
 use id_arena::*;
 use rustc_hash::FxHashMap;
@@ -72,6 +72,7 @@ pub enum IRNodeKind {
     FCmp,
 
     FIAddr,
+    GlobalAddr,
 
     CopyToReg,
     CopyFromReg,
@@ -107,6 +108,7 @@ pub enum CondKind {
 #[derive(Debug, Clone, PartialEq)]
 pub enum AddressKind {
     FunctionName(String),
+    Global(GlobalVariableId),
 }
 
 impl Into<CondKind> for ICmpKind {
@@ -271,12 +273,23 @@ impl DAGNode {
         }
     }
 
+    pub fn as_address(&self) -> &AddressKind {
+        match &self.kind {
+            NodeKind::Operand(OperandNodeKind::Address(a)) => a,
+            _ => panic!(),
+        }
+    }
+
     pub fn is_constant(&self) -> bool {
         matches!(self.kind, NodeKind::Operand(OperandNodeKind::Constant(_)))
     }
 
     pub fn is_frame_index(&self) -> bool {
         matches!(self.kind, NodeKind::Operand(OperandNodeKind::FrameIndex(_)))
+    }
+
+    pub fn is_address(&self) -> bool {
+        matches!(self.kind, NodeKind::Operand(OperandNodeKind::Address(_)))
     }
 
     pub fn is_maybe_register(&self) -> bool {
@@ -356,6 +369,15 @@ impl DAGNode {
             next.debug(f, tys, s, id, indent)?;
         }
         fmt::Result::Ok(())
+    }
+}
+
+impl AddressKind {
+    pub fn as_global(&self) -> &GlobalVariableId {
+        match self {
+            Self::Global(id) => id,
+            _ => panic!(),
+        }
     }
 }
 

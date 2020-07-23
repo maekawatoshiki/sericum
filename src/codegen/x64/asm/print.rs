@@ -6,10 +6,13 @@ use crate::codegen::common::machine::{
     function::{InstIter, MachineFunction},
     module::MachineModule,
 };
+use crate::ir::{global_val::GlobalVariableId, types::TypeSize};
+use rustc_hash::FxHashMap;
 
 pub struct MachineAsmPrinter {
     pub output: String,
     cur_bb_id_base: usize,
+    id_to_global_name: FxHashMap<GlobalVariableId, String>,
 }
 
 impl MachineAsmPrinter {
@@ -17,12 +20,21 @@ impl MachineAsmPrinter {
         Self {
             output: "".to_string(),
             cur_bb_id_base: 0,
+            id_to_global_name: FxHashMap::default(),
         }
     }
 
     pub fn run_on_module(&mut self, m: &MachineModule) {
         self.output.push_str("  .text\n");
         self.output.push_str("  .intel_syntax noprefix\n");
+
+        for (id, g) in &m.global_vars.arena {
+            let size = g.ty.size_in_byte(&m.types);
+            let align = g.ty.align_in_byte(&m.types);
+            self.output
+                .push_str(format!("  .comm {},{},{}\n", g.name, size, align).as_str());
+            self.id_to_global_name.insert(id, g.name.clone());
+        }
 
         for (_, func) in &m.functions {
             self.run_on_function(&func)
@@ -138,6 +150,28 @@ impl MachineAsmPrinter {
             MachineOperand::Mem(MachineMemOperand::Address(AddressKind::Label(id))) => {
                 self.output.push_str(self.data_id_to_label_id(id).as_str())
             }
+            MachineOperand::Mem(MachineMemOperand::Address(AddressKind::Global(id))) => self
+                .output
+                .push_str(format!("{} ptr [{}]", word, self.global_var_name(id)).as_str()),
+            MachineOperand::Mem(MachineMemOperand::AddressOff(AddressKind::Global(id), off)) => {
+                self.output.push_str(
+                    format!("{} ptr [{} + {}]", word, self.global_var_name(id), off).as_str(),
+                )
+            }
+            MachineOperand::Mem(MachineMemOperand::AddressAlignOff(
+                AddressKind::Global(id),
+                align,
+                off,
+            )) => self.output.push_str(
+                format!(
+                    "{} ptr [{} + {}*{}]",
+                    word,
+                    self.global_var_name(id),
+                    align,
+                    off.as_phys_reg().name()
+                )
+                .as_str(),
+            ),
             MachineOperand::Mem(MachineMemOperand::BaseFi(base, fi)) => {
                 let base = base.as_phys_reg();
                 let offset = fo.offset(fi.idx).unwrap();
@@ -200,6 +234,10 @@ impl MachineAsmPrinter {
             data_id.arena_id(),
             data_id.id()
         )
+    }
+
+    fn global_var_name(&self, id: &GlobalVariableId) -> &String {
+        self.id_to_global_name.get(id).unwrap()
     }
 }
 
