@@ -8,33 +8,56 @@ pub type VirtualRegister = usize;
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Register(usize);
 
+/// An representation of cilk instruction.
 #[derive(Clone, Debug)]
 pub struct Instruction {
+    /// An opcode that defines the instruction's behavior.
     pub opcode: Opcode,
+    /// A sequence of Operands.
     pub operands: Vec<Operand>,
+    /// A [Type](../types/enum.Type.html) that the instruction returns.
     pub ty: Type,
+    /// An id
     pub id: Option<InstructionId>,
+    /// A [BasicBlock](../basic_block/struct.BasicBlock.html) the instruction belongs to.
     pub parent: BasicBlockId,
+    /// A set of users the instruction returned value used by.
     pub users: RefCell<Vec<InstructionId>>,
 }
 
 #[derive(Clone, Debug, Copy, PartialEq, Eq, Hash)]
 pub enum Opcode {
+    /// Allocate a virtual register with specifying [Type](../types/enum.Type.html).
     Alloca,
+    /// Load a [value](../value/enum.Value.html) from memory.
     Load,
+    /// Write a [value](../value/enum.Value.html) to memory.
     Store,
+    /// Get the address of a subelement of a data structure.
     GetElementPtr, // ptr val, indices
+    /// Returns the sum of its two [operands](../value/enum.Value.html).
     Add,
+    /// Returns the difference of its two [operands](../value/enum.Value.html)
     Sub,
+    /// Returns the product of its two [operands](../value/enum.Value.html)
     Mul,
+    /// Returns the quotient of its two [operands](../value/enum.Value.html)
     Div,
+    /// Returns the reminder from the signed division of its two [operands](../value/enum.Value.html)
     Rem,
+    /// Returns a 1-bit integer(boolean) based on comparison of its two integer.
     ICmp,
+    /// Returns a 1-bit integer(boolean) based on comparison of its two floating-point.
     FCmp,
+    /// Flows to a different [BasicBlock](../basic_block/struct.BasicBlock.html) unconditionally.
     Br,
+    ///  Evaluate a value of 1-bit integer(boolean), then Flows to either basic-blocks by the value is true or false.
     CondBr,
+    /// Create a phi function for implementing phi node n the SSA graph.
     Phi,
+    /// Call a cilk [Function](../function/struct.Function.html) or the pointer references to it.
     Call,
+    /// Return control flow and [value](../value/enum.Value.html) from a function back to the caller.
     Ret,
 }
 

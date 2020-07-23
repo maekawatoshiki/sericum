@@ -54,7 +54,7 @@ impl Function {
     ///
     /// * `module` ... A module that owns created function.
     /// * `name` ... Function's name
-    /// * `ret_ty` ... A [Type](../types/enum.Type.html) that is owned by the function.
+    /// * `ret_ty` ... A [Type](../types/enum.Type.html) the function returns.
     /// * `params_ty` ... A sequence of [Type](../types/enum.Type.html) that are passed to the function.
     ///
     /// # Examples

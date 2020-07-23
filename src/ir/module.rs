@@ -12,6 +12,8 @@ pub struct Module {
     /// Functions attached to the module
     pub functions: Arena<Function>,
 
+    /// A set of global variable's defintion.
+    /// See [GlobalVariables](../global_val/struct.GlobalVariables.html).
     pub global_vars: GlobalVariables,
 
     /// Type definitions in the module
