@@ -28,6 +28,83 @@ pub struct ConversionInfo {
     pub arg_regs: FxHashMap<usize, Raw<DAGNode>>,
 }
 
+pub struct ConvertToDAGModule<'a> {
+    pub module: &'a Module,
+    pub inst_id_node_id: FxHashMap<InstructionId, Raw<DAGNode>>,
+    pub cur_conversion_info: Option<ConversionInfo>,
+}
+
+pub struct ConvertToDAGFunction<'a> {
+    func: &'a Function,
+    bb_arena: Arena<DAGBasicBlock>,
+    bb_order: Vec<DAGBasicBlockId>,
+    bb_map: FxHashMap<BasicBlockId, DAGBasicBlockId>,
+}
+
+impl<'a> ConvertToDAGModule<'a> {
+    pub fn new(module: &'a Module) -> Self {
+        IRLivenessAnalyzer::new(&module).analyze();
+        Self {
+            module,
+            inst_id_node_id: FxHashMap::default(),
+            cur_conversion_info: None,
+        }
+    }
+
+    pub fn run(mut self) -> DAGModule {
+        let mut functions: Arena<DAGFunction> = Arena::new();
+
+        for (_, func) in &self.module.functions {
+            functions.alloc(
+                ConvertToDAGFunction {
+                    func,
+                    bb_arena: Arena::new(),
+                    bb_order: vec![],
+                    bb_map: FxHashMap::default(),
+                }
+                .run(),
+            );
+            // functions.alloc(self.construct_dag(f_id));
+        }
+        panic!()
+        // DAGModule {
+        //     name: self.module.name.clone(),
+        //     functions,
+        //     types: self.types,
+        //     global_vars: self.module.global_vars.clone(),
+        // }
+    }
+}
+
+impl<'a> ConvertToDAGFunction<'a> {
+    pub fn run(mut self) -> DAGFunction {
+        for &bb_id in &self.func.basic_blocks.order {
+            let dag_bb_id = self.bb_arena.alloc(DAGBasicBlock::new());
+            self.bb_order.push(dag_bb_id);
+            self.bb_map.insert(bb_id, dag_bb_id);
+        }
+
+        self.set_dag_bb_pred_and_succ();
+
+        panic!()
+    }
+
+    fn set_dag_bb_pred_and_succ(&mut self) {
+        for (&bb, &dag_bb) in &self.bb_map {
+            self.bb_arena[dag_bb].pred = self.func.basic_blocks.arena[bb]
+                .pred
+                .iter()
+                .map(|bb| self.bb_map[bb])
+                .collect();
+            self.bb_arena[dag_bb].succ = self.func.basic_blocks.arena[bb]
+                .succ
+                .iter()
+                .map(|bb| self.bb_map[bb])
+                .collect();
+        }
+    }
+}
+
 impl<'a> ConvertToDAG<'a> {
     pub fn new(module: &'a Module) -> Self {
         IRLivenessAnalyzer::new(&module).analyze();
