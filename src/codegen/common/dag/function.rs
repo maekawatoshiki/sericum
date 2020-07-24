@@ -31,6 +31,7 @@ pub struct DAGFunction {
 }
 
 pub struct DAGHeap {
+    // TODO: -> NodeHeap
     heap: RawAllocator<DAGNode>,
     node_none: Raw<DAGNode>,
     node_regs: [Option<Raw<DAGNode>>; PHYS_REGISTERS_NUM],

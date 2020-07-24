@@ -100,7 +100,7 @@ pub fn standard_conversion_into_machine_module(module: &mut Module) -> MachineMo
     // println!("{:?}", module);
     ir::merge_ret::MergeReturns::new().run_on_module(module);
 
-    let mut dag_module = dag::convert::ConvertToDAG::new(module).convert_module();
+    let mut dag_module = dag::convert::ConvertToDAGModule::new(module).run();
 
     let mut pass_mgr = ModulePassManager::new();
     pass_mgr.add_pass(combine::Combine::new());

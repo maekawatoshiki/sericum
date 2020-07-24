@@ -72,7 +72,7 @@ impl Types {
         }
     }
 
-    fn new_non_primitive_ty(&mut self, t: NonPrimitiveType) -> NonPrimitiveTypeId {
+    fn new_non_primitive_ty(&self, t: NonPrimitiveType) -> NonPrimitiveTypeId {
         let non_primitive_types = &mut self.base.borrow_mut().non_primitive_types;
         for (id, t_) in &*non_primitive_types {
             if &t == t_ {
@@ -82,24 +82,24 @@ impl Types {
         non_primitive_types.alloc(t)
     }
 
-    pub fn new_pointer_ty(&mut self, elem_ty: Type) -> Type {
+    pub fn new_pointer_ty(&self, elem_ty: Type) -> Type {
         let id = self.new_non_primitive_ty(NonPrimitiveType::Pointer(elem_ty));
         Type::Pointer(id)
     }
 
-    pub fn new_array_ty(&mut self, elem_ty: Type, len: usize) -> Type {
+    pub fn new_array_ty(&self, elem_ty: Type, len: usize) -> Type {
         let id = self.new_non_primitive_ty(NonPrimitiveType::Array(ArrayType::new(elem_ty, len)));
         Type::Array(id)
     }
 
-    pub fn new_function_ty(&mut self, ret_ty: Type, params_ty: Vec<Type>) -> Type {
+    pub fn new_function_ty(&self, ret_ty: Type, params_ty: Vec<Type>) -> Type {
         let id = self.new_non_primitive_ty(NonPrimitiveType::Function(FunctionType::new(
             ret_ty, params_ty,
         )));
         Type::Function(id)
     }
 
-    pub fn new_struct_ty(&mut self, fields_ty: Vec<Type>) -> Type {
+    pub fn new_struct_ty(&self, fields_ty: Vec<Type>) -> Type {
         let id =
             self.new_non_primitive_ty(NonPrimitiveType::Struct(StructType::new(self, fields_ty)));
         Type::Struct(id)
