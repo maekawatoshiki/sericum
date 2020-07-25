@@ -232,19 +232,20 @@ impl<'a> ScheduleByBlock<'a> {
                 operands.push(MachineOperand::Branch(
                     self.get_machine_bb(node.operand[3].as_basic_block()),
                 ));
-                Some(self.push_inst(MachineInst::new_simple(
-                    match cond_kind!(node.operand[0]) {
-                        CondKind::Eq => MachineOpcode::BEQ,
-                        CondKind::Le => MachineOpcode::BLE,
-                        CondKind::Lt => MachineOpcode::BLT,
-                        // CondKind::Lt => MachineOpcode::JL,
-                        // CondKind::Ge => MachineOpcode::JGE,
-                        // CondKind::Gt => MachineOpcode::JG,
-                        _ => unreachable!(),
-                    },
-                    operands,
-                    self.cur_bb,
-                )))
+                unimplemented!()
+                // Some(self.push_inst(MachineInst::new_simple(
+                //     match cond_kind!(node.operand[0]) {
+                //         CondKind::Eq => MachineOpcode::BEQ,
+                //         CondKind::Le => MachineOpcode::BLE,
+                //         CondKind::Lt => MachineOpcode::BLT,
+                //         // CondKind::Lt => MachineOpcode::JL,
+                //         // CondKind::Ge => MachineOpcode::JGE,
+                //         // CondKind::Gt => MachineOpcode::JG,
+                //         _ => unreachable!(),
+                //     },
+                //     operands,
+                //     self.cur_bb,
+                // )))
             }
             // NodeKind::IR(IRNodeKind::FPBrcc) => {
             //     let op0 = self.normal_operand(node.operand[1]);
@@ -289,7 +290,7 @@ impl<'a> ScheduleByBlock<'a> {
 
     fn convert_ret(&mut self, node: &DAGNode) -> MachineInstId {
         let val = self.normal_operand(node.operand[0]);
-        let ra = self.cur_func.regs_info.get_phys_reg(GPR::RA);
+        // let ra = self.cur_func.regs_info.get_phys_reg(GPR::RA);
 
         if let Some(ty) = val.get_type(&self.cur_func.regs_info) {
             assert!(ty.is_integer());
@@ -297,12 +298,12 @@ impl<'a> ScheduleByBlock<'a> {
             let set_ret_val = self.move2reg(self.cur_func.regs_info.get_phys_reg(ret_reg), val);
             self.push_inst(set_ret_val);
         }
-
-        self.push_inst(MachineInst::new_simple(
-            MachineOpcode::JR, // TODO
-            vec![MachineOperand::Register(ra)],
-            self.cur_bb,
-        ))
+        unimplemented!()
+        // self.push_inst(MachineInst::new_simple(
+        //     MachineOpcode::JR, // TODO
+        //     vec![MachineOperand::Register(ra)],
+        //     self.cur_bb,
+        // ))
     }
 
     fn move2reg(&self, r: RegisterId, src: MachineOperand) -> MachineInst {
@@ -390,7 +391,7 @@ impl<'a> ScheduleByBlock<'a> {
         let callee = self.normal_operand(node.operand[0]);
         let ret_reg = self.cur_func.regs_info.get_phys_reg(
             ty2rc(&node.ty)
-                .unwrap_or(RegisterClassKind::GPR)
+                .unwrap_or(RegisterClassKind::GR64)
                 .return_value_register(),
         );
         let call_inst = self.push_inst(
@@ -401,7 +402,7 @@ impl<'a> ScheduleByBlock<'a> {
                         Type::Void => vec![],
                         _ => vec![ret_reg],
                     };
-                    imp_defs.push(self.cur_func.regs_info.get_phys_reg(GPR::RA));
+                    // imp_defs.push(self.cur_func.regs_info.get_phys_reg(GPR::RA));
                     imp_defs
                 }),
         );
@@ -586,11 +587,12 @@ impl<'a> ScheduleByBlock<'a> {
 // }
 
 pub fn opcode_copy2reg(src: &MachineOperand) -> MachineOpcode {
-    match src {
-        MachineOperand::Constant(MachineConstant::Int32(_))
-        | MachineOperand::Constant(MachineConstant::Int64(_))
-        | MachineOperand::Constant(MachineConstant::Int8(_)) => MachineOpcode::LI,
-        MachineOperand::Register(_) => MachineOpcode::MV,
-        _ => unimplemented!(),
-    }
+    unimplemented!()
+    // match src {
+    //     MachineOperand::Constant(MachineConstant::Int32(_))
+    //     | MachineOperand::Constant(MachineConstant::Int64(_))
+    //     | MachineOperand::Constant(MachineConstant::Int8(_)) => MachineOpcode::LI,
+    //     MachineOperand::Register(_) => MachineOpcode::MV,
+    //     _ => unimplemented!(),
+    // }
 }

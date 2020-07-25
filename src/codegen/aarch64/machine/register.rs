@@ -6,17 +6,35 @@ use rustc_hash::FxHashMap;
 use std::cell::RefCell;
 
 registers! {
-    class GPR (64, Int64, [Int32, Int64, Pointer!], [A0, A1]) {
-        ZERO, RA, SP, GP, TP, T0, T1, T2, S0, S1, A0,
-        A1, A2, A3, A4, A5, A6, A7, S2, S3, S4, S5,
-        S6, S7, S8, S9, S10, S11, T3, T4, T5, T6
+    class GR64 (64, Int64, [Int64, Pointer!], [X0]) {
+        X0, X1, X2, X3, X4,
+        X5, X6, X7, X8, X9,
+        X10, X11, X12, X13, X14,
+        X15, X16, X17, X18, X19,
+        X20, X21, X22, X23, X24,
+        X25, X26, X27, X28, X29, X30
     }
 
-    order arg GPR { A0, A1, A2, A3, A4, A5, A6, A7 }
+    class GR32 (32, Int32, [Int32], [W0]) {
+        W0, W1, W2, W3, W4,
+        W5, W6, W7, W8, W9,
+        W10, W11, W12, W13, W14,
+        W15, W16, W17, W18, W19,
+        W20, W21, W22, W23, W24,
+        W25, W26, W27, W28, W29, W30
+    }
 
-    order gp GPR { T0, T1, T2, A0, A1, A2, A3, A4,
-                    A5, A6, A7, T3, T4, T5, T6, S2,
-                    S3, S4, S5, S6, S7, S8, S9, S10, S11 } // S1 is reserved
+    order arg GR32 { W0, W1, W2, W3, W4, W5, W6, W7 }
+    order arg GR64 { X0, X1, X2, X3, X4, X5, X6, X7 }
+
+    order gp GR32 {
+        W9, W10, W11, W12, W13, W14, W15,
+        W19, W20, W21, W22, W23, W24, W25, W26, W27, W28
+    }
+    order gp GR64 {
+        X9, X10, X11, X12, X13, X14, X15,
+        X19, X20, X21, X22, X23, X24, X25, X26, X27, X28
+    }
 }
 
 macro_rules! to_phys {
@@ -29,19 +47,26 @@ thread_local! {
     pub static CALLEE_SAVED_REGS: PhysRegSet = {
         let mut bits = PhysRegSet::new();
         let regs = to_phys![
-            GPR::SP,
-            GPR::S0,
-            GPR::S1,
-            GPR::S2,
-            GPR::S3,
-            GPR::S4,
-            GPR::S5,
-            GPR::S6,
-            GPR::S7,
-            GPR::S8,
-            GPR::S9,
-            GPR::S10,
-            GPR::S11
+            GR32::W19,
+            GR32::W20,
+            GR32::W21,
+            GR32::W22,
+            GR32::W23,
+            GR32::W24,
+            GR32::W25,
+            GR32::W26,
+            GR32::W27,
+            GR32::W28,
+            GR64::X19,
+            GR64::X20,
+            GR64::X21,
+            GR64::X22,
+            GR64::X23,
+            GR64::X24,
+            GR64::X25,
+            GR64::X26,
+            GR64::X27,
+            GR64::X28
         ];
         for reg in regs {
             bits.set(reg)

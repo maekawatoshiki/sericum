@@ -13,18 +13,20 @@ pub enum MachineMemOperand {
 
 impl MachineOpcode {
     pub fn is_copy_like(&self) -> bool {
-        matches!(self, MachineOpcode::MV | MachineOpcode::Copy)
+        matches!(self, MachineOpcode::Copy)
     }
 
     pub fn is_terminator(&self) -> bool {
-        matches!(
-            self,
-            MachineOpcode::JR | MachineOpcode::J | MachineOpcode::BEQ
-        )
+        false
+        // matches!(
+        //     self,
+        //     MachineOpcode::JR | MachineOpcode::J | MachineOpcode::BEQ
+        // )
     }
 
     pub fn is_unconditional_jmp(&self) -> bool {
-        matches!(self, MachineOpcode::JR | MachineOpcode::J)
+        false
+        // matches!(self, MachineOpcode::JR | MachineOpcode::J)
     }
 }
 
