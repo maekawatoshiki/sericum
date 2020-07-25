@@ -35,11 +35,13 @@ use std::{fmt::Debug, hash::Hash};
 pub enum TargetRegister {
     RegClass(RegisterClassKind),
     Specific(PhysReg),
+    Any,
 }
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum TargetImmediate {
     I8,
+    I16,
     I32,
     I64,
     F64,
