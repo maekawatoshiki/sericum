@@ -70,28 +70,20 @@ mod inst {
             .set_uses(vec![TargetOperand::Any])
             .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GPR)]);
         pub static ref LW: TargetInstDef = TargetInstDef::new("lw", TargetOpcode::LW)
-            .set_uses(vec![
-                TargetOperand::Immediate(TargetImmediate::I32),
-                TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GPR))
-            ])
+            .set_uses(vec![TargetOperand::Mem])
             .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GPR)]);
         pub static ref LD: TargetInstDef = TargetInstDef::new("ld", TargetOpcode::LD)
-            .set_uses(vec![
-                TargetOperand::Immediate(TargetImmediate::I32),
-                TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GPR))
-            ])
+            .set_uses(vec![TargetOperand::Mem])
             .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GPR)]);
         pub static ref SW: TargetInstDef =
             TargetInstDef::new("sw", TargetOpcode::SW).set_uses(vec![
                 TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GPR)),
-                TargetOperand::Immediate(TargetImmediate::I32),
-                TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GPR))
+                TargetOperand::Mem
             ]);
         pub static ref SD: TargetInstDef =
             TargetInstDef::new("sd", TargetOpcode::SD).set_uses(vec![
                 TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GPR)),
-                TargetOperand::Immediate(TargetImmediate::I32),
-                TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GPR))
+                TargetOperand::Mem
             ]);
         pub static ref SEXT_W: TargetInstDef = TargetInstDef::new("sext.w", TargetOpcode::SEXT_W)
             .set_uses(vec![TargetOperand::Register(TargetRegister::RegClass(

@@ -6,7 +6,6 @@ use rustc_hash::FxHashMap;
 use std::cell::RefCell;
 
 registers! {
-    // register nubmering: https://corsix.github.io/dynasm-doc/instructions.html#registers
     class GPR (64, Int64, [Int32, Int64, Pointer!], [A0, A1]) {
         ZERO, RA, SP, GP, TP, T0, T1, T2, S0, S1, A0,
         A1, A2, A3, A4, A5, A6, A7, S2, S3, S4, S5,

@@ -99,6 +99,7 @@ impl MISelector {
             }
             (ir.Load a): Int32 {
                 (ir.FIAddr b) a { mem32 b => (mi.LW [FiReg b, %s0]) }
+                (ir.GlobalAddr b) a => (mi.LW [Address b])
                 GPR a => (mi.LW [ImmReg $0, a])
             }
             // 64bit load
@@ -112,6 +113,10 @@ impl MISelector {
                     mem64 c {
                         GPR b => (mi.SD b, [FiReg c, %s0])
                     }
+                }
+                (ir.GlobalAddr c) a {
+                    imm32 b => (mi.SW (mi.LI b), [Address c], %s1)
+                    GPR   b => (mi.SW         b, [Address c], %s1)
                 }
                 GPR a {
                     imm32 b => (mi.SW (mi.LI b), [ImmReg $0, a])

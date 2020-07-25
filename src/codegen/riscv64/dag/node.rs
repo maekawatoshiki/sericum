@@ -4,4 +4,5 @@ pub use crate::codegen::common::dag::node::*;
 pub enum MemNodeKind {
     FiReg,
     ImmReg,
+    Address,
 }

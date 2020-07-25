@@ -458,9 +458,12 @@ impl<'a> ScheduleByBlock<'a> {
                     *self.normal_operand(node.operand[1]).as_register(),
                 )),
                 MemNodeKind::ImmReg => MachineOperand::Mem(MachineMemOperand::ImmReg(
-                        self.normal_operand(node.operand[0]).as_constant().as_i32(),
-                        *self.normal_operand(node.operand[1]).as_register()
-                ))
+                    self.normal_operand(node.operand[0]).as_constant().as_i32(),
+                    *self.normal_operand(node.operand[1]).as_register(),
+                )),
+                MemNodeKind::Address => MachineOperand::Mem(MachineMemOperand::Address(
+                    inst::AddressKind::Global(*node.operand[0].as_address().as_global()),
+                )),
                 // MemNodeKind::Base => MachineOperand::Mem(MachineMemOperand::Base(
                 //     *self.normal_operand(node.operand[0]).as_register(),
                 // )),

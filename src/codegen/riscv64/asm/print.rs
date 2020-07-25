@@ -5,22 +5,34 @@ use crate::codegen::common::machine::{
     function::{InstIter, MachineFunction},
     module::MachineModule,
 };
+use crate::ir::{global_val::GlobalVariableId, types::TypeSize};
+use rustc_hash::FxHashMap;
 
-pub struct MachineAsmPrinter {
+pub struct MachineAsmPrinter<'a> {
     pub output: String,
     cur_bb_id_base: usize,
+    global_var_name: FxHashMap<GlobalVariableId, &'a str>,
 }
 
-impl MachineAsmPrinter {
+impl<'s> MachineAsmPrinter<'s> {
     pub fn new() -> Self {
         Self {
             output: "".to_string(),
             cur_bb_id_base: 0,
+            global_var_name: FxHashMap::default(),
         }
     }
 
-    pub fn run_on_module(&mut self, m: &MachineModule) {
+    pub fn run_on_module(&mut self, m: &'s MachineModule) {
         self.output.push_str("  .text\n");
+
+        for (id, g) in &m.global_vars.arena {
+            let size = g.ty.size_in_byte(&m.types);
+            let align = g.ty.align_in_byte(&m.types);
+            self.output
+                .push_str(format!("  .comm {},{},{}\n", g.name, size, align).as_str());
+            self.global_var_name.insert(id, g.name.as_str());
+        }
 
         for (_, func) in &m.functions {
             self.run_on_function(&func)
@@ -123,6 +135,9 @@ impl MachineAsmPrinter {
                 .push_str(format!("{}({})", imm, r.as_phys_reg().name()).as_str()),
             MachineOperand::Mem(MachineMemOperand::Address(AddressKind::FunctionName(name))) => {
                 self.output.push_str(name.replace('.', "_").as_str())
+            }
+            MachineOperand::Mem(MachineMemOperand::Address(AddressKind::Global(id))) => {
+                self.output.push_str(self.global_var_name[id])
             }
             _ => unimplemented!(),
         };
