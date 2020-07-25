@@ -40,7 +40,17 @@ impl FrameObjectsInfo {
             let size = ty.size_in_byte(tys) as i32;
             let align = ty.align_in_byte(tys) as i32;
             total_size += size + padding(total_size, align);
-            offset_map.insert(*idx, -total_size);
+            // offset_map.insert(*idx, -total_size);
+        }
+
+        total_size = roundup(total_size, ALIGN);
+
+        let mut sz = 0;
+        for FrameIndexInfo { idx, ty } in &f.local_mgr.locals {
+            let size = ty.size_in_byte(tys) as i32;
+            let align = ty.align_in_byte(tys) as i32;
+            sz += size + padding(sz, align);
+            offset_map.insert(*idx, total_size - sz);
         }
 
         let stack_down = Self::calc_max_adjust_stack_down(f) as i32;

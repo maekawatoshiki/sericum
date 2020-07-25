@@ -97,33 +97,33 @@ impl MISelector {
             //         imm6 b => (mi.SLLI a, b)
             //     }
             // }
-            // (ir.Load a): Int32 {
-            //     (ir.FIAddr b) a { mem32 b => (mi.LW [FiReg b, %s0]) }
-            //     (ir.GlobalAddr b) a => (mi.LW [Address b])
-            //     GPR a => (mi.LW [ImmReg $0, a])
-            // }
+            (ir.Load a): Int32 {
+                (ir.FIAddr b) a { mem32 b => (mi.LDR [RegFi %sp, b]) }
+                // (ir.GlobalAddr b) a => (mi.LW [Address b])
+                // GPR a => (mi.LW [ImmReg $0, a])
+            }
             // // 64bit load
             // (ir.Load a) { GPR a => (mi.LD [ImmReg $0, a]) }
-            // (ir.Store a, b) {
-            //     (ir.FIAddr c) a {
-            //         mem32 c {
-            //             imm32 b => (mi.SW (mi.LI b), [FiReg c, %s0])
-            //             GPR   b => (mi.SW         b, [FiReg c, %s0])
-            //         }
-            //         mem64 c {
-            //             GPR b => (mi.SD b, [FiReg c, %s0])
-            //         }
-            //     }
-            //     (ir.GlobalAddr c) a {
-            //         imm32 b => (mi.SW (mi.LI b), [Address c], %s1)
-            //         GPR   b => (mi.SW         b, [Address c], %s1)
-            //     }
-            //     GPR a {
-            //         imm32 b => (mi.SW (mi.LI b), [ImmReg $0, a])
-            //         GPR: Int32 b => (mi.SW b, [ImmReg $0, a])
-            //         GPR b => (mi.SD b, [ImmReg $0, a])
-            //     }
-            // }
+            (ir.Store a, b) {
+                (ir.FIAddr c) a {
+                    mem32 c {
+                        imm32 b => (mi.STR (mi.MOVr32i b), [RegFi %sp, c])
+                        // GPR   b => (mi.SW         b, [FiReg c, %s0])
+                    }
+                    // mem64 c {
+                    //     GPR b => (mi.SD b, [FiReg c, %s0])
+                    // }
+                }
+                // (ir.GlobalAddr c) a {
+                //     imm32 b => (mi.SW (mi.LI b), [Address c], %s1)
+                //     GPR   b => (mi.SW         b, [Address c], %s1)
+                // }
+                // GPR a {
+                //     imm32 b => (mi.SW (mi.LI b), [ImmReg $0, a])
+                //     GPR: Int32 b => (mi.SW b, [ImmReg $0, a])
+                //     GPR b => (mi.SD b, [ImmReg $0, a])
+                // }
+            }
             // (ir.FIAddr a) {
             //     mem a => (mi.ADDI %s0, a)
             // }

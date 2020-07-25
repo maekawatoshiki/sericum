@@ -6,14 +6,14 @@ use crate::ir::types::Type;
 
 #[derive(Debug, Clone)]
 pub enum MachineMemOperand {
-    FiReg(FrameIndexInfo, RegisterId),
-    ImmReg(i32, RegisterId),
+    RegFi(RegisterId, FrameIndexInfo),
+    // ImmReg(i32, RegisterId),
     Address(AddressKind),
 }
 
 impl MachineOpcode {
     pub fn is_copy_like(&self) -> bool {
-        matches!(self, MachineOpcode::Copy)
+        matches!(self, MachineOpcode::Copy | MachineOpcode::MOVrr)
     }
 
     pub fn is_terminator(&self) -> bool {
@@ -33,22 +33,22 @@ impl MachineOpcode {
 impl MachineMemOperand {
     pub fn registers(&self) -> Vec<&RegisterId> {
         match self {
-            MachineMemOperand::ImmReg(_, r) | MachineMemOperand::FiReg(_, r) => vec![r],
+            MachineMemOperand::RegFi(r, _) => vec![r],
             MachineMemOperand::Address(_) => vec![],
         }
     }
 
     pub fn registers_mut(&mut self) -> Vec<&mut RegisterId> {
         match self {
-            MachineMemOperand::ImmReg(_, r) | MachineMemOperand::FiReg(_, r) => vec![r],
+            MachineMemOperand::RegFi(r, _) => vec![r],
             MachineMemOperand::Address(_) => vec![],
         }
     }
 
     pub fn get_type(&self) -> Option<Type> {
         match self {
-            Self::FiReg(fi, _) => Some(fi.ty),
-            Self::ImmReg(_, _) | Self::Address(_) => None,
+            Self::RegFi(_, fi) => Some(fi.ty),
+            Self::Address(_) => None,
         }
     }
 }

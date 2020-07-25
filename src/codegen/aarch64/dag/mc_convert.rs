@@ -451,13 +451,9 @@ impl<'a> ScheduleByBlock<'a> {
             }
             NodeKind::Operand(OperandNodeKind::Register(ref r)) => MachineOperand::Register(*r),
             NodeKind::Operand(OperandNodeKind::Mem(ref mem)) => match mem {
-                MemNodeKind::FiReg => MachineOperand::Mem(MachineMemOperand::FiReg(
-                    *self.normal_operand(node.operand[0]).as_frame_index(),
-                    *self.normal_operand(node.operand[1]).as_register(),
-                )),
-                MemNodeKind::ImmReg => MachineOperand::Mem(MachineMemOperand::ImmReg(
-                    self.normal_operand(node.operand[0]).as_constant().as_i32(),
-                    *self.normal_operand(node.operand[1]).as_register(),
+                MemNodeKind::RegFi => MachineOperand::Mem(MachineMemOperand::RegFi(
+                    *self.normal_operand(node.operand[0]).as_register(),
+                    *self.normal_operand(node.operand[1]).as_frame_index(),
                 )),
                 MemNodeKind::Address => MachineOperand::Mem(MachineMemOperand::Address(
                     inst::AddressKind::Global(*node.operand[0].as_address().as_global()),
@@ -587,8 +583,9 @@ pub fn opcode_copy2reg(src: &MachineOperand) -> MachineOpcode {
     // unimplemented!()
     match src {
         MachineOperand::Constant(MachineConstant::Int32(_))
-        | MachineOperand::Constant(MachineConstant::Int64(_))
-        | MachineOperand::Constant(MachineConstant::Int8(_)) => MachineOpcode::MOVri,
+        // | MachineOperand::Constant(MachineConstant::Int64(_))
+        | MachineOperand::Constant(MachineConstant::Int8(_)) => MachineOpcode::MOVr32i,
+        MachineOperand::Constant(MachineConstant::Int64(_)) => unimplemented!(),
         MachineOperand::Register(_) => MachineOpcode::MOVrr,
         _ => unimplemented!(),
     }

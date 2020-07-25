@@ -7,12 +7,26 @@ mod inst {
 
     // TODO: need macro to describe the followings
     lazy_static! {
+        // ldr, str
         pub static ref MOVrr: TargetInstDef = TargetInstDef::new("mov", TargetOpcode::MOVrr)
             .set_uses(vec![TargetOperand::Register(TargetRegister::Any)])
             .set_defs(vec![TargetRegister::Any]);
-        pub static ref MOVri: TargetInstDef = TargetInstDef::new("mov", TargetOpcode::MOVrr)
+        pub static ref MOVr32i: TargetInstDef = TargetInstDef::new("mov", TargetOpcode::MOVr32i)
             .set_uses(vec![TargetOperand::Immediate(TargetImmediate::I16)])
+            .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR32)]);
+        pub static ref ADDrr64i: TargetInstDef = TargetInstDef::new("add", TargetOpcode::ADDrr64i)
+            .set_uses(vec![TargetOperand::Register(TargetRegister::Any),
+                           TargetOperand::Immediate(TargetImmediate::I16)]) // TODO: I12
             .set_defs(vec![TargetRegister::Any]);
+        pub static ref SUBrr64i: TargetInstDef = TargetInstDef::new("sub", TargetOpcode::SUBrr64i)
+            .set_uses(vec![TargetOperand::Register(TargetRegister::Any),
+                           TargetOperand::Immediate(TargetImmediate::I16)]) // TODO: I12
+            .set_defs(vec![TargetRegister::Any]);
+        pub static ref LDR: TargetInstDef = TargetInstDef::new("ldr", TargetOpcode::LDR)
+            .set_uses(vec![TargetOperand::Mem])
+            .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR32)]);
+        pub static ref STR: TargetInstDef = TargetInstDef::new("str", TargetOpcode::STR)
+            .set_uses(vec![TargetOperand::Register(TargetRegister::Any), TargetOperand::Mem]);
         pub static ref RET: TargetInstDef = TargetInstDef::new("ret", TargetOpcode::RET);
         // pub static ref ADDI: TargetInstDef = TargetInstDef::new("addi", TargetOpcode::ADDI)
         //     .set_uses(vec![
@@ -133,7 +147,11 @@ mod inst {
 pub enum TargetOpcode {
     CALL,
     MOVrr,
-    MOVri,
+    MOVr32i,
+    ADDrr64i,
+    SUBrr64i,
+    LDR,
+    STR,
     RET,
     // ADDI,  // Add Integer
     // ADDIW, // Add Integer Word
@@ -170,7 +188,11 @@ impl TargetOpcode {
     pub fn inst_def(&self) -> Option<&TargetInstDef> {
         match self {
             Self::MOVrr => Some(&*inst::MOVrr),
-            Self::MOVri => Some(&*inst::MOVri),
+            Self::MOVr32i => Some(&*inst::MOVr32i),
+            Self::ADDrr64i => Some(&*inst::ADDrr64i),
+            Self::SUBrr64i => Some(&*inst::SUBrr64i),
+            Self::LDR => Some(&*inst::LDR),
+            Self::STR => Some(&*inst::STR),
             Self::RET => Some(&*inst::RET),
             // Self::ADDI => Some(&*inst::ADDI),
             // Self::ADDIW => Some(&*inst::ADDIW),

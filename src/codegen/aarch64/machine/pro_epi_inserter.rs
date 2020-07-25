@@ -78,32 +78,30 @@ impl PrologueEpilogueInserter {
         saved_regs: &[PhysReg],
         frame_objects: &FrameObjectsInfo,
     ) {
-        // let adjust = frame_objects.total_size();
-        // let callee_saved_regs_adjust = frame_objects.aligned_callee_saved_regs_byte();
-        // let big_stack_down = !bits_within(adjust, 12);
-        // let mut builder = Builder::new(cur_func);
-        // builder.set_insert_point_at_entry_block();
-        //
-        // //addi sp,sp,-X
-        // let sp = builder.function.regs_info.get_phys_reg(GPR::SP);
-        // let addi = MachineInst::new_simple(
-        //     MachineOpcode::ADDI,
-        //     vec![
-        //         MachineOperand::Register(sp),
-        //         MachineOperand::Constant(MachineConstant::Int32(if big_stack_down {
-        //             -callee_saved_regs_adjust
-        //         } else {
-        //             -adjust
-        //         })),
-        //     ],
-        //     builder.get_cur_bb().unwrap(),
-        // )
-        // .with_def(vec![sp]);
-        // builder.insert(addi);
-        //
-        // let mut s0_used = false;
+        let adjust = frame_objects.total_size();
+        let callee_saved_regs_adjust = frame_objects.aligned_callee_saved_regs_byte();
+        let big_stack_down = !bits_within(adjust, 12);
+        let mut builder = Builder::new(cur_func);
+        builder.set_insert_point_at_entry_block();
+
+        // sub sp,sp,X
+        let sp = builder.function.regs_info.get_phys_reg(SP::SP);
+        let sub = MachineInst::new_simple(
+            MachineOpcode::SUBrr64i,
+            vec![
+                MachineOperand::Register(sp),
+                MachineOperand::Constant(MachineConstant::Int32(if big_stack_down {
+                    -callee_saved_regs_adjust
+                } else {
+                    adjust
+                })),
+            ],
+            builder.get_cur_bb().unwrap(),
+        )
+        .with_def(vec![sp]);
+        builder.insert(sub);
+
         // for (i, r) in saved_regs.iter().enumerate() {
-        //     s0_used |= r == &GPR::S0.as_phys_reg();
         //     let r = builder.function.regs_info.get_phys_reg(*r);
         //     let sd = MachineInst::new_simple(
         //         MachineOpcode::SD,
@@ -122,24 +120,7 @@ impl PrologueEpilogueInserter {
         //     );
         //     builder.insert(sd);
         // }
-        //
-        // if s0_used {
-        //     let addi = MachineInst::new_simple(
-        //         MachineOpcode::ADDI,
-        //         vec![
-        //             MachineOperand::Register(sp),
-        //             MachineOperand::Constant(MachineConstant::Int32(if big_stack_down {
-        //                 callee_saved_regs_adjust
-        //             } else {
-        //                 adjust
-        //             })),
-        //         ],
-        //         builder.get_cur_bb().unwrap(),
-        //     )
-        //     .with_def(vec![builder.function.regs_info.get_phys_reg(GPR::S0)]);
-        //     builder.insert(addi);
-        // }
-        //
+
         // if big_stack_down {
         //     let s1 = builder.function.regs_info.get_phys_reg(GPR::S1);
         //     let li = MachineInst::new_simple(
@@ -177,91 +158,86 @@ impl PrologueEpilogueInserter {
         saved_regs: &[PhysReg],
         frame_objects: &FrameObjectsInfo,
     ) {
-        // let adjust = frame_objects.total_size();
-        // let callee_saved_regs_adjust = frame_objects.aligned_callee_saved_regs_byte();
-        // let big_stack_down = !bits_within(adjust, 12);
-        // let mut bb_iseq = vec![];
-        // // let has_call = cur_func.body.has_call();
-        //
-        // for (bb_id, bb) in cur_func.body.basic_blocks.id_and_block() {
-        //     let last_inst_id = *bb.iseq_ref().last().unwrap();
-        //     let last_inst = &cur_func.body.inst_arena[last_inst_id];
-        //     let is_return =
-        //         last_inst.opcode == MachineOpcode::JR && last_inst.operand[0].is_register() && {
-        //             let r = last_inst.operand[0].as_register();
-        //             r.is_phys_reg() && r.as_phys_reg() == GPR::RA.as_phys_reg()
-        //         };
-        //
-        //     if !is_return {
-        //         continue;
-        //     }
-        //
-        //     let mut iseq = vec![];
-        //
-        //     let sp = cur_func.regs_info.get_phys_reg(GPR::SP);
-        //
-        //     if big_stack_down {
-        //         let s1 = cur_func.regs_info.get_phys_reg(GPR::S1);
-        //         let li = MachineInst::new_simple(
-        //             MachineOpcode::LI,
-        //             vec![MachineOperand::imm_i32(adjust - callee_saved_regs_adjust)],
-        //             bb_id,
-        //         )
-        //         .with_def(vec![s1]);
-        //         let add = MachineInst::new_simple(
-        //             MachineOpcode::ADD,
-        //             vec![MachineOperand::Register(sp), MachineOperand::Register(s1)],
-        //             bb_id,
-        //         )
-        //         .with_def(vec![cur_func.regs_info.get_phys_reg(GPR::SP)]);
-        //         iseq.push(cur_func.body.inst_arena.alloc(&cur_func.regs_info, li));
-        //         iseq.push(cur_func.body.inst_arena.alloc(&cur_func.regs_info, add));
-        //     }
-        //
-        //     // let s0 = cur_func.regs_info.get_phys_reg(GPR::S0);
-        //     for (i, r) in saved_regs.iter().enumerate().rev() {
-        //         let r = cur_func.regs_info.get_phys_reg(*r);
-        //         let ld = MachineInst::new_simple(
-        //             MachineOpcode::LD,
-        //             vec![MachineOperand::Mem(MachineMemOperand::ImmReg(
-        //                 if big_stack_down {
-        //                     callee_saved_regs_adjust - 8 * (i as i32 + 1)
-        //                 } else {
-        //                     adjust - 8 * (i as i32 + 1)
-        //                 },
-        //                 sp,
-        //             ))],
-        //             bb_id,
-        //         )
-        //         .with_def(vec![r]);
-        //         iseq.push(cur_func.body.inst_arena.alloc(&cur_func.regs_info, ld));
-        //     }
-        //
-        //     let addi = MachineInst::new_simple(
-        //         MachineOpcode::ADDI,
-        //         vec![
-        //             MachineOperand::Register(sp),
-        //             MachineOperand::Constant(MachineConstant::Int32(if big_stack_down {
-        //                 callee_saved_regs_adjust
-        //             } else {
-        //                 adjust
-        //             })),
-        //         ],
-        //         bb_id,
-        //     )
-        //     .with_def(vec![sp]);
-        //     iseq.push(cur_func.body.inst_arena.alloc(&cur_func.regs_info, addi));
-        //
-        //     bb_iseq.push((last_inst_id, iseq));
-        // }
-        //
-        // for (ret_id, iseq) in bb_iseq {
-        //     let mut builder = Builder::new(cur_func);
-        //     builder.set_insert_point_before_inst(ret_id);
-        //     for inst in iseq {
-        //         builder.insert(inst)
-        //     }
-        // }
+        let adjust = frame_objects.total_size();
+        let callee_saved_regs_adjust = frame_objects.aligned_callee_saved_regs_byte();
+        let big_stack_down = !bits_within(adjust, 12);
+        let mut bb_iseq = vec![];
+        // let has_call = cur_func.body.has_call();
+
+        for (bb_id, bb) in cur_func.body.basic_blocks.id_and_block() {
+            let last_inst_id = *bb.iseq_ref().last().unwrap();
+            let last_inst = &cur_func.body.inst_arena[last_inst_id];
+            let is_return = last_inst.opcode == MachineOpcode::RET;
+
+            if !is_return {
+                continue;
+            }
+
+            let mut iseq = vec![];
+
+            let sp = cur_func.regs_info.get_phys_reg(SP::SP);
+
+            // if big_stack_down {
+            //     let s1 = cur_func.regs_info.get_phys_reg(GPR::S1);
+            //     let li = MachineInst::new_simple(
+            //         MachineOpcode::LI,
+            //         vec![MachineOperand::imm_i32(adjust - callee_saved_regs_adjust)],
+            //         bb_id,
+            //     )
+            //     .with_def(vec![s1]);
+            //     let add = MachineInst::new_simple(
+            //         MachineOpcode::ADD,
+            //         vec![MachineOperand::Register(sp), MachineOperand::Register(s1)],
+            //         bb_id,
+            //     )
+            //     .with_def(vec![cur_func.regs_info.get_phys_reg(GPR::SP)]);
+            //     iseq.push(cur_func.body.inst_arena.alloc(&cur_func.regs_info, li));
+            //     iseq.push(cur_func.body.inst_arena.alloc(&cur_func.regs_info, add));
+            // }
+
+            // for (i, r) in saved_regs.iter().enumerate().rev() {
+            //     let r = cur_func.regs_info.get_phys_reg(*r);
+            //     let ld = MachineInst::new_simple(
+            //         MachineOpcode::LD,
+            //         vec![MachineOperand::Mem(MachineMemOperand::ImmReg(
+            //             if big_stack_down {
+            //                 callee_saved_regs_adjust - 8 * (i as i32 + 1)
+            //             } else {
+            //                 adjust - 8 * (i as i32 + 1)
+            //             },
+            //             sp,
+            //         ))],
+            //         bb_id,
+            //     )
+            //     .with_def(vec![r]);
+            //     iseq.push(cur_func.body.inst_arena.alloc(&cur_func.regs_info, ld));
+            // }
+
+            let add = MachineInst::new_simple(
+                MachineOpcode::ADDrr64i,
+                vec![
+                    MachineOperand::Register(sp),
+                    MachineOperand::Constant(MachineConstant::Int32(if big_stack_down {
+                        callee_saved_regs_adjust
+                    } else {
+                        adjust
+                    })),
+                ],
+                bb_id,
+            )
+            .with_def(vec![sp]);
+            iseq.push(cur_func.body.inst_arena.alloc(&cur_func.regs_info, add));
+
+            bb_iseq.push((last_inst_id, iseq));
+        }
+
+        for (ret_id, iseq) in bb_iseq {
+            let mut builder = Builder::new(cur_func);
+            builder.set_insert_point_before_inst(ret_id);
+            for inst in iseq {
+                builder.insert(inst)
+            }
+        }
     }
 }
 
