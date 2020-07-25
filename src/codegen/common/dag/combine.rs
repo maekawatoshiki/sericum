@@ -139,7 +139,7 @@ impl Combine {
             return node.operand[1];
         }
 
-        // TODO
+        // TODO: Implement IR-level combine
         // (N(int) * 2^n) -> N(int) << n
         // if node.operand[0].ty.is_integer() && node.operand[1].is_constant() {
         //     if let Some(n) = node.operand[1].as_constant().is_power_of_two() {
