@@ -1,8 +1,12 @@
+#[cfg(feature = "aarch64")]
+pub mod aarch64;
 pub mod common;
 #[cfg(feature = "riscv64")]
 pub mod riscv64;
 #[cfg(feature = "x86_64")]
 pub mod x64;
+#[cfg(feature = "aarch64")]
+pub use aarch64 as arch;
 #[cfg(feature = "riscv64")]
 pub use riscv64 as arch;
 #[cfg(feature = "x86_64")]
