@@ -6,7 +6,7 @@ pub mod machine;
 
 use crate::{
     codegen::common::{
-        dag::combine,
+        dag::{combine, convert},
         machine::{branch_folding, module::MachineModule},
     },
     ir,
@@ -38,7 +38,28 @@ impl TypeSize for Type {
     fn size_in_bits(&self, tys: &Types) -> usize {
         self.size_in_byte(tys) * 8
     }
+
+    fn align_in_byte(&self, tys: &Types) -> usize {
+        match self {
+            Type::Int1 => 1,
+            Type::Int8 => 1,
+            Type::Int32 => 4,
+            Type::Int64 => 8,
+            Type::F64 => 8,
+            Type::Array(id) => tys.base.borrow().non_primitive_types[*id]
+                .as_array()
+                .align_in_byte(tys),
+            Type::Struct(id) => tys.base.borrow().non_primitive_types[*id]
+                .as_struct()
+                .align_in_byte(tys),
+            Type::Pointer(_) => 8,
+            Type::Function(_) => unimplemented!(),
+            Type::Void => 0,
+        }
+    }
 }
+
+const MAX_ALIGN: usize = 16;
 
 impl TypeSize for ArrayType {
     fn size_in_byte(&self, tys: &Types) -> usize {
@@ -48,29 +69,29 @@ impl TypeSize for ArrayType {
     fn size_in_bits(&self, tys: &Types) -> usize {
         self.size_in_byte(tys) * 8
     }
+
+    fn align_in_byte(&self, tys: &Types) -> usize {
+        let size = self.size_in_byte(tys);
+        let align = self.elem_ty.align_in_byte(tys);
+        if size > MAX_ALIGN {
+            MAX_ALIGN
+        } else {
+            align
+        }
+    }
 }
 
 impl TypeSize for StructType {
-    fn size_in_byte(&self, tys: &Types) -> usize {
-        let mut size_total = 0;
-        let calc_padding = |off, align| -> usize {
-            if off % align == 0 {
-                0
-            } else {
-                align - off % align
-            }
-        };
-        for ty in &self.fields_ty {
-            size_total += {
-                let size = ty.size_in_byte(tys);
-                size + calc_padding(size_total, size)
-            };
-        }
-        size_total
+    fn size_in_byte(&self, _tys: &Types) -> usize {
+        self.size()
     }
 
     fn size_in_bits(&self, tys: &Types) -> usize {
         self.size_in_byte(tys) * 8
+    }
+
+    fn align_in_byte(&self, _tys: &Types) -> usize {
+        self.align()
     }
 }
 
@@ -78,7 +99,7 @@ pub fn standard_conversion_into_machine_module(module: &mut Module) -> MachineMo
     ir::branch_folding::BranchFolding::new().run_on_module(module);
     ir::merge_ret::MergeReturns::new().run_on_module(module);
 
-    let mut dag_module = dag::convert::ConvertToDAG::new(module).convert_module();
+    let mut dag_module = convert::ConvertToDAGModule::new(module).run();
 
     let mut pass_mgr = ModulePassManager::new();
     pass_mgr.add_pass(combine::Combine::new());
