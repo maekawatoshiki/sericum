@@ -812,4 +812,37 @@ mod riscv64 {
             &mut m,
         );
     }
+
+    #[test]
+    fn asm_global_var_array() {
+        let mut m = Module::new("cilk");
+        let ty = m.types.new_array_ty(types::Type::Int32, 8);
+        let g = m
+            .global_vars
+            .new_global_var_with_name(ty, global_val::Linkage::Common, "g");
+        let g = value::Value::Global(value::GlobalValue {
+            id: g,
+            ty: m.types.new_pointer_ty(ty),
+        });
+
+        cilk_ir!(m; define [i32] test [] {
+            entry:
+                i = alloca i32;
+                store (i32 2), (%i);
+                li = load (%i);
+                x = gep (%g), [(i32 0), (%li)];
+                store (i32 123), (%x);
+                i = load (%x);
+                ret (%i);
+        });
+
+        println!("{:?}", m);
+
+        compile_and_run(
+            "#include <assert.h>
+        extern int test();
+        int main() { assert(test() == 123); }",
+            &mut m,
+        );
+    }
 }

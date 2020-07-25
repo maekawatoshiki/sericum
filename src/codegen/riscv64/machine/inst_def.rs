@@ -66,6 +66,9 @@ mod inst {
                 RegisterClassKind::GPR
             ))])
             .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GPR)]);
+        pub static ref LA: TargetInstDef = TargetInstDef::new("la", TargetOpcode::LA)
+            .set_uses(vec![TargetOperand::Mem])
+            .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GPR)]);
         pub static ref LI: TargetInstDef = TargetInstDef::new("li", TargetOpcode::LI)
             .set_uses(vec![TargetOperand::Any])
             .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GPR)]);
@@ -128,16 +131,17 @@ pub enum TargetOpcode {
     Setle,
     Setlt,
 
-    ADDI,   // Add Integer
-    ADDIW,  // Add Integer Word
-    ADDW,   // Add Word
-    ADD,    // Add
-    MUL,    // Mul
-    MULW,   // Mul Word
-    DIVW,   // Div Word
-    REMW,   // Rem Word
-    SLLI,   // Shift Left Logical Immediate
-    MV,     // Move
+    ADDI,  // Add Integer
+    ADDIW, // Add Integer Word
+    ADDW,  // Add Word
+    ADD,   // Add
+    MUL,   // Mul
+    MULW,  // Mul Word
+    DIVW,  // Div Word
+    REMW,  // Rem Word
+    SLLI,  // Shift Left Logical Immediate
+    MV,    // Move
+    LA,
     LI,     // Load Immediate
     LW,     // Load Word
     LD,     // Load Double
@@ -172,6 +176,7 @@ impl TargetOpcode {
             Self::REMW => Some(&*inst::REMW),
             Self::SLLI => Some(&*inst::SLLI),
             Self::MV => Some(&*inst::MV),
+            Self::LA => Some(&*inst::LA),
             Self::LI => Some(&*inst::LI),
             Self::LW => Some(&*inst::LW),
             Self::LD => Some(&*inst::LD),

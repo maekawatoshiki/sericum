@@ -127,6 +127,7 @@ impl MISelector {
             (ir.FIAddr a) {
                 mem a => (mi.ADDI %s0, a)
             }
+            (ir.GlobalAddr a) => (mi.LA [Address a])
             // (ir.CopyFromReg a) => (mi.Copy a)
         );
 
