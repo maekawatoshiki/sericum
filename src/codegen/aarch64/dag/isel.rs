@@ -112,7 +112,7 @@ impl MISelector {
             //     }
             // }
             (ir.Load a): Int32 {
-                (ir.FIAddr b) a { mem32 b => (mi.LDR32 [RegFi %sp, b]) }
+                (ir.FIAddr b) a { mem32 b => (mi.LDR32 [RegFi %x29, b]) }
                 // (ir.GlobalAddr b) a => (mi.LW [Address b])
                 // GPR a => (mi.LW [ImmReg $0, a])
             }
@@ -121,7 +121,7 @@ impl MISelector {
             (ir.Store a, b) {
                 (ir.FIAddr c) a {
                     mem32 c {
-                        imm32 b => (mi.STR (mi.MOVr32i b), [RegFi %sp, c])
+                        imm32 b => (mi.STR (mi.MOVr32i b), [RegFi %x29, c])
                         // GPR   b => (mi.SW         b, [FiReg c, %s0])
                     }
                     // mem64 c {

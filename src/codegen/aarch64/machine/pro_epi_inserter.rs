@@ -78,68 +78,34 @@ impl PrologueEpilogueInserter {
         saved_regs: &[PhysReg],
         frame_objects: &FrameObjectsInfo,
     ) {
+        // stp x29, x30, [sp, -16]!
+        // mov x29, sp
         let adjust = frame_objects.total_size();
         let callee_saved_regs_adjust = frame_objects.aligned_callee_saved_regs_byte();
         let big_stack_down = !bits_within(adjust, 12);
         let mut builder = Builder::new(cur_func);
         builder.set_insert_point_at_entry_block();
 
-        // sub sp,sp,X
         let sp = builder.function.regs_info.get_phys_reg(SP::SP);
-        let sub = MachineInst::new_simple(
-            MachineOpcode::SUBrr64i,
-            vec![
-                MachineOperand::Register(sp),
-                MachineOperand::Constant(MachineConstant::Int32(if big_stack_down {
-                    -callee_saved_regs_adjust
-                } else {
-                    adjust
-                })),
-            ],
+        let x29 = builder.function.regs_info.get_phys_reg(GR64::X29);
+        let x30 = builder.function.regs_info.get_phys_reg(GR64::X30);
+        let stp = MachineInst::new_simple(
+            MachineOpcode::STP,
+            vec![MachineOperand::Mem(MachineMemOperand::PreIndex(
+                sp, -adjust,
+            ))],
             builder.get_cur_bb().unwrap(),
         )
-        .with_def(vec![sp]);
-        builder.insert(sub);
+        .with_def(vec![x29, x30]);
+        let mov = MachineInst::new_simple(
+            MachineOpcode::MOVrr,
+            vec![MachineOperand::Register(sp)],
+            builder.get_cur_bb().unwrap(),
+        )
+        .with_def(vec![x29]);
 
-        // for (i, r) in saved_regs.iter().enumerate() {
-        //     let r = builder.function.regs_info.get_phys_reg(*r);
-        //     let sd = MachineInst::new_simple(
-        //         MachineOpcode::SD,
-        //         vec![
-        //             MachineOperand::Register(r),
-        //             MachineOperand::Mem(MachineMemOperand::ImmReg(
-        //                 if big_stack_down {
-        //                     callee_saved_regs_adjust - 8 * (i as i32 + 1)
-        //                 } else {
-        //                     adjust - 8 * (i as i32 + 1)
-        //                 },
-        //                 sp,
-        //             )),
-        //         ],
-        //         builder.get_cur_bb().unwrap(),
-        //     );
-        //     builder.insert(sd);
-        // }
-
-        // if big_stack_down {
-        //     let s1 = builder.function.regs_info.get_phys_reg(GPR::S1);
-        //     let li = MachineInst::new_simple(
-        //         MachineOpcode::LI,
-        //         vec![MachineOperand::imm_i32(
-        //             -(adjust - callee_saved_regs_adjust),
-        //         )],
-        //         builder.get_cur_bb().unwrap(),
-        //     )
-        //     .with_def(vec![s1]);
-        //     let add = MachineInst::new_simple(
-        //         MachineOpcode::ADD,
-        //         vec![MachineOperand::Register(sp), MachineOperand::Register(s1)],
-        //         builder.get_cur_bb().unwrap(),
-        //     )
-        //     .with_def(vec![builder.function.regs_info.get_phys_reg(GPR::SP)]);
-        //     builder.insert(li);
-        //     builder.insert(add);
-        // }
+        builder.insert(stp);
+        builder.insert(mov);
 
         // self.insert_arg_copy(&tys.base.borrow(), &mut builder);
     }
@@ -158,11 +124,15 @@ impl PrologueEpilogueInserter {
         saved_regs: &[PhysReg],
         frame_objects: &FrameObjectsInfo,
     ) {
+        // ldp x29, x30, [sp], adjust
         let adjust = frame_objects.total_size();
         let callee_saved_regs_adjust = frame_objects.aligned_callee_saved_regs_byte();
         let big_stack_down = !bits_within(adjust, 12);
         let mut bb_iseq = vec![];
         // let has_call = cur_func.body.has_call();
+        let sp = cur_func.regs_info.get_phys_reg(SP::SP);
+        let x29 = cur_func.regs_info.get_phys_reg(GR64::X29);
+        let x30 = cur_func.regs_info.get_phys_reg(GR64::X30);
 
         for (bb_id, bb) in cur_func.body.basic_blocks.id_and_block() {
             let last_inst_id = *bb.iseq_ref().last().unwrap();
@@ -213,20 +183,30 @@ impl PrologueEpilogueInserter {
             //     iseq.push(cur_func.body.inst_arena.alloc(&cur_func.regs_info, ld));
             // }
 
-            let add = MachineInst::new_simple(
-                MachineOpcode::ADDrr64i,
-                vec![
-                    MachineOperand::Register(sp),
-                    MachineOperand::Constant(MachineConstant::Int32(if big_stack_down {
-                        callee_saved_regs_adjust
-                    } else {
-                        adjust
-                    })),
-                ],
+            let ldp = MachineInst::new_simple(
+                MachineOpcode::LDP64,
+                vec![MachineOperand::Mem(MachineMemOperand::PostIndex(
+                    sp, adjust,
+                ))],
                 bb_id,
             )
-            .with_def(vec![sp]);
-            iseq.push(cur_func.body.inst_arena.alloc(&cur_func.regs_info, add));
+            .with_def(vec![x29, x30]);
+            iseq.push(cur_func.body.inst_arena.alloc(&cur_func.regs_info, ldp));
+
+            // let add = MachineInst::new_simple(
+            //     MachineOpcode::ADDrr64i,
+            //     vec![
+            //         MachineOperand::Register(sp),
+            //         MachineOperand::Constant(MachineConstant::Int32(if big_stack_down {
+            //             callee_saved_regs_adjust
+            //         } else {
+            //             adjust
+            //         })),
+            //     ],
+            //     bb_id,
+            // )
+            // .with_def(vec![sp]);
+            // iseq.push(cur_func.body.inst_arena.alloc(&cur_func.regs_info, add));
 
             bb_iseq.push((last_inst_id, iseq));
         }

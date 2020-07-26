@@ -69,6 +69,8 @@ thread_local! {
             GR32::W26,
             GR32::W27,
             GR32::W28,
+            GR32::W29,
+            GR32::W30,
             GR64::X19,
             GR64::X20,
             GR64::X21,
@@ -78,7 +80,9 @@ thread_local! {
             GR64::X25,
             GR64::X26,
             GR64::X27,
-            GR64::X28
+            GR64::X28,
+            GR64::X29,
+            GR64::X30
         ];
         for reg in regs {
             bits.set(reg)

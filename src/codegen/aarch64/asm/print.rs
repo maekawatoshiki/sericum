@@ -135,9 +135,12 @@ impl<'s> MachineAsmPrinter<'s> {
                 )
                 .as_str(),
             ),
-            // MachineOperand::Mem(MachineMemOperand::ImmReg(imm, r)) => self
-            //     .output
-            //     .push_str(format!("{}({})", imm, r.as_phys_reg().name()).as_str()),
+            MachineOperand::Mem(MachineMemOperand::PreIndex(r, off)) => self
+                .output
+                .push_str(format!("[{}, {}]!", r.as_phys_reg().name(), off).as_str()),
+            MachineOperand::Mem(MachineMemOperand::PostIndex(r, off)) => self
+                .output
+                .push_str(format!("[{}], {}", r.as_phys_reg().name(), off).as_str()),
             MachineOperand::Mem(MachineMemOperand::Address(AddressKind::FunctionName(name))) => {
                 self.output.push_str(name.replace('.', "_").as_str())
             }

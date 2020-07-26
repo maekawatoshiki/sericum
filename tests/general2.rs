@@ -1007,7 +1007,7 @@ mod aarch64 {
                 store (i32 50), (%i);
                 ii = load (%i);
                 x = sub (%ii), (i32 8);
-                x = sub (%ii), (%arg.0);
+                x = sub (%x), (%arg.0);
                 ret (%x);
         });
         compile_and_run(

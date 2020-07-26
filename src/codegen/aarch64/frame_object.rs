@@ -7,14 +7,16 @@ use rustc_hash::FxHashMap;
 impl FrameObjectsInfo {
     pub fn new(tys: &Types, f: &MachineFunction) -> Self {
         let mut offset_map = FxHashMap::default();
-        let callee_saved_regs_byte: usize = f
-            .body
-            .appeared_phys_regs()
-            .containing_callee_saved_regs()
-            .to_phys_set()
-            .len()
-            * 8
-            + f.body.has_call() as usize * 8/*=ra*/;
+        let callee_saved_regs_byte: usize = ::std::cmp::max(
+            f.body
+                .appeared_phys_regs()
+                .containing_callee_saved_regs()
+                .to_phys_set()
+                .len()
+                * 8,
+            16,
+        );
+        // + f.body.has_call() as usize * 8/*=ra*/;
         let mut total_size = 0i32;
 
         let padding = |off, align| -> i32 { (align - off % align) % align };
@@ -66,7 +68,7 @@ impl FrameObjectsInfo {
     pub fn offset(&self, kind: FrameIndexKind) -> Option<i32> {
         self.offset_map
             .get(&kind)
-            .map(|x| *x as i32 - roundup(self.callee_saved_regs_byte as i32, ALIGN))
+            .map(|x| *x as i32 + roundup(self.callee_saved_regs_byte as i32, ALIGN))
     }
 
     pub fn total_size(&self) -> i32 {
