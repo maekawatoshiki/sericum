@@ -49,7 +49,9 @@ mod inst {
         pub static ref CMPri: TargetInstDef = TargetInstDef::new("cmp", TargetOpcode::CMPri)
             .set_uses(vec![TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR32)),
                            TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR32))]);
-        pub static ref BEQ: TargetInstDef = TargetInstDef::new("beq", TargetOpcode::BEQ).set_uses(vec![TargetOperand::Block]);
+        pub static ref B_EQ: TargetInstDef = TargetInstDef::new("b.eq", TargetOpcode::B_EQ).set_uses(vec![TargetOperand::Block]);
+        pub static ref B_LT: TargetInstDef = TargetInstDef::new("b.lt", TargetOpcode::B_LT).set_uses(vec![TargetOperand::Block]);
+        pub static ref B_LE: TargetInstDef = TargetInstDef::new("b.le", TargetOpcode::B_LE).set_uses(vec![TargetOperand::Block]);
         pub static ref B: TargetInstDef = TargetInstDef::new("b", TargetOpcode::B).set_uses(vec![TargetOperand::Block]);
         pub static ref LDR32: TargetInstDef = TargetInstDef::new("ldr", TargetOpcode::LDR32)
             .set_uses(vec![TargetOperand::Mem])
@@ -83,7 +85,9 @@ pub enum TargetOpcode {
     MULrrr32,
     SDIVrrr32,
     CMPri,
-    BEQ,
+    B_EQ,
+    B_LT,
+    B_LE,
     B,
     LDR32,
     STR,
@@ -135,7 +139,9 @@ impl TargetOpcode {
             Self::MULrrr32 => Some(&*inst::MULrrr32),
             Self::SDIVrrr32 => Some(&*inst::SDIVrrr32),
             Self::CMPri => Some(&*inst::CMPri),
-            Self::BEQ => Some(&*inst::BEQ),
+            Self::B_EQ => Some(&*inst::B_EQ),
+            Self::B_LT => Some(&*inst::B_LT),
+            Self::B_LE => Some(&*inst::B_LE),
             Self::B => Some(&*inst::B),
             Self::LDR32 => Some(&*inst::LDR32),
             Self::STR => Some(&*inst::STR),

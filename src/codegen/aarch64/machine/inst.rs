@@ -19,7 +19,7 @@ impl MachineOpcode {
     }
 
     pub fn is_terminator(&self) -> bool {
-        matches!(self, MachineOpcode::B | MachineOpcode::BEQ)
+        matches!(self, MachineOpcode::B | MachineOpcode::B_EQ)
     }
 
     pub fn is_unconditional_jmp(&self) -> bool {

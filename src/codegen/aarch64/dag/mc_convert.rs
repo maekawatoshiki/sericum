@@ -237,9 +237,9 @@ impl<'a> ScheduleByBlock<'a> {
                 // unimplemented!()
                 Some(self.push_inst(MachineInst::new_simple(
                     match cond_kind!(node.operand[0]) {
-                        CondKind::Eq => MachineOpcode::BEQ,
-                        // CondKind::Le => MachineOpcode::BLE,
-                        // CondKind::Lt => MachineOpcode::BLT,
+                        CondKind::Eq => MachineOpcode::B_EQ,
+                        CondKind::Le => MachineOpcode::B_LE,
+                        CondKind::Lt => MachineOpcode::B_LT,
                         // CondKind::Lt => MachineOpcode::JL,
                         // CondKind::Ge => MachineOpcode::JGE,
                         // CondKind::Gt => MachineOpcode::JG,
