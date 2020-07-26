@@ -67,22 +67,22 @@ impl MISelector {
             // (ir.Call _a) => { self.select_call(tys, regs_info, heap, node) }
             (ir.Add a, b): Int32 {
                 GR32 a {
-                    imm12 b => (mi.ADDrr32i a, b) } }
-                    // imm32 b => (mi.ADDW  a, (mi.LI b))
-                    // GPR   b => (mi.ADDW  a, b) } }
+                    imm12 b => (mi.ADDrr32i a, b)
+                    imm32 b => (mi.ADDrrr32 a, (mi.MOVr32i b))
+                    GR32  b => (mi.ADDrrr32 a, b) } }
             (ir.Sub x, y): Int32 {
                 GR32 x {
-                    imm12 y => (mi.SUBrr32i x, y) } }
+                    imm12 y => (mi.SUBrr32i x, y)
+                    imm32 y => (mi.SUBrrr32 x, (mi.MOVr32i y))
+                    GR32  y => (mi.SUBrrr32 x, y) } }
             (ir.Mul x, y): Int32 {
                 GR32 x {
                     imm32 y => (mi.MULrrr32 x, (mi.MOVr32i y))
-                }
-            }
+                    GR32  y => (mi.MULrrr32 x, y) } }
             (ir.Div x, y): Int32 {
                 GR32 x {
                     imm32 y => (mi.SDIVrrr32 x, (mi.MOVr32i y))
-                }
-            }
+                    GR32  y => (mi.SDIVrrr32 x, y) } }
             // (ir.Add a, b) {
             //     GPR a {
             //         imm12 b => (mi.ADDI a, b)

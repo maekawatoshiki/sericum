@@ -22,6 +22,10 @@ mod inst {
             .set_uses(vec![TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR32)),
                            TargetOperand::Immediate(TargetImmediate::I16)]) // TODO: I12
             .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR32)]);
+        pub static ref ADDrrr32: TargetInstDef = TargetInstDef::new("add", TargetOpcode::ADDrrr32)
+            .set_uses(vec![TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR32)),
+                           TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR32))])
+            .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR32)]);
         pub static ref SUBrr64i: TargetInstDef = TargetInstDef::new("sub", TargetOpcode::SUBrr64i)
             .set_uses(vec![TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR64)),
                            TargetOperand::Immediate(TargetImmediate::I16)]) // TODO: I12
@@ -29,6 +33,10 @@ mod inst {
         pub static ref SUBrr32i: TargetInstDef = TargetInstDef::new("sub", TargetOpcode::SUBrr32i)
             .set_uses(vec![TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR32)),
                            TargetOperand::Immediate(TargetImmediate::I16)]) // TODO: I12
+            .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR32)]);
+        pub static ref SUBrrr32: TargetInstDef = TargetInstDef::new("sub", TargetOpcode::SUBrrr32)
+            .set_uses(vec![TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR32)),
+                           TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR32))])
             .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR32)]);
         pub static ref MULrrr32: TargetInstDef = TargetInstDef::new("mul", TargetOpcode::MULrrr32)
             .set_uses(vec![TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR32)),
@@ -166,8 +174,10 @@ pub enum TargetOpcode {
     MOVr32i,
     ADDrr64i,
     ADDrr32i,
+    ADDrrr32,
     SUBrr64i,
     SUBrr32i,
+    SUBrrr32,
     MULrrr32,
     SDIVrrr32,
     LDR32,
@@ -211,8 +221,10 @@ impl TargetOpcode {
             Self::MOVr32i => Some(&*inst::MOVr32i),
             Self::ADDrr64i => Some(&*inst::ADDrr64i),
             Self::ADDrr32i => Some(&*inst::ADDrr32i),
+            Self::ADDrrr32 => Some(&*inst::ADDrrr32),
             Self::SUBrr64i => Some(&*inst::SUBrr64i),
             Self::SUBrr32i => Some(&*inst::SUBrr32i),
+            Self::SUBrrr32 => Some(&*inst::SUBrrr32),
             Self::MULrrr32 => Some(&*inst::MULrrr32),
             Self::SDIVrrr32 => Some(&*inst::SDIVrrr32),
             Self::LDR32 => Some(&*inst::LDR32),

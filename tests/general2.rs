@@ -992,30 +992,32 @@ mod aarch64 {
     #[test]
     fn asm_add_sub() {
         let mut m = Module::new("cilk");
-        cilk_ir!(m; define [i32] test_add [] {
+        cilk_ir!(m; define [i32] test_add [(i32)] {
             entry:
                 i = alloca i32;
                 store (i32 40), (%i);
                 ii = load (%i);
                 x = add (%ii), (i32 2);
+                x = add (%arg.0), (%x);
                 ret (%x);
         });
-        cilk_ir!(m; define [i32] test_sub [] {
+        cilk_ir!(m; define [i32] test_sub [(i32)] {
             entry:
                 i = alloca i32;
                 store (i32 50), (%i);
                 ii = load (%i);
                 x = sub (%ii), (i32 8);
+                x = sub (%ii), (%arg.0);
                 ret (%x);
         });
         compile_and_run(
             "
     #include <assert.h>
-    extern int test_add();
+    extern int test_add(int);
     extern int test_sub();
     int main() {
-        assert(test_add() == 42);
-        assert(test_sub() == 42);
+        assert(test_add(2) == 44);
+        assert(test_sub(3) == 39);
     }
             ",
             &mut m,
@@ -1025,30 +1027,32 @@ mod aarch64 {
     #[test]
     fn asm_mul_div() {
         let mut m = Module::new("cilk");
-        cilk_ir!(m; define [i32] test_mul [] {
+        cilk_ir!(m; define [i32] test_mul [(i32)] {
             entry:
                 i = alloca i32;
                 store (i32 21), (%i);
                 ii = load (%i);
                 x = mul (%ii), (i32 2);
+                x = mul (%x), (%arg.0);
                 ret (%x);
         });
-        cilk_ir!(m; define [i32] test_div [] {
+        cilk_ir!(m; define [i32] test_div [(i32)] {
             entry:
                 i = alloca i32;
                 store (i32 85), (%i);
                 ii = load (%i);
                 x = div (%ii), (i32 2);
+                x = div (%x), (%arg.0);
                 ret (%x);
         });
         compile_and_run(
             "
     #include <assert.h>
-    extern int test_mul();
+    extern int test_mul(int);
     extern int test_div();
     int main() {
-        assert(test_mul() == 42);
-        assert(test_div() == 42);
+        assert(test_mul(2) == 84);
+        assert(test_div(3) == 14);
     }
             ",
             &mut m,
