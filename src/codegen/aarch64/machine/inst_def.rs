@@ -15,14 +15,22 @@ mod inst {
             .set_uses(vec![TargetOperand::Immediate(TargetImmediate::I16)])
             .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR32)]);
         pub static ref ADDrr64i: TargetInstDef = TargetInstDef::new("add", TargetOpcode::ADDrr64i)
-            .set_uses(vec![TargetOperand::Register(TargetRegister::Any),
+            .set_uses(vec![TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR64)),
                            TargetOperand::Immediate(TargetImmediate::I16)]) // TODO: I12
-            .set_defs(vec![TargetRegister::Any]);
+            .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR64)]);
+        pub static ref ADDrr32i: TargetInstDef = TargetInstDef::new("add", TargetOpcode::ADDrr32i)
+            .set_uses(vec![TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR32)),
+                           TargetOperand::Immediate(TargetImmediate::I16)]) // TODO: I12
+            .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR32)]);
         pub static ref SUBrr64i: TargetInstDef = TargetInstDef::new("sub", TargetOpcode::SUBrr64i)
-            .set_uses(vec![TargetOperand::Register(TargetRegister::Any),
+            .set_uses(vec![TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR64)),
                            TargetOperand::Immediate(TargetImmediate::I16)]) // TODO: I12
-            .set_defs(vec![TargetRegister::Any]);
-        pub static ref LDR: TargetInstDef = TargetInstDef::new("ldr", TargetOpcode::LDR)
+            .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR64)]);
+        pub static ref SUBrr32i: TargetInstDef = TargetInstDef::new("sub", TargetOpcode::SUBrr32i)
+            .set_uses(vec![TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR32)),
+                           TargetOperand::Immediate(TargetImmediate::I16)]) // TODO: I12
+            .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR32)]);
+        pub static ref LDR32: TargetInstDef = TargetInstDef::new("ldr", TargetOpcode::LDR32)
             .set_uses(vec![TargetOperand::Mem])
             .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR32)]);
         pub static ref STR: TargetInstDef = TargetInstDef::new("str", TargetOpcode::STR)
@@ -149,8 +157,10 @@ pub enum TargetOpcode {
     MOVrr,
     MOVr32i,
     ADDrr64i,
+    ADDrr32i,
     SUBrr64i,
-    LDR,
+    SUBrr32i,
+    LDR32,
     STR,
     RET,
     // ADDI,  // Add Integer
@@ -190,8 +200,10 @@ impl TargetOpcode {
             Self::MOVrr => Some(&*inst::MOVrr),
             Self::MOVr32i => Some(&*inst::MOVr32i),
             Self::ADDrr64i => Some(&*inst::ADDrr64i),
+            Self::ADDrr32i => Some(&*inst::ADDrr32i),
             Self::SUBrr64i => Some(&*inst::SUBrr64i),
-            Self::LDR => Some(&*inst::LDR),
+            Self::SUBrr32i => Some(&*inst::SUBrr32i),
+            Self::LDR32 => Some(&*inst::LDR32),
             Self::STR => Some(&*inst::STR),
             Self::RET => Some(&*inst::RET),
             // Self::ADDI => Some(&*inst::ADDI),

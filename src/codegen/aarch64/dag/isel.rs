@@ -65,11 +65,14 @@ impl MISelector {
         let mut selected = isel_pat!(
             // TODO: Refactoring
             // (ir.Call _a) => { self.select_call(tys, regs_info, heap, node) }
-            // (ir.Add a, b): Int32 {
-            //     GPR a {
-            //         imm12 b => (mi.ADDIW a, b)
-            //         imm32 b => (mi.ADDW  a, (mi.LI b))
-            //         GPR   b => (mi.ADDW  a, b) } }
+            (ir.Add a, b): Int32 {
+                GR32 a {
+                    imm12 b => (mi.ADDrr32i a, b) } }
+                    // imm32 b => (mi.ADDW  a, (mi.LI b))
+                    // GPR   b => (mi.ADDW  a, b) } }
+            (ir.Sub x, y): Int32 {
+                GR32 x {
+                    imm12 y => (mi.SUBrr32i x, y) } }
             // (ir.Add a, b) {
             //     GPR a {
             //         imm12 b => (mi.ADDI a, b)
@@ -98,7 +101,7 @@ impl MISelector {
             //     }
             // }
             (ir.Load a): Int32 {
-                (ir.FIAddr b) a { mem32 b => (mi.LDR [RegFi %sp, b]) }
+                (ir.FIAddr b) a { mem32 b => (mi.LDR32 [RegFi %sp, b]) }
                 // (ir.GlobalAddr b) a => (mi.LW [Address b])
                 // GPR a => (mi.LW [ImmReg $0, a])
             }

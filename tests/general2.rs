@@ -966,4 +966,59 @@ mod aarch64 {
             &mut m,
         );
     }
+
+    #[test]
+    fn asm_arg() {
+        let mut m = Module::new("cilk");
+        cilk_ir!(m; define [i32] test [(i32), (i32)] {
+            entry:
+                // i = alloca i32;
+                // store (i32 42), (%i);
+                // ii = load (%i);
+                ret (%arg.1);
+        });
+        compile_and_run(
+            "
+    #include <assert.h>
+    extern int test(int,int);
+    int main() {
+        assert(test(1, 42) == 42);
+    }
+            ",
+            &mut m,
+        );
+    }
+
+    #[test]
+    fn asm_add_sub() {
+        let mut m = Module::new("cilk");
+        cilk_ir!(m; define [i32] test_add [] {
+            entry:
+                i = alloca i32;
+                store (i32 40), (%i);
+                ii = load (%i);
+                x = add (%ii), (i32 2);
+                ret (%x);
+        });
+        cilk_ir!(m; define [i32] test_sub [] {
+            entry:
+                i = alloca i32;
+                store (i32 50), (%i);
+                ii = load (%i);
+                x = sub (%ii), (i32 8);
+                ret (%x);
+        });
+        compile_and_run(
+            "
+    #include <assert.h>
+    extern int test_add();
+    extern int test_sub();
+    int main() {
+        assert(test_add() == 42);
+        assert(test_sub() == 42);
+    }
+            ",
+            &mut m,
+        );
+    }
 }
