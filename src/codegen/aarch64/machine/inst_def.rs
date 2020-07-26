@@ -30,6 +30,14 @@ mod inst {
             .set_uses(vec![TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR32)),
                            TargetOperand::Immediate(TargetImmediate::I16)]) // TODO: I12
             .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR32)]);
+        pub static ref MULrrr32: TargetInstDef = TargetInstDef::new("mul", TargetOpcode::MULrrr32)
+            .set_uses(vec![TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR32)),
+                           TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR32))])
+            .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR32)]);
+        pub static ref SDIVrrr32: TargetInstDef = TargetInstDef::new("sdiv", TargetOpcode::SDIVrrr32)
+            .set_uses(vec![TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR32)),
+                           TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR32))])
+            .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR32)]);
         pub static ref LDR32: TargetInstDef = TargetInstDef::new("ldr", TargetOpcode::LDR32)
             .set_uses(vec![TargetOperand::Mem])
             .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR32)]);
@@ -160,6 +168,8 @@ pub enum TargetOpcode {
     ADDrr32i,
     SUBrr64i,
     SUBrr32i,
+    MULrrr32,
+    SDIVrrr32,
     LDR32,
     STR,
     RET,
@@ -203,6 +213,8 @@ impl TargetOpcode {
             Self::ADDrr32i => Some(&*inst::ADDrr32i),
             Self::SUBrr64i => Some(&*inst::SUBrr64i),
             Self::SUBrr32i => Some(&*inst::SUBrr32i),
+            Self::MULrrr32 => Some(&*inst::MULrrr32),
+            Self::SDIVrrr32 => Some(&*inst::SDIVrrr32),
             Self::LDR32 => Some(&*inst::LDR32),
             Self::STR => Some(&*inst::STR),
             Self::RET => Some(&*inst::RET),

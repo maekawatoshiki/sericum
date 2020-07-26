@@ -1021,4 +1021,37 @@ mod aarch64 {
             &mut m,
         );
     }
+
+    #[test]
+    fn asm_mul_div() {
+        let mut m = Module::new("cilk");
+        cilk_ir!(m; define [i32] test_mul [] {
+            entry:
+                i = alloca i32;
+                store (i32 21), (%i);
+                ii = load (%i);
+                x = mul (%ii), (i32 2);
+                ret (%x);
+        });
+        cilk_ir!(m; define [i32] test_div [] {
+            entry:
+                i = alloca i32;
+                store (i32 85), (%i);
+                ii = load (%i);
+                x = div (%ii), (i32 2);
+                ret (%x);
+        });
+        compile_and_run(
+            "
+    #include <assert.h>
+    extern int test_mul();
+    extern int test_div();
+    int main() {
+        assert(test_mul() == 42);
+        assert(test_div() == 42);
+    }
+            ",
+            &mut m,
+        );
+    }
 }
