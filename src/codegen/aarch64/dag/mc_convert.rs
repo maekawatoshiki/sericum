@@ -216,36 +216,38 @@ impl<'a> ScheduleByBlock<'a> {
             //     Some(self.push_inst(inst))
             // }
             NodeKind::IR(IRNodeKind::Brcc) => {
-                let mut operands = node.operand[1..3]
-                    .iter()
-                    .map(|&op| {
-                        let op = self.normal_operand(op);
-                        match self.move2reg_if_necessary(op) {
-                            Ok((r, inst)) => {
-                                self.push_inst(inst);
-                                MachineOperand::Register(r)
-                            }
-                            Err(op) => op,
-                        }
-                    })
-                    .collect::<Vec<_>>();
-                operands.push(MachineOperand::Branch(
-                    self.get_machine_bb(node.operand[3].as_basic_block()),
+                let op0 = self.normal_operand(node.operand[1]);
+                let op1 = self.normal_operand(node.operand[2]);
+                let dst =
+                    MachineOperand::Branch(self.get_machine_bb(node.operand[3].as_basic_block()));
+
+                self.push_inst(MachineInst::new_simple(
+                    if op0.is_register() && op1.is_constant() {
+                        MachineOpcode::CMPri
+                    } else if op0.is_register() && op1.is_register() {
+                        unimplemented!()
+                    // MachineOpcode::CMPrr
+                    } else {
+                        unreachable!()
+                    },
+                    vec![op0, op1],
+                    self.cur_bb,
                 ));
-                unimplemented!()
-                // Some(self.push_inst(MachineInst::new_simple(
-                //     match cond_kind!(node.operand[0]) {
-                //         CondKind::Eq => MachineOpcode::BEQ,
-                //         CondKind::Le => MachineOpcode::BLE,
-                //         CondKind::Lt => MachineOpcode::BLT,
-                //         // CondKind::Lt => MachineOpcode::JL,
-                //         // CondKind::Ge => MachineOpcode::JGE,
-                //         // CondKind::Gt => MachineOpcode::JG,
-                //         _ => unreachable!(),
-                //     },
-                //     operands,
-                //     self.cur_bb,
-                // )))
+
+                // unimplemented!()
+                Some(self.push_inst(MachineInst::new_simple(
+                    match cond_kind!(node.operand[0]) {
+                        CondKind::Eq => MachineOpcode::BEQ,
+                        // CondKind::Le => MachineOpcode::BLE,
+                        // CondKind::Lt => MachineOpcode::BLT,
+                        // CondKind::Lt => MachineOpcode::JL,
+                        // CondKind::Ge => MachineOpcode::JGE,
+                        // CondKind::Gt => MachineOpcode::JG,
+                        _ => unreachable!(),
+                    },
+                    vec![dst],
+                    self.cur_bb,
+                )))
             }
             // NodeKind::IR(IRNodeKind::FPBrcc) => {
             //     let op0 = self.normal_operand(node.operand[1]);

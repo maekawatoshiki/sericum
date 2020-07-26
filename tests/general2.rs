@@ -1058,4 +1058,29 @@ mod aarch64 {
             &mut m,
         );
     }
+
+    #[test]
+    fn asm_brcc() {
+        let mut m = Module::new("cilk");
+        cilk_ir!(m; define [i32] test [(i32)] {
+            entry:
+                c = icmp eq (%arg.0), (i32 0);
+                br (%c) l1, l2;
+            l1:
+                ret (i32 1);
+            l2:
+                ret (i32 0);
+        });
+        compile_and_run(
+            "
+    #include <assert.h>
+    extern int test(int);
+    int main() {
+        assert(test(1) == 0);
+        assert(test(0) == 1);
+    }
+            ",
+            &mut m,
+        );
+    }
 }
