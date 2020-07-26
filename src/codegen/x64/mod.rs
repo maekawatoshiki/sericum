@@ -7,7 +7,7 @@ pub mod machine;
 use crate::{
     codegen::common::{
         dag::{combine, convert},
-        machine::{branch_folding, module::MachineModule},
+        machine::{branch_folding, module::MachineModule, phi_elimination},
     },
     ir,
     ir::module::Module,
@@ -111,7 +111,7 @@ pub fn standard_conversion_into_machine_module(module: &mut Module) -> MachineMo
     let mut machine_module = dag::mc_convert::convert_module(dag_module);
 
     let mut pass_mgr = ModulePassManager::new();
-    pass_mgr.add_pass(machine::phi_elimination::PhiElimination::new());
+    pass_mgr.add_pass(phi_elimination::PhiElimination::new());
     pass_mgr.add_pass(machine::two_addr::TwoAddressConverter::new());
     pass_mgr.add_pass(machine::regalloc::RegisterAllocator::new());
     pass_mgr.add_pass(branch_folding::BranchFolding::new());

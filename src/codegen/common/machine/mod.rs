@@ -8,4 +8,5 @@ pub mod inst;
 pub mod inst_def;
 pub mod liveness;
 pub mod module;
+pub mod phi_elimination;
 pub mod register;

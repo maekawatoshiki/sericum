@@ -1,6 +1,5 @@
 pub mod calc_spill_weight;
 pub mod inst;
-pub mod phi_elimination;
 pub mod pro_epi_inserter;
 pub mod reg_coalescer;
 pub mod regalloc;
