@@ -1083,4 +1083,33 @@ mod aarch64 {
             &mut m,
         );
     }
+
+    #[test]
+    fn asm_fibo() {
+        let mut m = module::Module::new("cilk");
+        cilk_ir!(m; define [i32] fibo [(i32)] {
+            entry:
+                cond = icmp le (%arg.0), (i32 2);
+                br (%cond) l1, l2;
+            l1:
+                ret (i32 1);
+            l2:
+                a1 = sub (%arg.0), (i32 1);
+                r1 = call fibo [(%a1)];
+                a2 = sub (%arg.0), (i32 2);
+                r2 = call fibo [(%a2)];
+                r3 = add (%r1), (%r2);
+                ret (%r3);
+        });
+        compile_and_run(
+            "
+    #include <assert.h>
+    extern int fibo(int);
+    int main() {
+        assert(fibo(10) == 55);
+    }
+            ",
+            &mut m,
+        );
+    }
 }

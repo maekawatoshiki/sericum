@@ -231,35 +231,35 @@ impl RegisterAllocator {
         let call_inst_parent = cur_func.body.inst_arena[call_inst_id].parent;
 
         for (frinfo, reg) in slots_to_save_regs.into_iter().zip(regs_to_save.into_iter()) {
-            // let src = MachineOperand::Register(reg);
-            // let s0 = cur_func.regs_info.get_phys_reg(GPR::S0);
-            // let store_inst_id = cur_func.alloc_inst(MachineInst::new(
-            //     &cur_func.regs_info,
-            //     MachineOpcode::SD,
-            //     vec![
-            //         src,
-            //         MachineOperand::Mem(MachineMemOperand::FiReg(frinfo, s0)),
-            //     ],
-            //     None,
-            //     call_inst_parent,
-            // ));
-            //
-            // let load_inst_id = cur_func.alloc_inst(
-            //     MachineInst::new_simple(
-            //         MachineOpcode::LD,
-            //         vec![MachineOperand::Mem(MachineMemOperand::FiReg(frinfo, s0))],
-            //         call_inst_parent,
-            //     )
-            //     .with_def(vec![reg]),
-            // );
+            let src = MachineOperand::Register(reg);
+            let x29 = cur_func.regs_info.get_phys_reg(GR64::X29);
+            let store_inst_id = cur_func.alloc_inst(MachineInst::new(
+                &cur_func.regs_info,
+                MachineOpcode::STR,
+                vec![
+                    src,
+                    MachineOperand::Mem(MachineMemOperand::RegFi(x29, frinfo)),
+                ],
+                None,
+                call_inst_parent,
+            ));
 
-            // let mut builder = BuilderWithLiveInfoEdit::new(matrix, cur_func);
-            //
-            // builder.set_insert_point_before_inst(call_inst_id);
-            // builder.insert(store_inst_id);
-            //
-            // builder.set_insert_point_after_inst(call_inst_id);
-            // builder.insert(load_inst_id);
+            let load_inst_id = cur_func.alloc_inst(
+                MachineInst::new_simple(
+                    MachineOpcode::LDR32,
+                    vec![MachineOperand::Mem(MachineMemOperand::RegFi(x29, frinfo))],
+                    call_inst_parent,
+                )
+                .with_def(vec![reg]),
+            );
+
+            let mut builder = BuilderWithLiveInfoEdit::new(matrix, cur_func);
+
+            builder.set_insert_point_before_inst(call_inst_id);
+            builder.insert(store_inst_id);
+
+            builder.set_insert_point_after_inst(call_inst_id);
+            builder.insert(load_inst_id);
         }
     }
 

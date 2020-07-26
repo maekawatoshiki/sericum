@@ -53,6 +53,7 @@ mod inst {
         pub static ref B_LT: TargetInstDef = TargetInstDef::new("b.lt", TargetOpcode::B_LT).set_uses(vec![TargetOperand::Block]);
         pub static ref B_LE: TargetInstDef = TargetInstDef::new("b.le", TargetOpcode::B_LE).set_uses(vec![TargetOperand::Block]);
         pub static ref B: TargetInstDef = TargetInstDef::new("b", TargetOpcode::B).set_uses(vec![TargetOperand::Block]);
+        pub static ref BL: TargetInstDef = TargetInstDef::new("bl", TargetOpcode::CALL).set_uses(vec![TargetOperand::Addr]);
         pub static ref LDR32: TargetInstDef = TargetInstDef::new("ldr", TargetOpcode::LDR32)
             .set_uses(vec![TargetOperand::Mem])
             .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR32)]);
@@ -143,6 +144,7 @@ impl TargetOpcode {
             Self::B_LT => Some(&*inst::B_LT),
             Self::B_LE => Some(&*inst::B_LE),
             Self::B => Some(&*inst::B),
+            Self::CALL => Some(&*inst::BL),
             Self::LDR32 => Some(&*inst::LDR32),
             Self::STR => Some(&*inst::STR),
             Self::LDP64 => Some(&*inst::LDP64),

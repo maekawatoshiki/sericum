@@ -330,7 +330,7 @@ impl<'a> ScheduleByBlock<'a> {
     }
 
     fn convert_call_dag(&mut self, node: &DAGNode) -> MachineInstId {
-        let mut arg_regs = vec![];
+        let mut arg_regs = vec![self.cur_func.regs_info.get_phys_reg(GR64::X30)];
         // let mut off = 0;
 
         let mut args = vec![];
@@ -401,7 +401,6 @@ impl<'a> ScheduleByBlock<'a> {
                         Type::Void => vec![],
                         _ => vec![ret_reg],
                     };
-                    // imp_defs.push(self.cur_func.regs_info.get_phys_reg(GPR::RA));
                     imp_defs
                 }),
         );
