@@ -19,11 +19,50 @@ impl MachineOpcode {
     }
 
     pub fn is_terminator(&self) -> bool {
-        matches!(self, MachineOpcode::B | MachineOpcode::B_EQ)
+        matches!(
+            self,
+            MachineOpcode::RET
+                | MachineOpcode::Ret
+                | MachineOpcode::B
+                | MachineOpcode::B_EQ
+                | MachineOpcode::B_NE
+                | MachineOpcode::B_LE
+                | MachineOpcode::B_LT
+                | MachineOpcode::B_GE
+                | MachineOpcode::B_GT
+        )
     }
 
     pub fn is_unconditional_jmp(&self) -> bool {
         matches!(self, MachineOpcode::B)
+    }
+
+    pub fn is_conditional_jmp(&self) -> bool {
+        matches!(
+            self,
+            MachineOpcode::B_EQ
+                | MachineOpcode::B_NE
+                | MachineOpcode::B_LE
+                | MachineOpcode::B_LT
+                | MachineOpcode::B_GE
+                | MachineOpcode::B_GT
+        )
+    }
+
+    pub fn is_jmp(&self) -> bool {
+        self.is_unconditional_jmp() | self.is_conditional_jmp()
+    }
+
+    pub fn flip_conditional_jmp(&self) -> Option<Self> {
+        match self {
+            Self::B_EQ => Some(Self::B_NE),
+            Self::B_NE => Some(Self::B_EQ),
+            Self::B_GE => Some(Self::B_LT),
+            Self::B_GT => Some(Self::B_LE),
+            Self::B_LE => Some(Self::B_GT),
+            Self::B_LT => Some(Self::B_GE),
+            _ => None,
+        }
     }
 }
 

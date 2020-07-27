@@ -50,8 +50,11 @@ mod inst {
             .set_uses(vec![TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR32)),
                            TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR32))]);
         pub static ref B_EQ: TargetInstDef = TargetInstDef::new("b.eq", TargetOpcode::B_EQ).set_uses(vec![TargetOperand::Block]);
+        pub static ref B_NE: TargetInstDef = TargetInstDef::new("b.ne", TargetOpcode::B_NE).set_uses(vec![TargetOperand::Block]);
         pub static ref B_LT: TargetInstDef = TargetInstDef::new("b.lt", TargetOpcode::B_LT).set_uses(vec![TargetOperand::Block]);
         pub static ref B_LE: TargetInstDef = TargetInstDef::new("b.le", TargetOpcode::B_LE).set_uses(vec![TargetOperand::Block]);
+        pub static ref B_GT: TargetInstDef = TargetInstDef::new("b.gt", TargetOpcode::B_GT).set_uses(vec![TargetOperand::Block]);
+        pub static ref B_GE: TargetInstDef = TargetInstDef::new("b.ge", TargetOpcode::B_GE).set_uses(vec![TargetOperand::Block]);
         pub static ref B: TargetInstDef = TargetInstDef::new("b", TargetOpcode::B).set_uses(vec![TargetOperand::Block]);
         pub static ref BL: TargetInstDef = TargetInstDef::new("bl", TargetOpcode::CALL).set_uses(vec![TargetOperand::Addr]);
         pub static ref LDR32: TargetInstDef = TargetInstDef::new("ldr", TargetOpcode::LDR32)
@@ -87,8 +90,11 @@ pub enum TargetOpcode {
     SDIVrrr32,
     CMPri,
     B_EQ,
+    B_NE,
     B_LT,
     B_LE,
+    B_GT,
+    B_GE,
     B,
     LDR32,
     STR,
@@ -141,8 +147,11 @@ impl TargetOpcode {
             Self::SDIVrrr32 => Some(&*inst::SDIVrrr32),
             Self::CMPri => Some(&*inst::CMPri),
             Self::B_EQ => Some(&*inst::B_EQ),
+            Self::B_NE => Some(&*inst::B_NE),
             Self::B_LT => Some(&*inst::B_LT),
             Self::B_LE => Some(&*inst::B_LE),
+            Self::B_GT => Some(&*inst::B_GT),
+            Self::B_GE => Some(&*inst::B_GE),
             Self::B => Some(&*inst::B),
             Self::CALL => Some(&*inst::BL),
             Self::LDR32 => Some(&*inst::LDR32),
