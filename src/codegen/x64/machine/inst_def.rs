@@ -322,8 +322,14 @@ mod inst {
         pub static ref JG: TargetInstDef = {
             TargetInstDef::new("jg", TargetOpcode::JG).set_uses(vec![TargetOperand::Block])
         };
+        pub static ref JGE: TargetInstDef = {
+            TargetInstDef::new("jge", TargetOpcode::JGE).set_uses(vec![TargetOperand::Block])
+        };
         pub static ref JE: TargetInstDef = {
             TargetInstDef::new("je", TargetOpcode::JE).set_uses(vec![TargetOperand::Block])
+        };
+        pub static ref JNE: TargetInstDef = {
+            TargetInstDef::new("jne", TargetOpcode::JNE).set_uses(vec![TargetOperand::Block])
         };
         pub static ref JLE: TargetInstDef = {
             TargetInstDef::new("jle", TargetOpcode::JLE).set_uses(vec![TargetOperand::Block])
@@ -455,6 +461,7 @@ pub enum TargetOpcode {
     CMPri,
     UCOMISDrr,
     JE,
+    JNE,
     JBE,
     JB,
     JLE,
@@ -520,7 +527,9 @@ impl TargetOpcode {
             Self::POP64 => Some(&*inst::POP64),
             Self::JMP => Some(&*inst::JMP),
             Self::JG => Some(&*inst::JG),
+            Self::JGE => Some(&*inst::JGE),
             Self::JE => Some(&*inst::JE),
+            Self::JNE => Some(&*inst::JNE),
             Self::JLE => Some(&*inst::JLE),
             Self::JL => Some(&*inst::JL),
             Self::JB => Some(&*inst::JB),

@@ -17,6 +17,74 @@ pub enum MachineMemOperand {
     AddressAlignOff(AddressKind, i32, RegisterId),
 }
 
+impl MachineOpcode {
+    pub fn is_copy_like(&self) -> bool {
+        matches!(
+            self,
+            MachineOpcode::MOVrr32
+                | MachineOpcode::MOVrr64
+                | MachineOpcode::Copy
+                | MachineOpcode::MOVSDrr
+        )
+    }
+
+    pub fn is_terminator(&self) -> bool {
+        matches!(
+            self,
+            MachineOpcode::Ret
+                | MachineOpcode::RET
+                | MachineOpcode::JMP
+                | MachineOpcode::BrCond
+                | MachineOpcode::JE
+                | MachineOpcode::JNE
+                | MachineOpcode::JL
+                | MachineOpcode::JLE
+                | MachineOpcode::JG
+                | MachineOpcode::JGE
+                | MachineOpcode::JA
+                | MachineOpcode::JAE
+                | MachineOpcode::JBE
+                | MachineOpcode::JB
+        )
+    }
+
+    pub fn is_unconditional_jmp(&self) -> bool {
+        matches!(self, MachineOpcode::JMP)
+    }
+
+    pub fn is_conditional_jmp(&self) -> bool {
+        matches!(
+            self,
+            MachineOpcode::BrCond
+                | MachineOpcode::JE
+                | MachineOpcode::JNE
+                | MachineOpcode::JL
+                | MachineOpcode::JLE
+                | MachineOpcode::JG
+                | MachineOpcode::JGE
+                | MachineOpcode::JA
+                | MachineOpcode::JAE
+                | MachineOpcode::JBE
+                | MachineOpcode::JB
+        )
+    }
+
+    pub fn flip_conditional_jmp(&self) -> Option<Self> {
+        match self {
+            MachineOpcode::JE => Some(Self::JNE),
+            MachineOpcode::JL => Some(Self::JGE),
+            MachineOpcode::JLE => Some(Self::JG),
+            MachineOpcode::JG => Some(Self::JLE),
+            MachineOpcode::JGE => Some(Self::JL),
+            MachineOpcode::JA => Some(Self::JBE),
+            MachineOpcode::JAE => Some(Self::JB),
+            MachineOpcode::JBE => Some(Self::JA),
+            MachineOpcode::JB => Some(Self::JAE),
+            _ => None,
+        }
+    }
+}
+
 impl MachineMemOperand {
     pub fn registers(&self) -> Vec<&RegisterId> {
         match self {
@@ -56,38 +124,5 @@ impl MachineMemOperand {
             | Self::AddressOff(_, _)
             | Self::AddressAlignOff(_, _, _) => None,
         }
-    }
-}
-
-impl MachineOpcode {
-    pub fn is_copy_like(&self) -> bool {
-        matches!(
-            self,
-            MachineOpcode::MOVrr32
-                | MachineOpcode::MOVrr64
-                | MachineOpcode::Copy
-                | MachineOpcode::MOVSDrr
-        )
-    }
-
-    pub fn is_terminator(&self) -> bool {
-        matches!(
-            self,
-            MachineOpcode::Ret
-                | MachineOpcode::RET
-                | MachineOpcode::JMP
-                | MachineOpcode::BrCond
-                | MachineOpcode::JE
-                | MachineOpcode::JL
-                | MachineOpcode::JLE
-                | MachineOpcode::JA
-                | MachineOpcode::JAE
-                | MachineOpcode::JBE
-                | MachineOpcode::JB
-        )
-    }
-
-    pub fn is_unconditional_jmp(&self) -> bool {
-        matches!(self, MachineOpcode::JMP)
     }
 }

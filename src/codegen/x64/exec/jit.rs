@@ -260,6 +260,7 @@ impl JITCompiler {
                     MachineOpcode::CMPrr => self.compile_cmp_rr(inst),
                     MachineOpcode::UCOMISDrr => self.compile_ucomisd_rr(inst),
                     MachineOpcode::JE => self.compile_je(inst),
+                    MachineOpcode::JNE => self.compile_jne(inst),
                     MachineOpcode::JBE => self.compile_jbe(inst),
                     MachineOpcode::JB => self.compile_jb(inst),
                     MachineOpcode::JLE => self.compile_jle(inst),
@@ -723,6 +724,11 @@ impl JITCompiler {
     fn compile_je(&mut self, inst: &MachineInst) {
         let l = self.get_label(inst.operand[0].as_basic_block());
         dynasm!(self.asm; je => l);
+    }
+
+    fn compile_jne(&mut self, inst: &MachineInst) {
+        let l = self.get_label(inst.operand[0].as_basic_block());
+        dynasm!(self.asm; jne => l);
     }
 
     fn compile_jle(&mut self, inst: &MachineInst) {

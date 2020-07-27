@@ -1,4 +1,6 @@
-use crate::codegen::common::machine::{function::MachineFunction, module::MachineModule};
+use crate::codegen::common::machine::{
+    builder::*, function::MachineFunction, inst::*, module::MachineModule,
+};
 use crate::traits::basic_block::BasicBlocksTrait;
 use crate::traits::pass::ModulePassTrait;
 use rustc_hash::FxHashSet;
@@ -31,6 +33,7 @@ impl BranchFolding {
             self.remove_unreachable(f);
             self.remove_empty_block(f);
             self.merge_blocks(f);
+            self.remove_jmp(f);
         }
     }
 
@@ -153,6 +156,64 @@ impl BranchFolding {
 
         for (remove, _) in worklist {
             f.body.basic_blocks.order.retain(|&bb| bb != remove);
+        }
+    }
+
+    fn remove_jmp(&mut self, f: &mut MachineFunction) {
+        let mut jmps = None;
+        let mut remove = vec![];
+        let mut new_jmps = vec![]; // (block id, jmp isnt)
+        let order = &f.body.basic_blocks.order;
+        for (i, &bb_id) in order.iter().enumerate() {
+            let block = &f.body.basic_blocks.arena[bb_id];
+            for &id in block.iseq_ref().iter().rev() {
+                let inst = &f.body.inst_arena[id];
+                if inst.opcode.is_terminator() {
+                    if inst.opcode.is_conditional_jmp() {
+                        let dst = inst.operand[0].as_basic_block();
+                        if dst == order[i + 1] {
+                            let opcode = inst.opcode.flip_conditional_jmp().unwrap();
+                            let new_dst =
+                                f.body.inst_arena[jmps.unwrap()].operand[0].as_basic_block();
+                            new_jmps.push((
+                                bb_id,
+                                MachineInst::new_simple(
+                                    opcode,
+                                    vec![MachineOperand::Branch(new_dst)],
+                                    bb_id,
+                                ),
+                            ));
+                            remove.push(jmps.unwrap());
+                            remove.push(id);
+                            jmps = None;
+                        }
+                    } else {
+                        jmps = Some(id);
+                    }
+                } else {
+                    if let Some(jmp) = jmps {
+                        let inst = &f.body.inst_arena[jmp];
+                        if inst.opcode != MachineOpcode::RET {
+                            let dst = inst.operand[0].as_basic_block();
+                            if dst == order[i + 1] {
+                                remove.push(jmp);
+                            };
+                        }
+                        jmps = None;
+                    }
+                    break;
+                }
+            }
+        }
+
+        for remove in remove {
+            f.remove_inst(remove)
+        }
+
+        for (bb_id, jmp_inst) in new_jmps {
+            let mut builder = Builder::new(f);
+            builder.set_insert_point_at_end(bb_id);
+            builder.insert(jmp_inst);
         }
     }
 }
