@@ -522,8 +522,7 @@ fibo:
   sub rsp, 16
   mov eax, edi
   cmp eax, 2
-  jle .L1
-  jmp .L2
+  jg .L2
 .L1:
   mov eax, 1
   jmp .L3
@@ -539,7 +538,6 @@ fibo:
   mov ecx, dword ptr [rbp - 4]
   add ecx, eax
   mov eax, ecx
-  jmp .L3
 .L3:
   add rsp, 16
   pop rbp
