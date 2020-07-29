@@ -171,27 +171,32 @@ impl BranchFolding {
                 let inst = &f.body.inst_arena[id];
 
                 if !inst.opcode.is_jmp() {
-                    if let Some(jmp) = last_jmp {
-                        let dst = f.body.inst_arena[jmp].operand[0].as_basic_block();
-                        if i + 1 < order.len() && dst == order[i + 1] {
-                            jmps_to_remove.push(jmp);
+                    if let Some(jmp) = last_jmp.take() {
+                        if let Some(dst) = f.body.inst_arena[jmp].get_jmp_dst() {
+                            if i + 1 < order.len() && dst == order[i + 1] {
+                                jmps_to_remove.push(jmp);
+                            }
                         }
-                        last_jmp = None;
                     }
                     break;
                 }
 
                 if inst.opcode.is_conditional_jmp() {
-                    let dst = inst.operand[0].as_basic_block();
+                    let dst = inst.get_jmp_dst().unwrap();
                     if i + 1 < order.len() && dst == order[i + 1] {
                         let opcode = inst.opcode.flip_conditional_jmp().unwrap();
                         let last_jmp = last_jmp.take().unwrap();
-                        let new_dst = f.body.inst_arena[last_jmp].operand[0].as_basic_block();
-                        new_jmps.push(MachineInst::new_simple(
-                            opcode,
-                            vec![MachineOperand::Branch(new_dst)],
-                            bb_id,
-                        ));
+                        let new_dst = f.body.inst_arena[last_jmp].get_jmp_dst().unwrap();
+                        let new_operands = inst
+                            .operand
+                            .clone()
+                            .into_iter()
+                            .map(|op| match op {
+                                MachineOperand::Branch(_) => MachineOperand::Branch(new_dst),
+                                _ => op,
+                            })
+                            .collect();
+                        new_jmps.push(MachineInst::new_simple(opcode, new_operands, bb_id));
                         jmps_to_remove.push(last_jmp);
                         jmps_to_remove.push(id);
                     }

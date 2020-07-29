@@ -1,7 +1,7 @@
 use super::super::machine::register::RegisterId;
 use super::frame_object::*;
 pub use super::inst_def::TargetOpcode;
-pub use crate::codegen::common::machine::inst::*;
+pub use crate::codegen::common::machine::{basic_block::MachineBasicBlockId, inst::*};
 use crate::ir::types::Type;
 
 #[derive(Debug, Clone)]
@@ -84,6 +84,28 @@ impl MachineOpcode {
             MachineOpcode::JAE => Some(Self::JB),
             MachineOpcode::JBE => Some(Self::JA),
             MachineOpcode::JB => Some(Self::JAE),
+            _ => None,
+        }
+    }
+}
+
+impl MachineInst {
+    pub fn get_jmp_dst(&self) -> Option<MachineBasicBlockId> {
+        if !self.opcode.is_jmp() {
+            return None;
+        }
+
+        match self.opcode {
+            MachineOpcode::JMP
+            | MachineOpcode::JE
+            | MachineOpcode::JL
+            | MachineOpcode::JLE
+            | MachineOpcode::JG
+            | MachineOpcode::JGE
+            | MachineOpcode::JA
+            | MachineOpcode::JAE
+            | MachineOpcode::JBE
+            | MachineOpcode::JB => Some(self.operand[0].as_basic_block()),
             _ => None,
         }
     }

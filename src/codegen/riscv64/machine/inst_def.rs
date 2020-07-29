@@ -100,6 +100,12 @@ mod inst {
                 TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GPR)),
                 TargetOperand::Block
             ]);
+        pub static ref BNE: TargetInstDef =
+            TargetInstDef::new("bne", TargetOpcode::BNE).set_uses(vec![
+                TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GPR)),
+                TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GPR)),
+                TargetOperand::Block
+            ]);
         pub static ref BLE: TargetInstDef =
             TargetInstDef::new("ble", TargetOpcode::BLE).set_uses(vec![
                 TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GPR)),
@@ -108,6 +114,18 @@ mod inst {
             ]);
         pub static ref BLT: TargetInstDef =
             TargetInstDef::new("blt", TargetOpcode::BLT).set_uses(vec![
+                TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GPR)),
+                TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GPR)),
+                TargetOperand::Block
+            ]);
+        pub static ref BGE: TargetInstDef =
+            TargetInstDef::new("bge", TargetOpcode::BGE).set_uses(vec![
+                TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GPR)),
+                TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GPR)),
+                TargetOperand::Block
+            ]);
+        pub static ref BGT: TargetInstDef =
+            TargetInstDef::new("bgt", TargetOpcode::BGT).set_uses(vec![
                 TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GPR)),
                 TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GPR)),
                 TargetOperand::Block
@@ -150,8 +168,11 @@ pub enum TargetOpcode {
     SEXT_W, // Sign-extend Word
     CALL,
     BEQ,
+    BNE,
     BLE,
     BLT,
+    BGE,
+    BGT,
     J,
     JR,
 
@@ -185,8 +206,11 @@ impl TargetOpcode {
             Self::SEXT_W => Some(&*inst::SEXT_W),
             Self::CALL => Some(&*inst::CALL),
             Self::BEQ => Some(&*inst::BEQ),
+            Self::BNE => Some(&*inst::BNE),
             Self::BLE => Some(&*inst::BLE),
             Self::BLT => Some(&*inst::BLT),
+            Self::BGE => Some(&*inst::BGE),
+            Self::BGT => Some(&*inst::BGT),
             Self::J => Some(&*inst::J),
             Self::JR => Some(&*inst::JR),
             _ => None,
