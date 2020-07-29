@@ -38,6 +38,7 @@ pub enum Node {
     Assign(Box<Node>, Box<Node>),
     Load(Box<Node>),
     Addr(Box<Node>),
+    TypeCast(Box<Node>, Type),
     // GlobalDataAddr(String),
 }
 
@@ -139,6 +140,7 @@ peg::parser!(pub grammar parser() for str {
         a:(@) _ "/" _ b:@ { Node::Div(Box::new(a), Box::new(b)) }
         a:(@) _ "%" _ b:@ { Node::Rem(Box::new(a), Box::new(b)) }
         --
+        t:types() _ "(" _ a:expression(false) _ ")" { Node::TypeCast(Box::new(a), t) }
         i:identifier() _ "(" args:((_ e:expression(false) _ {e}) ** ",") ")" { Node::Call(i, args) }
         p:primary(assign) { if assign { p } else { Node::Load(Box::new(p)) } }
         "(" _ a:expression(false) _ ")" { a }

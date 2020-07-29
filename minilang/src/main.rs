@@ -284,7 +284,7 @@ fn ray_tracing() {
 
     function color_of(t: f64): i32 {
       var ret: i32;
-      ret = f64_to_i32((i32_to_f64(256) * clamp(t, 0.0, 1.0)));
+      ret = i32(256.0 * clamp(t, 0.0, 1.0));
       if ret == 256 { return 256 - 1; }
       return ret;
     }
@@ -313,8 +313,8 @@ fn ray_tracing() {
 
       row = 0; while row < 300 {
         col = 0; while col < 300 {
-          x = i32_to_f64(col) / (300.0 / 2.0) - 1.0;
-          y = i32_to_f64(300 - row) / (300.0 / 2.0) - 1.0;
+          x = f64(col) / (300.0 / 2.0) - 1.0;
+          y = f64(300 - row) / (300.0 / 2.0) - 1.0;
 
           ray = Ray_new( Vec_new(0.0, 2.0, 6.0), Vec_normalize(Vec_new(x, y, 0.0 - 1.0)) );
           i = Isect_new(0, Vec_new(0.0, 0.0, 0.0), Vec_new(0.0, 0.0, 0.0), Vec_new(0.0, 0.0, 0.0),
@@ -373,8 +373,6 @@ extern char *cilk_malloc_i32(int x) { return malloc(x); }
 extern double cilk_floor_f64(double x) { return floor(x); }
 extern int cilk_fabs_f64(double x) { return fabs(x); }
 extern int cilk_cos_f64(double x) { return cos(x); }
-extern double cilk_i32_to_f64_i32(int x) { return (double) x; }
-extern int cilk_f64_to_i32_f64(double x) { return (int) x; }
 extern int cilk_print_i32(int x) { printf(\"%d\", x); }
 extern int cilk_printch_i32(int x) { putchar(x); }
         ",

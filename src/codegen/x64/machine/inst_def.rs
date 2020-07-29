@@ -237,6 +237,16 @@ mod inst {
                 .set_imp_def(vec![TargetRegister::Specific(GR32::EDX.as_phys_reg())])
                 .set_imp_use(vec![TargetRegister::Specific(GR32::EAX.as_phys_reg())])
         };
+        pub static ref CVTSI2SDrr32: TargetInstDef = {
+            TargetInstDef::new("cvtsi2sd", TargetOpcode::CVTSI2SDrr32)
+                .set_uses(vec![TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR32))])
+                .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::XMM)])
+        };
+        pub static ref CVTTSD2SIr32r: TargetInstDef = {
+            TargetInstDef::new("cvttsd2si", TargetOpcode::CVTTSD2SIr32r)
+                .set_uses(vec![TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::XMM))])
+                .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR32)])
+        };
         pub static ref MOVrr32: TargetInstDef = {
             TargetInstDef::new("mov", TargetOpcode::MOVrr32)
                 .set_uses(vec![TargetOperand::Register(TargetRegister::RegClass(
@@ -437,6 +447,8 @@ pub enum TargetOpcode {
     DIVSDrm,
     SHLr64i8,
     SHLr32i8,
+    CVTTSD2SIr32r,
+    CVTSI2SDrr32,
     SQRTSDrr,
     MOVrr32,
     MOVri32,
@@ -511,6 +523,8 @@ impl TargetOpcode {
             Self::DIVSDrm => Some(&*inst::DIVSDrm),
             Self::SHLr64i8 => Some(&*inst::SHLr64i8),
             Self::SHLr32i8 => Some(&*inst::SHLr32i8),
+            Self::CVTSI2SDrr32 => Some(&*inst::CVTSI2SDrr32),
+            Self::CVTTSD2SIr32r => Some(&*inst::CVTTSD2SIr32r),
             Self::SQRTSDrr => Some(&*inst::SQRTSDrr),
             Self::MOVrr32 => Some(&*inst::MOVrr32),
             Self::MOVri32 => Some(&*inst::MOVri32),
