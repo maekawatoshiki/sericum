@@ -34,10 +34,6 @@ impl MachineOpcode {
         )
     }
 
-    pub fn is_jmp(&self) -> bool {
-        self.is_unconditional_jmp() | self.is_conditional_jmp()
-    }
-
     pub fn flip_conditional_jmp(&self) -> Option<Self> {
         match self {
             Self::BEQ => Some(Self::BNE),

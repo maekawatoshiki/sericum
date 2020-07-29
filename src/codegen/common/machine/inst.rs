@@ -612,6 +612,12 @@ impl MachineInst {
     }
 }
 
+impl MachineOpcode {
+    pub fn is_jmp(&self) -> bool {
+        self.is_unconditional_jmp() | self.is_conditional_jmp()
+    }
+}
+
 impl MachineOperand {
     pub fn debug(&self, tys: &Types, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {

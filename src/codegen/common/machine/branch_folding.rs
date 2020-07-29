@@ -161,8 +161,28 @@ impl BranchFolding {
 
     fn remove_jmp(&mut self, f: &mut MachineFunction) {
         let mut last_jmp = None;
-        let mut jmps_to_remove = vec![];
+        let mut remove_list = vec![];
         let mut new_jmps = vec![];
+
+        // before:
+        //
+        // L1:
+        //  jeq L2
+        //  jmp L3
+        // L2:
+        //  ...
+        //  jmp L3
+        // L3:
+        //  ...
+        //
+        // after:
+        //
+        // L1:
+        //  jne L3
+        // L2:
+        //  ...
+        // L3:
+        //  ...
 
         let order = &f.body.basic_blocks.order;
         for (i, &bb_id) in order.iter().enumerate() {
@@ -173,8 +193,10 @@ impl BranchFolding {
                 if !inst.opcode.is_jmp() {
                     if let Some(jmp) = last_jmp.take() {
                         if let Some(dst) = f.body.inst_arena[jmp].get_jmp_dst() {
+                            // If we jump to the next block, remove the jump instruction. It's
+                            // unnecessary.
                             if i + 1 < order.len() && dst == order[i + 1] {
-                                jmps_to_remove.push(jmp);
+                                remove_list.push(jmp);
                             }
                         }
                     }
@@ -183,10 +205,12 @@ impl BranchFolding {
 
                 if inst.opcode.is_conditional_jmp() {
                     let dst = inst.get_jmp_dst().unwrap();
+                    // If we jump to the next block conditionally, flip the jump condition.
                     if i + 1 < order.len() && dst == order[i + 1] {
                         let opcode = inst.opcode.flip_conditional_jmp().unwrap();
-                        let last_jmp = last_jmp.take().unwrap();
+                        let last_jmp = last_jmp.take().unwrap(); // there must be unconditional jump before conditional jump.
                         let new_dst = f.body.inst_arena[last_jmp].get_jmp_dst().unwrap();
+                        // replace jump destination
                         let new_operands = inst
                             .operand
                             .clone()
@@ -197,19 +221,20 @@ impl BranchFolding {
                             })
                             .collect();
                         new_jmps.push(MachineInst::new_simple(opcode, new_operands, bb_id));
-                        jmps_to_remove.push(last_jmp);
-                        jmps_to_remove.push(id);
+                        remove_list.push(last_jmp);
+                        remove_list.push(id);
                     }
                     continue;
                 }
 
                 if inst.opcode.is_unconditional_jmp() {
                     last_jmp = Some(id);
+                    continue;
                 }
             }
         }
 
-        for id in jmps_to_remove {
+        for id in remove_list {
             f.remove_inst(id)
         }
 
