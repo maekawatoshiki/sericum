@@ -1085,6 +1085,31 @@ mod aarch64 {
     }
 
     #[test]
+    fn asm_pointer1() {
+        let mut m = Module::new("cilk");
+        cilk_ir!(m; define [i32] test [] {
+            entry:
+                x = alloca_ (ptr i32);
+                y = alloca i32;
+                store (%y), (%x);
+                xx = load (%x);
+                store (i32 42), (%xx);
+                yy = load (%y);
+                ret (%yy);
+        });
+        compile_and_run(
+            "
+    #include <assert.h>
+    extern int test();
+    int main() {
+        assert(test() == 42);
+    }
+            ",
+            &mut m,
+        );
+    }
+
+    #[test]
     fn asm_fibo() {
         let mut m = module::Module::new("cilk");
         cilk_ir!(m; define [i32] fibo [(i32)] {

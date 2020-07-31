@@ -9,6 +9,7 @@ pub enum MachineMemOperand {
     RegFi(RegisterId, FrameIndexInfo),
     PreIndex(RegisterId, i32),
     PostIndex(RegisterId, i32),
+    Reg(RegisterId),
     // ImmReg(i32, RegisterId),
     Address(AddressKind),
 }
@@ -84,14 +85,18 @@ impl MachineInst {
 impl MachineMemOperand {
     pub fn registers(&self) -> Vec<&RegisterId> {
         match self {
-            Self::PostIndex(r, _) | Self::PreIndex(r, _) | Self::RegFi(r, _) => vec![r],
+            Self::PostIndex(r, _) | Self::PreIndex(r, _) | Self::Reg(r) | Self::RegFi(r, _) => {
+                vec![r]
+            }
             Self::Address(_) => vec![],
         }
     }
 
     pub fn registers_mut(&mut self) -> Vec<&mut RegisterId> {
         match self {
-            Self::PostIndex(r, _) | Self::PreIndex(r, _) | Self::RegFi(r, _) => vec![r],
+            Self::PostIndex(r, _) | Self::PreIndex(r, _) | Self::Reg(r) | Self::RegFi(r, _) => {
+                vec![r]
+            }
             Self::Address(_) => vec![],
         }
     }
@@ -99,7 +104,7 @@ impl MachineMemOperand {
     pub fn get_type(&self) -> Option<Type> {
         match self {
             Self::RegFi(_, fi) => Some(fi.ty),
-            Self::PostIndex(_, _) | Self::PreIndex(_, _) | Self::Address(_) => None,
+            Self::PostIndex(_, _) | Self::PreIndex(_, _) | Self::Address(_) | Self::Reg(_) => None,
         }
     }
 }

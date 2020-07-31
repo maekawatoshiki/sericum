@@ -10,7 +10,7 @@ registers! {
         SP
     }
 
-    class WSP (64, Int64, [Int64], [WSP]) {
+    class WSP (64, Int64, [Int64], [WSP]) < SP {
         WSP
     }
 
@@ -23,7 +23,7 @@ registers! {
         X25, X26, X27, X28, X29, X30
     }
 
-    class GR32 (32, Int32, [Int32], [W0]) {
+    class GR32 (32, Int32, [Int32], [W0]) < GR64 {
         W0, W1, W2, W3, W4,
         W5, W6, W7, W8, W9,
         W10, W11, W12, W13, W14,

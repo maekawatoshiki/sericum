@@ -452,6 +452,9 @@ impl<'a> ScheduleByBlock<'a> {
             }
             NodeKind::Operand(OperandNodeKind::Register(ref r)) => MachineOperand::Register(*r),
             NodeKind::Operand(OperandNodeKind::Mem(ref mem)) => match mem {
+                MemNodeKind::Reg => MachineOperand::Mem(MachineMemOperand::Reg(
+                    *self.normal_operand(node.operand[0]).as_register(),
+                )),
                 MemNodeKind::RegFi => MachineOperand::Mem(MachineMemOperand::RegFi(
                     *self.normal_operand(node.operand[0]).as_register(),
                     *self.normal_operand(node.operand[1]).as_frame_index(),

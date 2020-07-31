@@ -113,9 +113,11 @@ impl MISelector {
             // }
             (ir.Load a): Int32 {
                 (ir.FIAddr b) a { mem32 b => (mi.LDR32 [RegFi %x29, b]) }
+                GR64 a => (mi.LDR64 [Reg a])
                 // (ir.GlobalAddr b) a => (mi.LW [Address b])
                 // GPR a => (mi.LW [ImmReg $0, a])
             }
+            (ir.Load a) { GR64 a => (mi.LDR64 [Reg a]) }
             // // 64bit load
             // (ir.Load a) { GPR a => (mi.LD [ImmReg $0, a]) }
             (ir.Store a, b) {
@@ -124,9 +126,13 @@ impl MISelector {
                         imm32 b => (mi.STR (mi.MOVr32i b), [RegFi %x29, c])
                         // GPR   b => (mi.SW         b, [FiReg c, %s0])
                     }
-                    // mem64 c {
-                    //     GPR b => (mi.SD b, [FiReg c, %s0])
-                    // }
+                    mem64 c {
+                        GR64 b => (mi.STR b, [RegFi %x29, c])
+                    }
+                }
+                GR64 a {
+                    imm32 b => (mi.STR (mi.MOVr32i b), [Reg a])
+                    GR64 b => (mi.STR b, [Reg a])
                 }
                 // (ir.GlobalAddr c) a {
                 //     imm32 b => (mi.SW (mi.LI b), [Address c], %s1)
@@ -138,9 +144,9 @@ impl MISelector {
                 //     GPR b => (mi.SD b, [ImmReg $0, a])
                 // }
             }
-            // (ir.FIAddr a) {
-            //     mem a => (mi.ADDI %s0, a)
-            // }
+            (ir.FIAddr a) {
+                mem a => (mi.ADDrr64i %x29, a)
+            }
             // (ir.GlobalAddr a) => (mi.LA [Address a])
             // (ir.CopyFromReg a) => (mi.Copy a)
         );
