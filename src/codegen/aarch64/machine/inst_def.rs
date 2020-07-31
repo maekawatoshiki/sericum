@@ -14,6 +14,9 @@ mod inst {
         pub static ref MOVr32i: TargetInstDef = TargetInstDef::new("mov", TargetOpcode::MOVr32i)
             .set_uses(vec![TargetOperand::Immediate(TargetImmediate::I16)])
             .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR32)]);
+        pub static ref MOVr64i: TargetInstDef = TargetInstDef::new("mov", TargetOpcode::MOVr64i)
+            .set_uses(vec![TargetOperand::Immediate(TargetImmediate::I16)])
+            .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR64)]);
         pub static ref ADDrr64i: TargetInstDef = TargetInstDef::new("add", TargetOpcode::ADDrr64i)
             .set_uses(vec![TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR64)),
                            TargetOperand::Immediate(TargetImmediate::I16)]) // TODO: I12
@@ -94,6 +97,7 @@ pub enum TargetOpcode {
     CALL,
     MOVrr,
     MOVr32i,
+    MOVr64i,
     ADDrr64i,
     ADDrr32i,
     ADDrrr32,
@@ -155,6 +159,7 @@ impl TargetOpcode {
         match self {
             Self::MOVrr => Some(&*inst::MOVrr),
             Self::MOVr32i => Some(&*inst::MOVr32i),
+            Self::MOVr64i => Some(&*inst::MOVr64i),
             Self::ADDrr64i => Some(&*inst::ADDrr64i),
             Self::ADDrr32i => Some(&*inst::ADDrr32i),
             Self::ADDrrr32 => Some(&*inst::ADDrrr32),

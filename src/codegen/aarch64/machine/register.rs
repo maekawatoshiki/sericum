@@ -10,7 +10,7 @@ registers! {
         SP
     }
 
-    class WSP (64, Int64, [Int64], [WSP]) < SP {
+    class WSP (32, Int64, [Int64], [WSP]) < SP {
         WSP
     }
 

@@ -64,19 +64,15 @@ impl MISelector {
         }
 
         let mut selected = isel_pat!(
-            // TODO: Refactoring
-            // (ir.Call _a) => { self.select_call(tys, regs_info, heap, node) }
-            (ir.Add a, b) {
-                GR64 a {
-                    imm32 b => (mi.ADDrr64i a, b)
-                    GR64 b => (mi.ADDrrr64 a, b)
-                }
-            }
             (ir.Add a, b): Int32 {
                 GR32 a {
                     imm12 b => (mi.ADDrr32i a, b)
                     imm32 b => (mi.ADDrrr32 a, (mi.MOVr32i b))
                     GR32  b => (mi.ADDrrr32 a, b) } }
+            (ir.Add a, b) {
+                GR64 a {
+                    imm32 b => (mi.ADDrr64i a, b)
+                    GR64  b => (mi.ADDrrr64 a, b) } }
             (ir.Sub x, y): Int32 {
                 GR32 x {
                     imm12 y => (mi.SUBrr32i x, y)
@@ -88,49 +84,18 @@ impl MISelector {
                     GR32  y => (mi.MULrrr32 x, y) } }
             (ir.Mul x, y) {
                 GR64 x {
-                    imm32 y => (mi.MULrrr64 x, (mi.MOVr32i y))
+                    imm32 y => (mi.MULrrr64 x, (mi.MOVr64i y))
                     GR64  y => (mi.MULrrr64 x, y) } }
             (ir.Div x, y): Int32 {
                 GR32 x {
                     imm32 y => (mi.SDIVrrr32 x, (mi.MOVr32i y))
                     GR32  y => (mi.SDIVrrr32 x, y) } }
             (ir.Br dst) => (mi.B dst)
-            // (ir.Add a, b) {
-            //     GPR a {
-            //         imm12 b => (mi.ADDI a, b)
-            //         imm32 b => (mi.ADD  a, (mi.LI b))
-            //         GPR   b => (mi.ADD  a, b) } }
-            // (ir.Mul a, b): Int32 {
-            //     GPR a {
-            //         imm32 b => (mi.MULW a, (mi.LI b))
-            //         GPR   b => (mi.MULW a, b) } }
-            // (ir.Mul a, b) {
-            //     GPR a {
-            //         imm32 b => (mi.MUL a, (mi.LI b))
-            //         GPR   b => (mi.MUL a, b) } }
-            // (ir.Div a, b): Int32 {
-            //     GPR a {
-            //         imm32 b => (mi.DIVW a, (mi.LI b))
-            //         GPR   b => (mi.DIVW a, b) } }
-            // (ir.Rem a, b): Int32 {
-            //     GPR a {
-            //         imm32 b => (mi.REMW a, (mi.LI b))
-            //         GPR   b => (mi.REMW a, b) } }
-            // (ir.Br a) => (mi.J a)
-            // (ir.Shl a, b) {
-            //     GPR a {
-            //         imm6 b => (mi.SLLI a, b)
-            //     }
-            // }
             (ir.Load a): Int32 {
                 (ir.FIAddr b) a { mem32 b => (mi.LDR32 [RegFi %x29, b]) }
-                GR64 a => (mi.LDR64 [Reg a])
                 // (ir.GlobalAddr b) a => (mi.LW [Address b])
-                // GPR a => (mi.LW [ImmReg $0, a])
             }
             (ir.Load a) { GR64 a => (mi.LDR64 [Reg a]) }
-            // // 64bit load
-            // (ir.Load a) { GPR a => (mi.LD [ImmReg $0, a]) }
             (ir.Store a, b) {
                 (ir.FIAddr c) a {
                     mem32 c {
