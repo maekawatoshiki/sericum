@@ -6,11 +6,11 @@ use rustc_hash::FxHashMap;
 use std::cell::RefCell;
 
 registers! {
-    class SP (64, Int64, [Int64], [SP]) {
+    class SP (64, Int64, [], [SP]) {
         SP
     }
 
-    class WSP (64, Int64, [Int64], [WSP]) < SP {
+    class WSP (32, Int32, [], [WSP]) < SP {
         WSP
     }
 

@@ -106,7 +106,6 @@ pub fn standard_conversion_into_machine_module(module: &mut Module) -> MachineMo
     pass_mgr.add_pass(dag::legalize::Legalize::new());
     pass_mgr.add_pass(dag::isel::MISelector::new());
     pass_mgr.run_on_module(&mut dag_module);
-    println!("{:?}", dag_module);
 
     let mut machine_module = dag::mc_convert::convert_module(dag_module);
 

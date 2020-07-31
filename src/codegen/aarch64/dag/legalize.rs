@@ -271,8 +271,6 @@ impl Legalize {
             && node.operand[0].operand[0].is_maybe_register()
         {
             let op = self.run_on_node(tys, regs_info, heap, node.operand[0].operand[0]);
-            // let fi = node.operand[0].operand[0].operand[0];
-            // let x29 = heap.alloc_phys_reg(regs_info, GR64::X29);
             let mem = heap.alloc(DAGNode::new_mem(MemNodeKind::Reg, vec![op]));
             return heap.alloc(DAGNode::new(
                 NodeKind::MI(MINodeKind::LDRSW64),

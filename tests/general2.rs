@@ -1146,10 +1146,6 @@ mod aarch64 {
                 y = alloca i32;
                 store (i32 2), (%y);
                 yy = load (%y);
-                // store (%y), (%x);
-                // xx = load (%x);
-                // store (i32 42), (%xx);
-                // yy = load (%y);
                 a = gep (%x), [(i32 0), (%yy)];
                 store (i32 42), (%a);
                 a = load (%a);
