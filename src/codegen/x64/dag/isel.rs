@@ -135,6 +135,8 @@ impl MISelector {
                 GR32 a {
                     imm8 b => (mi.SHLr32i8 a, b) }
             }
+            (ir.SIToFP x): F64 { GR32 x => (mi.CVTSI2SDrr32 x) }
+            (ir.FPToSI x): Int32 { XMM x => (mi.CVTTSD2SIr32r x) }
             (ir.Load a) {
                 (ir.FIAddr b) a {
                     f64mem b => (mi.MOVSDrm [BaseFi %rbp, b])

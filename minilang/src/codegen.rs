@@ -396,6 +396,18 @@ impl<'a> CodeGeneratorForFunction<'a> {
                 }
             },
             Node::Addr(e) => self.run_on_node(e),
+            Node::TypeCast(val, to) => {
+                let (val, ty) = self.run_on_node(val);
+                let to_ = to.into_cilk_type(&self.types, &mut self.builder.func.module.types);
+                if ty.is_integer() {
+                    return (self.builder.build_sitofp(val, to_), to.clone());
+                }
+                if ty.is_float() {
+                    return (self.builder.build_fptosi(val, to_), to.clone());
+                }
+                unimplemented!()
+            }
+
             Node::Index(base, idx) => {
                 let (base, ty) = self.run_on_node(base);
                 let indices = vec![
@@ -479,6 +491,10 @@ impl parser::Type {
 
     pub fn is_integer(&self) -> bool {
         matches!(self, Self::Int32 | Self::Int64 | Self::Int1)
+    }
+
+    pub fn is_float(&self) -> bool {
+        matches!(self, Self::F64)
     }
 
     pub fn get_elem_ty(&self) -> parser::Type {

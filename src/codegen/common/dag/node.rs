@@ -60,6 +60,8 @@ pub enum IRNodeKind {
     Mul,
     Div,
     Rem,
+    SIToFP,
+    FPToSI,
     Call,
     Phi,
     Setcc,

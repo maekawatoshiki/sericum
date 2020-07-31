@@ -341,6 +341,10 @@ impl Type {
         matches!(self, Self::Int1 | Self::Int8 | Self::Int32 | Self::Int64)
     }
 
+    pub fn is_float(&self) -> bool {
+        matches!(self, Self::F64)
+    }
+
     pub fn to_string(&self) -> String {
         match self {
             Type::Void => "void".to_string(),
