@@ -32,6 +32,7 @@ impl MISelector {
     }
 
     pub fn run_on_module(&mut self, module: &mut DAGModule) {
+        println!("{:?}", module);
         for (_, func) in &mut module.functions {
             if func.is_internal {
                 continue;
@@ -65,6 +66,12 @@ impl MISelector {
         let mut selected = isel_pat!(
             // TODO: Refactoring
             // (ir.Call _a) => { self.select_call(tys, regs_info, heap, node) }
+            (ir.Add a, b) {
+                GR64 a {
+                    imm32 b => (mi.ADDrr64i a, b)
+                    GR64 b => (mi.ADDrrr64 a, b)
+                }
+            }
             (ir.Add a, b): Int32 {
                 GR32 a {
                     imm12 b => (mi.ADDrr32i a, b)
@@ -79,6 +86,10 @@ impl MISelector {
                 GR32 x {
                     imm32 y => (mi.MULrrr32 x, (mi.MOVr32i y))
                     GR32  y => (mi.MULrrr32 x, y) } }
+            (ir.Mul x, y) {
+                GR64 x {
+                    imm32 y => (mi.MULrrr64 x, (mi.MOVr32i y))
+                    GR64  y => (mi.MULrrr64 x, y) } }
             (ir.Div x, y): Int32 {
                 GR32 x {
                     imm32 y => (mi.SDIVrrr32 x, (mi.MOVr32i y))

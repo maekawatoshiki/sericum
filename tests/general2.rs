@@ -1110,6 +1110,64 @@ mod aarch64 {
     }
 
     #[test]
+    fn asm_array1() {
+        let mut m = Module::new("cilk");
+        cilk_ir!(m; define [i32] test [] {
+            entry:
+                x = alloca_ ([8; i32]);
+                // y = alloca i32;
+                // store (%y), (%x);
+                // xx = load (%x);
+                // store (i32 42), (%xx);
+                // yy = load (%y);
+                a = gep (%x), [(i32 0), (i32 1)];
+                store (i32 42), (%a);
+                a = load (%a);
+                ret (%a);
+        });
+        compile_and_run(
+            "
+    #include <assert.h>
+    extern int test();
+    int main() {
+        assert(test() == 42);
+    }
+            ",
+            &mut m,
+        );
+    }
+
+    #[test]
+    fn asm_array2() {
+        let mut m = Module::new("cilk");
+        cilk_ir!(m; define [i32] test [] {
+            entry:
+                x = alloca_ ([8; i32]);
+                y = alloca i32;
+                store (i32 2), (%y);
+                yy = load (%y);
+                // store (%y), (%x);
+                // xx = load (%x);
+                // store (i32 42), (%xx);
+                // yy = load (%y);
+                a = gep (%x), [(i32 0), (%yy)];
+                store (i32 42), (%a);
+                a = load (%a);
+                ret (%a);
+        });
+        compile_and_run(
+            "
+    #include <assert.h>
+    extern int test();
+    int main() {
+        assert(test() == 42);
+    }
+            ",
+            &mut m,
+        );
+    }
+
+    #[test]
     fn asm_fibo() {
         let mut m = module::Module::new("cilk");
         cilk_ir!(m; define [i32] fibo [(i32)] {
