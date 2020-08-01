@@ -279,18 +279,18 @@ impl Legalize {
             ));
         }
 
-        // if node.ty == Type::Int64
-        //     && !node.operand[0].is_constant()
-        //     && node.operand[0].ty == Type::Int32
-        // {
-        //     let op = self.run_on_node(tys, regs_info, heap, node.operand[0]);
-        //     return heap.alloc(DAGNode::new(
-        //         NodeKind::MI(MINodeKind::SEXT_W),
-        //         vec![op],
-        //         node.ty,
-        //     ));
-        // }
-        //
+        if node.ty == Type::Int64
+            && !node.operand[0].is_constant()
+            && node.operand[0].ty == Type::Int32
+        {
+            let op = self.run_on_node(tys, regs_info, heap, node.operand[0]);
+            return heap.alloc(DAGNode::new(
+                NodeKind::MI(MINodeKind::SXTW64rr),
+                vec![op],
+                node.ty,
+            ));
+        }
+
         self.run_on_node_operand(tys, regs_info, heap, node);
         node
     }

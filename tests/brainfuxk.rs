@@ -298,7 +298,7 @@ mod x86_64 {
         // use cilk::codegen::x64::standard_conversion_into_machine_module;
         // let machine_module = standard_conversion_into_machine_module(&mut m);
         // let mut printer = MachineAsmPrinter::new();
-        // // println!("{:?}", machine_module);
+        // println!("{:?}", machine_module);
         // printer.run_on_module(&machine_module);
         // println!("{}", printer.output);
 

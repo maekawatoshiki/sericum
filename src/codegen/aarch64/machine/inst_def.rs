@@ -68,6 +68,9 @@ mod inst {
         pub static ref B_GE: TargetInstDef = TargetInstDef::new("b.ge", TargetOpcode::B_GE).set_uses(vec![TargetOperand::Block]);
         pub static ref B: TargetInstDef = TargetInstDef::new("b", TargetOpcode::B).set_uses(vec![TargetOperand::Block]);
         pub static ref BL: TargetInstDef = TargetInstDef::new("bl", TargetOpcode::CALL).set_uses(vec![TargetOperand::Addr]);
+        pub static ref SXTW64rr: TargetInstDef = TargetInstDef::new("sxtw", TargetOpcode::SXTW64rr)
+            .set_uses(vec![TargetOperand::Register(TargetRegister::Any)])
+            .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR64)]);
         pub static ref LDR32: TargetInstDef = TargetInstDef::new("ldr", TargetOpcode::LDR32)
             .set_uses(vec![TargetOperand::Mem])
             .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR32)]);
@@ -116,6 +119,7 @@ pub enum TargetOpcode {
     B_GT,
     B_GE,
     B,
+    SXTW64rr,
     LDR32,
     LDR64,
     LDRSW64,
@@ -179,6 +183,7 @@ impl TargetOpcode {
             Self::B_GE => Some(&*inst::B_GE),
             Self::B => Some(&*inst::B),
             Self::CALL => Some(&*inst::BL),
+            Self::SXTW64rr => Some(&*inst::SXTW64rr),
             Self::LDR32 => Some(&*inst::LDR32),
             Self::LDR64 => Some(&*inst::LDR64),
             Self::LDRSW64 => Some(&*inst::LDRSW64),

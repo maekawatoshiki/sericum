@@ -107,6 +107,7 @@ impl MISelector {
                 }
                 GR64 a {
                     imm32 b => (mi.STR (mi.MOVr32i b), [Reg a])
+                    GR32 b => (mi.STR b, [Reg a])
                     GR64 b => (mi.STR b, [Reg a])
                 }
                 // (ir.GlobalAddr c) a {
