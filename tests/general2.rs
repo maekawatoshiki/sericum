@@ -1164,6 +1164,103 @@ mod aarch64 {
     }
 
     #[test]
+    fn asm_array3() {
+        let mut m = Module::new("cilk");
+        cilk_ir!(m; define [i32] matrix_mul [(ptr [8; [8; i32]]), (ptr [8; [8; i32]]), (ptr [8; [8; i32]])] {
+            entry:
+                x = alloca i32;
+                y = alloca i32;
+                z = alloca i32;
+                store (i32 0), (%x);
+                br label1;
+            label1:
+                store (i32 0), (%y);
+                xx = load (%x);
+                c = icmp lt (%xx), (i32 8);
+                br (%c) label2, label3;
+            label2:
+                store (i32 0), (%z);
+                yy = load (%y);
+                c = icmp lt (%yy), (i32 8);
+                br (%c) label4, label5;
+            label4:
+                zz = load (%z);
+                c = icmp lt (%zz), (i32 8);
+                br (%c) label6, label7;
+            label6:
+                cx = gep (%arg.0), [(i32 0), (%xx), (%yy)];
+                ax = gep (%arg.1), [(i32 0), (%xx), (%zz)];
+                bx = gep (%arg.2), [(i32 0), (%zz), (%yy)];
+                ai = load (%ax);
+                bi = load (%bx);
+                ci = load (%cx);
+                t  = mul (%ai), (%bi);
+                ci = add (%ci), (%t);
+                store (%ci), (%cx);
+
+                zi = add (%zz), (i32 1);
+                store (%zi), (%z);
+                br label4;
+            label7:
+                yi = add (%yy), (i32 1);
+                store (%yi), (%y);
+                br label2;
+            label5:
+                xi = add (%xx), (i32 1);
+                store (%xi), (%x);
+                br label1;
+            label3:
+                ret (%ci);
+        });
+        compile_and_run(
+            "
+    #include <assert.h>
+    extern int matrix_mul(int *, int *, int *);
+    int main() {
+        int c[8][8] = {0};
+        int a[8][8] = {
+        {3, 3, 2, 9, 0, 8, 2, 6}, 
+        {6, 9, 1, 1, 3, 5, 8, 3}, 
+        {0, 6, 9, 2, 7, 7, 2, 8}, 
+        {0, 3, 9, 2, 4, 9, 1, 7}, 
+        {0, 4, 5, 0, 4, 0, 2, 4}, 
+        {3, 1, 0, 6, 6, 1, 9, 7}, 
+        {5, 1, 0, 4, 4, 5, 9, 0}, 
+        {7, 6, 3, 4, 4, 0, 9, 0}};
+
+        int b[8][8] = {
+        {6, 2, 2, 3, 0, 9, 9, 5}, 
+        {5, 9, 7, 9, 7, 4, 6, 9}, 
+        {6, 4, 3, 5, 7, 6, 9, 4}, 
+        {2, 5, 3, 8, 1, 0, 0, 7}, 
+        {5, 6, 3, 1, 7, 2, 6, 8}, 
+        {2, 1, 0, 0, 8, 1, 1, 4}, 
+        {7, 4, 7, 5, 8, 1, 8, 7}, 
+        {1, 7, 3, 9, 5, 0, 0, 3}};
+
+        int d[8][8] = {
+        { 99,  144,   92,  182,  154,   61,   87,  177}, 
+        {173,  178,  155,  182,  211,  115,  204,  231}, 
+        {159,  213,  134,  204,  268,  101,  182,  226}, 
+        {125,  159,   94,  160,  229,   84,  140,  173}, 
+        { 88,  116,   81,  111,  127,   56,  109,  114}, 
+        {137,  167,  133,  180,  170,   53,  142,  202}, 
+        {136,  104,  104,  105,  151,   71,  152,  177}, 
+        {181,  160,  152,  171,  167,  122,  222,  224}};
+
+        matrix_mul(&c, a, b);
+
+        for (int i = 0 ; i < 8; i++) {
+            for (int k = 0; k < 8; k++)
+                assert(c[i][k] == d[i][k]);
+        }
+    }
+            ",
+            &mut m,
+        );
+    }
+
+    #[test]
     fn asm_fibo() {
         let mut m = module::Module::new("cilk");
         cilk_ir!(m; define [i32] fibo [(i32)] {

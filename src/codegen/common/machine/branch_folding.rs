@@ -152,7 +152,7 @@ impl BranchFolding {
             }
         }
 
-        debug!(println!("{} blocks removed", worklist.len()));
+        debug!(println!("{} empty blocks removed", worklist.len(),));
 
         for (remove, _) in worklist {
             f.body.basic_blocks.order.retain(|&bb| bb != remove);

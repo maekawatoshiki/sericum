@@ -252,7 +252,12 @@ impl<'a> ConvertToDAGNode<'a> {
                         self.inst_to_node.insert(inst_id, id);
                     }
                 }
-                Opcode::Add | Opcode::Sub | Opcode::Mul | Opcode::Div | Opcode::Rem => {
+                Opcode::Add
+                | Opcode::Sub
+                | Opcode::Mul
+                | Opcode::Div
+                | Opcode::Rem
+                | Opcode::Shl => {
                     let v1 = self.get_node_from_value(inst.operands[0].as_value());
                     let v2 = self.get_node_from_value(inst.operands[1].as_value());
                     let bin_id = self.alloc_node_as_necessary(
@@ -264,6 +269,7 @@ impl<'a> ConvertToDAGNode<'a> {
                                 Opcode::Mul => NodeKind::IR(IRNodeKind::Mul),
                                 Opcode::Div => NodeKind::IR(IRNodeKind::Div),
                                 Opcode::Rem => NodeKind::IR(IRNodeKind::Rem),
+                                Opcode::Shl => NodeKind::IR(IRNodeKind::Shl),
                                 _ => unreachable!(),
                             },
                             vec![v1, v2],
@@ -442,6 +448,7 @@ impl<'a> ConvertToDAGNode<'a> {
             }
             Value::Immediate(imm) => {
                 let imm = match imm {
+                    ImmediateValue::Int8(i) => ConstantKind::Int8(*i),
                     ImmediateValue::Int32(i) => ConstantKind::Int32(*i),
                     ImmediateValue::Int64(i) => ConstantKind::Int64(*i),
                     ImmediateValue::F64(f) => ConstantKind::F64(*f),

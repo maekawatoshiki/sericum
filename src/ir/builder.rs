@@ -201,6 +201,20 @@ impl<F: FuncRef> Builder<F> {
         inst
     }
 
+    pub fn build_shl(&mut self, v1: Value, v2: Value) -> Value {
+        // if let Some(konst) = v1.const_shl(&v2) {
+        //     return konst;
+        // }
+
+        let inst = self.create_inst_value(
+            Opcode::Shl,
+            vec![Operand::Value(v1), Operand::Value(v2)],
+            v1.get_type(),
+        );
+        self.append_inst_to_cur_bb(inst);
+        inst
+    }
+
     pub fn build_sitofp(&mut self, v: Value, ty: Type) -> Value {
         let inst = self.create_inst_value(Opcode::SIToFP, vec![Operand::Value(v)], ty);
         self.append_inst_to_cur_bb(inst);

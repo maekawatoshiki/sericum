@@ -61,6 +61,7 @@ pub struct GlobalValue {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ImmediateValue {
+    Int8(i8),
     Int32(i32),
     Int64(i64),
     F64(f64),
@@ -69,6 +70,7 @@ pub enum ImmediateValue {
 impl hash::Hash for ImmediateValue {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         match self {
+            Self::Int8(i) => i.hash(state),
             Self::Int32(i) => i.hash(state),
             Self::Int64(i) => i.hash(state),
             Self::F64(f) => unsafe { ::std::mem::transmute::<f64, u64>(*f) }.hash(state),
@@ -79,6 +81,10 @@ impl hash::Hash for ImmediateValue {
 impl Eq for ImmediateValue {}
 
 impl Value {
+    pub fn new_imm_int8(i: i8) -> Self {
+        Self::Immediate(ImmediateValue::Int8(i))
+    }
+
     pub fn new_imm_int32(i: i32) -> Self {
         Self::Immediate(ImmediateValue::Int32(i))
     }
@@ -127,6 +133,7 @@ impl Value {
                 format!("{} %arg.{}", ty.to_string(), index)
             }
             Value::Immediate(iv) => match iv {
+                ImmediateValue::Int8(i) => format!("i8 {}", i),
                 ImmediateValue::Int32(i) => format!("i32 {}", i),
                 ImmediateValue::Int64(i) => format!("i64 {}", i),
                 ImmediateValue::F64(f) => format!("f64 {}", f),
@@ -171,6 +178,13 @@ impl Value {
         }
     }
 
+    pub fn get_imm(&self) -> Option<&ImmediateValue> {
+        match self {
+            Self::Immediate(imm) => Some(imm),
+            _ => None,
+        }
+    }
+
     pub fn as_imm(&self) -> &ImmediateValue {
         match self {
             Value::Immediate(imm) => imm,
@@ -187,8 +201,18 @@ impl Value {
 }
 
 impl ImmediateValue {
+    pub fn is_power_of_two(&self) -> Option<u32> {
+        match self {
+            Self::Int8(x) if (*x as usize).is_power_of_two() => Some(x.trailing_zeros()),
+            Self::Int32(x) if (*x as usize).is_power_of_two() => Some(x.trailing_zeros()),
+            Self::Int64(x) if (*x as usize).is_power_of_two() => Some(x.trailing_zeros()),
+            Self::Int64(_) | Self::Int32(_) | Self::Int8(_) | Self::F64(_) => None,
+        }
+    }
+
     pub fn get_type(&self) -> &Type {
         match self {
+            ImmediateValue::Int8(_) => &Type::Int8,
             ImmediateValue::Int32(_) => &Type::Int32,
             ImmediateValue::Int64(_) => &Type::Int64,
             ImmediateValue::F64(_) => &Type::F64,

@@ -140,7 +140,7 @@ impl Parse for RCInfo {
 impl Parse for Types {
     fn parse(input: ParseStream) -> Result<Self, Error> {
         let mut types = vec![];
-        loop {
+        while !input.cursor().eof() {
             types.push(parse_ty(input)?);
             if input.parse::<Token![,]>().is_err() {
                 break;

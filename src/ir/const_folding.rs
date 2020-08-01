@@ -31,7 +31,8 @@ impl<'a> ConstantFoldingOnFunction<'a> {
     }
 
     pub fn run(&mut self) {
-        let mut worklist = VecDeque::new();
+        let mut foldable = VecDeque::new();
+        let mut to_shift = VecDeque::new();
 
         for &id in &self.cur_func.basic_blocks.order {
             let bb = &self.cur_func.basic_blocks.arena[id];
@@ -40,12 +41,16 @@ impl<'a> ConstantFoldingOnFunction<'a> {
                 let inst = &self.cur_func.inst_table[inst_id];
 
                 if Self::is_foldable(inst) {
-                    worklist.push_back(inst_id);
+                    foldable.push_back(inst_id);
+                }
+
+                if Self::is_mul_power_of_two(inst) {
+                    to_shift.push_back(inst_id);
                 }
             }
         }
 
-        while let Some(inst_id) = worklist.pop_front() {
+        while let Some(inst_id) = foldable.pop_front() {
             let inst = &self.cur_func.inst_table[inst_id];
             let folded = match inst.fold_const() {
                 Some(folded) => folded,
@@ -63,10 +68,25 @@ impl<'a> ConstantFoldingOnFunction<'a> {
                 );
                 let user = &self.cur_func.inst_table[user_id];
                 if Self::is_foldable(user) {
-                    worklist.push_back(user_id)
+                    foldable.push_back(user_id)
                 }
             }
             self.cur_func.remove_inst(inst_id);
+        }
+
+        while let Some(inst_id) = to_shift.pop_front() {
+            let inst = &mut self.cur_func.inst_table[inst_id];
+            assert!(inst.opcode == Opcode::Mul);
+            inst.opcode = Opcode::Shl;
+            inst.operands[1] = Operand::Value(Value::new_imm_int8(
+                inst.operands[1]
+                    .get_value()
+                    .unwrap()
+                    .get_imm()
+                    .unwrap()
+                    .is_power_of_two()
+                    .unwrap() as i8,
+            ))
         }
     }
 
@@ -78,5 +98,15 @@ impl<'a> ConstantFoldingOnFunction<'a> {
             .operands
             .iter()
             .all(|op| matches!(op, Operand::Value(Value::Immediate(_))))
+    }
+
+    fn is_mul_power_of_two(inst: &Instruction) -> bool {
+        inst.opcode == Opcode::Mul
+            && inst.operands[0]
+                .get_value()
+                .map_or(false, |v| v.get_imm().is_none())
+            && inst.operands[1].get_value().map_or(false, |v| {
+                v.get_imm().map_or(false, |i| i.is_power_of_two().is_some())
+            })
     }
 }

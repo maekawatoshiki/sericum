@@ -32,7 +32,6 @@ impl MISelector {
     }
 
     pub fn run_on_module(&mut self, module: &mut DAGModule) {
-        println!("{:?}", module);
         for (_, func) in &mut module.functions {
             if func.is_internal {
                 continue;
@@ -108,6 +107,7 @@ impl MISelector {
                 }
                 GR64 a {
                     imm32 b => (mi.STR (mi.MOVr32i b), [Reg a])
+                    GR32 b => (mi.STR b, [Reg a])
                     GR64 b => (mi.STR b, [Reg a])
                 }
                 // (ir.GlobalAddr c) a {

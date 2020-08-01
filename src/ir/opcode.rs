@@ -29,6 +29,7 @@ pub enum Opcode {
     Mul,
     Div,
     Rem,
+    Shl,
     SIToFP,
     FPToSI,
     ICmp,
@@ -239,6 +240,7 @@ impl Opcode {
             Opcode::Mul => "mul",
             Opcode::Div => "div",
             Opcode::Rem => "rem",
+            Opcode::Shl => "shl",
             Opcode::SIToFP => "sitofp",
             Opcode::FPToSI => "fptosi",
             Opcode::ICmp => "icmp",
@@ -265,6 +267,13 @@ impl Operand {
             Self::FCmpKind(kind) => kind.as_str().to_owned(),
             Self::Type(ty) => parent.types.to_string(*ty),
             Self::Value(v) => v.to_string(parent, false),
+        }
+    }
+
+    pub fn get_value(&self) -> Option<&Value> {
+        match self {
+            Self::Value(val) => Some(val),
+            _ => None,
         }
     }
 
