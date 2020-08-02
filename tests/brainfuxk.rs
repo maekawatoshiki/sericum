@@ -811,7 +811,7 @@ mod aarch64 {
         builder.set_insert_point(entry);
 
         // tape and index
-        let tape_len = 248;
+        let tape_len = 2048;
         let ary_ty = builder
             .func
             .module
