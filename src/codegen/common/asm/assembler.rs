@@ -84,7 +84,7 @@ impl<'a> FunctionAssembler<'a> {
             self.stream.append(&mut block_asmer.stream);
         }
 
-        println!("inst stream: {:?}", self.stream);
+        debug!(println!("inst stream: {:?}", self.stream));
     }
 }
 
@@ -148,7 +148,7 @@ impl InstructionStream {
         self.bytes.push(u)
     }
 
-    pub fn push_little_u32(&mut self, u: u32) {
+    pub fn push_u32_le(&mut self, u: u32) {
         self.bytes.push((u & 0x000000ff) as u8);
         self.bytes.push(((u & 0x0000ff00) >> 8) as u8);
         self.bytes.push(((u & 0x00ff0000) >> 16) as u8);

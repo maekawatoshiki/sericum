@@ -77,4 +77,22 @@ mod x86_64 {
             &mut m,
         );
     }
+
+    #[test]
+    fn asmer_local() {
+        let mut m = Module::new("cilk");
+        cilk_ir!(m; define [i32] test [] {
+            entry:
+                i = alloca i32;
+                store (i32 42), (%i);
+                li = load (%i);
+                ret (%li);
+        });
+        compile(
+            "#include <assert.h>
+                 extern int test(); 
+                 int main() { assert(test() == 42); return 0; }",
+            &mut m,
+        );
+    }
 }
