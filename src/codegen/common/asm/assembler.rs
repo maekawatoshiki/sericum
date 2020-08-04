@@ -2,7 +2,9 @@ use crate::codegen::common::machine::{
     basic_block::MachineBasicBlock, function::MachineFunction, inst::MachineInst,
     module::MachineModule,
 };
-use std::fmt;
+use faerie::*;
+use std::str::FromStr;
+use std::{fmt, fs::File, path::Path};
 
 pub struct Assembler<'a> {
     module: &'a MachineModule,
@@ -39,10 +41,33 @@ impl<'a> Assembler<'a> {
     }
 
     pub fn assemble(&mut self) {
+        let name = "test.o";
+        let file = File::create(Path::new(name)).unwrap();
+        let mut obj = ArtifactBuilder::new(triple!("x86_64-unknown-unknown-unknown-elf"))
+            .name(name.to_owned())
+            .finish();
+
+        obj.declarations(
+            [
+                // ("deadbeef", Decl::function().into()),
+                ("test", Decl::function().global().into()),
+                // ("str.1", Decl::cstring().into()),
+                // ("DEADBEEF", Decl::data_import().into()),
+                // ("printf", Decl::function_import().into()),
+            ]
+            .iter()
+            .cloned(),
+        )
+        .unwrap();
+
         for (_id, func) in &self.module.functions {
             let mut func_asmer = FunctionAssembler::new(self.module, func);
             func_asmer.assemble();
+            obj.define(func.name.as_str(), func_asmer.stream.bytes)
+                .unwrap();
         }
+
+        // obj.write(file).unwrap();
     }
 }
 
