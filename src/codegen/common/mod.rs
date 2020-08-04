@@ -1,2 +1,3 @@
-pub mod machine;
+pub mod asm;
 pub mod dag;
+pub mod machine;
