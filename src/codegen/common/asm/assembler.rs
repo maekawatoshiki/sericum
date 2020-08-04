@@ -8,6 +8,7 @@ use std::{fmt, fs::File, path::Path};
 
 pub struct Assembler<'a> {
     module: &'a MachineModule,
+    artifact: Artifact,
 }
 
 pub struct FunctionAssembler<'a> {
@@ -37,37 +38,33 @@ pub struct InstructionStream {
 
 impl<'a> Assembler<'a> {
     pub fn new(module: &'a MachineModule) -> Self {
-        Self { module }
+        Self {
+            module,
+            artifact: ArtifactBuilder::new(triple!("x86_64-unknown-unknown-unknown-elf"))
+                .name(module.name.to_owned())
+                .finish(),
+        }
     }
 
     pub fn assemble(&mut self) {
-        let name = "test.o";
-        let file = File::create(Path::new(name)).unwrap();
-        let mut obj = ArtifactBuilder::new(triple!("x86_64-unknown-unknown-unknown-elf"))
-            .name(name.to_owned())
-            .finish();
-
-        obj.declarations(
-            [
-                // ("deadbeef", Decl::function().into()),
-                ("test", Decl::function().global().into()),
-                // ("str.1", Decl::cstring().into()),
-                // ("DEADBEEF", Decl::data_import().into()),
-                // ("printf", Decl::function_import().into()),
-            ]
-            .iter()
-            .cloned(),
-        )
-        .unwrap();
+        for (_, func) in &self.module.functions {
+            self.artifact
+                .declare(&func.name, Decl::function().global())
+                .unwrap();
+        }
 
         for (_id, func) in &self.module.functions {
             let mut func_asmer = FunctionAssembler::new(self.module, func);
             func_asmer.assemble();
-            obj.define(func.name.as_str(), func_asmer.stream.bytes)
+            self.artifact
+                .define(func.name.as_str(), func_asmer.stream.bytes)
                 .unwrap();
         }
+    }
 
-        // obj.write(file).unwrap();
+    pub fn write_to_file(&mut self, name: &str) {
+        let file = File::create(Path::new(name)).unwrap();
+        self.artifact.write(file).unwrap();
     }
 }
 

@@ -2,11 +2,8 @@
 mod x86_64 {
     use cilk::{
         cilk_ir,
-        codegen::x64::{
-            asm::{assembler::Assembler, print::MachineAsmPrinter},
-            standard_conversion_into_machine_module,
-        },
-        ir::{builder, global_val, types, value},
+        codegen::x64::{asm::assembler::Assembler, standard_conversion_into_machine_module},
+        ir::{builder, /*global_val,*/ types, value},
         module::Module,
         *, // for macro
     };
@@ -32,48 +29,38 @@ mod x86_64 {
         format!("/tmp/{}.{}", name, extension)
     }
 
-    // fn assemble_and_run(c_parent: &str, s_target: &str) {
-    //     let parent_name = unique_file_name("c");
-    //     let target_name = unique_file_name("s");
-    //     {
-    //         let mut parent = BufWriter::new(fs::File::create(parent_name.as_str()).unwrap());
-    //         let mut target = BufWriter::new(fs::File::create(target_name.as_str()).unwrap());
-    //         parent.write_all(c_parent.as_bytes()).unwrap();
-    //         target.write_all(s_target.as_bytes()).unwrap();
-    //     }
-    //
-    //     let output_name = unique_file_name("out");
-    //     let compilation = process::Command::new("clang")
-    //         .args(&[
-    //             parent_name.as_str(),
-    //             target_name.as_str(),
-    //             "-o",
-    //             output_name.as_str(),
-    //         ])
-    //         .status()
-    //         .unwrap();
-    //     assert!(compilation.success());
-    //
-    //     let execution = process::Command::new(output_name.as_str())
-    //         .status()
-    //         .unwrap();
-    //     assert!(execution.success());
-    //
-    //     fs::remove_file(output_name).unwrap();
-    //     fs::remove_file(parent_name).unwrap();
-    //     fs::remove_file(target_name).unwrap();
-    // }
+    fn compile(parent_in_c: &str, module: &mut Module) {
+        let parent_name = unique_file_name("c");
+        {
+            let mut parent = BufWriter::new(fs::File::create(parent_name.as_str()).unwrap());
+            parent.write_all(parent_in_c.as_bytes()).unwrap();
+        }
 
-    fn compile(module: &mut Module) {
         let machine_module = standard_conversion_into_machine_module(module);
         println!("{:?}", machine_module);
+
         let mut asmer = Assembler::new(&machine_module);
         asmer.assemble();
-        // let mut printer = MachineAsmPrinter::new();
-        // println!("{:?}", machine_module);
-        // printer.run_on_module(&machine_module);
-        // println!("{}", printer.output);
-        // assemble_and_run(c_parent, &printer.output);
+
+        let obj_name = unique_file_name(".o");
+        asmer.write_to_file(&obj_name);
+
+        let output_name = unique_file_name("out");
+        let compilation = process::Command::new("clang")
+            .args(&[
+                obj_name.as_str(),
+                parent_name.as_str(),
+                "-o",
+                output_name.as_str(),
+            ])
+            .status()
+            .unwrap();
+        assert!(compilation.success());
+
+        let execution = process::Command::new(output_name.as_str())
+            .status()
+            .unwrap();
+        assert!(execution.success());
     }
 
     #[test]
@@ -81,8 +68,13 @@ mod x86_64 {
         let mut m = Module::new("cilk");
         cilk_ir!(m; define [i32] test [] {
             entry:
-                ret (i32  42);
+                ret (i32 42);
         });
-        compile(&mut m);
+        compile(
+            "#include <assert.h>
+                 extern int test(); 
+                 int main() { assert(test() == 42); return 0; }",
+            &mut m,
+        );
     }
 }
