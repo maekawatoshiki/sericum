@@ -66,7 +66,9 @@ mod x86_64 {
 
     fn compile(module: &mut Module) {
         let machine_module = standard_conversion_into_machine_module(module);
+        println!("{:?}", machine_module);
         let mut asmer = Assembler::new(&machine_module);
+        asmer.assemble();
         // let mut printer = MachineAsmPrinter::new();
         // println!("{:?}", machine_module);
         // printer.run_on_module(&machine_module);
@@ -75,14 +77,11 @@ mod x86_64 {
     }
 
     #[test]
-    fn asm_load_store() {
+    fn asmer_minimum() {
         let mut m = Module::new("cilk");
         cilk_ir!(m; define [i32] test [] {
             entry:
-                a = alloca i32;
-                store (i32 1), (%a);
-                la = load (%a);
-                ret (%la);
+                ret (i32  42);
         });
         compile(&mut m);
     }
