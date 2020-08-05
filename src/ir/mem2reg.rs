@@ -74,26 +74,28 @@ impl<'a> Mem2RegOnFunction<'a> {
                 let is_promotable = self.is_alloca_promotable(alloca);
                 debug!(println!("promotable? {:?}", is_promotable));
 
+                if !is_promotable {
+                    continue;
+                }
+
                 let is_stored_only_once = self.is_alloca_stored_only_once(alloca);
                 debug!(println!("single store? {:?}", is_stored_only_once));
 
                 let is_only_used_in_single_block = self.is_alloca_only_used_in_single_block(alloca);
                 debug!(println!("single block? {:?}", is_only_used_in_single_block));
 
-                if is_promotable && is_stored_only_once {
+                if is_stored_only_once {
                     single_store_allocas.push(inst_id);
                     continue;
                 }
 
-                if is_promotable && is_only_used_in_single_block {
+                if is_only_used_in_single_block {
                     single_block_allocas.push(inst_id);
                     continue;
                 }
 
                 // stores and loads in multiple basic blocks
-                if is_promotable {
-                    multi_block_allocas.push(inst_id);
-                }
+                multi_block_allocas.push(inst_id);
             }
         }
 
