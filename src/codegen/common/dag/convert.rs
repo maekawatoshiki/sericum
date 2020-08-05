@@ -206,12 +206,13 @@ impl<'a> ConvertToDAGNode<'a> {
                         inst_id,
                         DAGNode::new(NodeKind::IR(IRNodeKind::Load), vec![v], inst.ty),
                     );
-                    if self.block.liveness.borrow().live_out.contains(&inst_id) {
-                        let copy_from_reg = self.make_chain_with_copying(load_id);
-                        self.inst_to_node.insert(inst_id, copy_from_reg);
-                    } else {
-                        self.inst_to_node.insert(inst_id, load_id);
-                    }
+                    // TODO
+                    // if self.block.liveness.borrow().live_out.contains(&inst_id) {
+                    let copy_from_reg = self.make_chain_with_copying(load_id);
+                    self.inst_to_node.insert(inst_id, copy_from_reg);
+                    // } else {
+                    //     self.inst_to_node.insert(inst_id, load_id);
+                    // }
                 }
                 Opcode::Store => {
                     let src = self.get_node_from_value(inst.operands[0].as_value());
