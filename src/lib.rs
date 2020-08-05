@@ -20,6 +20,9 @@ extern crate defs;
 #[macro_use]
 extern crate dynasm;
 extern crate dynasmrt;
+#[macro_use]
+extern crate target_lexicon;
+extern crate faerie;
 extern crate id_arena;
 #[macro_use]
 extern crate lazy_static;

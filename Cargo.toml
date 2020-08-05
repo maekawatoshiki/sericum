@@ -16,6 +16,8 @@ dynasmrt = "0.3.1"
 lazy_static = "1.4.0"
 defs = { path = "defs", version = "0.1.0" }
 rand = "0.7.3"
+faerie = "0.15.0"
+target-lexicon = "0.10.0"
 
 [features]
 
