@@ -377,7 +377,61 @@ extern int cilk_print_i32(int x) { printf(\"%d\", x); }
 extern int cilk_printch_i32(int x) { putchar(x); }
         ",
         printer.output.as_str(),
-        "8b3272fe6057ba7c5d493aaad6128973",
+        Some("8b3272fe6057ba7c5d493aaad6128973"),
+    );
+}
+
+#[test]
+fn bubble_sort() {
+    let input = r#"
+    function sort(a: **i32, len: i32): i32 {
+        var t: i32;
+        var i: i32;
+        var k: i32;
+        i = 0; while i < len {
+            k = i; while k < len {
+                if a[k] < a[i] {
+                    t = a[k];
+                    a[k] = a[i];
+                    a[i] = t;
+                }
+                k = k + 1;
+            }
+            i = i + 1;
+        }
+        return 0;
+    }
+    "#;
+    let mut codegen = codegen::CodeGenerator::new();
+    codegen.run(input);
+
+    cilk::ir::mem2reg::Mem2Reg::new().run_on_module(&mut codegen.module);
+    cilk::ir::cse::CommonSubexprElimination::new().run_on_module(&mut codegen.module);
+
+    use cilk::codegen::x64::asm::print::MachineAsmPrinter;
+    use cilk::codegen::x64::standard_conversion_into_machine_module;
+    let machine_module = standard_conversion_into_machine_module(&mut codegen.module);
+    let mut printer = MachineAsmPrinter::new();
+    printer.run_on_module(&machine_module);
+    assemble_and_run(
+        "
+        #include <assert.h>
+        extern int sort(int [], int);
+        int main() {
+            const int len = 100;
+            int *a = malloc(sizeof(int) * len);
+            for (int i = 0; i < len; i++)
+                a[i] = rand();
+            sort(a, len);
+            for (int i = 0; i < len; i++)
+                printf(\"%d \", a[i]);
+            int x = a[0];
+            for (int i = 1; i < len; i++) {
+                assert(x <= a[i]); x = a[i]; }
+            return 0;
+        }",
+        printer.output.as_str(),
+        None,
     );
 }
 
@@ -540,7 +594,7 @@ fn pi2() {
 }
 
 #[allow(dead_code)]
-fn assemble_and_run(c_lib: &str, s_target: &str, md5hash: &str) {
+fn assemble_and_run(c_lib: &str, s_target: &str, md5hash: Option<&str>) {
     fn unique_file_name(extension: &str) -> String {
         const CHARSET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ\
                             abcdefghijklmnopqrstuvwxyz\
@@ -594,17 +648,20 @@ fn assemble_and_run(c_lib: &str, s_target: &str, md5hash: &str) {
         .unwrap();
     assert!(compilation.success());
 
-    let execution = process::Command::new(output_name.as_str())
-        .stdout(::std::process::Stdio::piped())
-        .spawn()
-        .unwrap();
-    let mut s = String::new();
-    execution.stdout.unwrap().read_to_string(&mut s).unwrap();
-    // println!("{:?}", s);
-    assert_eq!(format!("{:?}", md5::compute(s)).as_str(), md5hash);
-
-    fs::remove_file(output_name).unwrap();
-    fs::remove_file(lib_output_name).unwrap();
-    fs::remove_file(lib_name).unwrap();
-    fs::remove_file(target_name).unwrap();
+    if let Some(md5hash) = md5hash {
+        let execution = process::Command::new(output_name.as_str())
+            .stdout(::std::process::Stdio::piped())
+            .spawn()
+            .unwrap();
+        let mut s = String::new();
+        execution.stdout.unwrap().read_to_string(&mut s).unwrap();
+        println!("{:?}", s);
+        assert_eq!(format!("{:?}", md5::compute(s)).as_str(), md5hash);
+    } else {
+        let execution = process::Command::new(output_name.as_str())
+            .stdout(::std::process::Stdio::null())
+            .status()
+            .unwrap();
+        assert!(execution.success());
+    }
 }
