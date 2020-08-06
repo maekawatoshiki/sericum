@@ -416,6 +416,7 @@ fn bubble_sort() {
     assemble_and_run(
         "
         #include <assert.h>
+        #include <time.h>
         extern int sort(int [], int);
         int main() {
             const int len = 100;
@@ -423,11 +424,76 @@ fn bubble_sort() {
             for (int i = 0; i < len; i++)
                 a[i] = rand();
             sort(a, len);
+            int z = a[0];
+            for (int i = 0; i < len; i++) {
+                assert(z <= a[i]); 
+                z = a[i]; 
+            }
+            return 0;
+        }",
+        printer.output.as_str(),
+        None,
+    );
+}
+
+#[test]
+fn quick_sort() {
+    let input = r#"
+    function sort(a: **i32, left: i32, right: i32): i32 {
+        var l: i32;
+        var r: i32;
+        var pivot: i32;
+        var t: i32;
+        var f: i32;
+        f = 1;
+        l = left;
+        r = right;
+        pivot = a[(left+right)/2];
+        while f == 1 {
+            while a[l] < pivot { l = l + 1; }
+            while pivot < a[r] { r = r - 1; }
+            if l < r {
+                t = a[l];
+                a[l] = a[r];
+                a[r] = t;
+                l = l + 1;
+                r = r - 1;
+            } else {
+                f = 0;
+            }
+        }
+        if left < l - 1 { sort(a, left, l - 1); }
+        if r + 1 < right { sort(a, r + 1, right); }
+        return 0;
+    }
+    "#;
+    let mut codegen = codegen::CodeGenerator::new();
+    codegen.run(input);
+
+    cilk::ir::mem2reg::Mem2Reg::new().run_on_module(&mut codegen.module);
+    cilk::ir::cse::CommonSubexprElimination::new().run_on_module(&mut codegen.module);
+
+    use cilk::codegen::x64::asm::print::MachineAsmPrinter;
+    use cilk::codegen::x64::standard_conversion_into_machine_module;
+    let machine_module = standard_conversion_into_machine_module(&mut codegen.module);
+    // println!("{:?}", machine_module);
+    let mut printer = MachineAsmPrinter::new();
+    printer.run_on_module(&machine_module);
+    assemble_and_run(
+        "
+        #include <assert.h>
+        #include <time.h>
+        extern int sort(int a[], int left, int right);
+        int main() {
+            const int len = 100;
+            int *a = malloc(sizeof(int) * len);
             for (int i = 0; i < len; i++)
-                printf(\"%d \", a[i]);
-            int x = a[0];
+                a[i] = rand();
+            sort(a, 0, len - 1);
+            int z = a[0];
             for (int i = 1; i < len; i++) {
-                assert(x <= a[i]); x = a[i]; }
+                assert(z <= a[i]); z = a[i]; 
+            }
             return 0;
         }",
         printer.output.as_str(),
@@ -658,8 +724,9 @@ fn assemble_and_run(c_lib: &str, s_target: &str, md5hash: Option<&str>) {
         println!("{:?}", s);
         assert_eq!(format!("{:?}", md5::compute(s)).as_str(), md5hash);
     } else {
+        println!("{:?}", output_name);
         let execution = process::Command::new(output_name.as_str())
-            .stdout(::std::process::Stdio::null())
+            // .stdout(::std::process::Stdio::piped())
             .status()
             .unwrap();
         assert!(execution.success());

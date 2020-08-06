@@ -30,7 +30,7 @@ impl ReplaceCopyWithProperMInst {
 
     pub fn run_on_function(&mut self, tys: &Types, f: &mut MachineFunction) {
         if f.is_internal {
-            continue;
+            return;
         }
 
         for (_, bb) in f.body.basic_blocks.id_and_block() {

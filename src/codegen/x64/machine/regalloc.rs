@@ -48,7 +48,7 @@ impl RegisterAllocator {
     }
 
     pub fn run_on_function(&mut self, tys: &Types, cur_func: &mut MachineFunction) {
-        if func.is_internal {
+        if cur_func.is_internal {
             return;
         }
 
@@ -244,6 +244,7 @@ impl RegisterAllocator {
         for (frinfo, reg) in slots_to_save_regs.into_iter().zip(regs_to_save.into_iter()) {
             if let Some(_) = LiveIntervalSplitter::new(cur_func, matrix).split(
                 tys,
+                &dom_tree,
                 &loops,
                 &reg,
                 &frinfo,
