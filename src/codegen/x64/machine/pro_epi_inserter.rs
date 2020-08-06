@@ -32,9 +32,6 @@ impl PrologueEpilogueInserter {
 
     pub fn run_on_module(&mut self, module: &mut MachineModule) {
         for (_, func) in &mut module.functions {
-            if func.is_internal {
-                continue;
-            }
             self.run_on_function(&module.types, func);
         }
     }

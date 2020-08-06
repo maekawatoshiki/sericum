@@ -30,6 +30,7 @@ impl BranchFolding {
             if f.is_internal {
                 continue;
             }
+
             self.remove_unreachable(f);
             self.remove_empty_block(f);
             self.merge_blocks(f);

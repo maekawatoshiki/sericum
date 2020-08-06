@@ -25,9 +25,6 @@ impl TwoAddressConverter {
 
     pub fn run_on_module(&mut self, module: &mut MachineModule) {
         for (_, f) in &mut module.functions {
-            if f.is_internal {
-                continue;
-            }
             self.run_on_function(f);
         }
     }

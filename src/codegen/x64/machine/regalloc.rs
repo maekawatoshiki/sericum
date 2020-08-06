@@ -43,14 +43,15 @@ impl RegisterAllocator {
 
     pub fn run_on_module(&mut self, module: &mut MachineModule) {
         for (_, func) in &mut module.functions {
-            if func.is_internal {
-                continue;
-            }
             self.run_on_function(&module.types, func);
         }
     }
 
     pub fn run_on_function(&mut self, tys: &Types, cur_func: &mut MachineFunction) {
+        if func.is_internal {
+            return;
+        }
+
         let mut matrix = LivenessAnalysis::new().analyze_function(cur_func);
         calc_spill_weight(cur_func, &mut matrix);
 

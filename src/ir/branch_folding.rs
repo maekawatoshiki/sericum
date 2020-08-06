@@ -18,10 +18,12 @@ impl BranchFolding {
             if f.is_internal {
                 continue;
             }
+
             self.removed_blocks = 0;
             self.remove_unreachable(f);
             self.remove_empty_block(f);
             self.merge_blocks(f);
+
             debug!(println!(
                 "{}: removed {} blocks",
                 f.name, self.removed_blocks

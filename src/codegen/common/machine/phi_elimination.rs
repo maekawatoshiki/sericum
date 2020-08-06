@@ -23,14 +23,15 @@ impl PhiElimination {
 
     pub fn run_on_module(&mut self, module: &mut MachineModule) {
         for (_, f) in &mut module.functions {
-            if f.is_internal {
-                continue;
-            }
             self.run_on_function(f);
         }
     }
 
     pub fn run_on_function(&mut self, f: &mut MachineFunction) {
+        if f.is_internal {
+            return;
+        }
+
         let phi_list: Vec<_> = f
             .body
             .basic_blocks
