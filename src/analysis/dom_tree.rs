@@ -45,13 +45,8 @@ impl<T: BasicBlockTrait> DominatorTree<T> {
             })
     }
 
-    pub fn children_of(&self, bb: Id<T>) -> FxHashSet<Id<T>> {
-        let mut children = FxHashSet::default();
-        for child in self.tree.get(&bb).unwrap_or(&FxHashSet::default()) {
-            children.insert(*child);
-            children = &children | &self.children_of(*child)
-        }
-        children
+    pub fn children_of(&self, bb: Id<T>) -> Option<&FxHashSet<Id<T>>> {
+        self.tree.get(&bb)
     }
 
     pub fn dominance_frontier_of(&self, bb: Id<T>) -> Option<&FxHashSet<Id<T>>> {
@@ -192,13 +187,12 @@ impl<'a, BBS: BasicBlocksTrait> DominatorTreeConstructor<'a, BBS> {
         frontier.insert(x, FxHashSet::default());
 
         for succ in self.basic_blocks.get_arena()[x].get_succs() {
-            let a = self.idom.get(succ).map_or(true, |&x_| x != x_);
-            if a {
+            if self.idom.get(succ).map_or(true, |&x_| x != x_) {
                 frontier.get_mut(&x).unwrap().insert(*succ);
             }
-            for child in self.tree.children_of(x) {
-                self.calc_dom_frontier_of(child, frontier);
-                for y in frontier.get(&child).unwrap().clone() {
+            for child in self.tree.children_of(x).unwrap_or(&FxHashSet::default()) {
+                self.calc_dom_frontier_of(*child, frontier);
+                for y in frontier.get(child).unwrap().clone() {
                     if self.idom.get(&y).map_or(true, |&x_| x_ != x) {
                         frontier.get_mut(&x).unwrap().insert(y);
                     }
