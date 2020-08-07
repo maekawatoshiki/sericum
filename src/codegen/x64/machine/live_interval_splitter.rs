@@ -31,27 +31,6 @@ impl<'a> LiveIntervalSplitter<'a> {
         before_load: &MachineInstId,
     ) -> Option<RegisterId> {
         let mut s = FxHashSet::default();
-        // TODO: Extremely inefficient!
-        fn has_path_to(
-            x: MachineBasicBlockId,
-            y: MachineBasicBlockId,
-            bbs: &MachineBasicBlocks,
-            ss: &mut FxHashSet<MachineBasicBlockId>,
-        ) -> bool {
-            let bb = &bbs.arena[x];
-            if !ss.insert(x) {
-                return false;
-            }
-            for s in &bb.succ {
-                if *s == y {
-                    return true;
-                }
-                if has_path_to(*s, y, bbs, ss) {
-                    return true;
-                }
-            }
-            false
-        }
         fn update_live_info(
             reg: &RegisterId,
             new_reg: RegisterId,
@@ -111,19 +90,12 @@ impl<'a> LiveIntervalSplitter<'a> {
         }
 
         {
-            let p2 = self.func.body.inst_arena[*after_store].parent;
+            let x = self.func.body.inst_arena[*after_store].parent;
             let r = &self.func.regs_info.arena_ref()[*reg];
             for &u in &r.uses {
-                let inst = &self.func.body.inst_arena[u];
-                if has_path_to(
-                    p2,
-                    inst.parent,
-                    &self.func.body.basic_blocks,
-                    &mut FxHashSet::default(),
-                ) {
-                    if !dom_tree.dominate_bb(p2, inst.parent) {
-                        return None;
-                    }
+                let y = self.func.body.inst_arena[u].parent;
+                if dom_tree.path_exists(x, y) && !dom_tree.dominate_bb(x, y) {
+                    return None;
                 }
             }
         }

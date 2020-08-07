@@ -8,6 +8,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 pub struct DominatorTree<T: BasicBlockTrait> {
     pub root: Option<Id<T>>,
     pub tree: FxHashMap<Id<T>, FxHashSet<Id<T>>>,
+    pub frontier: FxHashMap<Id<T>, FxHashSet<Id<T>>>,
     pub level: FxHashMap<Id<T>, usize>,
 }
 
@@ -31,6 +32,7 @@ impl<T: BasicBlockTrait> DominatorTree<T> {
         Self {
             root: None,
             tree: FxHashMap::default(),
+            frontier: FxHashMap::default(),
             level: FxHashMap::default(),
         }
     }
@@ -40,6 +42,28 @@ impl<T: BasicBlockTrait> DominatorTree<T> {
             || self.tree.get(&bb0).map_or(false, |children| {
                 children.contains(&bb1)
                     || children.iter().any(|&child| self.dominate_bb(child, bb1))
+            })
+    }
+
+    pub fn children_of(&self, bb: Id<T>) -> FxHashSet<Id<T>> {
+        let mut children = FxHashSet::default();
+        for child in self.tree.get(&bb).unwrap_or(&FxHashSet::default()) {
+            children.insert(*child);
+            children = &children | &self.children_of(*child)
+        }
+        children
+    }
+
+    pub fn dominance_frontier_of(&self, bb: Id<T>) -> Option<&FxHashSet<Id<T>>> {
+        self.frontier.get(&bb)
+    }
+
+    pub fn path_exists(&self, from: Id<T>, to: Id<T>) -> bool {
+        self.dominate_bb(from, to)
+            || self.dominance_frontier_of(from).map_or(false, |frontiers| {
+                frontiers
+                    .iter()
+                    .any(|&frontier| self.path_exists(frontier, to))
             })
     }
 
@@ -155,6 +179,46 @@ impl<'a, BBS: BasicBlocksTrait> DominatorTreeConstructor<'a, BBS> {
         self.best.insert(node, node);
     }
 
+    fn calc_dom_frontier_of(
+        &self,
+        x: Id<BBS::BB>,
+        frontier: &mut FxHashMap<Id<BBS::BB>, FxHashSet<Id<BBS::BB>>>,
+    ) {
+        if frontier.contains_key(&x) {
+            // dominance frontier for x is already calcuated
+            return;
+        }
+
+        frontier.insert(x, FxHashSet::default());
+
+        for succ in self.basic_blocks.get_arena()[x].get_succs() {
+            let a = self.idom.get(succ).map_or(true, |&x_| x != x_);
+            if a {
+                frontier.get_mut(&x).unwrap().insert(*succ);
+            }
+            for child in self.tree.children_of(x) {
+                self.calc_dom_frontier_of(child, frontier);
+                for y in frontier.get(&child).unwrap().clone() {
+                    if self.idom.get(&y).map_or(true, |&x_| x_ != x) {
+                        frontier.get_mut(&x).unwrap().insert(y);
+                    }
+                }
+            }
+        }
+    }
+
+    fn calc_dom_frontier(
+        &self,
+        start: Id<BBS::BB>,
+    ) -> FxHashMap<Id<BBS::BB>, FxHashSet<Id<BBS::BB>>> {
+        let mut frontier = FxHashMap::default();
+        for &child in self.tree.tree.get(&start).unwrap_or(&FxHashSet::default()) {
+            self.calc_dom_frontier_of(child, &mut frontier);
+        }
+        self.calc_dom_frontier_of(start, &mut frontier);
+        frontier
+    }
+
     pub fn construct(mut self) -> DominatorTree<BBS::BB> {
         self.construct_dom();
 
@@ -183,6 +247,7 @@ impl<'a, BBS: BasicBlocksTrait> DominatorTreeConstructor<'a, BBS> {
         }
 
         let entry = self.basic_blocks.get_order()[0];
+        self.tree.frontier = self.calc_dom_frontier(entry);
         leveling(&mut self.tree.level, &self.tree.tree, entry, 0);
 
         self.tree.root = Some(entry);
