@@ -104,10 +104,14 @@ impl<'a> GlobalCommonSubexprEliminationOnFunction<'a> {
 
         self.bb_avails.insert(root, commons.clone());
 
+        for &frontier in dom_tree
+            .dominance_frontier_of(root)
+            .unwrap_or(&FxHashSet::default())
+        {
+            self.dom_frontiers.insert(frontier);
+        }
+
         for &child in dom_tree.tree.get(&root).unwrap_or(&FxHashSet::default()) {
-            if self.func.basic_block_ref(child).pred.len() > 1 {
-                self.dom_frontiers.insert(child);
-            }
             self.run_sub(dom_tree, child, commons.clone())
         }
     }
@@ -199,6 +203,7 @@ impl<'a> GlobalCommonSubexprEliminationOnFunction<'a> {
         }
 
         for succ in self.func.basic_block_ref(*root).succ.clone() {
+            // Do not visit a dom frontier block twice
             if self.dom_frontiers.contains(&succ) {
                 continue;
             }
