@@ -7,7 +7,7 @@ use crate::codegen::arch::machine::{
 use crate::codegen::common::machine::{basic_block::*, const_data::DataId};
 use crate::ir::{global_val::GlobalVariableId, types::*};
 use id_arena::*;
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::FxHashMap;
 use std::{fmt, fmt::Debug};
 
 pub type MachineOpcode = TargetOpcode;
@@ -239,13 +239,9 @@ impl MachineInst {
         to: RegisterId,
     ) -> Vec<usize> {
         let mut replaced_operands_idx = vec![];
-        let mut processed = FxHashSet::default();
         // TODO: This loop may run once at most
         for (i, o) in self.operand.iter_mut().enumerate() {
             for r in &mut o.registers_mut() {
-                if !processed.insert(**r) {
-                    continue;
-                }
                 if r.kind == from.kind {
                     regs_info.arena_ref_mut()[**r].remove_use(self.id.unwrap());
                     **r = to;
