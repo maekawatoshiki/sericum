@@ -45,17 +45,22 @@ impl RegisterAllocator {
     }
 
     pub fn run_on_function(&mut self, /*tys: &Types,*/ cur_func: &mut MachineFunction) {
+        println!("{:?}", cur_func);
         let mut matrix = LivenessAnalysis::new().analyze_function(cur_func);
         calc_spill_weight(cur_func, &mut matrix);
 
         // debug!(println!("before coalesing {:?}", cur_func));
 
+        println!("{:?}", matrix.virt_reg_interval.inner());
         coalesce_function(&mut matrix, cur_func);
 
         // debug!(println!("after coalesing {:?}", cur_func));
 
         // TODO: preserve_phys_reg_uses_across_call
         self.preserve_reg_uses_across_call(cur_func, &mut matrix);
+
+        println!("{:?}", cur_func);
+        println!("{:?}", matrix.virt_reg_interval.inner());
 
         self.queue = matrix.collect_virt_regs().into_iter().collect();
         self.sort_queue(&matrix); // for better allocation. not necessary
@@ -153,6 +158,7 @@ impl RegisterAllocator {
                         continue;
                     }
 
+                    println!(">> {:?}", r.virt_reg);
                     let p = matrix
                         .virt_reg_interval
                         .get(&r.virt_reg)
