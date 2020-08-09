@@ -4,6 +4,7 @@ use crate::codegen::common::machine::{
     builder::*, function::MachineFunction, module::MachineModule,
 };
 use crate::{ir::types::*, traits::pass::ModulePassTrait};
+use rustc_hash::FxHashMap;
 
 pub struct PrologueEpilogueInserter {}
 
@@ -23,6 +24,7 @@ struct CopyArgs<'a> {
     offset: i32,
     builder: &'a mut Builder<'a>,
     params_ty: &'a Vec<Type>,
+    params_attr: &'a FxHashMap<usize, ParamAttribute>,
 }
 
 impl PrologueEpilogueInserter {
@@ -121,6 +123,7 @@ impl PrologueEpilogueInserter {
         CopyArgs::new(
             builder,
             &tys.as_function_ty(builder.function.ty).unwrap().params_ty,
+            &tys.as_function_ty(builder.function.ty).unwrap().params_attr,
         )
         .copy();
     }
@@ -177,22 +180,61 @@ impl PrologueEpilogueInserter {
 }
 
 impl<'a> CopyArgs<'a> {
-    pub fn new(builder: &'a mut Builder<'a>, params_ty: &'a Vec<Type>) -> Self {
+    pub fn new(
+        builder: &'a mut Builder<'a>,
+        params_ty: &'a Vec<Type>,
+        params_attr: &'a FxHashMap<usize, ParamAttribute>,
+    ) -> Self {
         Self {
             builder,
             params_ty,
+            params_attr,
             offset: 16, // call + push rbp. TODO: this may vary if there're more pushes
         }
     }
 
     pub fn copy(mut self) {
         for (i, &ty) in self.params_ty.iter().enumerate() {
+            let byval = self.params_attr.get(&i).map_or(false, |attr| attr.byval);
+            if byval {
+                let struct_ty = self
+                    .builder
+                    .function
+                    .types
+                    .get_element_ty(ty, None)
+                    .unwrap();
+                self.copy_struct(struct_ty, i);
+                continue;
+            }
             match ty {
                 Type::Int32 => self.copy_int(ty, i, 32),
                 Type::Int64 | Type::Pointer(_) => self.copy_int(ty, i, 64),
                 Type::F64 => self.copy_f64(i),
                 _ => unimplemented!(),
             }
+        }
+    }
+
+    fn copy_struct(&mut self, ty: Type, i: usize) {
+        let sz = ty.size_in_byte(&self.builder.function.types);
+        if sz <= 4 {
+        } else if sz <= 8 {
+            let r = RegisterClassKind::GR64.get_nth_arg_reg(i).unwrap();
+            let r = self.builder.function.regs_info.get_phys_reg(r);
+            let inst = MachineInst::new_simple(
+                MachineOpcode::MOVmr64,
+                vec![
+                    MachineOperand::Mem(MachineMemOperand::BaseFi(
+                        self.builder.function.regs_info.get_phys_reg(GR64::RBP),
+                        FrameIndexInfo::new(ty, FrameIndexKind::Arg(i)),
+                    )),
+                    MachineOperand::Register(r),
+                ],
+                self.builder.get_cur_bb().unwrap(),
+            );
+            self.builder.insert(inst);
+        } else {
+            unimplemented!()
         }
     }
 

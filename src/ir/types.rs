@@ -411,10 +411,19 @@ impl FunctionType {
         format!(
             "{} ({})",
             tys.to_string(self.ret_ty),
-            self.params_ty.iter().fold("".to_string(), |mut s, p| {
-                s += &(tys.to_string(*p) + ", ");
-                s
-            }),
+            self.params_ty
+                .iter()
+                .enumerate()
+                .fold("".to_string(), |mut s, (i, p)| {
+                    s += &(tys.to_string(*p)
+                        + self
+                            .params_attr
+                            .get(&i)
+                            .map_or("", |a| if a.byval { " byval" } else { "" })
+                        + ", ");
+                    s
+                })
+                .trim_matches(&[',', ' '][0..]),
         )
     }
 }

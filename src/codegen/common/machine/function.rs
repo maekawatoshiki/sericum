@@ -34,6 +34,8 @@ pub struct MachineFunction {
     pub frame_objects: Option<FrameObjectsInfo>,
 
     pub const_data: ConstDataArena,
+
+    pub types: Types,
 }
 
 #[derive(Clone, Debug)]
@@ -137,6 +139,7 @@ impl MachineFunction {
             regs_info: f.regs_info,
             frame_objects: None,
             const_data: ConstDataArena::new(),
+            types: f.types.clone(),
         }
     }
 

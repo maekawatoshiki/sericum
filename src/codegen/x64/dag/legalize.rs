@@ -176,8 +176,18 @@ impl Legalize {
     ) -> Raw<DAGNode> {
         isel_pat! {
         (ir.Store dst, src) {
+            (ir.FIAddr fi) dst {
+                mem fi {
+                    imm32 src => (mi.MOVmi32 [BaseFi %rbp, fi], src)
+                    GR32  src => (mi.MOVmr32 [BaseFi %rbp, fi], src)
+                    GR64  src => (mi.MOVmr64 [BaseFi %rbp, fi], src) } }
             (ir.Add a1, a2) dst {
                 (ir.FIAddr fi) a1 {
+                    mem fi {
+                        imm32 a2 {
+                            GR32  src => (mi.MOVmr32 [BaseFiOff %rbp, fi, a2], src)
+                            GR64  src => (mi.MOVmr64 [BaseFiOff %rbp, fi, a2], src)
+                            imm32 src => (mi.MOVmi32 [BaseFiOff %rbp, fi, a2], src) } }
                     mem32 fi {
                         imm32 a2 {
                             GR32  src => (mi.MOVmr32 [BaseFiOff %rbp, fi, a2], src)

@@ -20,16 +20,20 @@ impl FrameObjectsInfo {
 
         let padding = |off, align| -> i32 { (align - off % align) % align };
 
-        for (i, param_ty) in tys
-            .base
-            .borrow()
-            .as_function_ty(f.ty)
-            .unwrap()
-            .params_ty
-            .iter()
-            .enumerate()
-        {
+        let base = &tys.base.borrow();
+        let f_ty = base.as_function_ty(f.ty).unwrap();
+        for (i, param_ty) in f_ty.params_ty.iter().enumerate() {
             // TODO: Correct?
+            let byval = f_ty.params_attr.get(&i).map_or(false, |attr| attr.byval);
+            if byval {
+                let param_ty = base.get_element_ty(*param_ty, None).unwrap();
+                let size = param_ty.size_in_byte(tys) as i32;
+                let align = param_ty.align_in_byte(tys) as i32;
+                offset += size + padding(offset, align);
+                offset_map.insert(FrameIndexKind::Arg(i), offset);
+                continue;
+            }
+
             let rc = ty2rc(param_ty).unwrap();
             if rc.get_nth_arg_reg(i).is_none() {
                 let size = param_ty.size_in_byte(tys) as i32;

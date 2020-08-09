@@ -365,16 +365,70 @@ impl<'a> ScheduleByBlock<'a> {
 
     fn convert_call_dag(&mut self, node: &DAGNode) -> MachineInstId {
         let mut arg_regs = vec![self.cur_func.regs_info.get_phys_reg(GR64::RSP)]; // call uses RSP
-        let mut kill_regs = vec![];
         let mut off = 0;
 
+        // println!("T {:?}", self.types.to_string(node.operand[0].ty));
+        let f_ty = node.operand[0].ty;
+
         let mut args = vec![];
-        for operand in &node.operand[1..] {
-            args.push(self.normal_operand(*operand));
+        for (i, operand) in node.operand[1..].iter().enumerate() {
+            let byval = {
+                let base = self.types.base.borrow();
+                base.as_function_ty(f_ty)
+                    .unwrap()
+                    .params_attr
+                    .get(&i)
+                    .map_or(false, |attr| attr.byval)
+            };
+            if byval {
+                args.push(MachineOperand::None);
+            } else {
+                args.push(self.normal_operand(*operand));
+            }
         }
 
+        let mut gap = 0i32;
         for (i, arg) in args.into_iter().enumerate() {
-            let ty = arg.get_type(&self.cur_func.regs_info).unwrap();
+            let (ty, byval) = {
+                let base = self.types.base.borrow();
+                let f = &base.as_function_ty(f_ty).unwrap();
+                (
+                    *f.params_ty.get(i).unwrap(),
+                    f.params_attr.get(&i).map_or(false, |attr| attr.byval),
+                )
+            };
+            if byval {
+                let struct_ty = self.types.get_element_ty(ty, None).unwrap();
+                let sz = struct_ty.size_in_byte(&self.types);
+                let mem = self.normal_operand(node.operand[1 + i].operand[0]);
+                // mov rdi,
+                println!("{:?} {}", mem, sz);
+                if sz <= 4 {
+                    // eXx
+                } else if sz <= 8 {
+                    let r = RegisterClassKind::GR64
+                        .get_nth_arg_reg((i as i32 + gap) as usize)
+                        .unwrap();
+                    let r = self.cur_func.regs_info.get_phys_reg(r);
+                    arg_regs.push(r);
+                    let mov = self.move2reg(r, mem);
+                    self.append_inst(mov);
+                // rXx
+                } else {
+                    unimplemented!()
+                }
+                if sz <= 8 {
+                    gap += 0;
+                } else if sz <= 16 {
+                    gap += 1;
+                } else {
+                    // gap -= 1
+                    unimplemented!()
+                }
+                continue;
+            }
+
+            // let ty = arg.get_type(&self.cur_func.regs_info).unwrap();
 
             if !matches!(
                 ty,
@@ -384,11 +438,10 @@ impl<'a> ScheduleByBlock<'a> {
             };
 
             let reg_class = ty2rc(&ty).unwrap();
-            let inst = match reg_class.get_nth_arg_reg(i) {
+            let inst = match reg_class.get_nth_arg_reg((i as i32 + gap) as usize) {
                 Some(arg_reg) => {
                     let r = self.cur_func.regs_info.get_phys_reg(arg_reg);
                     arg_regs.push(r.clone());
-                    kill_regs.push(r);
                     self.move2reg(r, arg)
                 }
                 None => {
@@ -431,7 +484,6 @@ impl<'a> ScheduleByBlock<'a> {
         let call_inst = self.append_inst(
             MachineInst::new_simple(MachineOpcode::CALL, vec![callee], self.cur_bb)
                 .with_imp_uses(arg_regs)
-                .with_kills(kill_regs)
                 .with_imp_defs({
                     let mut defs = vec![self.cur_func.regs_info.get_phys_reg(GR64::RSP)];
                     if node.ty != Type::Void {

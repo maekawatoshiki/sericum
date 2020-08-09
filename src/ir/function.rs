@@ -95,6 +95,12 @@ impl Function {
         params_ty.get(idx).map_or(None, |&ty| Some(ty))
     }
 
+    pub fn get_param_attr(&self, idx: usize) -> Option<ParamAttribute> {
+        let base = self.types.base.borrow();
+        let params_attr = &base.as_function_ty(self.ty).unwrap().params_attr;
+        params_attr.get(&idx).map_or(None, |&a| Some(a))
+    }
+
     pub fn get_params_len(&self) -> usize {
         let base = self.types.base.borrow();
         base.as_function_ty(self.ty).unwrap().params_ty.len()

@@ -28,6 +28,8 @@ pub struct DAGFunction {
     pub regs_info: RegistersInfo,
 
     pub is_internal: bool,
+
+    pub types: Types,
 }
 
 pub struct DAGHeap {
@@ -55,6 +57,7 @@ impl DAGFunction {
             dag_heap,
             local_mgr,
             regs_info,
+            types: func.types.clone(),
         }
     }
 

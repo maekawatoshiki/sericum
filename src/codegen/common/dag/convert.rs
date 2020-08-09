@@ -118,6 +118,7 @@ impl<'a> ConvertToDAGFunction<'a> {
             local_mgr: self.local_mgr,
             regs_info: self.regs_info,
             is_internal: self.func.is_internal,
+            types: self.func.types.clone(),
         }
     }
 
@@ -444,35 +445,51 @@ impl<'a> ConvertToDAGNode<'a> {
                     .function_ref(av.func_id)
                     .get_param_type(av.index)
                     .unwrap();
-                let fi_ty = self.func.types.new_pointer_ty(ty);
-                let fi = self.alloc_node(DAGNode::new(
-                    NodeKind::Operand(OperandNodeKind::FrameIndex(FrameIndexInfo::new(
+                let byval = self
+                    .module
+                    .function_ref(av.func_id)
+                    .get_param_attr(av.index)
+                    .map_or(false, |attr| attr.byval);
+                if byval {
+                    let fi = self.alloc_node(DAGNode::new(
+                        NodeKind::Operand(OperandNodeKind::FrameIndex(FrameIndexInfo::new(
+                            ty,
+                            FrameIndexKind::Arg(av.index),
+                        ))),
+                        vec![],
                         ty,
-                        FrameIndexKind::Arg(av.index),
-                    ))),
-                    vec![],
-                    ty,
-                ));
-                let fiaddr = self.alloc_node(DAGNode::new(
-                    NodeKind::IR(IRNodeKind::FIAddr),
-                    vec![fi],
-                    fi_ty,
-                ));
-                let load_id = self.alloc_node(DAGNode::new(
-                    NodeKind::IR(IRNodeKind::Load),
-                    vec![fiaddr],
-                    ty,
-                ));
-                load_id
+                    ));
+                    self.alloc_node(DAGNode::new(NodeKind::IR(IRNodeKind::FIAddr), vec![fi], ty))
+                } else {
+                    let fi_ty = self.func.types.new_pointer_ty(ty);
+                    let fi = self.alloc_node(DAGNode::new(
+                        NodeKind::Operand(OperandNodeKind::FrameIndex(FrameIndexInfo::new(
+                            ty,
+                            FrameIndexKind::Arg(av.index),
+                        ))),
+                        vec![],
+                        ty,
+                    ));
+                    let fiaddr = self.alloc_node(DAGNode::new(
+                        NodeKind::IR(IRNodeKind::FIAddr),
+                        vec![fi],
+                        fi_ty,
+                    ));
+                    self.alloc_node(DAGNode::new(
+                        NodeKind::IR(IRNodeKind::Load),
+                        vec![fiaddr],
+                        ty,
+                    ))
+                }
             }
-            Value::Function(FunctionValue { func_id, .. }) => {
+            Value::Function(FunctionValue { func_id, ty }) => {
                 let f = self.module.function_ref(*func_id);
                 self.alloc_node(DAGNode::new(
                     NodeKind::Operand(OperandNodeKind::Address(AddressKind::FunctionName(
                         f.name.to_string(),
                     ))),
                     vec![],
-                    Type::Void, // TODO
+                    *ty,
                 ))
             }
             Value::Global(GlobalValue { id, ty }) => {
