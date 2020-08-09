@@ -30,17 +30,17 @@ pub struct ConvertToDAGFunction<'a> {
 }
 
 pub struct ConvertToDAGNode<'a> {
-    module: &'a Module,
-    func: &'a Function,
-    block: &'a BasicBlock,
-    node_heap: &'a mut DAGHeap,
-    inst_to_node: &'a mut FxHashMap<InstructionId, Raw<DAGNode>>,
-    regs_info: &'a mut RegistersInfo,
-    arg_regs: &'a mut FxHashMap<usize, Raw<DAGNode>>,
-    local_mgr: &'a mut LocalVariables,
-    bb_map: &'a FxHashMap<BasicBlockId, DAGBasicBlockId>,
-    entry: bool,
-    last_chained_node: Option<Raw<DAGNode>>,
+    pub module: &'a Module,
+    pub func: &'a Function,
+    pub block: &'a BasicBlock,
+    pub node_heap: &'a mut DAGHeap,
+    pub inst_to_node: &'a mut FxHashMap<InstructionId, Raw<DAGNode>>,
+    pub regs_info: &'a mut RegistersInfo,
+    pub arg_regs: &'a mut FxHashMap<usize, Raw<DAGNode>>,
+    pub local_mgr: &'a mut LocalVariables,
+    pub bb_map: &'a FxHashMap<BasicBlockId, DAGBasicBlockId>,
+    pub entry: bool,
+    pub last_chained_node: Option<Raw<DAGNode>>,
 }
 
 impl<'a> ConvertToDAGModule<'a> {
@@ -150,32 +150,7 @@ impl<'a> ConvertToDAGNode<'a> {
         // program entry
         if self.entry {
             // Copy physical argument registers to virtual regieters
-            for i in 0..self.func.get_params_len() {
-                if let Some(ty) = self.func.get_param_type(i) {
-                    let arg_reg_class = match ty2rc(&ty) {
-                        Some(rc) => rc,
-                        None => continue,
-                    };
-                    let arg_reg = match arg_reg_class.get_nth_arg_reg(i) {
-                        Some(reg) => reg,
-                        None => continue,
-                    };
-                    let arg_reg = self.alloc_node(DAGNode::new_phys_reg(&self.regs_info, arg_reg));
-                    let vreg = self.regs_info.new_virt_reg(arg_reg_class);
-                    let vreg = self.alloc_node(DAGNode::new(
-                        NodeKind::Operand(OperandNodeKind::Register(vreg)),
-                        vec![],
-                        ty,
-                    ));
-                    let copy = self.alloc_node(DAGNode::new(
-                        NodeKind::IR(IRNodeKind::CopyToReg),
-                        vec![vreg, arg_reg],
-                        ty,
-                    ));
-                    self.make_chain(copy);
-                    self.arg_regs.insert(i, vreg);
-                }
-            }
+            self.copy_reg_args();
         }
 
         for inst_val in self.block.iseq_ref().iter() {
@@ -578,7 +553,7 @@ impl<'a> ConvertToDAGNode<'a> {
         gep
     }
 
-    fn make_chain(&mut self, node: Raw<DAGNode>) {
+    pub fn make_chain(&mut self, node: Raw<DAGNode>) {
         if let Some(last_chained_node) = &mut self.last_chained_node {
             last_chained_node.next = Some(node);
             *last_chained_node = node;
@@ -602,11 +577,11 @@ impl<'a> ConvertToDAGNode<'a> {
         node
     }
 
-    fn alloc_node(&mut self, new: DAGNode) -> Raw<DAGNode> {
+    pub fn alloc_node(&mut self, new: DAGNode) -> Raw<DAGNode> {
         self.node_heap.alloc(new)
     }
 
-    fn alloc_node_as_necessary(&mut self, id: InstructionId, new: DAGNode) -> Raw<DAGNode> {
+    pub fn alloc_node_as_necessary(&mut self, id: InstructionId, new: DAGNode) -> Raw<DAGNode> {
         if let Some(node) = self.inst_to_node.get_mut(&id) {
             **node = new;
             *node
