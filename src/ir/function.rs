@@ -158,8 +158,13 @@ impl DumpToString for &Function {
             self.name,
             ty.params_ty
                 .iter()
-                .fold("".to_string(), |mut s, p| {
-                    s += &(base.to_string(*p) + ", ");
+                .enumerate()
+                .fold("".to_string(), |mut s, (i, p)| {
+                    s += &(base.to_string(*p)
+                        + ty.params_attr
+                            .get(&i)
+                            .map_or("", |a| if a.byval { " byval" } else { "" })
+                        + ", ");
                     s
                 })
                 .trim_matches(&[',', ' '][0..]),

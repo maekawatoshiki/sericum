@@ -1,5 +1,6 @@
 use super::value::Value;
 use id_arena::*;
+use rustc_hash::FxHashMap;
 use std::fmt;
 use std::{cell::RefCell, rc::Rc};
 
@@ -48,6 +49,12 @@ pub trait TypeSize {
 pub struct FunctionType {
     pub ret_ty: Type,
     pub params_ty: Vec<Type>,
+    pub params_attr: FxHashMap<usize, ParamAttribute>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct ParamAttribute {
+    pub byval: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -92,9 +99,22 @@ impl Types {
         Type::Array(id)
     }
 
-    pub fn new_function_ty(&self, ret_ty: Type, params_ty: Vec<Type>) -> Type {
+    pub fn new_function_ty(&self, ret_ty: Type, mut params_ty: Vec<Type>) -> Type {
+        let mut params_attr = FxHashMap::default();
+        for (i, ty) in params_ty.iter_mut().enumerate() {
+            match ty {
+                Type::Struct(_) => {
+                    let ptr = self.new_pointer_ty(*ty);
+                    *ty = ptr;
+                    params_attr.insert(i, ParamAttribute { byval: true });
+                }
+                _ => {}
+            }
+        }
         let id = self.new_non_primitive_ty(NonPrimitiveType::Function(FunctionType::new(
-            ret_ty, params_ty,
+            ret_ty,
+            params_ty,
+            params_attr,
         )));
         Type::Function(id)
     }
@@ -219,9 +239,22 @@ impl TypesBase {
         Type::Array(id)
     }
 
-    pub fn new_function_ty(&mut self, ret_ty: Type, params_ty: Vec<Type>) -> Type {
+    pub fn new_function_ty(&mut self, ret_ty: Type, mut params_ty: Vec<Type>) -> Type {
+        let mut params_attr = FxHashMap::default();
+        for (i, ty) in params_ty.iter_mut().enumerate() {
+            match ty {
+                Type::Struct(_) => {
+                    let ptr = self.new_pointer_ty(*ty);
+                    *ty = ptr;
+                    params_attr.insert(i, ParamAttribute { byval: true });
+                }
+                _ => {}
+            }
+        }
         let id = self.new_non_primitive_ty(NonPrimitiveType::Function(FunctionType::new(
-            ret_ty, params_ty,
+            ret_ty,
+            params_ty,
+            params_attr,
         )));
         Type::Function(id)
     }
@@ -362,8 +395,16 @@ impl Type {
 }
 
 impl FunctionType {
-    pub fn new(ret_ty: Type, params_ty: Vec<Type>) -> Self {
-        Self { ret_ty, params_ty }
+    pub fn new(
+        ret_ty: Type,
+        params_ty: Vec<Type>,
+        params_attr: FxHashMap<usize, ParamAttribute>,
+    ) -> Self {
+        Self {
+            ret_ty,
+            params_ty,
+            params_attr,
+        }
     }
 
     pub fn to_string(&self, tys: &TypesBase) -> String {
