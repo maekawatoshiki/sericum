@@ -1009,4 +1009,60 @@ main:
         let res = jit.run(func, vec![]);
         assert_eq!(jit.run(func, vec![]), exec::jit::GenericValue::Int32(22));
     }
+
+    #[test]
+    fn pass_struct1() {
+        let mut m = module::Module::new("cilk");
+
+        let struct_ty = m.types.new_struct_ty(vec![
+            types::Type::Int32,
+            types::Type::Int32,
+            types::Type::Int32,
+            types::Type::Int32,
+            types::Type::Int32,
+        ]);
+        let f = m.create_function("f", types::Type::Int32, vec![types::Type::Int32, struct_ty]);
+        {
+            let mut builder = builder::Builder::new(builder::FunctionIdWithModule::new(&mut m, f));
+            let entry = builder.append_basic_block();
+            builder.set_insert_point(entry);
+            cilk_ir!((builder) {
+                x = gep (%arg.1), [(i32 0), (i32 0)];
+                load_x = load (%x);
+                y = gep (%arg.1), [(i32 0), (i32 1)];
+                load_y = load (%y);
+                z = gep (%arg.1), [(i32 0), (i32 2)];
+                load_z = load (%z);
+                a = add (%load_x), (%load_y);
+                b = add (%a), (%load_z);
+                c = add (%arg.0), (%b);
+                ret (%c);
+            });
+        }
+        let main = m.create_function("main", types::Type::Int32, vec![]);
+        {
+            let mut builder =
+                builder::Builder::new(builder::FunctionIdWithModule::new(&mut m, main));
+            let entry = builder.append_basic_block();
+            builder.set_insert_point(entry);
+            let var = builder.build_alloca(struct_ty);
+            cilk_ir!((builder) {
+                x = gep (%var), [(i32 0), (i32 0)];
+                store (i32 10), (%x);
+                x = gep (%var), [(i32 0), (i32 1)];
+                store (i32 12), (%x);
+                x = gep (%var), [(i32 0), (i32 2)];
+                store (i32 14), (%x);
+                r = call f [(i32 2), (%var)];
+                ret (%r);
+            });
+        }
+
+        println!("{:?}", m);
+
+        let mut jit = exec::jit::JITExecutor::new(&mut m);
+        let func = jit.find_function_by_name("main").unwrap();
+        let res = jit.run(func, vec![]);
+        assert_eq!(jit.run(func, vec![]), exec::jit::GenericValue::Int32(38));
+    }
 }

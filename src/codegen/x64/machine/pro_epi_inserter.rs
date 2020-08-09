@@ -194,6 +194,7 @@ impl<'a> CopyArgs<'a> {
     }
 
     pub fn copy(mut self) {
+        let mut reg_nth = 0;
         for (i, &ty) in self.params_ty.iter().enumerate() {
             let byval = self.params_attr.get(&i).map_or(false, |attr| attr.byval);
             if byval {
@@ -203,23 +204,24 @@ impl<'a> CopyArgs<'a> {
                     .types
                     .get_element_ty(ty, None)
                     .unwrap();
-                self.copy_struct(struct_ty, i);
+                self.copy_struct(struct_ty, &mut reg_nth, i);
                 continue;
             }
             match ty {
-                Type::Int32 => self.copy_int(ty, i, 32),
-                Type::Int64 | Type::Pointer(_) => self.copy_int(ty, i, 64),
-                Type::F64 => self.copy_f64(i),
+                Type::Int32 => self.copy_int(ty, reg_nth, i, 32),
+                Type::Int64 | Type::Pointer(_) => self.copy_int(ty, reg_nth, i, 64),
+                Type::F64 => self.copy_f64(reg_nth, i),
                 _ => unimplemented!(),
             }
+            reg_nth += 1;
         }
     }
 
-    fn copy_struct(&mut self, ty: Type, i: usize) {
+    fn copy_struct(&mut self, ty: Type, reg_nth: &mut usize, i: usize) {
         let sz = ty.size_in_byte(&self.builder.function.types);
         if sz <= 4 {
         } else if sz <= 8 {
-            let r = RegisterClassKind::GR64.get_nth_arg_reg(i).unwrap();
+            let r = RegisterClassKind::GR64.get_nth_arg_reg(*reg_nth).unwrap();
             let r = self.builder.function.regs_info.get_phys_reg(r);
             let inst = MachineInst::new_simple(
                 MachineOpcode::MOVmr64,
@@ -233,15 +235,91 @@ impl<'a> CopyArgs<'a> {
                 self.builder.get_cur_bb().unwrap(),
             );
             self.builder.insert(inst);
-        } else {
+            *reg_nth += 1;
+        } else if sz <= 16 {
             unimplemented!()
+        } else {
+            let mut x = 0;
+            while x < sz {
+                if x + 8 <= sz {
+                    let rax = self.builder.function.regs_info.get_phys_reg(GR64::RAX);
+                    let mov = MachineInst::new_simple(
+                        MachineOpcode::MOVrm64,
+                        vec![MachineOperand::Mem(MachineMemOperand::BaseOff(
+                            self.builder.function.regs_info.get_phys_reg(GR64::RBP),
+                            self.offset,
+                        ))],
+                        self.builder.get_cur_bb().unwrap(),
+                    )
+                    .with_def(vec![rax]);
+                    self.builder.insert(mov);
+                    let mem = if x == 0 {
+                        MachineMemOperand::BaseFi(
+                            self.builder.function.regs_info.get_phys_reg(GR64::RBP),
+                            FrameIndexInfo::new(ty, FrameIndexKind::Arg(i)),
+                        )
+                    } else {
+                        MachineMemOperand::BaseFiOff(
+                            self.builder.function.regs_info.get_phys_reg(GR64::RBP),
+                            FrameIndexInfo::new(ty, FrameIndexKind::Arg(i)),
+                            x as i32,
+                        )
+                    };
+                    let mov = MachineInst::new_simple(
+                        MachineOpcode::MOVmr64,
+                        vec![MachineOperand::Mem(mem), MachineOperand::Register(rax)],
+                        self.builder.get_cur_bb().unwrap(),
+                    );
+                    self.builder.insert(mov);
+                    self.offset += 8;
+                    x += 8;
+                    continue;
+                }
+                if x + 4 <= sz {
+                    let eax = self.builder.function.regs_info.get_phys_reg(GR32::EAX);
+                    let mov = MachineInst::new_simple(
+                        MachineOpcode::MOVrm32,
+                        vec![MachineOperand::Mem(MachineMemOperand::BaseOff(
+                            self.builder.function.regs_info.get_phys_reg(GR64::RBP),
+                            self.offset,
+                        ))],
+                        self.builder.get_cur_bb().unwrap(),
+                    )
+                    .with_def(vec![eax]);
+                    self.builder.insert(mov);
+                    let mem = if x == 0 {
+                        MachineMemOperand::BaseFi(
+                            self.builder.function.regs_info.get_phys_reg(GR32::EBP),
+                            FrameIndexInfo::new(ty, FrameIndexKind::Arg(i)),
+                        )
+                    } else {
+                        MachineMemOperand::BaseFiOff(
+                            self.builder.function.regs_info.get_phys_reg(GR32::EBP),
+                            FrameIndexInfo::new(ty, FrameIndexKind::Arg(i)),
+                            x as i32,
+                        )
+                    };
+                    let mov = MachineInst::new_simple(
+                        MachineOpcode::MOVmr32,
+                        vec![MachineOperand::Mem(mem), MachineOperand::Register(eax)],
+                        self.builder.get_cur_bb().unwrap(),
+                    );
+                    self.builder.insert(mov);
+                    self.offset += 4;
+                    x += 4;
+                    continue;
+                }
+                unimplemented!()
+            }
+            // FrameIndexInfo::new(ty, FrameIndexKind::Arg(i))
+            // let
         }
     }
 
-    fn copy_f64(&mut self, i: usize) {
+    fn copy_f64(&mut self, reg_nth: usize, i: usize) {
         let ret_reg = XMM::XMM0.as_phys_reg();
         let dst = FrameIndexInfo::new(Type::F64, FrameIndexKind::Arg(i));
-        let src = match RegisterClassKind::XMM.get_nth_arg_reg(i) {
+        let src = match RegisterClassKind::XMM.get_nth_arg_reg(reg_nth) {
             Some(_arg_reg) => return, // MachineOperand::phys_reg(&self.builder.function.regs_info, arg_reg),
             None => {
                 let ax = self.builder.function.regs_info.get_phys_reg(ret_reg);
@@ -273,7 +351,7 @@ impl<'a> CopyArgs<'a> {
         self.builder.insert(inst)
     }
 
-    fn copy_int(&mut self, ty: Type, i: usize, bit: usize) {
+    fn copy_int(&mut self, ty: Type, reg_nth: usize, i: usize, bit: usize) {
         let (ax, rc, movrm) = match bit {
             32 => (
                 GR32::EAX.as_phys_reg(),
@@ -288,7 +366,7 @@ impl<'a> CopyArgs<'a> {
             _ => unimplemented!(),
         };
         let dst = FrameIndexInfo::new(ty, FrameIndexKind::Arg(i));
-        let src = match rc.get_nth_arg_reg(i) {
+        let src = match rc.get_nth_arg_reg(reg_nth) {
             Some(_arg_reg) => return, // MachineOperand::phys_reg(&self.builder.function.regs_info, arg_reg),
             None => {
                 let ax = self.builder.function.regs_info.get_phys_reg(ax);
