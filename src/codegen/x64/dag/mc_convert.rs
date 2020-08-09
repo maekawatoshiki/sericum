@@ -502,7 +502,7 @@ impl<'a> ScheduleByBlock<'a> {
 
     fn pass_struct_arg(
         &mut self,
-        nth: &mut usize,
+        reg_nth: &mut usize,
         off: &mut i32,
         ty: Type,
         fi: FrameIndexInfo,
@@ -511,81 +511,75 @@ impl<'a> ScheduleByBlock<'a> {
         let struct_ty = self.types.get_element_ty(ty, None).unwrap();
         let sz = struct_ty.size_in_byte(&self.types);
 
-        if sz <= 4 {
-            // eXx
-        } else if sz <= 8 {
-            let r = RegisterClassKind::GR64.get_nth_arg_reg(*nth).unwrap();
-            let r = self.cur_func.regs_info.get_phys_reg(r);
-            arg_regs.push(r);
+        if sz <= 16 {
+            let mov8 = sz / 8;
+            let mov4 = ::std::cmp::max(1, (sz - 8 * mov8) / 4); // TODO: Support struct less than 4 bytes
             let rbp = self.cur_func.regs_info.get_phys_reg(GR64::RBP);
-            let mov = self.move2reg(r, MachineOperand::Mem(MachineMemOperand::BaseFi(rbp, fi)));
-            self.append_inst(mov);
-        } else if sz <= 12 {
-            let r1 = RegisterClassKind::GR64.get_nth_arg_reg(*nth).unwrap();
-            let r2 = RegisterClassKind::GR64.get_nth_arg_reg(*nth + 1).unwrap();
-            let r1 = self.cur_func.regs_info.get_phys_reg(r1);
-            let r2 = self.cur_func.regs_info.get_phys_reg(r2);
-            let rbp = self.cur_func.regs_info.get_phys_reg(GR64::RBP);
-            let mem = MachineOperand::Mem(MachineMemOperand::BaseFi(rbp, fi.clone()));
-            let mem2 = MachineOperand::Mem(MachineMemOperand::BaseFiOff(rbp, fi, 8));
-            let mov1 = MachineInst::new_simple(MachineOpcode::MOVrm64, vec![mem], self.cur_bb);
-            let mov2 = MachineInst::new_simple(MachineOpcode::MOVrm32, vec![mem2], self.cur_bb);
-            arg_regs.push(r1);
-            arg_regs.push(r2);
-            self.append_inst(mov1);
-            self.append_inst(mov2);
-        } else if sz <= 16 {
-            // rXx
-        } else {
-            let mut x = 0;
-            while x < sz {
-                let rbp = self.cur_func.regs_info.get_phys_reg(GR64::RBP);
-                if x + 8 <= sz {
-                    let mem = if x == 0 {
-                        MachineOperand::Mem(MachineMemOperand::BaseFi(rbp, fi.clone()))
-                    } else {
-                        MachineOperand::Mem(MachineMemOperand::BaseFiOff(rbp, fi.clone(), 8))
-                    };
+            let mut off = 0;
+            for (c, s, rc, op) in vec![
+                (mov8, 8, RegisterClassKind::GR64, MachineOpcode::MOVrm64),
+                (mov4, 4, RegisterClassKind::GR32, MachineOpcode::MOVrm32),
+            ]
+            .into_iter()
+            {
+                for _ in 0..c {
                     let r = self
                         .cur_func
                         .regs_info
-                        .new_virt_reg(RegisterClassKind::GR64);
-                    let mov =
-                        MachineInst::new_simple(MachineOpcode::MOVrm64, vec![mem], self.cur_bb)
-                            .with_def(vec![r]);
-                    let inst = MachineInst::new_simple(
-                        MachineOpcode::MOVmr64,
-                        vec![
-                            MachineOperand::Mem(MachineMemOperand::BaseOff(
-                                self.cur_func.regs_info.get_phys_reg(GR64::RSP),
-                                *off + x as i32,
-                            )),
-                            MachineOperand::Register(r),
-                        ],
-                        self.cur_bb,
-                    );
+                        .get_phys_reg(rc.get_nth_arg_reg(*reg_nth).unwrap());
+                    arg_regs.push(r);
+                    let mem = if off == 0 {
+                        MachineOperand::Mem(MachineMemOperand::BaseFi(rbp, fi.clone()))
+                    } else {
+                        MachineOperand::Mem(MachineMemOperand::BaseFiOff(rbp, fi.clone(), off))
+                    };
+                    off += s;
+                    let mov = MachineInst::new_simple(op, vec![mem], self.cur_bb).with_def(vec![r]);
                     self.append_inst(mov);
-                    self.append_inst(inst);
-                    x += 8;
-                    continue;
+                    *reg_nth += 1;
                 }
-                if x + 4 <= sz {
-                    x += 4;
-                    continue;
-                }
-                unimplemented!()
             }
-            *off += sz as i32;
-            // unimplemented!()
+            return arg_regs;
         }
 
-        if sz <= 8 {
-            *nth += 1;
-        } else if sz <= 16 {
-            *nth += 2;
-        } else {
-            // unimplemented!()
+        let mut x = 0;
+        while x < sz {
+            let rbp = self.cur_func.regs_info.get_phys_reg(GR64::RBP);
+            if x + 8 <= sz {
+                let mem = if x == 0 {
+                    MachineOperand::Mem(MachineMemOperand::BaseFi(rbp, fi.clone()))
+                } else {
+                    MachineOperand::Mem(MachineMemOperand::BaseFiOff(rbp, fi.clone(), 8))
+                };
+                let r = self
+                    .cur_func
+                    .regs_info
+                    .new_virt_reg(RegisterClassKind::GR64);
+                let mov = MachineInst::new_simple(MachineOpcode::MOVrm64, vec![mem], self.cur_bb)
+                    .with_def(vec![r]);
+                let inst = MachineInst::new_simple(
+                    MachineOpcode::MOVmr64,
+                    vec![
+                        MachineOperand::Mem(MachineMemOperand::BaseOff(
+                            self.cur_func.regs_info.get_phys_reg(GR64::RSP),
+                            *off + x as i32,
+                        )),
+                        MachineOperand::Register(r),
+                    ],
+                    self.cur_bb,
+                );
+                self.append_inst(mov);
+                self.append_inst(inst);
+                x += 8;
+                continue;
+            }
+            if x + 4 <= sz {
+                x += 4;
+                continue;
+            }
+            unimplemented!()
         }
+        *off += sz as i32;
 
         arg_regs
     }
