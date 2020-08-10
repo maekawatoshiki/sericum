@@ -373,14 +373,15 @@ impl<'a> ScheduleByBlock<'a> {
 
         let mut args = vec![];
         for (i, operand) in node.operand[1..].iter().enumerate() {
-            let byval = {
-                let base = self.types.base.borrow();
-                base.as_function_ty(f_ty)
-                    .unwrap()
-                    .params_attr
-                    .get(&i)
-                    .map_or(false, |attr| attr.byval)
-            };
+            let byval = self
+                .types
+                .base
+                .borrow()
+                .as_function_ty(f_ty)
+                .unwrap()
+                .params_attr
+                .get(&i)
+                .map_or(false, |attr| attr.byval);
             if byval {
                 args.push(MachineOperand::None);
             } else {
@@ -398,6 +399,7 @@ impl<'a> ScheduleByBlock<'a> {
                     f.params_attr.get(&i).map_or(false, |attr| attr.byval),
                 )
             };
+
             if byval {
                 let lea = &node.operand[1 + i];
                 let mem = lea.operand[0];
@@ -542,46 +544,43 @@ impl<'a> ScheduleByBlock<'a> {
             return arg_regs;
         }
 
-        let mut x = 0;
-        while x < sz {
-            let rbp = self.cur_func.regs_info.get_phys_reg(GR64::RBP);
-            if x + 8 <= sz {
-                let mem = if x == 0 {
+        let mov8 = sz / 8;
+        let mov4 = (sz - 8 * mov8) / 4;
+        let rbp = self.cur_func.regs_info.get_phys_reg(GR64::RBP);
+        let mut offset = 0;
+        for (c, s, rc, op) in vec![
+            (mov8, 8, RegisterClassKind::GR64, MachineOpcode::MOVrm64),
+            (mov4, 4, RegisterClassKind::GR32, MachineOpcode::MOVrm32),
+        ]
+        .into_iter()
+        {
+            for _ in 0..c {
+                let r = self.cur_func.regs_info.new_virt_reg(rc);
+                let mem = if offset == 0 {
                     MachineOperand::Mem(MachineMemOperand::BaseFi(rbp, fi.clone()))
                 } else {
-                    MachineOperand::Mem(MachineMemOperand::BaseFiOff(rbp, fi.clone(), 8))
+                    MachineOperand::Mem(MachineMemOperand::BaseFiOff(rbp, fi.clone(), offset))
                 };
-                let r = self
-                    .cur_func
-                    .regs_info
-                    .new_virt_reg(RegisterClassKind::GR64);
-                let mov = MachineInst::new_simple(MachineOpcode::MOVrm64, vec![mem], self.cur_bb)
-                    .with_def(vec![r]);
-                let inst = MachineInst::new_simple(
+                let mov = MachineInst::new_simple(op, vec![mem], self.cur_bb).with_def(vec![r]);
+                self.append_inst(mov);
+                let mov = MachineInst::new_simple(
                     MachineOpcode::MOVmr64,
                     vec![
                         MachineOperand::Mem(MachineMemOperand::BaseOff(
                             self.cur_func.regs_info.get_phys_reg(GR64::RSP),
-                            *off + x as i32,
+                            *off + offset as i32,
                         )),
                         MachineOperand::Register(r),
                     ],
                     self.cur_bb,
                 );
                 self.append_inst(mov);
-                self.append_inst(inst);
-                x += 8;
-                continue;
+                offset += s;
             }
-            if x + 4 <= sz {
-                x += 4;
-                continue;
-            }
-            unimplemented!()
         }
         *off += sz as i32;
 
-        arg_regs
+        vec![]
     }
 
     fn normal_operand(&mut self, node: Raw<DAGNode>) -> MachineOperand {
