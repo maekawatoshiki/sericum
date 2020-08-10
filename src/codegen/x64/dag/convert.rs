@@ -1,8 +1,8 @@
 use super::node::*;
 use crate::codegen::arch::machine::register::*;
 use crate::codegen::common::dag::convert::ConvertToDAGNode;
-use crate::ir::{opcode::Instruction, types::Type};
-use crate::util::allocator::Raw;
+use crate::ir::types::Type;
+// use crate::util::allocator::Raw;
 // use id_arena::*;
 // use rustc_hash::FxHashMap;
 // use std::mem;

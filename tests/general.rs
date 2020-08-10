@@ -1103,4 +1103,55 @@ main:
         let func = jit.find_function_by_name("main").unwrap();
         assert_eq!(jit.run(func, vec![]), exec::jit::GenericValue::F64(12.3));
     }
+
+    #[test]
+    fn pass_struct3() {
+        let mut m = module::Module::new("cilk");
+
+        let struct_ty = m
+            .types
+            .new_struct_ty(vec![types::Type::Int32, types::Type::F64]);
+        let struct_ty2 = m.types.new_struct_ty(vec![
+            types::Type::F64,
+            types::Type::Int32,
+            types::Type::Int32,
+        ]);
+        let f = m.create_function("f", types::Type::F64, vec![struct_ty, struct_ty2]);
+        {
+            let mut builder = builder::Builder::new(builder::FunctionIdWithModule::new(&mut m, f));
+            let entry = builder.append_basic_block();
+            builder.set_insert_point(entry);
+            cilk_ir!((builder) {
+                x = gep (%arg.0), [(i32 0), (i32 1)];
+                load_x = load (%x);
+                y = gep (%arg.1), [(i32 0), (i32 0)];
+                load_y = load (%y);
+                a = add (%load_x), (%load_y);
+                ret (%a);
+            });
+        }
+        let main = m.create_function("main", types::Type::F64, vec![]);
+        {
+            let mut builder =
+                builder::Builder::new(builder::FunctionIdWithModule::new(&mut m, main));
+            let entry = builder.append_basic_block();
+            builder.set_insert_point(entry);
+            let var = builder.build_alloca(struct_ty);
+            let var2 = builder.build_alloca(struct_ty2);
+            cilk_ir!((builder) {
+                x = gep (%var), [(i32 0), (i32 1)];
+                store (f64 12.3), (%x);
+                x = gep (%var2), [(i32 0), (i32 0)];
+                store (f64 12.3), (%x);
+                r = call f [(%var), (%var2)];
+                ret (%r);
+            });
+        }
+
+        // println!("{:?}", m);
+
+        let mut jit = exec::jit::JITExecutor::new(&mut m);
+        let func = jit.find_function_by_name("main").unwrap();
+        assert_eq!(jit.run(func, vec![]), exec::jit::GenericValue::F64(24.6));
+    }
 }
