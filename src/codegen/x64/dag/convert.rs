@@ -9,20 +9,27 @@ use crate::ir::types::TypeSize;
 
 impl<'a> ConvertToDAGNode<'a> {
     pub fn copy_reg_args(&mut self) {
-        let mut gap = 0i32;
+        let mut arg_regs_order = RegisterClassKind::arg_regs();
         for i in 0..self.func.get_params_len() {
             let byval = self.func.get_param_attr(i).map_or(false, |attr| attr.byval);
             if let Some(ty) = self.func.get_param_type(i) {
                 if byval {
                     let struct_ty = self.func.types.get_element_ty(ty, None).unwrap();
                     let sz = struct_ty.size_in_byte(&self.func.types);
-                    if sz <= 8 {
-                        gap += 0
-                    } else if sz <= 16 {
-                        gap += 1;
-                    } else {
-                        gap -= 1;
+
+                    let mov8 = sz / 8;
+                    let mov4 = (sz - 8 * mov8) / 4;
+                    assert!((sz - 8 * mov8) % 4 == 0);
+
+                    for (c, rc) in vec![
+                        (mov8, RegisterClassKind::GR64),
+                        (mov4, RegisterClassKind::GR32),
+                    ] {
+                        for _ in 0..c {
+                            arg_regs_order.next(rc);
+                        }
                     }
+
                     continue;
                 }
 
@@ -30,7 +37,7 @@ impl<'a> ConvertToDAGNode<'a> {
                     Some(rc) => rc,
                     None => continue,
                 };
-                let arg_reg = match arg_reg_class.get_nth_arg_reg((i as i32 + gap) as usize) {
+                let arg_reg = match arg_regs_order.next(arg_reg_class) {
                     Some(reg) => reg,
                     None => continue,
                 };

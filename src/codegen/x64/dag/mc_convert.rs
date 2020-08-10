@@ -389,7 +389,8 @@ impl<'a> ScheduleByBlock<'a> {
             }
         }
 
-        let mut reg_nth = 0;
+        let mut arg_regs_order = RegisterClassKind::arg_regs();
+
         for (i, arg) in args.into_iter().enumerate() {
             let (ty, byval) = {
                 let base = self.types.base.borrow();
@@ -401,17 +402,16 @@ impl<'a> ScheduleByBlock<'a> {
             };
 
             if byval {
+                // TODO
                 let lea = &node.operand[1 + i];
                 let mem = lea.operand[0];
                 let fi = match self.normal_operand(mem) {
                     MachineOperand::Mem(MachineMemOperand::BaseFi(_, fi)) => fi,
                     _ => panic!(),
                 };
-                arg_regs.append(&mut self.pass_struct_arg(&mut reg_nth, &mut off, ty, fi));
+                arg_regs.append(&mut self.pass_struct_byval(&mut arg_regs_order, &mut off, ty, fi));
                 continue;
             }
-
-            // let ty = arg.get_type(&self.cur_func.regs_info).unwrap();
 
             if !matches!(
                 ty,
@@ -421,7 +421,7 @@ impl<'a> ScheduleByBlock<'a> {
             };
 
             let reg_class = ty2rc(&ty).unwrap();
-            let inst = match reg_class.get_nth_arg_reg(reg_nth) {
+            let inst = match arg_regs_order.next(reg_class) {
                 Some(arg_reg) => {
                     let r = self.cur_func.regs_info.get_phys_reg(arg_reg);
                     arg_regs.push(r.clone());
@@ -446,7 +446,6 @@ impl<'a> ScheduleByBlock<'a> {
             };
 
             self.append_inst(inst);
-            reg_nth += 1;
         }
 
         self.append_inst(
@@ -502,9 +501,9 @@ impl<'a> ScheduleByBlock<'a> {
         self.append_inst(copy)
     }
 
-    fn pass_struct_arg(
+    fn pass_struct_byval(
         &mut self,
-        reg_nth: &mut usize,
+        arg_regs_order: &mut ArgRegs,
         off: &mut i32,
         ty: Type,
         fi: FrameIndexInfo,
@@ -528,7 +527,7 @@ impl<'a> ScheduleByBlock<'a> {
                     let r = self
                         .cur_func
                         .regs_info
-                        .get_phys_reg(rc.get_nth_arg_reg(*reg_nth).unwrap());
+                        .get_phys_reg(arg_regs_order.next(rc).unwrap());
                     arg_regs.push(r);
                     let mem = if off == 0 {
                         MachineOperand::Mem(MachineMemOperand::BaseFi(rbp, fi.clone()))
@@ -538,7 +537,6 @@ impl<'a> ScheduleByBlock<'a> {
                     off += s;
                     let mov = MachineInst::new_simple(op, vec![mem], self.cur_bb).with_def(vec![r]);
                     self.append_inst(mov);
-                    *reg_nth += 1;
                 }
             }
             return arg_regs;

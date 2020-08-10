@@ -35,6 +35,38 @@ registers! {
     order gp XMM { XMM0, XMM1, XMM2, XMM3, XMM4, XMM5 }
 }
 
+// TODO: Auto generate
+impl RegisterClassKind {
+    pub fn arg_regs() -> ArgRegs {
+        ArgRegs::new()
+    }
+}
+
+pub struct ArgRegs {
+    nths: Vec<usize>, // GR(32|64), XMM
+}
+
+impl ArgRegs {
+    pub fn new() -> Self {
+        Self { nths: vec![0, 0] }
+    }
+
+    pub fn next(&mut self, rc: RegisterClassKind) -> Option<PhysReg> {
+        match rc {
+            RegisterClassKind::GR32 | RegisterClassKind::GR64 => {
+                let nth = self.nths[0];
+                self.nths[0] += 1;
+                rc.get_nth_arg_reg(nth)
+            }
+            RegisterClassKind::XMM => {
+                let nth = self.nths[1];
+                self.nths[1] += 1;
+                rc.get_nth_arg_reg(nth)
+            }
+        }
+    }
+}
+
 macro_rules! to_phys {
     ($($r:path),*) => {
         vec![$(($r.as_phys_reg())),*]
