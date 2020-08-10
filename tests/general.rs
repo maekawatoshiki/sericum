@@ -1006,7 +1006,6 @@ main:
 
         let mut jit = exec::jit::JITExecutor::new(&mut m);
         let func = jit.find_function_by_name("main").unwrap();
-        let res = jit.run(func, vec![]);
         assert_eq!(jit.run(func, vec![]), exec::jit::GenericValue::Int32(22));
     }
 
@@ -1062,7 +1061,6 @@ main:
 
         let mut jit = exec::jit::JITExecutor::new(&mut m);
         let func = jit.find_function_by_name("main").unwrap();
-        let res = jit.run(func, vec![]);
         assert_eq!(jit.run(func, vec![]), exec::jit::GenericValue::Int32(38));
     }
 
@@ -1103,7 +1101,6 @@ main:
 
         let mut jit = exec::jit::JITExecutor::new(&mut m);
         let func = jit.find_function_by_name("main").unwrap();
-        let res = jit.run(func, vec![]);
         assert_eq!(jit.run(func, vec![]), exec::jit::GenericValue::F64(12.3));
     }
 }

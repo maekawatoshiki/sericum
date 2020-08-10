@@ -86,7 +86,7 @@ fn ray_tracing() {
     }
 
     struct Ray {
-      origin: * struct Vec,
+      origin: struct Vec,
       dir: * struct Vec
     }
 
@@ -97,17 +97,17 @@ fn ray_tracing() {
     }
 
     struct Plane {
-      position: * struct Vec,
-      normal  : * struct Vec,
-      color   : * struct Vec
+      position: *struct Vec,
+      normal  : *struct Vec,
+      color   : *struct Vec
     }
 
     struct Env {
-      light     : *struct Vec,
-      sphere1: *struct Sphere,
-      sphere2: *struct Sphere,
-      sphere3: *struct Sphere,
-      plane   : *struct Plane
+      light  : struct Vec,
+      sphere1: struct Sphere,
+      sphere2: struct Sphere,
+      sphere3: struct Sphere,
+      plane  : struct Plane
     }
 
     function clamp(t: f64, min: f64, max: f64): f64 {
@@ -119,6 +119,13 @@ fn ray_tracing() {
     function Vec_new(x: f64, y: f64, z: f64): *struct Vec {
       var vec: * struct Vec;
       vec = malloc(128);
+      (*vec).x = x;
+      (*vec).y = y;
+      (*vec).z = z;
+      return vec;
+    }
+
+    function Vec_new2(vec: *struct Vec, x: f64, y: f64, z: f64): *struct Vec {
       (*vec).x = x;
       (*vec).y = y;
       (*vec).z = z;
@@ -166,35 +173,38 @@ fn ray_tracing() {
       return v;
     }
 
-    function Ray_new(origin: *struct Vec, dir: *struct Vec): *struct Ray {
-      var ray: *struct Ray;
-      ray = malloc(128);
-      (*ray).origin = origin;
+    function Ray_new(ray: *struct Ray, origin: *struct Vec, dir: *struct Vec): i32 {
+      (*ray).origin.x = (*origin).x;
+      (*ray).origin.y = (*origin).y;
+      (*ray).origin.z = (*origin).z;
       (*ray).dir = dir;
-      return ray;
+      return 0;
     }
 
     function Isect_new(
+      dst: *struct Isect,
       hit: i32,
       hit_point: *struct Vec,
       normal: *struct Vec,
       color: *struct Vec,
       distance: f64,
-      ray_dir: *struct Vec): *struct Isect {
-      var i: *struct Isect;
-      i = malloc(128);
-      (*i).hit       = hit      ;
-      (*i).hit_point = hit_point;
-      (*i).normal    = normal   ;
-      (*i).color     = color    ;
-      (*i).distance  = distance ;
-      (*i).ray_dir   = ray_dir ;
-      return i;
+      ray_dir: *struct Vec): i32 {
+      (*dst).hit       = hit      ;
+      (*dst).hit_point = hit_point;
+      (*dst).normal    = normal   ;
+      (*dst).color     = color    ;
+      (*dst).distance  = distance ;
+      (*dst).ray_dir   = ray_dir ;
+      return 0;
     }
 
-    function Sphere_new(radius: f64, position: *struct Vec, color: *struct Vec): *struct Sphere {
-      var s: *struct Sphere;
-      s = malloc(128);
+    function Sphere_new(s: *struct Sphere, radius: f64, position: *struct Vec, color: *struct Vec): *struct Sphere {
+      (*s).radius   = radius;
+      (*s).position = position;
+      (*s).color    = color;
+      return s;
+    }
+    function Sphere_new2(s: *struct Sphere, radius: f64, position: struct Vec, color: *struct Vec): *struct Sphere {
       (*s).radius   = radius;
       (*s).position = position;
       (*s).color    = color;
@@ -204,7 +214,7 @@ fn ray_tracing() {
     function Sphere_intersect(s: *struct Sphere, light: *struct Vec, ray: *struct Ray, isect: *struct Isect): i32 {
       var rs: *struct Vec;
       var b: f64; var c: f64; var d: f64; var t: f64;
-      rs = Vec_sub((*ray).origin, (*s).position);
+      rs = Vec_sub(&(*ray).origin, (*s).position);
       b = Vec_dot(rs, (*ray).dir);
       c = Vec_dot(rs, rs) - (*s).radius * (*s).radius;
       d = b * b - c;
@@ -212,7 +222,7 @@ fn ray_tracing() {
       if d <= 0.0 { return 0; }
       if t <= 0.0001 { return 0; }
       if (*isect).distance <= t { return 0; }
-      (*isect).hit_point = Vec_add((*ray).origin, Vec_mul((*ray).dir, t));
+      (*isect).hit_point = Vec_add(&(*ray).origin, Vec_mul((*ray).dir, t));
       (*isect).normal = Vec_normalize(Vec_sub((*isect).hit_point, (*s).position));
       (*isect).color = Vec_mul((*s).color, clamp(Vec_dot(light, (*isect).normal), 0.1, 1.0));
       (*isect).distance = t;
@@ -221,9 +231,7 @@ fn ray_tracing() {
       return 0;
     }
 
-    function Plane_new(position: *struct Vec, normal: *struct Vec, color: *struct Vec): *struct Plane {
-      var p: *struct Plane;
-      p = malloc(128);
+    function Plane_new(p: *struct Plane, position: *struct Vec, normal: *struct Vec, color: *struct Vec): *struct Plane {
       (*p).position = position;
       (*p).normal = normal;
       (*p).color = color;
@@ -242,10 +250,10 @@ fn ray_tracing() {
       var f: f64;
       d = 0.0 - Vec_dot((*p).position, (*p).normal);
       v = Vec_dot((*ray).dir, (*p).normal);
-      t = 0.0 - (Vec_dot((*ray).origin, (*p).normal) + d) / v;
+      t = 0.0 - (Vec_dot(&(*ray).origin, (*p).normal) + d) / v;
       if t <= 0.0001 { return 0; }
       if (*isect).distance <= t { return 0; }
-      (*isect).hit_point = Vec_add((*ray).origin, Vec_mul((*ray).dir, t));
+      (*isect).hit_point = Vec_add(&(*ray).origin, Vec_mul((*ray).dir, t));
       (*isect).normal = (*p).normal;
       d2 = clamp(Vec_dot(light, (*isect).normal), 0.1, 1.0);
       m = (*(*isect).hit_point).x - 2.0*floor((*(*isect).hit_point).x / 2.0);
@@ -264,21 +272,19 @@ fn ray_tracing() {
     }
 
     function Env_intersect(env: *struct Env, ray: *struct Ray, i: *struct Isect): i32 {
-      Sphere_intersect((*env).sphere1, (*env).light, ray, i);
-      Sphere_intersect((*env).sphere2, (*env).light, ray, i);
-      Sphere_intersect((*env).sphere3, (*env).light, ray, i);
-      Plane_intersect((*env).plane, (*env).light, ray, i);
+      Sphere_intersect(&(*env).sphere1, &(*env).light, ray, i);
+      Sphere_intersect(&(*env).sphere2, &(*env).light, ray, i);
+      Sphere_intersect(&(*env).sphere3, &(*env).light, ray, i);
+      Plane_intersect (&(*env).plane,   &(*env).light, ray, i);
       return 0;
     }
 
-    function Env_new(): *struct Env {
-      var env: *struct Env;
-      env = malloc(128);
-      (*env).light = Vec_new(0.577, 0.577, 0.577);
-      (*env).sphere1 = Sphere_new(0.5, Vec_new( 0.0, 0.0-0.5, 0.0), Vec_new(1.0, 0.0, 0.0));
-      (*env).sphere2 = Sphere_new(1.0, Vec_new( 2.0,  0.0, cos(10.0 * 0.666)), Vec_new(0.0, 1.0, 0.0));
-      (*env).sphere3 = Sphere_new(1.5, Vec_new(0.0-2.0,  0.5, cos(10.0 * 0.333)), Vec_new(0.0, 0.0, 1.0));
-      (*env).plane = Plane_new(Vec_new(0.0, 0.0-1.0, 0.0), Vec_new(0.0, 1.0, 0.0), Vec_new(1.0, 1.0, 1.0));
+    function Env_new(env: *struct Env): *struct Env {
+      Vec_new2(&(*env).light, 0.577, 0.577, 0.577);
+      Sphere_new(&(*env).sphere1, 0.5, Vec_new(0.0, 0.0-0.5, 0.0),               Vec_new(1.0, 0.0, 0.0));
+      Sphere_new(&(*env).sphere2, 1.0, Vec_new(2.0, 0.0, cos(10.0 * 0.666)),     Vec_new(0.0, 1.0, 0.0));
+      Sphere_new(&(*env).sphere3, 1.5, Vec_new(0.0-2.0, 0.5, cos(10.0 * 0.333)), Vec_new(0.0, 0.0, 1.0));
+      Plane_new (&(*env).plane,        Vec_new(0.0, 0.0-1.0, 0.0),               Vec_new(0.0, 1.0, 0.0), Vec_new(1.0, 1.0, 1.0));
       return env;
     }
 
@@ -297,47 +303,47 @@ fn ray_tracing() {
     }
 
     function main(): i32 {
-      var env: *struct Env;
+      var env: struct Env;
       var row: i32; var col: i32;
       var x: f64; var y: f64;
-      var ray: *struct Ray;
-      var i: *struct Isect;
+      var ray: struct Ray;
+      var i: struct Isect;
       var dest_col: *struct Vec;
       var temp_col: *struct Vec;
       var j: i32;
-      var q: *struct Ray;
+      var q: struct Ray;
       var q1: *struct Ray;
       var q2: *struct Ray;
 
-      env = Env_new();
+      Env_new(&env);
 
       row = 0; while row < 300 {
         col = 0; while col < 300 {
           x = f64(col) / (300.0 / 2.0) - 1.0;
           y = f64(300 - row) / (300.0 / 2.0) - 1.0;
-
-          ray = Ray_new( Vec_new(0.0, 2.0, 6.0), Vec_normalize(Vec_new(x, y, 0.0 - 1.0)) );
-          i = Isect_new(0, Vec_new(0.0, 0.0, 0.0), Vec_new(0.0, 0.0, 0.0), Vec_new(0.0, 0.0, 0.0),
+          Ray_new(&ray, Vec_new(0.0, 2.0, 6.0), Vec_normalize(Vec_new(x, y, 0.0 - 1.0)) );
+          Isect_new(&i, 0, Vec_new(0.0, 0.0, 0.0), Vec_new(0.0, 0.0, 0.0), Vec_new(0.0, 0.0, 0.0),
                         10000000.0, Vec_new(0.0, 0.0, 0.0));
-              Env_intersect(env, ray, i);
+          Env_intersect(&env, &ray, &i);
 
-          if 0 < (*i).hit {
-            dest_col = (*i).color;
-            temp_col = Vec_multi(Vec_new(1.0, 1.0, 1.0), (*i).color);
+          if 0 < i.hit {
+            dest_col = i.color;
+            temp_col = Vec_multi(Vec_new(1.0, 1.0, 1.0), i.color);
             j = 1; while j < 4 {
-              q = Ray_new(Vec_add((*i).hit_point, Vec_mul((*i).normal, 0.0001)),
-                                      Vec_reflect((*i).ray_dir, (*i).normal));
-              Env_intersect(env, q, i);
-              if j < (*i).hit {
-                dest_col = Vec_add(dest_col, Vec_multi(temp_col, (*i).color));
-                temp_col = Vec_multi(temp_col, (*i).color);
+                  
+              Ray_new(&q, Vec_add(i.hit_point, Vec_mul(i.normal, 0.0001)),
+                                      Vec_reflect(i.ray_dir, i.normal));
+              Env_intersect(&env, &q, &i);
+              if j < i.hit {
+                dest_col = Vec_add(dest_col, Vec_multi(temp_col, i.color));
+                temp_col = Vec_multi(temp_col, i.color);
               }
 
               j = j + 1;
             }
             print_col(dest_col);
           } else {
-            print_col(Vec_new((*(*ray).dir).y, (*(*ray).dir).y, (*(*ray).dir).y));
+            print_col(Vec_new((*(ray.dir)).y, (*(ray.dir)).y, (*(ray.dir)).y));
           }
           col = col + 1;
         }
@@ -721,10 +727,8 @@ fn assemble_and_run(c_lib: &str, s_target: &str, md5hash: Option<&str>) {
             .unwrap();
         let mut s = String::new();
         execution.stdout.unwrap().read_to_string(&mut s).unwrap();
-        println!("{:?}", s);
         assert_eq!(format!("{:?}", md5::compute(s)).as_str(), md5hash);
     } else {
-        println!("{:?}", output_name);
         let execution = process::Command::new(output_name.as_str())
             // .stdout(::std::process::Stdio::piped())
             .status()

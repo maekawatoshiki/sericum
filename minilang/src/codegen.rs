@@ -146,7 +146,7 @@ impl CodeGenerator {
     }
 
     pub fn run_on_module(&mut self, module: parser::Module) {
-        println!("Parsed: {:?}", module);
+        println!("Parsed: {:#?}", module);
 
         // Declare struct
         for (name, decls) in &module.structs {
@@ -221,6 +221,11 @@ impl<'a> CodeGeneratorForFunction<'a> {
     pub fn run(&mut self) {
         for (i, (name, ty)) in self.func.params.iter().enumerate() {
             let param = self.builder.get_param(i).unwrap();
+            // let ty = if matches!(ty, parser::Type::Struct(_)) {
+            //     parser::Type::Pointer(Box::new(ty.clone()))
+            // } else {
+            //     ty.clone()
+            // };
             self.create_var(name.clone(), true, ty.clone(), param);
         }
 
@@ -392,7 +397,11 @@ impl<'a> CodeGeneratorForFunction<'a> {
                 Node::Addr(e) => self.run_on_node(e),
                 from => {
                     let (from, ty) = self.run_on_node(&from);
+                    // if matches!(ty, parser::Type::Struct(_)) {
+                    //     (from, ty)
+                    // } else {
                     (self.builder.build_load(from), ty.get_elem_ty())
+                    // }
                 }
             },
             Node::Addr(e) => self.run_on_node(e),

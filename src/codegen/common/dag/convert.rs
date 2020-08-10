@@ -413,7 +413,7 @@ impl<'a> ConvertToDAGNode<'a> {
         entry
     }
 
-    fn get_node_from_value(&mut self, v: &Value) -> Raw<DAGNode> {
+    pub fn get_node_from_value(&mut self, v: &Value) -> Raw<DAGNode> {
         match v {
             Value::Instruction(iv) => {
                 if let Some(node) = self.inst_to_node.get(&iv.id) {

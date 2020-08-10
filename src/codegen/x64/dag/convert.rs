@@ -1,8 +1,8 @@
 use super::node::*;
 use crate::codegen::arch::machine::register::*;
 use crate::codegen::common::dag::convert::ConvertToDAGNode;
-use crate::ir::types::Type;
-// use crate::util::allocator::Raw;
+use crate::ir::{opcode::Instruction, types::Type};
+use crate::util::allocator::Raw;
 // use id_arena::*;
 // use rustc_hash::FxHashMap;
 // use std::mem;
@@ -10,6 +10,7 @@ use crate::ir::types::Type;
 impl<'a> ConvertToDAGNode<'a> {
     pub fn copy_reg_args(&mut self) {
         let mut arg_regs_order = RegisterClassKind::arg_regs();
+
         for i in 0..self.func.get_params_len() {
             let byval = self.func.get_param_attr(i).map_or(false, |attr| attr.byval);
             if let Some(ty) = self.func.get_param_type(i) {
@@ -26,7 +27,7 @@ impl<'a> ConvertToDAGNode<'a> {
 
                     for (c, s, rc) in vec![
                         (mov8, 8, RegisterClassKind::GR64),
-                        (mov4, 8, RegisterClassKind::GR32),
+                        (mov4, 4, RegisterClassKind::GR32),
                     ] {
                         for _ in 0..c {
                             if struct_ty.get_type_at(off) == Some(&Type::F64) {

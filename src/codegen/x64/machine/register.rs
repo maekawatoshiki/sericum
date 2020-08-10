@@ -35,38 +35,6 @@ registers! {
     order gp XMM { XMM0, XMM1, XMM2, XMM3, XMM4, XMM5 }
 }
 
-// TODO: Auto generate
-impl RegisterClassKind {
-    pub fn arg_regs() -> ArgRegs {
-        ArgRegs::new()
-    }
-}
-
-pub struct ArgRegs {
-    nths: Vec<usize>, // GR(32|64), XMM
-}
-
-impl ArgRegs {
-    pub fn new() -> Self {
-        Self { nths: vec![0, 0] }
-    }
-
-    pub fn next(&mut self, rc: RegisterClassKind) -> Option<PhysReg> {
-        match rc {
-            RegisterClassKind::GR32 | RegisterClassKind::GR64 => {
-                let nth = self.nths[0];
-                self.nths[0] += 1;
-                rc.get_nth_arg_reg(nth)
-            }
-            RegisterClassKind::XMM => {
-                let nth = self.nths[1];
-                self.nths[1] += 1;
-                rc.get_nth_arg_reg(nth)
-            }
-        }
-    }
-}
-
 macro_rules! to_phys {
     ($($r:path),*) => {
         vec![$(($r.as_phys_reg())),*]
@@ -102,5 +70,80 @@ thread_local! {
 
     pub static REG_FILE: RefCell<FxHashMap<PhysReg, PhysRegSet>> = {
         RefCell::new(FxHashMap::default())
+    }
+}
+
+// TODO: Auto generate
+impl RegisterClassKind {
+    pub fn arg_regs() -> ArgRegs {
+        ArgRegs::new()
+    }
+
+    pub fn ret_regs() -> RetRegs {
+        RetRegs::new()
+    }
+}
+
+pub struct ArgRegs {
+    nths: Vec<usize>, // GR(32|64), XMM
+}
+
+// TODO: Integrate into ArgRegs
+pub struct RetRegs {
+    nths: Vec<usize>, // GR(32|64), XMM
+    regs: Vec<Vec<PhysReg>>,
+}
+
+impl ArgRegs {
+    pub fn new() -> Self {
+        Self { nths: vec![0, 0] }
+    }
+
+    pub fn next(&mut self, rc: RegisterClassKind) -> Option<PhysReg> {
+        match rc {
+            RegisterClassKind::GR32 | RegisterClassKind::GR64 => {
+                let nth = self.nths[0];
+                self.nths[0] += 1;
+                rc.get_nth_arg_reg(nth)
+            }
+            RegisterClassKind::XMM => {
+                let nth = self.nths[1];
+                self.nths[1] += 1;
+                rc.get_nth_arg_reg(nth)
+            }
+        }
+    }
+}
+
+impl RetRegs {
+    pub fn new() -> Self {
+        Self {
+            nths: vec![0, 0],
+            regs: vec![
+                to_phys![GR32::EAX, GR32::EDX],
+                to_phys![GR64::RAX, GR64::RDX],
+                to_phys![XMM::XMM0, XMM::XMM1],
+            ],
+        }
+    }
+
+    pub fn next(&mut self, rc: RegisterClassKind) -> Option<PhysReg> {
+        match rc {
+            RegisterClassKind::GR32 => {
+                let nth = self.nths[0];
+                self.nths[0] += 1;
+                self.regs[0].get(nth).map_or(None, |a| Some(*a))
+            }
+            RegisterClassKind::GR64 => {
+                let nth = self.nths[0];
+                self.nths[0] += 1;
+                self.regs[1].get(nth).map_or(None, |a| Some(*a))
+            }
+            RegisterClassKind::XMM => {
+                let nth = self.nths[1];
+                self.nths[1] += 1;
+                self.regs[2].get(nth).map_or(None, |a| Some(*a))
+            }
+        }
     }
 }

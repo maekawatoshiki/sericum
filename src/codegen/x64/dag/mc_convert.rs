@@ -342,6 +342,7 @@ impl<'a> ScheduleByBlock<'a> {
 
     fn convert_ret(&mut self, node: &DAGNode) -> MachineInstId {
         let val = self.normal_operand(node.operand[0]);
+
         if let Some(ty) = val.get_type(&self.cur_func.regs_info) {
             let ret_reg = ty2rc(&ty).unwrap().return_value_register();
             let set_ret_val = MachineInst::new_simple(
@@ -352,6 +353,7 @@ impl<'a> ScheduleByBlock<'a> {
             .with_def(vec![self.cur_func.regs_info.get_phys_reg(ret_reg)]);
             self.append_inst(set_ret_val);
         }
+
         self.append_inst(MachineInst::new_simple(
             MachineOpcode::RET,
             vec![],
