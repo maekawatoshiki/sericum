@@ -217,14 +217,17 @@ impl<'a> CopyArgs<'a> {
     }
 
     fn copy_struct(&mut self, ty: Type, arg_regs_order: &mut ArgRegs, i: usize) {
-        let sz = ty.size_in_byte(&self.builder.function.types);
+        let base = self.builder.function.types.base.clone();
+        let base = base.borrow();
+        let struct_ty = base.as_struct_ty(ty).unwrap();
+        let sz = struct_ty.size();
+        let mov8 = sz / 8;
+        let mov4 = (sz - 8 * mov8) / 4;
+        assert!((sz - 8 * mov8) % 4 == 0);
 
         let rbp = self.builder.function.regs_info.get_phys_reg(GR64::RBP);
 
         if sz <= 16 {
-            let mov8 = sz / 8;
-            let mov4 = (sz - 8 * mov8) / 4;
-            assert!((sz - 8 * mov8) % 4 == 0);
             let mut off = 0;
 
             for (c, s, rc, op) in vec![
@@ -234,11 +237,12 @@ impl<'a> CopyArgs<'a> {
             .into_iter()
             {
                 for _ in 0..c {
-                    let r = self
-                        .builder
-                        .function
-                        .regs_info
-                        .get_phys_reg(arg_regs_order.next(rc).unwrap());
+                    let xmm = struct_ty.get_type_at(off) == Some(&Type::F64);
+                    let r = self.builder.function.regs_info.get_phys_reg(
+                        arg_regs_order
+                            .next(if xmm { RegisterClassKind::XMM } else { rc })
+                            .unwrap(),
+                    );
                     let mem = if off == 0 {
                         MachineOperand::Mem(MachineMemOperand::BaseFi(
                             rbp,
@@ -248,12 +252,12 @@ impl<'a> CopyArgs<'a> {
                         MachineOperand::Mem(MachineMemOperand::BaseFiOff(
                             rbp,
                             FrameIndexInfo::new(ty, FrameIndexKind::Arg(i)),
-                            off,
+                            off as i32,
                         ))
                     };
                     off += s;
                     let mov = MachineInst::new_simple(
-                        op,
+                        if xmm { MachineOpcode::MOVSDmr } else { op },
                         vec![mem, MachineOperand::Register(r)],
                         self.builder.get_cur_bb().unwrap(),
                     );
@@ -263,21 +267,26 @@ impl<'a> CopyArgs<'a> {
             return;
         }
 
-        let mut x = 0;
-        while x < sz {
-            if x + 8 <= sz {
-                let rax = self.builder.function.regs_info.get_phys_reg(GR64::RAX);
+        let rax = self.builder.function.regs_info.get_phys_reg(GR64::RAX);
+        let mut roff = 0;
+        for (c, s, rm, mr) in vec![
+            (mov8, 8, MachineOpcode::MOVrm64, MachineOpcode::MOVmr64),
+            (mov4, 4, MachineOpcode::MOVrm32, MachineOpcode::MOVmr32),
+        ]
+        .into_iter()
+        {
+            for _ in 0..c {
                 let mov = MachineInst::new_simple(
-                    MachineOpcode::MOVrm64,
+                    rm,
                     vec![MachineOperand::Mem(MachineMemOperand::BaseOff(
-                        self.builder.function.regs_info.get_phys_reg(GR64::RBP),
+                        rbp,
                         self.offset,
                     ))],
                     self.builder.get_cur_bb().unwrap(),
                 )
                 .with_def(vec![rax]);
                 self.builder.insert(mov);
-                let mem = if x == 0 {
+                let mem = if roff == 0 {
                     MachineMemOperand::BaseFi(
                         self.builder.function.regs_info.get_phys_reg(GR64::RBP),
                         FrameIndexInfo::new(ty, FrameIndexKind::Arg(i)),
@@ -286,54 +295,18 @@ impl<'a> CopyArgs<'a> {
                     MachineMemOperand::BaseFiOff(
                         self.builder.function.regs_info.get_phys_reg(GR64::RBP),
                         FrameIndexInfo::new(ty, FrameIndexKind::Arg(i)),
-                        x as i32,
+                        roff as i32,
                     )
                 };
                 let mov = MachineInst::new_simple(
-                    MachineOpcode::MOVmr64,
+                    mr,
                     vec![MachineOperand::Mem(mem), MachineOperand::Register(rax)],
                     self.builder.get_cur_bb().unwrap(),
                 );
                 self.builder.insert(mov);
-                self.offset += 8;
-                x += 8;
-                continue;
+                self.offset += s;
+                roff += s;
             }
-            if x + 4 <= sz {
-                let eax = self.builder.function.regs_info.get_phys_reg(GR32::EAX);
-                let mov = MachineInst::new_simple(
-                    MachineOpcode::MOVrm32,
-                    vec![MachineOperand::Mem(MachineMemOperand::BaseOff(
-                        self.builder.function.regs_info.get_phys_reg(GR64::RBP),
-                        self.offset,
-                    ))],
-                    self.builder.get_cur_bb().unwrap(),
-                )
-                .with_def(vec![eax]);
-                self.builder.insert(mov);
-                let mem = if x == 0 {
-                    MachineMemOperand::BaseFi(
-                        self.builder.function.regs_info.get_phys_reg(GR32::EBP),
-                        FrameIndexInfo::new(ty, FrameIndexKind::Arg(i)),
-                    )
-                } else {
-                    MachineMemOperand::BaseFiOff(
-                        self.builder.function.regs_info.get_phys_reg(GR32::EBP),
-                        FrameIndexInfo::new(ty, FrameIndexKind::Arg(i)),
-                        x as i32,
-                    )
-                };
-                let mov = MachineInst::new_simple(
-                    MachineOpcode::MOVmr32,
-                    vec![MachineOperand::Mem(mem), MachineOperand::Register(eax)],
-                    self.builder.get_cur_bb().unwrap(),
-                );
-                self.builder.insert(mov);
-                self.offset += 4;
-                x += 4;
-                continue;
-            }
-            unimplemented!()
         }
     }
 

@@ -271,6 +271,13 @@ impl TypesBase {
         }
     }
 
+    pub fn as_struct_ty(&self, ty: Type) -> Option<&StructType> {
+        match ty {
+            Type::Struct(id) => Some(self.non_primitive_types[id].as_struct()),
+            _ => None,
+        }
+    }
+
     pub fn get_element_ty(&self, ty: Type, index: Option<&Value>) -> Option<Type> {
         match ty {
             Type::Pointer(id) => Some(*self.non_primitive_types[id].as_pointer()),
@@ -476,6 +483,13 @@ impl StructType {
 
     pub fn get_elem_offset(&self, i: usize) -> Option<&usize> {
         self.fields_offset.get(i)
+    }
+
+    pub fn get_type_at(&self, i: usize) -> Option<&Type> {
+        self.fields_offset
+            .iter()
+            .position(|&off| off == i)
+            .map_or(None, |n| Some(&self.fields_ty[n]))
     }
 
     pub fn to_string(&self, tys: &TypesBase) -> String {

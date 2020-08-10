@@ -589,6 +589,11 @@ impl JITCompiler {
                 let r1 = phys_reg_to_dynasm_reg(base.as_phys_reg());
                 dynasm!(self.asm; movsd Rx(r0), [Rq(r1)]);
             }
+            MachineOperand::Mem(MachineMemOperand::BaseFiOff(base, fi, off)) => {
+                let r1 = phys_reg_to_dynasm_reg(base.as_phys_reg());
+                let m2 = fi.idx;
+                dynasm!(self.asm; movsd Rx(r0), [Rq(r1) - fo.offset(m2).unwrap() + off]);
+            }
             _ => unimplemented!(),
         }
     }
@@ -605,6 +610,12 @@ impl JITCompiler {
                 let r0 = phys_reg_to_dynasm_reg(base.as_phys_reg());
                 let r1 = phys_reg_to_dynasm_reg(inst.operand[1].as_register().as_phys_reg());
                 dynasm!(self.asm; movsd [Rq(r0)], Rx(r1));
+            }
+            MachineOperand::Mem(MachineMemOperand::BaseFiOff(base, fi, off)) => {
+                let r0 = phys_reg_to_dynasm_reg(base.as_phys_reg());
+                let m1 = fo.offset(fi.idx).unwrap();
+                let r2 = phys_reg_to_dynasm_reg(inst.operand[1].as_register().as_phys_reg());
+                dynasm!(self.asm; movsd [Rq(r0) - m1 + off], Rx(r2));
             }
             _ => unimplemented!(),
         }
