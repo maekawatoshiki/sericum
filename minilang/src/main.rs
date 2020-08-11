@@ -388,6 +388,55 @@ extern int cilk_printch_i32(int x) { putchar(x); }
 }
 
 #[test]
+fn pass_struct() {
+    let input = r#"
+    struct A {
+        x: i32,
+        y: i32,
+        z: f64,
+        u: f64
+    }
+
+    function f(a: struct A, b: struct A, c: i32): i32 {
+        return a.x-a.y-b.x+c;
+    }
+
+    function test(): i32 {
+        var a: struct A;
+        var b: struct A;
+        a.x=1;
+        a.y=1;
+        b.x=1;
+        return f(&a, &b, 1);
+    }
+    "#;
+    let mut codegen = codegen::CodeGenerator::new();
+    codegen.run(input);
+
+    cilk::ir::mem2reg::Mem2Reg::new().run_on_module(&mut codegen.module);
+    cilk::ir::cse::CommonSubexprElimination::new().run_on_module(&mut codegen.module);
+
+    println!("{:?}", codegen.module);
+
+    use cilk::codegen::x64::asm::print::MachineAsmPrinter;
+    use cilk::codegen::x64::standard_conversion_into_machine_module;
+    let machine_module = standard_conversion_into_machine_module(&mut codegen.module);
+    let mut printer = MachineAsmPrinter::new();
+    printer.run_on_module(&machine_module);
+    println!("{}", printer.output);
+    assemble_and_run(
+        "
+        #include <assert.h>
+        extern int test();
+        int main() {
+            return test();
+        }",
+        printer.output.as_str(),
+        None,
+    );
+}
+
+#[test]
 fn bubble_sort() {
     let input = r#"
     function sort(a: **i32, len: i32): i32 {

@@ -221,11 +221,11 @@ impl<'a> CodeGeneratorForFunction<'a> {
     pub fn run(&mut self) {
         for (i, (name, ty)) in self.func.params.iter().enumerate() {
             let param = self.builder.get_param(i).unwrap();
-            // let ty = if matches!(ty, parser::Type::Struct(_)) {
-            //     parser::Type::Pointer(Box::new(ty.clone()))
-            // } else {
-            //     ty.clone()
-            // };
+            let ty = if matches!(ty, parser::Type::Struct(_)) {
+                parser::Type::Pointer(Box::new(ty.clone()))
+            } else {
+                ty.clone()
+            };
             self.create_var(name.clone(), true, ty.clone(), param);
         }
 

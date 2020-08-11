@@ -137,18 +137,20 @@ impl MISelector {
             }
             (ir.SIToFP x): F64 { GR32 x => (mi.CVTSI2SDrr32 x) }
             (ir.FPToSI x): Int32 { XMM x => (mi.CVTTSD2SIr32r x) }
-            (ir.Load a) {
-                (ir.FIAddr b) a {
-                    f64mem b => (mi.MOVSDrm [BaseFi %rbp, b])
-                    mem32  b => (mi.MOVrm32 [BaseFi %rbp, b])
-                    mem64  b => (mi.MOVrm64 [BaseFi %rbp, b])
-                }
-            }
-            (ir.Load a): Int64    { GR64 a => (mi.MOVrm64 [Base a]) }
-            (ir.Load a): Int32    { (ir.GlobalAddr b) a => (mi.MOVrm32 [Address b])
+            // (ir.Load a) {
+            //     (ir.FIAddr b) a {
+            //         f64mem b => (mi.MOVSDrm [BaseFi %rbp, b])
+            //     }
+            // }
+            (ir.Load a): Int64    { (ir.FIAddr     b) a => (mi.MOVrm64 [BaseFi %rbp, b])
+                                                 GR64 a => (mi.MOVrm64 [Base a]) }
+            (ir.Load a): Int32    { (ir.FIAddr     b) a => (mi.MOVrm32 [BaseFi %rbp, b])
+                                    (ir.GlobalAddr b) a => (mi.MOVrm32 [Address b])
                                                  GR64 a => (mi.MOVrm32 [Base a]) }
-            (ir.Load a): F64      { GR64 a => (mi.MOVSDrm [Base a]) }
-            (ir.Load a): Pointer! { GR64 a => (mi.MOVrm64 [Base a]) }
+            (ir.Load a): F64      { (ir.FIAddr     b) a => (mi.MOVSDrm [BaseFi %rbp, b])
+                                                 GR64 a => (mi.MOVSDrm [Base a]) }
+            (ir.Load a): Pointer! { (ir.FIAddr     b) a => (mi.MOVrm64 [BaseFi %rbp, b])
+                                                 GR64 a => (mi.MOVrm64 [Base a]) }
             (ir.Store a, b) {
                 (ir.FIAddr c) a {
                     f64mem c {

@@ -20,22 +20,24 @@ impl<'a> ConvertToDAGNode<'a> {
                     let struct_ty = base.as_struct_ty(struct_ty).unwrap();
                     let sz = struct_ty.size();
 
-                    let mov8 = sz / 8;
-                    let mov4 = (sz - 8 * mov8) / 4;
-                    let mut off = 0;
-                    assert!((sz - 8 * mov8) % 4 == 0);
+                    if sz <= 16 {
+                        let mov8 = sz / 8;
+                        let mov4 = (sz - 8 * mov8) / 4;
+                        let mut off = 0;
+                        assert!((sz - 8 * mov8) % 4 == 0);
 
-                    for (c, s, rc) in vec![
-                        (mov8, 8, RegisterClassKind::GR64),
-                        (mov4, 4, RegisterClassKind::GR32),
-                    ] {
-                        for _ in 0..c {
-                            if struct_ty.get_type_at(off) == Some(&Type::F64) {
-                                arg_regs_order.next(RegisterClassKind::XMM);
-                            } else {
-                                arg_regs_order.next(rc);
+                        for (c, s, rc) in vec![
+                            (mov8, 8, RegisterClassKind::GR64),
+                            (mov4, 4, RegisterClassKind::GR32),
+                        ] {
+                            for _ in 0..c {
+                                if struct_ty.get_type_at(off) == Some(&Type::F64) {
+                                    arg_regs_order.next(RegisterClassKind::XMM);
+                                } else {
+                                    arg_regs_order.next(rc);
+                                }
+                                off += s;
                             }
-                            off += s;
                         }
                     }
 
