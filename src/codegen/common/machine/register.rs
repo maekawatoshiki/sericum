@@ -1,7 +1,7 @@
 use crate::codegen::arch::machine::{inst::MachineInstId, register::*};
 use crate::util::count::Count;
 use id_arena::{Arena, Id};
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxHashMap, FxHashSet};
 use std::fmt::Debug;
 use std::{
     cell::{Ref, RefCell, RefMut},
@@ -63,6 +63,10 @@ pub struct RegisterOrder {
     order: Vec<PhysReg>,
     nth: usize,
     reg_class: RegisterClassKind,
+}
+
+pub struct ArgRegs {
+    pub nths: FxHashMap<usize, usize>,
 }
 
 impl VirtReg {
@@ -288,6 +292,21 @@ impl Iterator for RegisterOrder {
     fn next(&mut self) -> Option<Self::Item> {
         self.nth += 1;
         self.order.get(self.nth - 1).and_then(|item| Some(*item))
+    }
+}
+
+impl ArgRegs {
+    pub fn new() -> Self {
+        Self {
+            nths: FxHashMap::default(),
+        }
+    }
+
+    pub fn next(&mut self, rc: RegisterClassKind) -> Option<PhysReg> {
+        let base = rc.register_file_base_class() as usize;
+        let nth = self.nths.entry(base).or_insert(0);
+        *nth += 1;
+        rc.get_nth_arg_reg(*nth - 1)
     }
 }
 

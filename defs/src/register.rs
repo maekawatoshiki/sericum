@@ -11,7 +11,7 @@ use syn::{parse_macro_input, Error, LitInt, Token};
 type TS = proc_macro2::TokenStream;
 
 struct Registers {
-    class: HashMap<String, RegisterClass>,
+    class: Vec<(String, RegisterClass)>,
     order: Vec<RegisterOrder>,
 }
 
@@ -52,7 +52,7 @@ enum RegisterOrderKind {
 
 impl Parse for Registers {
     fn parse(input: ParseStream) -> Result<Self, Error> {
-        let mut class = HashMap::new();
+        let mut class = vec![];
         let mut order = vec![];
 
         while !input.is_empty() {
@@ -60,7 +60,7 @@ impl Parse for Registers {
             match ident.to_string().as_str() {
                 "class" => {
                     let c = input.parse::<RegisterClass>()?;
-                    class.insert(c.name.to_string(), c);
+                    class.push((c.name.to_string(), c));
                 }
                 "order" => order.push(input.parse::<RegisterOrder>()?),
                 _ => {
@@ -302,7 +302,14 @@ impl DefinitionConstructible for Registers {
                         .get_mut(class_name_str.as_str())
                         .unwrap()
                         .super_;
-                    let name2 = &self.class.get(super_name_str).unwrap().body.0[i];
+                    let name2 = &self
+                        .class
+                        .iter()
+                        .find(|(name, _)| name == super_name_str)
+                        .unwrap()
+                        .1
+                        .body
+                        .0[i];
                     if let Some(super_) = super_ {
                         *super_ = quote! {
                             #super_
@@ -538,13 +545,9 @@ impl DefinitionConstructible for Registers {
             for (i, s) in set.iter().enumerate() {
                 let s = str2ident(s.as_str());
                 if i == set.len() - 1 {
-                    t = quote! {
-                        #t Self::#s
-                    };
+                    t = quote! { #t Self::#s };
                 } else {
-                    t = quote! {
-                        #t Self::#s |
-                    };
+                    t = quote! { #t Self::#s | };
                 }
             }
 

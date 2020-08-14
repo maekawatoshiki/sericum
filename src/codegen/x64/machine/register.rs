@@ -97,35 +97,10 @@ impl RegisterClassKind {
     }
 }
 
-pub struct ArgRegs {
-    nths: Vec<usize>, // GR(32|64), XMM
-}
-
 // TODO: Integrate into ArgRegs
 pub struct RetRegs {
     nths: Vec<usize>, // GR(32|64), XMM
     regs: Vec<Vec<PhysReg>>,
-}
-
-impl ArgRegs {
-    pub fn new() -> Self {
-        Self { nths: vec![0, 0] }
-    }
-
-    pub fn next(&mut self, rc: RegisterClassKind) -> Option<PhysReg> {
-        match rc {
-            RegisterClassKind::GR8 | RegisterClassKind::GR32 | RegisterClassKind::GR64 => {
-                let nth = self.nths[0];
-                self.nths[0] += 1;
-                rc.get_nth_arg_reg(nth)
-            }
-            RegisterClassKind::XMM => {
-                let nth = self.nths[1];
-                self.nths[1] += 1;
-                rc.get_nth_arg_reg(nth)
-            }
-        }
-    }
 }
 
 impl RetRegs {
