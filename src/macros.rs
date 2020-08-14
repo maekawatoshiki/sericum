@@ -174,6 +174,12 @@ macro_rules! cilk_expr {
     let $x = $builder.build_rem(val1, val2);
     cilk_expr!($builder; $bb_map; $( $remain )*);
 };
+($builder:expr; $bb_map:expr; $x:ident = sext [$($ty:tt)*] ($($val:tt)*); $($remain:tt)*) => {
+    let val = cilk_value!($builder; $( $val )*);
+    let ty = cilk_parse_ty!($builder.func.module.types, $($ty)*);
+    let $x = $builder.build_sext(val, ty);
+    cilk_expr!($builder; $bb_map; $( $remain )*);
+};
 ($builder:expr; $bb_map:expr; $x:ident = gep ($($val:tt)*), [$( ( $($idx:tt)* ) ),*] ; $($remain:tt)*) => {
     let val = cilk_value!($builder; $( $val )*);
     let indices = vec![$( cilk_value!($builder; $( $idx )*) ),*];

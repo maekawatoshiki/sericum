@@ -227,6 +227,12 @@ impl<F: FuncRef> Builder<F> {
         inst
     }
 
+    pub fn build_sext(&mut self, v: Value, ty: Type) -> Value {
+        let inst = self.create_inst_value(Opcode::Sext, vec![Operand::Value(v)], ty);
+        self.append_inst_to_cur_bb(inst);
+        inst
+    }
+
     pub fn build_icmp(&mut self, kind: ICmpKind, v1: Value, v2: Value) -> Value {
         let inst = self.create_inst_value(
             Opcode::ICmp,

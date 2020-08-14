@@ -184,6 +184,34 @@ mod x86_64 {
             &mut m,
         );
     }
+
+    #[test]
+    fn asm_digit2int() {
+        let mut m = Module::new("cilk");
+        cilk_ir!(m; define [i32] test [(i8)] {
+            entry:
+                c = icmp le (i32 48), (%arg.0); // '0'
+                br (%c) zero, exception;
+            zero:
+                c = icmp le (%arg.0), (i32 57); // '9'
+                br (%c) nine, exception;
+            nine:
+                x = sext [i32] (%arg.0);
+                x = sub (%x), (i32 48);
+                ret (%x);
+            exception:
+                ret (i32 -1);
+        });
+        compile_and_run(
+            "#include <assert.h>
+        extern int test(char);
+        int main() { assert(test('A') == -1); 
+                     assert(test('0') == 0); 
+                     assert(test('4') == 4); 
+                     assert(test('9') == 9); }",
+            &mut m,
+        );
+    }
 }
 
 #[cfg(feature = "riscv64")]

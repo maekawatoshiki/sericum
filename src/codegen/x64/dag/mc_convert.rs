@@ -332,7 +332,7 @@ impl<'a> ScheduleByBlock<'a> {
             }
             NodeKind::IR(IRNodeKind::Ret) => self.convert_ret(&*node),
             NodeKind::IR(IRNodeKind::CopyToLiveOut) => self.convert_node_to_inst(node.operand[0]),
-            e => panic!("{:?}", e),
+            e => panic!("{:?}, {:?}", e, node.ty),
         };
 
         self.node2inst.insert(node, inst_id);
@@ -697,6 +697,7 @@ pub fn mov_n_rx(bit: usize, x: &MachineOperand) -> Option<MachineOpcode> {
     }
 }
 
+// TODO: Will be deprecated
 pub fn mov_rx(tys: &Types, regs_info: &RegistersInfo, x: &MachineOperand) -> Option<MachineOpcode> {
     // TODO: special handling for float
     if x.get_type(regs_info).unwrap() == Type::F64 {
@@ -708,6 +709,7 @@ pub fn mov_rx(tys: &Types, regs_info: &RegistersInfo, x: &MachineOperand) -> Opt
         };
     }
 
+    let mov8rx = [MachineOpcode::MOVrr8];
     let mov32rx = [
         MachineOpcode::MOVrr32,
         MachineOpcode::MOVri32,
@@ -725,6 +727,7 @@ pub fn mov_rx(tys: &Types, regs_info: &RegistersInfo, x: &MachineOperand) -> Opt
         _ => return None, // TODO: Support Address?
     };
     match bit {
+        8 => Some(mov8rx[xidx]),
         32 => Some(mov32rx[xidx]),
         64 => Some(mov64rx[xidx]),
         _ => None,

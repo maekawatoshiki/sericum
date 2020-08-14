@@ -30,6 +30,11 @@ mod inst {
                 TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::XMM)),
             ])
         };
+        pub static ref MOVSXr32r8: TargetInstDef = {
+            TargetInstDef::new("movsx", TargetOpcode::MOVSXr32r8)
+                .set_uses(vec![TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR8))])
+                .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR32)])
+        };
         pub static ref MOVSXDr64m32: TargetInstDef = {
             TargetInstDef::new("movsxd", TargetOpcode::MOVSXDr64m32)
                 .set_uses(vec![TargetOperand::FrameIndex])
@@ -247,6 +252,11 @@ mod inst {
                 .set_uses(vec![TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::XMM))])
                 .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR32)])
         };
+        pub static ref MOVrr8: TargetInstDef = {
+            TargetInstDef::new("mov", TargetOpcode::MOVrr8)
+                .set_uses(vec![TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR8))])
+                .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR8)])
+        };
         pub static ref MOVrr32: TargetInstDef = {
             TargetInstDef::new("mov", TargetOpcode::MOVrr32)
                 .set_uses(vec![TargetOperand::Register(TargetRegister::RegClass(
@@ -415,6 +425,7 @@ pub enum TargetOpcode {
     MOVmr64,
     MOVmi64,
 
+    MOVSXr32r8,
     MOVSXDr64m32, // out = movsxd [rbp - fi.off]
     MOVSXDr64r32, // r64 = movsxd r32
 
@@ -450,6 +461,7 @@ pub enum TargetOpcode {
     CVTTSD2SIr32r,
     CVTSI2SDrr32,
     SQRTSDrr,
+    MOVrr8,
     MOVrr32,
     MOVri32,
     MOVrr64,
@@ -499,6 +511,7 @@ impl TargetOpcode {
             Self::MOVSDmr => Some(&*inst::MOVSDmr),
             Self::MOVSDrm => Some(&*inst::MOVSDrm),
             Self::MOVSDrr => Some(&*inst::MOVSDrr),
+            Self::MOVSXr32r8 => Some(&*inst::MOVSXr32r8),
             Self::MOVSXDr64m32 => Some(&*inst::MOVSXDr64m32),
             Self::MOVSXDr64r32 => Some(&*inst::MOVSXDr64r32),
             Self::LEAr64m => Some(&*inst::LEAr64m),
@@ -526,6 +539,7 @@ impl TargetOpcode {
             Self::CVTSI2SDrr32 => Some(&*inst::CVTSI2SDrr32),
             Self::CVTTSD2SIr32r => Some(&*inst::CVTTSD2SIr32r),
             Self::SQRTSDrr => Some(&*inst::SQRTSDrr),
+            Self::MOVrr8 => Some(&*inst::MOVrr8),
             Self::MOVrr32 => Some(&*inst::MOVrr32),
             Self::MOVri32 => Some(&*inst::MOVri32),
             Self::MOVrm32 => Some(&*inst::MOVrm32),

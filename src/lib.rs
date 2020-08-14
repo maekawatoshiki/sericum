@@ -20,6 +20,9 @@ extern crate defs;
 #[macro_use]
 extern crate dynasm;
 extern crate dynasmrt;
+extern crate num;
+#[macro_use]
+extern crate enum_primitive;
 #[macro_use]
 extern crate target_lexicon;
 extern crate faerie;

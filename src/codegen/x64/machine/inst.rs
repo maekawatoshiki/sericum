@@ -25,6 +25,7 @@ impl MachineOpcode {
                 | MachineOpcode::MOVrr64
                 | MachineOpcode::Copy
                 | MachineOpcode::MOVSDrr
+                | MachineOpcode::MOVrr8
         )
     }
 

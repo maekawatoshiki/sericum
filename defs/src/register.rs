@@ -619,9 +619,11 @@ impl DefinitionConstructible for RegisterClass {
             .fold(quote! {}, |acc, x| quote! { #acc #x, });
         let name = &self.name;
         quote! {
+            enum_from_primitive! {
             #[derive(Debug, Clone, Copy, Hash, PartialEq)]
             pub enum #name {
                 #list
+            }
             }
         }
     }
