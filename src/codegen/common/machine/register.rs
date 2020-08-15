@@ -65,8 +65,8 @@ pub struct RegisterOrder {
     reg_class: RegisterClassKind,
 }
 
-pub struct ArgRegs {
-    pub nths: FxHashMap<usize, usize>,
+pub struct GeneralArgRegOrder {
+    orders: FxHashMap<RegisterClassKind, usize>,
 }
 
 impl VirtReg {
@@ -295,16 +295,16 @@ impl Iterator for RegisterOrder {
     }
 }
 
-impl ArgRegs {
+impl GeneralArgRegOrder {
     pub fn new() -> Self {
         Self {
-            nths: FxHashMap::default(),
+            orders: FxHashMap::default(),
         }
     }
 
     pub fn next(&mut self, rc: RegisterClassKind) -> Option<PhysReg> {
-        let base = rc.register_file_base_class() as usize;
-        let nth = self.nths.entry(base).or_insert(0);
+        let base = rc.register_file_base_class();
+        let nth = self.orders.entry(base).or_insert(0);
         *nth += 1;
         rc.get_nth_arg_reg(*nth - 1)
     }

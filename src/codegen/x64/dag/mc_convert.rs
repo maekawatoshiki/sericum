@@ -391,7 +391,7 @@ impl<'a> ScheduleByBlock<'a> {
             }
         }
 
-        let mut arg_regs_order = RegisterClassKind::arg_regs();
+        let mut arg_regs_order = GeneralArgRegOrder::new();
 
         for (i, arg) in args.into_iter().enumerate() {
             let (ty, byval) = {
@@ -505,7 +505,7 @@ impl<'a> ScheduleByBlock<'a> {
 
     fn pass_struct_byval(
         &mut self,
-        arg_regs_order: &mut ArgRegs,
+        arg_regs_order: &mut GeneralArgRegOrder,
         off: &mut i32,
         ty: Type,
         fi: FrameIndexInfo,

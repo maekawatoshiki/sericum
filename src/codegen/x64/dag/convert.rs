@@ -2,14 +2,11 @@ use super::node::*;
 use crate::codegen::arch::machine::register::*;
 use crate::codegen::common::dag::convert::ConvertToDAGNode;
 use crate::ir::types::Type;
-// use crate::util::allocator::Raw;
-// use id_arena::*;
-// use rustc_hash::FxHashMap;
-// use std::mem;
 
 impl<'a> ConvertToDAGNode<'a> {
+    // TODO: Refine
     pub fn copy_reg_args(&mut self) {
-        let mut arg_regs_order = RegisterClassKind::arg_regs();
+        let mut arg_regs_order = GeneralArgRegOrder::new();
 
         for i in 0..self.func.get_params_len() {
             let byval = self.func.get_param_attr(i).map_or(false, |attr| attr.byval);

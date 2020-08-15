@@ -194,7 +194,7 @@ impl<'a> CopyArgs<'a> {
     }
 
     pub fn copy(mut self) {
-        let mut arg_regs_order = RegisterClassKind::arg_regs();
+        let mut arg_regs_order = GeneralArgRegOrder::new();
         for (i, &ty) in self.params_ty.iter().enumerate() {
             let byval = self.params_attr.get(&i).map_or(false, |attr| attr.byval);
             if byval {
@@ -216,7 +216,7 @@ impl<'a> CopyArgs<'a> {
         }
     }
 
-    fn copy_struct(&mut self, ty: Type, arg_regs_order: &mut ArgRegs, i: usize) {
+    fn copy_struct(&mut self, ty: Type, arg_regs_order: &mut GeneralArgRegOrder, i: usize) {
         let base = self.builder.function.types.base.clone();
         let base = base.borrow();
         let struct_ty = base.as_struct_ty(ty).unwrap();
@@ -310,7 +310,7 @@ impl<'a> CopyArgs<'a> {
         }
     }
 
-    fn copy_f64(&mut self, arg_regs_order: &mut ArgRegs, i: usize) {
+    fn copy_f64(&mut self, arg_regs_order: &mut GeneralArgRegOrder, i: usize) {
         let ret_reg = XMM::XMM0.as_phys_reg();
         let dst = FrameIndexInfo::new(Type::F64, FrameIndexKind::Arg(i));
         let src = match arg_regs_order.next(RegisterClassKind::XMM) {
@@ -345,7 +345,13 @@ impl<'a> CopyArgs<'a> {
         self.builder.insert(inst)
     }
 
-    fn copy_int(&mut self, ty: Type, arg_regs_order: &mut ArgRegs, i: usize, bit: usize) {
+    fn copy_int(
+        &mut self,
+        ty: Type,
+        arg_regs_order: &mut GeneralArgRegOrder,
+        i: usize,
+        bit: usize,
+    ) {
         let (ax, rc, movrm) = match bit {
             32 => (
                 GR32::EAX.as_phys_reg(),

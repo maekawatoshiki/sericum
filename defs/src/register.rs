@@ -407,7 +407,7 @@ impl DefinitionConstructible for Registers {
         };
 
         reg_class_kind = quote! {
-            #[derive(Debug, Clone, Copy, Hash, PartialEq)]
+            #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
             pub enum RegisterClassKind {
                 #reg_class_kind
             }
