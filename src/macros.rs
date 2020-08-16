@@ -74,6 +74,9 @@ macro_rules! cilk_value {
     ($builder:expr; void) => {{
         value::Value::None
     }};
+    ($builder:expr; i8 $n:expr) => {{
+        value::Value::Immediate(value::ImmediateValue::Int8($n))
+    }};
     ($builder:expr; i32 $n:expr) => {{
         value::Value::Immediate(value::ImmediateValue::Int32($n))
     }};

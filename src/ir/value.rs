@@ -8,8 +8,9 @@ macro_rules! const_op {
     pub fn $name(&self, v: &Value) -> Option<Value> {
         use ImmediateValue::*;
         match (self, v) {
-            (Value::Immediate(Int32(i1)), Value::Immediate(Int32(i2))) => Some(Value::Immediate(Int32(i1 $op i2))),
-            (Value::Immediate(F64(i1)), Value::Immediate(F64(i2))) => Some(Value::Immediate(F64(i1 $op i2))),
+            (Value::Immediate(Int8(x)), Value::Immediate(Int8(y))) => Some(Value::Immediate(Int8(x $op y))),
+            (Value::Immediate(Int32(x)), Value::Immediate(Int32(y))) => Some(Value::Immediate(Int32(x $op y))),
+            (Value::Immediate(F64(x)), Value::Immediate(F64(y))) => Some(Value::Immediate(F64(x $op y))),
             _ => None,
         }
     } };
@@ -17,7 +18,8 @@ macro_rules! const_op {
     pub fn $name(&self, v: &Value) -> Option<Value> {
         use ImmediateValue::*;
         match (self, v) {
-            (Value::Immediate(Int32(i1)), Value::Immediate(Int32(i2))) => Some(Value::Immediate(Int32(i1 $op i2))),
+            (Value::Immediate(Int8(x)), Value::Immediate(Int8(y))) => Some(Value::Immediate(Int8(x $op y))),
+            (Value::Immediate(Int32(x)), Value::Immediate(Int32(y))) => Some(Value::Immediate(Int32(x $op y))),
             _ => None,
         }
     } }

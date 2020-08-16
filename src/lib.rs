@@ -2,7 +2,7 @@
 #![feature(stmt_expr_attributes)]
 #![feature(drain_filter)]
 #![feature(vec_remove_item)]
-#![recursion_limit = "128"]
+#![recursion_limit = "256"]
 
 #[macro_use]
 pub mod macros;

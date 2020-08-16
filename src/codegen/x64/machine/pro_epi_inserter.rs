@@ -208,6 +208,7 @@ impl<'a> CopyArgs<'a> {
                 continue;
             }
             match ty {
+                Type::Int8 => self.copy_int(ty, &mut arg_regs_order, i, 8),
                 Type::Int32 => self.copy_int(ty, &mut arg_regs_order, i, 32),
                 Type::Int64 | Type::Pointer(_) => self.copy_int(ty, &mut arg_regs_order, i, 64),
                 Type::F64 => self.copy_f64(&mut arg_regs_order, i),
@@ -353,6 +354,11 @@ impl<'a> CopyArgs<'a> {
         bit: usize,
     ) {
         let (ax, rc, movrm) = match bit {
+            8 => (
+                GR8::AL.as_phys_reg(),
+                RegisterClassKind::GR8,
+                MachineOpcode::MOVrm8,
+            ),
             32 => (
                 GR32::EAX.as_phys_reg(),
                 RegisterClassKind::GR32,

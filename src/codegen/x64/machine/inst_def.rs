@@ -50,6 +50,24 @@ mod inst {
                 .set_uses(vec![TargetOperand::Mem])
                 .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR64)])
         };
+        pub static ref ADDrr8: TargetInstDef = {
+            TargetInstDef::new("add", TargetOpcode::ADDrr8)
+                .set_uses(vec![
+                    TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR8)),
+                    TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR8)),
+                ])
+                .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR8)])
+                .add_tie(DefOrUseReg::Def(0), DefOrUseReg::Use(0))
+        };
+        pub static ref ADDri8: TargetInstDef = {
+            TargetInstDef::new("add", TargetOpcode::ADDri8)
+                .set_uses(vec![
+                    TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR8)),
+                    TargetOperand::Immediate(TargetImmediate::I8)
+                ])
+                .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR8)])
+                .add_tie(DefOrUseReg::Def(0), DefOrUseReg::Use(0))
+        };
         pub static ref ADDrr32: TargetInstDef = {
             TargetInstDef::new("add", TargetOpcode::ADDrr32)
                 .set_uses(vec![
@@ -269,6 +287,28 @@ mod inst {
                 .set_uses(vec![TargetOperand::Immediate(TargetImmediate::I32)])
                 .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR32)])
         };
+        pub static ref MOVri8: TargetInstDef = {
+            TargetInstDef::new("mov", TargetOpcode::MOVri8)
+                .set_uses(vec![TargetOperand::Immediate(TargetImmediate::I8)])
+                .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR8)])
+        };
+        pub static ref MOVrm8: TargetInstDef = {
+            TargetInstDef::new("mov", TargetOpcode::MOVrm8)
+                .set_uses(vec![TargetOperand::Mem])
+                .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR8)])
+        };
+        pub static ref MOVmi8: TargetInstDef = {
+            TargetInstDef::new("mov", TargetOpcode::MOVmi8).set_uses(vec![
+                TargetOperand::Mem,
+                TargetOperand::Immediate(TargetImmediate::I8),
+            ])
+        };
+        pub static ref MOVmr8: TargetInstDef = {
+            TargetInstDef::new("mov", TargetOpcode::MOVmr8).set_uses(vec![
+                TargetOperand::Mem,
+                TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR8)),
+            ])
+        };
         pub static ref MOVrm32: TargetInstDef = {
             TargetInstDef::new("mov", TargetOpcode::MOVrm32)
                 .set_uses(vec![TargetOperand::Mem])
@@ -414,12 +454,16 @@ pub enum TargetOpcode {
     // out = mov [base          + align * off] | out = mov base, none, align, off
     // out = mov [base                       ] | out = mov base, none, none,  none
     MOVrm32,
+    MOVrm8,
+    MOVri8,
 
     // mov [rbp  - fi.off              ], r | mov rbp,  fi,   none,  none, r
     // mov [rbp  - fi.off + const.off  ], r | mov rbp,  fi,   none,  off,  r
     // mov [rbp  - fi.off + align * off], r | mov rbp,  fi,   align, off,  r
     // mov [base          + align * off], r | mov base, none, align, off,  r
     // mov [base                       ], r | mov base, none, none,  none, r
+    MOVmr8,
+    MOVmi8,
     MOVmr32,
     MOVmi32,
     MOVmr64,
@@ -436,6 +480,8 @@ pub enum TargetOpcode {
     // out = lea [base                       ] | out = lea base, none, none,  none
     LEAr64m,
 
+    ADDrr8,
+    ADDri8,
     ADDrr32,
     ADDrr64,
     ADDri32,
@@ -515,6 +561,8 @@ impl TargetOpcode {
             Self::MOVSXDr64m32 => Some(&*inst::MOVSXDr64m32),
             Self::MOVSXDr64r32 => Some(&*inst::MOVSXDr64r32),
             Self::LEAr64m => Some(&*inst::LEAr64m),
+            Self::ADDrr8 => Some(&*inst::ADDrr8),
+            Self::ADDri8 => Some(&*inst::ADDri8),
             Self::ADDrr32 => Some(&*inst::ADDrr32),
             Self::ADDrr64 => Some(&*inst::ADDrr64),
             Self::ADDri32 => Some(&*inst::ADDri32),
@@ -540,6 +588,10 @@ impl TargetOpcode {
             Self::CVTTSD2SIr32r => Some(&*inst::CVTTSD2SIr32r),
             Self::SQRTSDrr => Some(&*inst::SQRTSDrr),
             Self::MOVrr8 => Some(&*inst::MOVrr8),
+            Self::MOVri8 => Some(&*inst::MOVri8),
+            Self::MOVrm8 => Some(&*inst::MOVrm8),
+            Self::MOVmr8 => Some(&*inst::MOVmr8),
+            Self::MOVmi8 => Some(&*inst::MOVmi8),
             Self::MOVrr32 => Some(&*inst::MOVrr32),
             Self::MOVri32 => Some(&*inst::MOVri32),
             Self::MOVrm32 => Some(&*inst::MOVrm32),

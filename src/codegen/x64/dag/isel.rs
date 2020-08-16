@@ -69,6 +69,10 @@ impl MISelector {
             // TODO: Refactoring
             (ir.Call _a) => { self.select_call(tys, regs_info, heap, node) }
             (ir.Add a, b) {
+                GR8 a {
+                    GR8 b => (mi.ADDrr8 a, b)
+                    imm8 b => (mi.ADDri8 a, b)
+                }
                 GR32 a {
                     GR32  b => (mi.ADDrr32   a, b)
                     imm32 b => (mi.ADDri32   a, b) }
@@ -138,6 +142,7 @@ impl MISelector {
             (ir.SIToFP x): F64 { GR32 x => (mi.CVTSI2SDrr32 x) }
             (ir.FPToSI x): Int32 { XMM x => (mi.CVTTSD2SIr32r x) }
             (ir.Sext x): Int32 { GR8 x => (mi.MOVSXr32r8 x) }
+            (ir.Load a): Int8     { (ir.FIAddr     b) a => (mi.MOVrm8  [BaseFi %rbp, b]) }
             (ir.Load a): Int64    { (ir.FIAddr     b) a => (mi.MOVrm64 [BaseFi %rbp, b])
                                                  GR64 a => (mi.MOVrm64 [Base a]) }
             (ir.Load a): Int32    { (ir.FIAddr     b) a => (mi.MOVrm32 [BaseFi %rbp, b])
@@ -157,6 +162,10 @@ impl MISelector {
                         imm32 b => (mi.MOVmi32 [BaseFi %rbp, c], b) }
                     mem64  c {
                         GR64  b => (mi.MOVmr64 [BaseFi %rbp, c], b) }
+                    mem c {
+                        GR8 b => (mi.MOVmr8 [BaseFi %rbp, c], b)
+                        imm8 b => (mi.MOVmi8 [BaseFi %rbp, c], b)
+                    }
                 }
                 (ir.GlobalAddr c) a {
                     imm32 b   => (mi.MOVmr32 [Address c], b)

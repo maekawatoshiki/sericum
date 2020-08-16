@@ -259,9 +259,11 @@ fn opcode2word(opcode: &MachineOpcode) -> &'static str {
         | MachineOpcode::SUBSDrm
         | MachineOpcode::MULSDrm
         | MachineOpcode::DIVSDrr => 4,
+        MachineOpcode::MOVrm8 | MachineOpcode::MOVmr8 | MachineOpcode::MOVmi8 => 1,
         _ => 0,
     };
     match byte {
+        1 => "byte",
         4 => "dword",
         8 => "qword",
         _ => "",

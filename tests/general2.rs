@@ -186,6 +186,25 @@ mod x86_64 {
     }
 
     #[test]
+    fn asm_var_i8() {
+        let mut m = Module::new("cilk");
+        cilk_ir!(m; define [i8] test [(i8)] {
+            entry:
+                x = alloca i8;
+                a = add (%arg.0), (i8 1);
+                store (%a), (%x);
+                y = load (%x);
+                ret (%y);
+        });
+        compile_and_run(
+            "#include <assert.h>
+        extern char test(char);
+        int main() { assert(test(127) == -128); }",
+            &mut m,
+        );
+    }
+
+    #[test]
     fn asm_digit2int() {
         let mut m = Module::new("cilk");
         cilk_ir!(m; define [i32] test [(i8)] {
