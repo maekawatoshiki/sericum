@@ -217,7 +217,7 @@ impl ImmediateValue {
             ImmediateValue::Int8(_) => &Type::i8,
             ImmediateValue::Int32(_) => &Type::i32,
             ImmediateValue::Int64(_) => &Type::i64,
-            ImmediateValue::F64(_) => &Type::F64,
+            ImmediateValue::F64(_) => &Type::f64,
         }
     }
 

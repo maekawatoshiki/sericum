@@ -211,7 +211,7 @@ impl<'a> CopyArgs<'a> {
                 Type::i8 => self.copy_int(ty, &mut arg_regs_order, i, 8),
                 Type::i32 => self.copy_int(ty, &mut arg_regs_order, i, 32),
                 Type::i64 | Type::Pointer(_) => self.copy_int(ty, &mut arg_regs_order, i, 64),
-                Type::F64 => self.copy_f64(&mut arg_regs_order, i),
+                Type::f64 => self.copy_f64(&mut arg_regs_order, i),
                 _ => unimplemented!(),
             }
         }
@@ -238,7 +238,7 @@ impl<'a> CopyArgs<'a> {
             .into_iter()
             {
                 for _ in 0..c {
-                    let xmm = struct_ty.get_type_at(off) == Some(&Type::F64);
+                    let xmm = struct_ty.get_type_at(off) == Some(&Type::f64);
                     let r = self.builder.function.regs_info.get_phys_reg(
                         arg_regs_order
                             .next(if xmm { RegisterClassKind::XMM } else { rc })
@@ -313,7 +313,7 @@ impl<'a> CopyArgs<'a> {
 
     fn copy_f64(&mut self, arg_regs_order: &mut GeneralArgRegOrder, i: usize) {
         let ret_reg = XMM::XMM0.as_phys_reg();
-        let dst = FrameIndexInfo::new(Type::F64, FrameIndexKind::Arg(i));
+        let dst = FrameIndexInfo::new(Type::f64, FrameIndexKind::Arg(i));
         let src = match arg_regs_order.next(RegisterClassKind::XMM) {
             Some(_arg_reg) => return, // MachineOperand::phys_reg(&self.builder.function.regs_info, arg_reg),
             None => {

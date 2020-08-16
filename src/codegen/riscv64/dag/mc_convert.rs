@@ -343,7 +343,7 @@ impl<'a> ScheduleByBlock<'a> {
 
             if !matches!(
                 ty,
-                Type::i8 | Type::i32 | Type::i64 | Type::F64 | Type::Pointer(_) | Type::Array(_)
+                Type::i8 | Type::i32 | Type::i64 | Type::f64 | Type::Pointer(_) | Type::Array(_)
             ) {
                 unimplemented!()
             };
@@ -526,7 +526,7 @@ impl<'a> ScheduleByBlock<'a> {
 
 // pub fn mov_rx(tys: &Types, regs_info: &RegistersInfo, x: &MachineOperand) -> Option<MachineOpcode> {
 //     // TODO: special handling for float
-//     if x.get_type(regs_info).unwrap() == Type::F64 {
+//     if x.get_type(regs_info).unwrap() == Type::f64 {
 //         return match x {
 //             MachineOperand::Constant(_) => Some(MachineOpcode::MOVSDrm64),
 //             MachineOperand::FrameIndex(_) | MachineOperand::Mem(_) => Some(MachineOpcode::MOVSDrm),
@@ -559,7 +559,7 @@ impl<'a> ScheduleByBlock<'a> {
 // }
 //
 // pub fn mov_mx(regs_info: &RegistersInfo, x: &MachineOperand) -> Option<MachineOpcode> {
-//     if x.get_type(regs_info).unwrap() == Type::F64 {
+//     if x.get_type(regs_info).unwrap() == Type::f64 {
 //         return match x {
 //             MachineOperand::Register(_) => Some(MachineOpcode::MOVSDmr),
 //             _ => None,

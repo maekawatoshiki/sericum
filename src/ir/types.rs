@@ -33,7 +33,7 @@ pub enum Type {
     i8,
     i32,
     i64,
-    F64,
+    f64,
     Pointer(NonPrimitiveTypeId),
     Array(NonPrimitiveTypeId),
     Function(NonPrimitiveTypeId),
@@ -151,7 +151,7 @@ impl Types {
             | Type::i8
             | Type::i32
             | Type::i64
-            | Type::F64
+            | Type::f64
             | Type::Function(_) => Some(ty),
         }
     }
@@ -167,7 +167,7 @@ impl Types {
             | Type::i8
             | Type::i32
             | Type::i64
-            | Type::F64
+            | Type::f64
             | Type::Function(_) => None,
             Type::Pointer(id) => match indices.len() {
                 1 => Some(*self.base.borrow().non_primitive_types[id].as_pointer()),
@@ -292,7 +292,7 @@ impl TypesBase {
             | Type::i8
             | Type::i32
             | Type::i64
-            | Type::F64
+            | Type::f64
             | Type::Function(_) => Some(ty),
         }
     }
@@ -308,7 +308,7 @@ impl TypesBase {
             | Type::i8
             | Type::i32
             | Type::i64
-            | Type::F64
+            | Type::f64
             | Type::Function(_) => None,
             Type::Pointer(id) => match indices.len() {
                 1 => Some(*self.non_primitive_types[id].as_pointer()),
@@ -345,7 +345,7 @@ impl TypesBase {
             Type::i8 => "i8".to_string(),
             Type::i32 => "i32".to_string(),
             Type::i64 => "i64".to_string(),
-            Type::F64 => "f64".to_string(),
+            Type::f64 => "f64".to_string(),
             Type::Pointer(id) => {
                 let elem_ty = self.non_primitive_types[id].as_pointer();
                 format!("{}*", self.to_string(*elem_ty))
@@ -374,7 +374,7 @@ impl Type {
     pub fn is_atomic(&self) -> bool {
         matches!(
             self,
-            Self::Void | Self::i1 | Self::i8 | Self::i32 | Self::i64 | Self::F64
+            Self::Void | Self::i1 | Self::i8 | Self::i32 | Self::i64 | Self::f64
         )
     }
 
@@ -383,7 +383,7 @@ impl Type {
     }
 
     pub fn is_float(&self) -> bool {
-        matches!(self, Self::F64)
+        matches!(self, Self::f64)
     }
 
     pub fn to_string(&self) -> String {
@@ -393,7 +393,7 @@ impl Type {
             Type::i8 => "i8".to_string(),
             Type::i32 => "i32".to_string(),
             Type::i64 => "i64".to_string(),
-            Type::F64 => "f64".to_string(),
+            Type::f64 => "f64".to_string(),
             Type::Pointer(id) => format!("(ty:{})*", id.index()),
             Type::Array(id) => format!("arrty:{}", id.index()),
             Type::Function(id) => format!("functy:{}", id.index()),

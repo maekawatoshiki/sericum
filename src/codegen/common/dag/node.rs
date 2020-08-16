@@ -186,7 +186,7 @@ impl ConstantKind {
             ConstantKind::Int8(_) => Type::i8,
             ConstantKind::Int32(_) => Type::i32,
             ConstantKind::Int64(_) => Type::i64,
-            ConstantKind::F64(_) => Type::F64,
+            ConstantKind::F64(_) => Type::f64,
         }
     }
 

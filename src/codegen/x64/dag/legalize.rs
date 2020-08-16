@@ -106,7 +106,7 @@ impl Legalize {
                 GR64 x {
                     (ir.Mul z, u) y {
                         imm32 u => (mi.MOVrm32 [BaseAlignOff x, u, z]) } } } }
-        (ir.Load dst): F64 {
+        (ir.Load dst): f64 {
             (ir.Add x, y) dst {
                 (ir.FIAddr fi) x {
                     imm32 y => (mi.MOVSDrm [BaseFiOff %rbp, fi, y])
@@ -321,7 +321,7 @@ impl Legalize {
             let rhs = heap.alloc(DAGNode::new(
                 NodeKind::MI(MINodeKind::MOVSDrm64),
                 vec![rhs],
-                Type::F64,
+                Type::f64,
             ));
             return heap.alloc(DAGNode::new(
                 NodeKind::IR(IRNodeKind::FPBrcc),

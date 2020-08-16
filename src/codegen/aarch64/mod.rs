@@ -22,7 +22,7 @@ impl TypeSize for Type {
             Type::i8 => 1,
             Type::i32 => 4,
             Type::i64 => 8,
-            Type::F64 => 8,
+            Type::f64 => 8,
             Type::Array(id) => tys.base.borrow().non_primitive_types[*id]
                 .as_array()
                 .size_in_byte(tys),
@@ -45,7 +45,7 @@ impl TypeSize for Type {
             Type::i8 => 1,
             Type::i32 => 4,
             Type::i64 => 8,
-            Type::F64 => 8,
+            Type::f64 => 8,
             Type::Array(id) => tys.base.borrow().non_primitive_types[*id]
                 .as_array()
                 .align_in_byte(tys),

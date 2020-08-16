@@ -288,7 +288,7 @@ impl PatternMatchConstructible for OperandPattern {
                 quote! { if #parent.is_constant() && matches!(#parent.ty, Type::i32) { #body } }
             }
             "imm_f64" => {
-                quote! { if #parent.is_constant() && matches!(#parent.ty, Type::F64) {  #body } }
+                quote! { if #parent.is_constant() && matches!(#parent.ty, Type::f64) {  #body } }
             }
             _ if self.name.as_str().starts_with("imm") => {
                 let bit = self.name.as_str()["imm".len()..].parse::<u32>().unwrap();
@@ -312,7 +312,7 @@ impl PatternMatchConstructible for OperandPattern {
             }
             "f64mem" => {
                 let ty = match self.name.as_str() {
-                    "f64mem" => quote! { Type::F64 },
+                    "f64mem" => quote! { Type::f64 },
                     _ => unimplemented!(),
                 };
                 quote! {

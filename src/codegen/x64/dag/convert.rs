@@ -28,7 +28,7 @@ impl<'a> ConvertToDAGNode<'a> {
                             (mov4, 4, RegisterClassKind::GR32),
                         ] {
                             for _ in 0..c {
-                                if struct_ty.get_type_at(off) == Some(&Type::F64) {
+                                if struct_ty.get_type_at(off) == Some(&Type::f64) {
                                     arg_regs_order.next(RegisterClassKind::XMM);
                                 } else {
                                     arg_regs_order.next(rc);

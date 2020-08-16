@@ -47,7 +47,7 @@ macro_rules! cilk_parse_ty {
         types::Type::i64
     };
     ($_:expr, f64) => {
-        types::Type::F64
+        types::Type::f64
     };
     ($_:expr, void) => {
         types::Type::Void

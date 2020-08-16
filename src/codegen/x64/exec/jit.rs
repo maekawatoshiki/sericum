@@ -159,7 +159,7 @@ impl JITCompiler {
                 let f: extern "C" fn() -> i32 = unsafe { ::std::mem::transmute(buf.ptr(entry)) };
                 GenericValue::Int32(f())
             }
-            Type::F64 => {
+            Type::f64 => {
                 let f: extern "C" fn() -> f64 = unsafe { ::std::mem::transmute(buf.ptr(entry)) };
                 GenericValue::F64(f() as f64)
             }

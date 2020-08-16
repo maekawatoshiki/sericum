@@ -1066,8 +1066,8 @@ main:
 
         let struct_ty = m
             .types
-            .new_struct_ty(vec![types::Type::i32, types::Type::F64]);
-        let f = m.create_function("f", types::Type::F64, vec![struct_ty]);
+            .new_struct_ty(vec![types::Type::i32, types::Type::f64]);
+        let f = m.create_function("f", types::Type::f64, vec![struct_ty]);
         {
             let mut builder = builder::Builder::new(builder::FunctionIdWithModule::new(&mut m, f));
             let entry = builder.append_basic_block();
@@ -1078,7 +1078,7 @@ main:
                 ret (%load_x);
             });
         }
-        let main = m.create_function("main", types::Type::F64, vec![]);
+        let main = m.create_function("main", types::Type::f64, vec![]);
         {
             let mut builder =
                 builder::Builder::new(builder::FunctionIdWithModule::new(&mut m, main));
@@ -1106,11 +1106,11 @@ main:
 
         let struct_ty = m
             .types
-            .new_struct_ty(vec![types::Type::i32, types::Type::F64]);
+            .new_struct_ty(vec![types::Type::i32, types::Type::f64]);
         let struct_ty2 =
             m.types
-                .new_struct_ty(vec![types::Type::F64, types::Type::i32, types::Type::i32]);
-        let f = m.create_function("f", types::Type::F64, vec![struct_ty, struct_ty2]);
+                .new_struct_ty(vec![types::Type::f64, types::Type::i32, types::Type::i32]);
+        let f = m.create_function("f", types::Type::f64, vec![struct_ty, struct_ty2]);
         {
             let mut builder = builder::Builder::new(builder::FunctionIdWithModule::new(&mut m, f));
             let entry = builder.append_basic_block();
@@ -1124,7 +1124,7 @@ main:
                 ret (%a);
             });
         }
-        let main = m.create_function("main", types::Type::F64, vec![]);
+        let main = m.create_function("main", types::Type::f64, vec![]);
         {
             let mut builder =
                 builder::Builder::new(builder::FunctionIdWithModule::new(&mut m, main));
