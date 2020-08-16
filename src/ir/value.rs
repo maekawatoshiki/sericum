@@ -214,9 +214,9 @@ impl ImmediateValue {
 
     pub fn get_type(&self) -> &Type {
         match self {
-            ImmediateValue::Int8(_) => &Type::Int8,
-            ImmediateValue::Int32(_) => &Type::Int32,
-            ImmediateValue::Int64(_) => &Type::Int64,
+            ImmediateValue::Int8(_) => &Type::i8,
+            ImmediateValue::Int32(_) => &Type::i32,
+            ImmediateValue::Int64(_) => &Type::i64,
             ImmediateValue::F64(_) => &Type::F64,
         }
     }

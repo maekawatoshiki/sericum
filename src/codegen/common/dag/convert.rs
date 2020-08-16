@@ -546,7 +546,7 @@ impl<'a> ConvertToDAGNode<'a> {
                             size.unwrap_or(i * ty.size_in_byte(&self.module.types) as i32),
                         ))),
                         vec![],
-                        Type::Int32,
+                        Type::i32,
                     ))
                 }
                 NodeKind::IR(IRNodeKind::FIAddr) => idx.operand[0], // retrieve frame index
@@ -560,14 +560,14 @@ impl<'a> ConvertToDAGNode<'a> {
                             ty.size_in_byte(&self.module.types) as i32,
                         ))),
                         vec![],
-                        Type::Int32,
+                        Type::i32,
                     ));
-                    let cast = sext_if_necessary(self.node_heap, idx, Type::Int64);
-                    assert!(cast.ty == Type::Int64);
+                    let cast = sext_if_necessary(self.node_heap, idx, Type::i64);
+                    assert!(cast.ty == Type::i64);
                     self.node_heap.alloc(DAGNode::new(
                         NodeKind::IR(IRNodeKind::Mul),
                         vec![cast, tysz],
-                        Type::Int64, // TODO
+                        Type::i64, // TODO
                     ))
                 }
             };

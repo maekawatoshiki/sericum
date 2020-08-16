@@ -94,7 +94,7 @@ impl Legalize {
     //     heap: &mut DAGHeap,
     //     node: Raw<DAGNode>,
     // ) -> Raw<DAGNode> {
-    //     if matches!(node.ty, Type::Int32) && node.operand[0].kind == NodeKind::IR(IRNodeKind::Add) {
+    //     if matches!(node.ty, Type::i32) && node.operand[0].kind == NodeKind::IR(IRNodeKind::Add) {
     //         let add = node.operand[0];
     //         let op0 = self.run_on_node(tys, regs_info, heap, add.operand[0]);
     //         let op1 = self.run_on_node(tys, regs_info, heap, add.operand[1]);
@@ -250,9 +250,9 @@ impl Legalize {
         heap: &mut DAGHeap,
         node: Raw<DAGNode>,
     ) -> Raw<DAGNode> {
-        if node.ty == Type::Int64
+        if node.ty == Type::i64
             && node.operand[0].kind == NodeKind::IR(IRNodeKind::Load)
-            && node.operand[0].ty == Type::Int32
+            && node.operand[0].ty == Type::i32
             && node.operand[0].operand[0].kind == NodeKind::IR(IRNodeKind::FIAddr)
         {
             let fi = node.operand[0].operand[0].operand[0];
@@ -265,9 +265,9 @@ impl Legalize {
             ));
         }
 
-        if node.ty == Type::Int64
+        if node.ty == Type::i64
             && node.operand[0].kind == NodeKind::IR(IRNodeKind::Load)
-            && node.operand[0].ty == Type::Int32
+            && node.operand[0].ty == Type::i32
             && node.operand[0].operand[0].is_maybe_register()
         {
             let op = self.run_on_node(tys, regs_info, heap, node.operand[0].operand[0]);
@@ -279,9 +279,7 @@ impl Legalize {
             ));
         }
 
-        if node.ty == Type::Int64
-            && !node.operand[0].is_constant()
-            && node.operand[0].ty == Type::Int32
+        if node.ty == Type::i64 && !node.operand[0].is_constant() && node.operand[0].ty == Type::i32
         {
             let op = self.run_on_node(tys, regs_info, heap, node.operand[0]);
             return heap.alloc(DAGNode::new(

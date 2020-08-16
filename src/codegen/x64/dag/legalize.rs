@@ -93,7 +93,7 @@ impl Legalize {
         mut node: Raw<DAGNode>,
     ) -> Raw<DAGNode> {
         isel_pat! {
-        (ir.Load dst): Int32 {
+        (ir.Load dst): i32 {
             (ir.Add x, y) dst {
                 (ir.FIAddr fi) x {
                     imm32 y => (mi.MOVrm32 [BaseFiOff %rbp, fi, y])
@@ -176,7 +176,7 @@ impl Legalize {
             let one = heap.alloc(DAGNode::new(
                 NodeKind::Operand(OperandNodeKind::Constant(ConstantKind::Int32(1))),
                 vec![],
-                Type::Int32,
+                Type::i32,
             ));
 
             if node.operand[1].is_maybe_register() {
@@ -236,9 +236,9 @@ impl Legalize {
         heap: &mut DAGHeap,
         node: Raw<DAGNode>,
     ) -> Raw<DAGNode> {
-        if node.ty == Type::Int64
+        if node.ty == Type::i64
             && node.operand[0].kind == NodeKind::IR(IRNodeKind::Load)
-            && node.operand[0].ty == Type::Int32
+            && node.operand[0].ty == Type::i32
             && node.operand[0].operand[0].kind == NodeKind::IR(IRNodeKind::FIAddr)
         {
             let rbp = heap.alloc_phys_reg(regs_info, GR64::RBP);
@@ -253,10 +253,8 @@ impl Legalize {
             ));
         }
 
-        // TODO: Need instruction that converts Int32 to Int64
-        if node.ty == Type::Int64
-            && !node.operand[0].is_constant()
-            && node.operand[0].ty == Type::Int32
+        // TODO: Need instruction that converts i32 to i64
+        if node.ty == Type::i64 && !node.operand[0].is_constant() && node.operand[0].ty == Type::i32
         // && node.operand[0].operand[0].kind == NodeKind::IR(IRNodeKind::FIAddr)
         {
             let op = self.run_on_node(tys, regs_info, heap, node.operand[0]);

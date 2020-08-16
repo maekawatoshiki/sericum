@@ -123,7 +123,7 @@ mod x86_64 {
     #[test]
     fn asm_global_var() {
         let mut m = Module::new("cilk");
-        let ty = m.types.new_array_ty(types::Type::Int32, 8);
+        let ty = m.types.new_array_ty(types::Type::i32, 8);
         let g = m
             .global_vars
             .new_global_var_with_name(ty, global_val::Linkage::Common, "g");
@@ -158,7 +158,7 @@ mod x86_64 {
         let mut m = Module::new("cilk");
         let ty = m
             .types
-            .new_struct_ty(vec![types::Type::Int8, types::Type::Int32]);
+            .new_struct_ty(vec![types::Type::i8, types::Type::i32]);
         let g = m
             .global_vars
             .new_global_var_with_name(ty, global_val::Linkage::Common, "g");
@@ -834,7 +834,7 @@ mod riscv64 {
     #[test]
     fn asm_global_var() {
         let mut m = Module::new("cilk");
-        let ty = types::Type::Int32;
+        let ty = types::Type::i32;
         let g = m
             .global_vars
             .new_global_var_with_name(ty, global_val::Linkage::Common, "g");
@@ -863,7 +863,7 @@ mod riscv64 {
     #[test]
     fn asm_global_var_array() {
         let mut m = Module::new("cilk");
-        let ty = m.types.new_array_ty(types::Type::Int32, 8);
+        let ty = m.types.new_array_ty(types::Type::i32, 8);
         let g = m
             .global_vars
             .new_global_var_with_name(ty, global_val::Linkage::Common, "g");

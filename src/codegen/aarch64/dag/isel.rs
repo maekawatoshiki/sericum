@@ -63,7 +63,7 @@ impl MISelector {
         }
 
         let mut selected = isel_pat!(
-            (ir.Add a, b): Int32 {
+            (ir.Add a, b): i32 {
                 GR32 a {
                     imm12 b => (mi.ADDrr32i a, b)
                     imm32 b => (mi.ADDrrr32 a, (mi.MOVr32i b))
@@ -72,12 +72,12 @@ impl MISelector {
                 GR64 a {
                     imm32 b => (mi.ADDrr64i a, b)
                     GR64  b => (mi.ADDrrr64 a, b) } }
-            (ir.Sub x, y): Int32 {
+            (ir.Sub x, y): i32 {
                 GR32 x {
                     imm12 y => (mi.SUBrr32i x, y)
                     imm32 y => (mi.SUBrrr32 x, (mi.MOVr32i y))
                     GR32  y => (mi.SUBrrr32 x, y) } }
-            (ir.Mul x, y): Int32 {
+            (ir.Mul x, y): i32 {
                 GR32 x {
                     imm32 y => (mi.MULrrr32 x, (mi.MOVr32i y))
                     GR32  y => (mi.MULrrr32 x, y) } }
@@ -85,12 +85,12 @@ impl MISelector {
                 GR64 x {
                     imm32 y => (mi.MULrrr64 x, (mi.MOVr64i y))
                     GR64  y => (mi.MULrrr64 x, y) } }
-            (ir.Div x, y): Int32 {
+            (ir.Div x, y): i32 {
                 GR32 x {
                     imm32 y => (mi.SDIVrrr32 x, (mi.MOVr32i y))
                     GR32  y => (mi.SDIVrrr32 x, y) } }
             (ir.Br dst) => (mi.B dst)
-            (ir.Load a): Int32 {
+            (ir.Load a): i32 {
                 (ir.FIAddr b) a { mem32 b => (mi.LDR32 [RegFi %x29, b]) }
                 // (ir.GlobalAddr b) a => (mi.LW [Address b])
             }
@@ -116,7 +116,7 @@ impl MISelector {
                 // }
                 // GPR a {
                 //     imm32 b => (mi.SW (mi.LI b), [ImmReg $0, a])
-                //     GPR: Int32 b => (mi.SW b, [ImmReg $0, a])
+                //     GPR: i32 b => (mi.SW b, [ImmReg $0, a])
                 //     GPR b => (mi.SD b, [ImmReg $0, a])
                 // }
             }

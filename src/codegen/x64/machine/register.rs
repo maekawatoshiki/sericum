@@ -7,17 +7,17 @@ use std::cell::RefCell;
 
 registers! {
     // register nubmering: https://corsix.github.io/dynasm-doc/instructions.html#registers
-    class GR8  (8, Int8, [Int8], [AL]) < GR32 {
+    class GR8  (8, i8, [i8], [AL]) < GR32 {
         AL, CL, DL, BL, SPL, BPL, SIL, DIL,
         R8B, R9B, R10B, R11B, R12B, R13B, R14B, R15B
     }
 
-    class GR32 (32, Int32, [Int32], [EAX]) < GR64 {
+    class GR32 (32, i32, [i32], [EAX]) < GR64 {
         EAX, ECX, EDX, EBX, ESP, EBP, ESI, EDI,
         R8D, R9D, R10D, R11D, R12D, R13D, R14D, R15D
     }
 
-    class GR64 (64, Int64, [Int64, Pointer!], [RAX]) {
+    class GR64 (64, i64, [i64, Pointer!], [RAX]) {
         RAX, RCX, RDX, RBX, RSP, RBP, RSI, RDI,
         R8, R9, R10, R11, R12, R13, R14, R15
     }

@@ -183,9 +183,9 @@ impl ConstantKind {
 
     pub fn get_type(&self) -> Type {
         match self {
-            ConstantKind::Int8(_) => Type::Int8,
-            ConstantKind::Int32(_) => Type::Int32,
-            ConstantKind::Int64(_) => Type::Int64,
+            ConstantKind::Int8(_) => Type::i8,
+            ConstantKind::Int32(_) => Type::i32,
+            ConstantKind::Int64(_) => Type::i64,
             ConstantKind::F64(_) => Type::F64,
         }
     }

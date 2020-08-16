@@ -170,11 +170,11 @@ mod x86_64 {
     fn pointer() {
         let mut m = module::Module::new("cilk");
 
-        let ptr_i32_ty = m.types.new_pointer_ty(types::Type::Int32);
+        let ptr_i32_ty = m.types.new_pointer_ty(types::Type::i32);
         let cilk_memset_i32 = m.create_function(
             "cilk.memset.p0i32.i32",
             types::Type::Void,
-            vec![ptr_i32_ty, types::Type::Int32, types::Type::Int32],
+            vec![ptr_i32_ty, types::Type::i32, types::Type::i32],
         );
 
         let func = cilk_ir!(m; define [i32] func [] {
@@ -347,7 +347,7 @@ mod x86_64 {
         let cilk_println_i32 = m.create_function(
             "cilk.println.i32",
             ir::types::Type::Void,
-            vec![ir::types::Type::Int32],
+            vec![ir::types::Type::i32],
         );
 
         let func = cilk_ir!(m; define [i32] func [(i32)] {
@@ -427,7 +427,7 @@ mod x86_64 {
         let cilk_println_i32 = m.create_function(
             "cilk.println.i32",
             ir::types::Type::Void,
-            vec![ir::types::Type::Int32],
+            vec![ir::types::Type::i32],
         );
 
         let func = cilk_ir!(m; define [i32] func [(i32)] {
@@ -608,23 +608,19 @@ main:
     fn struct1() {
         let mut m = module::Module::new("cilk");
 
-        let f = m.create_function("f", types::Type::Int32, vec![]);
+        let f = m.create_function("f", types::Type::i32, vec![]);
 
         let mut builder = builder::Builder::new(builder::FunctionIdWithModule::new(&mut m, f));
 
         let entry = builder.append_basic_block();
         builder.set_insert_point(entry);
 
-        let ary_ty = builder
-            .func
-            .module
-            .types
-            .new_array_ty(types::Type::Int32, 16);
+        let ary_ty = builder.func.module.types.new_array_ty(types::Type::i32, 16);
         let struct_ty = builder
             .func
             .module
             .types
-            .new_struct_ty(vec![ary_ty, types::Type::Int32]);
+            .new_struct_ty(vec![ary_ty, types::Type::i32]);
         let var = builder.build_alloca(struct_ty);
 
         cilk_ir!((builder) {
@@ -648,7 +644,7 @@ main:
 
         let struct_ty = m
             .types
-            .new_struct_ty(vec![types::Type::Int32, types::Type::Int32]);
+            .new_struct_ty(vec![types::Type::i32, types::Type::i32]);
         let ptr_struct_ty = m.types.new_pointer_ty(struct_ty);
 
         let f = m.create_function("f", types::Type::Void, vec![ptr_struct_ty]);
@@ -664,7 +660,7 @@ main:
             ret (void);
         });
 
-        let main = m.create_function("main", types::Type::Int32, vec![]);
+        let main = m.create_function("main", types::Type::i32, vec![]);
 
         let mut builder = builder::Builder::new(builder::FunctionIdWithModule::new(&mut m, main));
 
@@ -970,8 +966,8 @@ main:
 
         let struct_ty = m
             .types
-            .new_struct_ty(vec![types::Type::Int32, types::Type::Int32]);
-        let f = m.create_function("f", types::Type::Int32, vec![struct_ty]);
+            .new_struct_ty(vec![types::Type::i32, types::Type::i32]);
+        let f = m.create_function("f", types::Type::i32, vec![struct_ty]);
         {
             let mut builder = builder::Builder::new(builder::FunctionIdWithModule::new(&mut m, f));
             let entry = builder.append_basic_block();
@@ -985,7 +981,7 @@ main:
                 ret (%a);
             });
         }
-        let main = m.create_function("main", types::Type::Int32, vec![]);
+        let main = m.create_function("main", types::Type::i32, vec![]);
         {
             let mut builder =
                 builder::Builder::new(builder::FunctionIdWithModule::new(&mut m, main));
@@ -1014,13 +1010,13 @@ main:
         let mut m = module::Module::new("cilk");
 
         let struct_ty = m.types.new_struct_ty(vec![
-            types::Type::Int32,
-            types::Type::Int32,
-            types::Type::Int32,
-            types::Type::Int32,
-            types::Type::Int32,
+            types::Type::i32,
+            types::Type::i32,
+            types::Type::i32,
+            types::Type::i32,
+            types::Type::i32,
         ]);
-        let f = m.create_function("f", types::Type::Int32, vec![types::Type::Int32, struct_ty]);
+        let f = m.create_function("f", types::Type::i32, vec![types::Type::i32, struct_ty]);
         {
             let mut builder = builder::Builder::new(builder::FunctionIdWithModule::new(&mut m, f));
             let entry = builder.append_basic_block();
@@ -1038,7 +1034,7 @@ main:
                 ret (%c);
             });
         }
-        let main = m.create_function("main", types::Type::Int32, vec![]);
+        let main = m.create_function("main", types::Type::i32, vec![]);
         {
             let mut builder =
                 builder::Builder::new(builder::FunctionIdWithModule::new(&mut m, main));
@@ -1070,7 +1066,7 @@ main:
 
         let struct_ty = m
             .types
-            .new_struct_ty(vec![types::Type::Int32, types::Type::F64]);
+            .new_struct_ty(vec![types::Type::i32, types::Type::F64]);
         let f = m.create_function("f", types::Type::F64, vec![struct_ty]);
         {
             let mut builder = builder::Builder::new(builder::FunctionIdWithModule::new(&mut m, f));
@@ -1110,12 +1106,10 @@ main:
 
         let struct_ty = m
             .types
-            .new_struct_ty(vec![types::Type::Int32, types::Type::F64]);
-        let struct_ty2 = m.types.new_struct_ty(vec![
-            types::Type::F64,
-            types::Type::Int32,
-            types::Type::Int32,
-        ]);
+            .new_struct_ty(vec![types::Type::i32, types::Type::F64]);
+        let struct_ty2 =
+            m.types
+                .new_struct_ty(vec![types::Type::F64, types::Type::i32, types::Type::i32]);
         let f = m.create_function("f", types::Type::F64, vec![struct_ty, struct_ty2]);
         {
             let mut builder = builder::Builder::new(builder::FunctionIdWithModule::new(&mut m, f));

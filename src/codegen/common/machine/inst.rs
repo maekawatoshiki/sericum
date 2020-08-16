@@ -449,9 +449,9 @@ impl MachineOperand {
     pub fn get_type(&self, regs_info: &RegistersInfo) -> Option<Type> {
         match self {
             MachineOperand::Branch(_) => None,
-            MachineOperand::Constant(MachineConstant::Int8(_)) => Some(Type::Int8),
-            MachineOperand::Constant(MachineConstant::Int32(_)) => Some(Type::Int32),
-            MachineOperand::Constant(MachineConstant::Int64(_)) => Some(Type::Int64),
+            MachineOperand::Constant(MachineConstant::Int8(_)) => Some(Type::i8),
+            MachineOperand::Constant(MachineConstant::Int32(_)) => Some(Type::i32),
+            MachineOperand::Constant(MachineConstant::Int64(_)) => Some(Type::i64),
             MachineOperand::Constant(MachineConstant::F64(_)) => Some(Type::F64),
             MachineOperand::FrameIndex(fi) => Some(fi.ty),
             MachineOperand::Mem(mem) => mem.get_type(),

@@ -208,9 +208,9 @@ impl<'a> CopyArgs<'a> {
                 continue;
             }
             match ty {
-                Type::Int8 => self.copy_int(ty, &mut arg_regs_order, i, 8),
-                Type::Int32 => self.copy_int(ty, &mut arg_regs_order, i, 32),
-                Type::Int64 | Type::Pointer(_) => self.copy_int(ty, &mut arg_regs_order, i, 64),
+                Type::i8 => self.copy_int(ty, &mut arg_regs_order, i, 8),
+                Type::i32 => self.copy_int(ty, &mut arg_regs_order, i, 32),
+                Type::i64 | Type::Pointer(_) => self.copy_int(ty, &mut arg_regs_order, i, 64),
                 Type::F64 => self.copy_f64(&mut arg_regs_order, i),
                 _ => unimplemented!(),
             }

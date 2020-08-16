@@ -18,10 +18,10 @@ use crate::{
 impl TypeSize for Type {
     fn size_in_byte(&self, tys: &Types) -> usize {
         match self {
-            Type::Int1 => 1,
-            Type::Int8 => 1,
-            Type::Int32 => 4,
-            Type::Int64 => 8,
+            Type::i1 => 1,
+            Type::i8 => 1,
+            Type::i32 => 4,
+            Type::i64 => 8,
             Type::F64 => 8,
             Type::Array(id) => tys.base.borrow().non_primitive_types[*id]
                 .as_array()
@@ -41,10 +41,10 @@ impl TypeSize for Type {
 
     fn align_in_byte(&self, tys: &Types) -> usize {
         match self {
-            Type::Int1 => 1,
-            Type::Int8 => 1,
-            Type::Int32 => 4,
-            Type::Int64 => 8,
+            Type::i1 => 1,
+            Type::i8 => 1,
+            Type::i32 => 4,
+            Type::i64 => 8,
             Type::F64 => 8,
             Type::Array(id) => tys.base.borrow().non_primitive_types[*id]
                 .as_array()

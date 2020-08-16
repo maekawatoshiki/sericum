@@ -8,7 +8,7 @@ mod x86_64 {
     };
 
     #[test]
-    // #[ignore]
+    #[ignore]
     fn brainfuxk() {
         // let code = "+++++++++[>++++++++>+++++++++++>+++>+<<<<-]>.>++.+++++++..+++.>+++++.<<
         //     +++++++++++++++.>.+++.------.--------.>+.>+.";
@@ -166,14 +166,14 @@ mod x86_64 {
         let cilk_printch_i32 = m.create_function(
             "cilk.printch.i32",
             types::Type::Void,
-            vec![types::Type::Int32],
+            vec![types::Type::i32],
         );
 
-        let ptr_i32_ty = m.types.new_pointer_ty(types::Type::Int32);
+        let ptr_i32_ty = m.types.new_pointer_ty(types::Type::i32);
         let cilk_memset_i32 = m.create_function(
             "cilk.memset.p0i32.i32",
             types::Type::Void,
-            vec![ptr_i32_ty, types::Type::Int32, types::Type::Int32],
+            vec![ptr_i32_ty, types::Type::i32, types::Type::i32],
         );
 
         let f_id = m.create_function("compiled_brainfuxk_code", types::Type::Void, vec![]);
@@ -188,9 +188,9 @@ mod x86_64 {
             .func
             .module
             .types
-            .new_array_ty(types::Type::Int32, tape_len);
+            .new_array_ty(types::Type::i32, tape_len);
         let tape = builder.build_alloca(ary_ty);
-        let idx = builder.build_alloca(types::Type::Int32);
+        let idx = builder.build_alloca(types::Type::i32);
 
         // initialize (idx = 0, fill tape with 0)
         cilk_ir!((builder) {
@@ -479,14 +479,14 @@ mod riscv64 {
         let cilk_printch_i32 = m.create_function(
             "cilk.printch.i32",
             types::Type::Void,
-            vec![types::Type::Int32],
+            vec![types::Type::i32],
         );
 
-        let ptr_i32_ty = m.types.new_pointer_ty(types::Type::Int32);
+        let ptr_i32_ty = m.types.new_pointer_ty(types::Type::i32);
         let cilk_memset_i32 = m.create_function(
             "cilk.memset.p0i32.i32",
             types::Type::Void,
-            vec![ptr_i32_ty, types::Type::Int32, types::Type::Int32],
+            vec![ptr_i32_ty, types::Type::i32, types::Type::i32],
         );
 
         let f_id = m.create_function("main", types::Type::Void, vec![]);
@@ -501,9 +501,9 @@ mod riscv64 {
             .func
             .module
             .types
-            .new_array_ty(types::Type::Int32, tape_len);
+            .new_array_ty(types::Type::i32, tape_len);
         let tape = builder.build_alloca(ary_ty);
-        let idx = builder.build_alloca(types::Type::Int32);
+        let idx = builder.build_alloca(types::Type::i32);
 
         // initialize (idx = 0, fill tape with 0)
         cilk_ir!((builder) {
@@ -794,14 +794,14 @@ mod aarch64 {
         let cilk_printch_i32 = m.create_function(
             "cilk.printch.i32",
             types::Type::Void,
-            vec![types::Type::Int32],
+            vec![types::Type::i32],
         );
 
-        let ptr_i32_ty = m.types.new_pointer_ty(types::Type::Int32);
+        let ptr_i32_ty = m.types.new_pointer_ty(types::Type::i32);
         let cilk_memset_i32 = m.create_function(
             "cilk.memset.p0i32.i32",
             types::Type::Void,
-            vec![ptr_i32_ty, types::Type::Int32, types::Type::Int32],
+            vec![ptr_i32_ty, types::Type::i32, types::Type::i32],
         );
 
         let f_id = m.create_function("main", types::Type::Void, vec![]);
@@ -816,9 +816,9 @@ mod aarch64 {
             .func
             .module
             .types
-            .new_array_ty(types::Type::Int32, tape_len);
+            .new_array_ty(types::Type::i32, tape_len);
         let tape = builder.build_alloca(ary_ty);
-        let idx = builder.build_alloca(types::Type::Int32);
+        let idx = builder.build_alloca(types::Type::i32);
 
         // initialize (idx = 0, fill tape with 0)
         cilk_ir!((builder) {

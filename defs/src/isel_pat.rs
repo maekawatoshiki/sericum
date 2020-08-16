@@ -282,10 +282,10 @@ impl PatternMatchConstructible for OperandPattern {
         let parent = &self.parent;
         match self.name.as_str() {
             "imm8" => {
-                quote! { if #parent.is_constant() && matches!(#parent.ty, Type::Int8) { #body } }
+                quote! { if #parent.is_constant() && matches!(#parent.ty, Type::i8) { #body } }
             }
             "imm32" => {
-                quote! { if #parent.is_constant() && matches!(#parent.ty, Type::Int32) { #body } }
+                quote! { if #parent.is_constant() && matches!(#parent.ty, Type::i32) { #body } }
             }
             "imm_f64" => {
                 quote! { if #parent.is_constant() && matches!(#parent.ty, Type::F64) {  #body } }
@@ -403,7 +403,7 @@ fn selected_operands(operands: &Vec<Selected>) -> (TS, TS) {
                             NodeKind::Operand(OperandNodeKind::Constant(
                                     ConstantKind::Int32(#i))),
                             vec![],
-                            Type::Int32
+                            Type::i32
                     ));
                 };
                 operands_ts = quote! {

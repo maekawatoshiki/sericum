@@ -6,15 +6,15 @@ use rustc_hash::FxHashMap;
 use std::cell::RefCell;
 
 registers! {
-    class SP (64, Int64, [], [SP]) {
+    class SP (64, i64, [], [SP]) {
         SP
     }
 
-    class WSP (32, Int32, [], [WSP]) < SP {
+    class WSP (32, i32, [], [WSP]) < SP {
         WSP
     }
 
-    class GR64 (64, Int64, [Int64, Pointer!], [X0]) {
+    class GR64 (64, i64, [i64, Pointer!], [X0]) {
         X0, X1, X2, X3, X4,
         X5, X6, X7, X8, X9,
         X10, X11, X12, X13, X14,
@@ -23,7 +23,7 @@ registers! {
         X25, X26, X27, X28, X29, X30
     }
 
-    class GR32 (32, Int32, [Int32], [W0]) < GR64 {
+    class GR32 (32, i32, [i32], [W0]) < GR64 {
         W0, W1, W2, W3, W4,
         W5, W6, W7, W8, W9,
         W10, W11, W12, W13, W14,

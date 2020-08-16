@@ -155,7 +155,7 @@ impl JITCompiler {
             .unwrap()
             .ret_ty
         {
-            Type::Int32 => {
+            Type::i32 => {
                 let f: extern "C" fn() -> i32 = unsafe { ::std::mem::transmute(buf.ptr(entry)) };
                 GenericValue::Int32(f())
             }

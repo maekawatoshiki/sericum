@@ -241,7 +241,7 @@ impl<F: FuncRef> Builder<F> {
                 Operand::Value(v1),
                 Operand::Value(v2),
             ],
-            Type::Int1,
+            Type::i1,
         );
         self.append_inst_to_cur_bb(inst);
         inst
@@ -255,7 +255,7 @@ impl<F: FuncRef> Builder<F> {
                 Operand::Value(v1),
                 Operand::Value(v2),
             ],
-            Type::Int1,
+            Type::i1,
         );
         self.append_inst_to_cur_bb(inst);
         inst

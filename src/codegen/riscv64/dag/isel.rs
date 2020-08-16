@@ -65,7 +65,7 @@ impl MISelector {
         let mut selected = isel_pat!(
             // TODO: Refactoring
             // (ir.Call _a) => { self.select_call(tys, regs_info, heap, node) }
-            (ir.Add a, b): Int32 {
+            (ir.Add a, b): i32 {
                 GPR a {
                     imm12 b => (mi.ADDIW a, b)
                     imm32 b => (mi.ADDW  a, (mi.LI b))
@@ -75,7 +75,7 @@ impl MISelector {
                     imm12 b => (mi.ADDI a, b)
                     imm32 b => (mi.ADD  a, (mi.LI b))
                     GPR   b => (mi.ADD  a, b) } }
-            (ir.Mul a, b): Int32 {
+            (ir.Mul a, b): i32 {
                 GPR a {
                     imm32 b => (mi.MULW a, (mi.LI b))
                     GPR   b => (mi.MULW a, b) } }
@@ -83,11 +83,11 @@ impl MISelector {
                 GPR a {
                     imm32 b => (mi.MUL a, (mi.LI b))
                     GPR   b => (mi.MUL a, b) } }
-            (ir.Div a, b): Int32 {
+            (ir.Div a, b): i32 {
                 GPR a {
                     imm32 b => (mi.DIVW a, (mi.LI b))
                     GPR   b => (mi.DIVW a, b) } }
-            (ir.Rem a, b): Int32 {
+            (ir.Rem a, b): i32 {
                 GPR a {
                     imm32 b => (mi.REMW a, (mi.LI b))
                     GPR   b => (mi.REMW a, b) } }
@@ -97,7 +97,7 @@ impl MISelector {
                     imm6 b => (mi.SLLI a, b)
                 }
             }
-            (ir.Load a): Int32 {
+            (ir.Load a): i32 {
                 (ir.FIAddr b) a { mem32 b => (mi.LW [FiReg b, %s0]) }
                 (ir.GlobalAddr b) a => (mi.LW [Address b])
                 GPR a => (mi.LW [ImmReg $0, a])
@@ -120,7 +120,7 @@ impl MISelector {
                 }
                 GPR a {
                     imm32 b => (mi.SW (mi.LI b), [ImmReg $0, a])
-                    GPR: Int32 b => (mi.SW b, [ImmReg $0, a])
+                    GPR: i32 b => (mi.SW b, [ImmReg $0, a])
                     GPR b => (mi.SD b, [ImmReg $0, a])
                 }
             }

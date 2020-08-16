@@ -343,7 +343,7 @@ impl<'a> ScheduleByBlock<'a> {
 
             if !matches!(
                 ty,
-                Type::Int8 | Type::Int32 | Type::Int64 | Type::F64 | Type::Pointer(_) | Type::Array(_)
+                Type::i8 | Type::i32 | Type::i64 | Type::F64 | Type::Pointer(_) | Type::Array(_)
             ) {
                 unimplemented!()
             };

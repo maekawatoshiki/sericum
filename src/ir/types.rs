@@ -25,13 +25,14 @@ pub enum NonPrimitiveType {
     Struct(StructType),
 }
 
+#[allow(non_camel_case_types)]
 #[derive(Clone, PartialEq, Eq, Copy, Hash)]
 pub enum Type {
     Void,
-    Int1,
-    Int8,
-    Int32,
-    Int64,
+    i1,
+    i8,
+    i32,
+    i64,
     F64,
     Pointer(NonPrimitiveTypeId),
     Array(NonPrimitiveTypeId),
@@ -146,10 +147,10 @@ impl Types {
                     .fields_ty[index.unwrap().as_imm().as_int32() as usize],
             ),
             Type::Void
-            | Type::Int1
-            | Type::Int8
-            | Type::Int32
-            | Type::Int64
+            | Type::i1
+            | Type::i8
+            | Type::i32
+            | Type::i64
             | Type::F64
             | Type::Function(_) => Some(ty),
         }
@@ -162,10 +163,10 @@ impl Types {
 
         match ty {
             Type::Void
-            | Type::Int1
-            | Type::Int8
-            | Type::Int32
-            | Type::Int64
+            | Type::i1
+            | Type::i8
+            | Type::i32
+            | Type::i64
             | Type::F64
             | Type::Function(_) => None,
             Type::Pointer(id) => match indices.len() {
@@ -287,10 +288,10 @@ impl TypesBase {
                     [index.unwrap().as_imm().as_int32() as usize],
             ),
             Type::Void
-            | Type::Int1
-            | Type::Int8
-            | Type::Int32
-            | Type::Int64
+            | Type::i1
+            | Type::i8
+            | Type::i32
+            | Type::i64
             | Type::F64
             | Type::Function(_) => Some(ty),
         }
@@ -303,10 +304,10 @@ impl TypesBase {
 
         match ty {
             Type::Void
-            | Type::Int1
-            | Type::Int8
-            | Type::Int32
-            | Type::Int64
+            | Type::i1
+            | Type::i8
+            | Type::i32
+            | Type::i64
             | Type::F64
             | Type::Function(_) => None,
             Type::Pointer(id) => match indices.len() {
@@ -340,10 +341,10 @@ impl TypesBase {
     pub fn to_string(&self, ty: Type) -> String {
         match ty {
             Type::Void => "void".to_string(),
-            Type::Int1 => "i1".to_string(),
-            Type::Int8 => "i8".to_string(),
-            Type::Int32 => "i32".to_string(),
-            Type::Int64 => "i64".to_string(),
+            Type::i1 => "i1".to_string(),
+            Type::i8 => "i8".to_string(),
+            Type::i32 => "i32".to_string(),
+            Type::i64 => "i64".to_string(),
             Type::F64 => "f64".to_string(),
             Type::Pointer(id) => {
                 let elem_ty = self.non_primitive_types[id].as_pointer();
@@ -373,12 +374,12 @@ impl Type {
     pub fn is_atomic(&self) -> bool {
         matches!(
             self,
-            Self::Void | Self::Int1 | Self::Int8 | Self::Int32 | Self::Int64 | Self::F64
+            Self::Void | Self::i1 | Self::i8 | Self::i32 | Self::i64 | Self::F64
         )
     }
 
     pub fn is_integer(&self) -> bool {
-        matches!(self, Self::Int1 | Self::Int8 | Self::Int32 | Self::Int64)
+        matches!(self, Self::i1 | Self::i8 | Self::i32 | Self::i64)
     }
 
     pub fn is_float(&self) -> bool {
@@ -388,10 +389,10 @@ impl Type {
     pub fn to_string(&self) -> String {
         match self {
             Type::Void => "void".to_string(),
-            Type::Int1 => "i1".to_string(),
-            Type::Int8 => "i8".to_string(),
-            Type::Int32 => "i32".to_string(),
-            Type::Int64 => "i64".to_string(),
+            Type::i1 => "i1".to_string(),
+            Type::i8 => "i8".to_string(),
+            Type::i32 => "i32".to_string(),
+            Type::i64 => "i64".to_string(),
             Type::F64 => "f64".to_string(),
             Type::Pointer(id) => format!("(ty:{})*", id.index()),
             Type::Array(id) => format!("arrty:{}", id.index()),

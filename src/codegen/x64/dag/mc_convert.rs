@@ -188,7 +188,7 @@ impl<'a> ScheduleByBlock<'a> {
                         .with_imp_use(eax),
                 );
 
-                assert_eq!(op2.get_type(&self.cur_func.regs_info), Some(Type::Int32));
+                assert_eq!(op2.get_type(&self.cur_func.regs_info), Some(Type::i32));
                 let inst1 = MachineInst::new(
                     &self.cur_func.regs_info,
                     mov_n_rx(32, &op2).unwrap(),
@@ -232,7 +232,7 @@ impl<'a> ScheduleByBlock<'a> {
                         .with_imp_use(eax),
                 );
 
-                assert_eq!(op2.get_type(&self.cur_func.regs_info), Some(Type::Int32));
+                assert_eq!(op2.get_type(&self.cur_func.regs_info), Some(Type::i32));
                 let inst1 = MachineInst::new(
                     &self.cur_func.regs_info,
                     mov_n_rx(32, &op2).unwrap(),
@@ -417,7 +417,7 @@ impl<'a> ScheduleByBlock<'a> {
 
             if !matches!(
                 ty,
-                Type::Int8 | Type::Int32 | Type::Int64 | Type::F64 | Type::Pointer(_) | Type::Array(_)
+                Type::i8 | Type::i32 | Type::i64 | Type::F64 | Type::Pointer(_) | Type::Array(_)
             ) {
                 unimplemented!()
             };
