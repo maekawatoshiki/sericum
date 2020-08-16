@@ -64,9 +64,9 @@ mod x86_64 {
     fn compile_and_run(c_parent: &str, module: &mut Module) {
         let machine_module = standard_conversion_into_machine_module(module);
         let mut printer = MachineAsmPrinter::new();
-        println!("{:?}", machine_module);
+        // println!("{:?}", machine_module);
         printer.run_on_module(&machine_module);
-        println!("{}", printer.output);
+        // println!("{}", printer.output);
         assemble_and_run(c_parent, &printer.output);
     }
 
@@ -115,7 +115,15 @@ mod x86_64 {
         compile_and_run(
             "#include <assert.h>
         extern int test(int);
-        int main() { assert(test(10) == 55); }",
+        int test_ref(int x) {
+            if (x <= 2) return 1;
+            return test_ref(x - 1) + test_ref(x - 2);
+        }
+        int main() { 
+            for (int i = 0; i < 30; i++)
+                assert(test(i) == test_ref(i)); 
+            return 0;
+        }",
             &mut m,
         );
     }
@@ -199,7 +207,15 @@ mod x86_64 {
         compile_and_run(
             "#include <assert.h>
         extern char test(char);
-        int main() { assert(test(127) == -128); }",
+        char test_ref(char x) {
+            char y = x + 1;
+            return y;
+        }
+        int main() { 
+            for (int i = -128; i <= 127; i++) 
+                assert(test(i) == test_ref(i));
+            return 0;
+        }",
             &mut m,
         );
     }
@@ -224,10 +240,15 @@ mod x86_64 {
         compile_and_run(
             "#include <assert.h>
         extern int test(char);
-        int main() { assert(test('A') == -1); 
-                     assert(test('0') == 0); 
-                     assert(test('4') == 4); 
-                     assert(test('9') == 9); }",
+        int test_ref(char x) {
+            if ('0' <= x && x <= '9') return (int)x - (int)'0';
+            return -1;
+        }
+        int main() { 
+            char x; int i;
+            for (x = -128, i = 0; i < 256; i++, x++) 
+                assert(test(x) == test_ref(x));
+        }",
             &mut m,
         );
     }

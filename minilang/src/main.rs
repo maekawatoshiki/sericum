@@ -437,6 +437,80 @@ fn pass_struct() {
 }
 
 #[test]
+fn pass_mandelbrot() {
+    let input = r#"
+    function test(c_x: f64, c_y: f64, n: i32): i32 {
+        var x_n: f64; x_n = 0.0;
+        var y_n: f64; y_n = 0.0;
+        var x_n_1: f64; var y_n_1: f64;
+        var i: i32;
+        i = 0;
+        while i < n {
+            x_n_1 = x_n*x_n - y_n*y_n + c_x;
+            y_n_1 = x_n * y_n * 2.0 + c_y;
+            if 4.0 < x_n_1*x_n_1 + y_n_1*y_n_1 {
+                return n;
+            } else {
+                x_n = x_n_1;
+                y_n = y_n_1;
+            }
+            i = i + 1;
+        }
+        return 0;
+    }
+    "#;
+    let mut codegen = codegen::CodeGenerator::new();
+    codegen.run(input);
+
+    cilk::ir::mem2reg::Mem2Reg::new().run_on_module(&mut codegen.module);
+    cilk::ir::cse::CommonSubexprElimination::new().run_on_module(&mut codegen.module);
+
+    // println!("{:?}", codegen.module);
+
+    use cilk::codegen::x64::asm::print::MachineAsmPrinter;
+    use cilk::codegen::x64::standard_conversion_into_machine_module;
+    let machine_module = standard_conversion_into_machine_module(&mut codegen.module);
+    let mut printer = MachineAsmPrinter::new();
+    printer.run_on_module(&machine_module);
+    println!("{}", printer.output);
+    assemble_and_run(
+        "
+        #include <assert.h>
+        #include <stdio.h>
+        #include <stdlib.h>
+        extern int test(double, double, int);
+        int test_ref(double c_x, double c_y, int n) {
+            double x_n = 0.0;
+            double y_n = 0.0;
+            double x_n_1; double y_n_1;
+            int i = 0;
+            while (i < n) {
+                x_n_1 = x_n*x_n - y_n*y_n + c_x;
+                y_n_1 = x_n * y_n * 2.0 + c_y;
+                if (4.0 < x_n_1*x_n_1 + y_n_1*y_n_1) {
+                    return n;
+                } else {
+                    x_n = x_n_1;
+                    y_n = y_n_1;
+                }
+                i = i + 1;
+            }
+            return 0;
+        }
+        int main() {
+            srand(123);
+            for (int i = 0; i < 100000; i++) {
+                double x = ((double)rand() / ((double)RAND_MAX + 1)) * 2 - 1;
+                double y = ((double)rand() / ((double)RAND_MAX + 1)) * 2 - 1;
+                assert(test(x, y, 200) == test_ref(x, y, 200));
+            }
+        }",
+        printer.output.as_str(),
+        None,
+    );
+}
+
+#[test]
 fn bubble_sort() {
     let input = r#"
     function sort(a: **i32, len: i32): i32 {
