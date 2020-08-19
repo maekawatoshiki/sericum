@@ -1,4 +1,5 @@
 pub mod calc_spill_weight;
+pub mod calling_conv;
 pub mod inst;
 pub mod inst_def;
 pub mod live_interval_splitter;
