@@ -96,7 +96,6 @@ impl TypeSize for StructType {
 }
 
 pub fn standard_conversion_into_machine_module(module: &mut Module) -> MachineModule {
-    ir::branch_folding::BranchFolding::new().run_on_module(module);
     ir::merge_ret::MergeReturns::new().run_on_module(module);
 
     let mut dag_module = convert::ConvertToDAGModule::new(module).run();
