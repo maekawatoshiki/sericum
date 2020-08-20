@@ -1,7 +1,8 @@
 use super::exec::roundup;
 use super::machine::register::ty2rc;
-pub use crate::codegen::common::machine::frame_object::*;
+use crate::codegen::arch::machine::calling_conv::SystemV;
 use crate::codegen::common::machine::function::MachineFunction;
+pub use crate::codegen::common::machine::{calling_conv::ArgumentRegisterOrder, frame_object::*};
 use crate::ir::types::*;
 use rustc_hash::FxHashMap;
 
@@ -22,6 +23,8 @@ impl FrameObjectsInfo {
 
         let base = &tys.base.borrow();
         let f_ty = base.as_function_ty(f.ty).unwrap();
+
+        let mut arg_reg_order = ArgumentRegisterOrder::new(SystemV::new());
         for (i, param_ty) in f_ty.params_ty.iter().enumerate() {
             // TODO: Correct?
             let byval = f_ty.params_attr.get(&i).map_or(false, |attr| attr.byval);
@@ -34,8 +37,9 @@ impl FrameObjectsInfo {
                 continue;
             }
 
+            // TODO: bug
             let rc = ty2rc(param_ty).unwrap();
-            if rc.get_nth_arg_reg(i).is_none() {
+            if arg_reg_order.next(rc).is_none() {
                 let size = param_ty.size_in_byte(tys) as i32;
                 let align = param_ty.align_in_byte(tys) as i32;
                 offset += size + padding(offset, align);

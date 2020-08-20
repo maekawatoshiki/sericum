@@ -2,10 +2,14 @@
 
 use super::super::machine::register::*;
 use super::super::machine::{inst, inst::*};
-use crate::codegen::arch::dag::{node, node::*};
+use crate::codegen::arch::{
+    dag::{node, node::*},
+    machine::calling_conv::AAPCS64,
+};
 use crate::codegen::common::dag::{basic_block::DAGBasicBlockId, function::*, module::*};
 use crate::codegen::common::machine::{
-    basic_block::*, function::*, inst_def::DefOrUseReg, module::*,
+    basic_block::*, calling_conv::ArgumentRegisterOrder, function::*, inst_def::DefOrUseReg,
+    module::*,
 };
 use crate::ir::types::Type;
 use crate::util::allocator::*;
@@ -338,6 +342,8 @@ impl<'a> ScheduleByBlock<'a> {
             args.push(self.normal_operand(*operand));
         }
 
+        let mut arg_regs_order = ArgumentRegisterOrder::new(AAPCS64::new());
+
         for (i, arg) in args.into_iter().enumerate() {
             let ty = arg.get_type(&self.cur_func.regs_info).unwrap();
 
@@ -349,7 +355,7 @@ impl<'a> ScheduleByBlock<'a> {
             };
 
             let reg_class = ty2rc(&ty).unwrap();
-            let inst = match reg_class.get_nth_arg_reg(i) {
+            let inst = match arg_regs_order.next(reg_class) {
                 Some(arg_reg) => {
                     let r = self.cur_func.regs_info.get_phys_reg(arg_reg);
                     arg_regs.push(r);

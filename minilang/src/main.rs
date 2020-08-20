@@ -437,7 +437,7 @@ fn pass_struct() {
 }
 
 #[test]
-fn pass_mandelbrot() {
+fn rand_mandelbrot() {
     let input = r#"
     function test(c_x: f64, c_y: f64, n: i32): i32 {
         var x_n: f64; x_n = 0.0;
