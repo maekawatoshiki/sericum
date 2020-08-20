@@ -1,7 +1,7 @@
 use super::node::*;
 use crate::{
     codegen::{
-        arch::machine::{calling_conv::SystemV, register::*},
+        arch::machine::{abi::SystemV, register::*},
         common::{dag::convert::ConvertToDAGNode, machine::calling_conv::ArgumentRegisterOrder},
     },
     ir::types::Type,

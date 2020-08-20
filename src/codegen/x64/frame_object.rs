@@ -1,6 +1,6 @@
 use super::exec::roundup;
 use super::machine::register::ty2rc;
-use crate::codegen::arch::machine::calling_conv::SystemV;
+use crate::codegen::arch::machine::abi::SystemV;
 use crate::codegen::common::machine::function::MachineFunction;
 pub use crate::codegen::common::machine::{calling_conv::ArgumentRegisterOrder, frame_object::*};
 use crate::ir::types::*;

@@ -2,7 +2,7 @@
 
 use super::super::machine::register::{PhysReg, RegisterClassKind};
 use crate::codegen::{
-    arch::machine::calling_conv::SystemV, common::machine::calling_conv::ArgumentRegisterOrder,
+    arch::machine::abi::SystemV, common::machine::calling_conv::ArgumentRegisterOrder,
 };
 use crate::{
     codegen::{

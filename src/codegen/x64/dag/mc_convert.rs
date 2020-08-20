@@ -2,7 +2,7 @@
 
 use super::super::machine::{inst, inst::*, register::*};
 use super::{node, node::*};
-use crate::codegen::arch::machine::calling_conv::SystemV;
+use crate::codegen::arch::machine::abi::SystemV;
 use crate::codegen::common::machine::calling_conv::{ArgumentRegisterOrder, CallingConv};
 use crate::codegen::common::{
     dag::{basic_block::*, function::*, module::*},

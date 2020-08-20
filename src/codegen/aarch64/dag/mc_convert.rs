@@ -4,7 +4,7 @@ use super::super::machine::register::*;
 use super::super::machine::{inst, inst::*};
 use crate::codegen::arch::{
     dag::{node, node::*},
-    machine::calling_conv::AAPCS64,
+    machine::abi::AAPCS64,
 };
 use crate::codegen::common::dag::{basic_block::DAGBasicBlockId, function::*, module::*};
 use crate::codegen::common::machine::{
