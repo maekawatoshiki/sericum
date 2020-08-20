@@ -1,11 +1,5 @@
 use crate::codegen::{arch::machine::register::*, common::machine::calling_conv::CallingConv};
 
-macro_rules! to_phys {
-    ($($r:path),*) => {
-        vec![$(($r.as_phys_reg())),*]
-    };
-}
-
 pub struct AAPCS64 {
     gr32: Vec<PhysReg>,
     gr64: Vec<PhysReg>,

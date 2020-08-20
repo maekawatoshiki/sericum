@@ -49,12 +49,6 @@ registers! {
     order gp SP { SP } order gp WSP { WSP }
 }
 
-macro_rules! to_phys {
-    ($($r:path),*) => {
-        vec![$(($r.as_phys_reg())),*]
-    };
-}
-
 thread_local! {
     pub static CALLEE_SAVED_REGS: PhysRegSet = {
         let mut bits = PhysRegSet::new();

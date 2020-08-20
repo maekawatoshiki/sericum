@@ -11,6 +11,13 @@ use std::{
     ops::{Index, IndexMut},
 };
 
+#[macro_export]
+macro_rules! to_phys {
+    ($($r:path),*) => {
+        vec![$(($r.as_phys_reg())),*]
+    };
+}
+
 pub trait TargetRegisterTrait: Copy + Clone {
     fn as_phys_reg(&self) -> PhysReg;
     fn sub_reg(&self) -> Option<PhysReg>;

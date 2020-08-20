@@ -11,4 +11,5 @@ pub mod liveness;
 pub mod module;
 pub mod phi_elimination;
 pub mod regalloc;
+#[macro_use]
 pub mod register;

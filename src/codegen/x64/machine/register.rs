@@ -42,12 +42,6 @@ registers! {
     order gp XMM { XMM0, XMM1, XMM2, XMM3, XMM4, XMM5 }
 }
 
-macro_rules! to_phys {
-    ($($r:path),*) => {
-        vec![$(($r.as_phys_reg())),*]
-    };
-}
-
 thread_local! {
     pub static CALLEE_SAVED_REGS: PhysRegSet = {
         let mut bits = PhysRegSet::new();
