@@ -1,7 +1,14 @@
-use super::super::{dag::mc_convert::mov_mx, frame_object::*, machine::register::*};
+use super::super::{
+    dag::mc_convert::mov_mx,
+    frame_object::*,
+    machine::{calling_conv::SystemV, register::*},
+};
 use super::inst::*;
 use crate::codegen::common::machine::{
-    builder::*, function::MachineFunction, module::MachineModule,
+    builder::*,
+    calling_conv::{ArgumentRegisterOrder, CallingConv},
+    function::MachineFunction,
+    module::MachineModule,
 };
 use crate::{ir::types::*, traits::pass::ModulePassTrait};
 use rustc_hash::FxHashMap;
@@ -194,7 +201,7 @@ impl<'a> CopyArgs<'a> {
     }
 
     pub fn copy(mut self) {
-        let mut arg_regs_order = GeneralArgRegOrder::new();
+        let mut arg_regs_order = ArgumentRegisterOrder::new(SystemV::new());
         for (i, &ty) in self.params_ty.iter().enumerate() {
             let byval = self.params_attr.get(&i).map_or(false, |attr| attr.byval);
             if byval {
@@ -217,7 +224,14 @@ impl<'a> CopyArgs<'a> {
         }
     }
 
-    fn copy_struct(&mut self, ty: Type, arg_regs_order: &mut GeneralArgRegOrder, i: usize) {
+    fn copy_struct<ABI: CallingConv>(
+        &mut self,
+        ty: Type,
+        arg_regs_order: &mut ArgumentRegisterOrder<ABI>,
+        i: usize,
+    ) where
+        ABI: CallingConv,
+    {
         let base = self.builder.function.types.base.clone();
         let base = base.borrow();
         let struct_ty = base.as_struct_ty(ty).unwrap();
@@ -311,7 +325,10 @@ impl<'a> CopyArgs<'a> {
         }
     }
 
-    fn copy_f64(&mut self, arg_regs_order: &mut GeneralArgRegOrder, i: usize) {
+    fn copy_f64<ABI>(&mut self, arg_regs_order: &mut ArgumentRegisterOrder<ABI>, i: usize)
+    where
+        ABI: CallingConv,
+    {
         let ret_reg = XMM::XMM0.as_phys_reg();
         let dst = FrameIndexInfo::new(Type::f64, FrameIndexKind::Arg(i));
         let src = match arg_regs_order.next(RegisterClassKind::XMM) {
@@ -346,13 +363,15 @@ impl<'a> CopyArgs<'a> {
         self.builder.insert(inst)
     }
 
-    fn copy_int(
+    fn copy_int<ABI>(
         &mut self,
         ty: Type,
-        arg_regs_order: &mut GeneralArgRegOrder,
+        arg_regs_order: &mut ArgumentRegisterOrder<ABI>,
         i: usize,
         bit: usize,
-    ) {
+    ) where
+        ABI: CallingConv,
+    {
         let (ax, rc, movrm) = match bit {
             8 => (
                 GR8::AL.as_phys_reg(),

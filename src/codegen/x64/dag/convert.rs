@@ -1,12 +1,16 @@
 use super::node::*;
-use crate::codegen::arch::machine::register::*;
-use crate::codegen::common::dag::convert::ConvertToDAGNode;
-use crate::ir::types::Type;
+use crate::{
+    codegen::{
+        arch::machine::{calling_conv::SystemV, register::*},
+        common::{dag::convert::ConvertToDAGNode, machine::calling_conv::ArgumentRegisterOrder},
+    },
+    ir::types::Type,
+};
 
 impl<'a> ConvertToDAGNode<'a> {
     // TODO: Refine
     pub fn copy_reg_args(&mut self) {
-        let mut arg_regs_order = GeneralArgRegOrder::new();
+        let mut arg_regs_order = ArgumentRegisterOrder::new(SystemV::new());
 
         for i in 0..self.func.get_params_len() {
             let byval = self.func.get_param_attr(i).map_or(false, |attr| attr.byval);

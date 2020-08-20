@@ -2,6 +2,8 @@
 
 use super::super::machine::{inst, inst::*, register::*};
 use super::{node, node::*};
+use crate::codegen::arch::machine::calling_conv::SystemV;
+use crate::codegen::common::machine::calling_conv::{ArgumentRegisterOrder, CallingConv};
 use crate::codegen::common::{
     dag::{basic_block::*, function::*, module::*},
     machine::{basic_block::*, function::*, inst_def::DefOrUseReg, module::*},
@@ -391,7 +393,7 @@ impl<'a> ScheduleByBlock<'a> {
             }
         }
 
-        let mut arg_regs_order = GeneralArgRegOrder::new();
+        let mut arg_regs_order = ArgumentRegisterOrder::new(SystemV::new());
 
         for (i, arg) in args.into_iter().enumerate() {
             let (ty, byval) = {
@@ -503,13 +505,16 @@ impl<'a> ScheduleByBlock<'a> {
         self.append_inst(copy)
     }
 
-    fn pass_struct_byval(
+    fn pass_struct_byval<ABI>(
         &mut self,
-        arg_regs_order: &mut GeneralArgRegOrder,
+        arg_regs_order: &mut ArgumentRegisterOrder<ABI>,
         off: &mut i32,
         ty: Type,
         fi: FrameIndexInfo,
-    ) -> Vec<RegisterId> {
+    ) -> Vec<RegisterId>
+    where
+        ABI: CallingConv,
+    {
         let mut arg_regs = vec![];
         let struct_ty = self.cur_func.types.get_element_ty(ty, None).unwrap();
         let base = &self.cur_func.types.base.borrow();
