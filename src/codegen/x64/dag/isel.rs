@@ -88,6 +88,10 @@ impl MISelector {
                 }
             }
             (ir.Sub a, b) {
+                GR8 a {
+                    GR8 b => (mi.SUBrr8 a, b)
+                    imm8 b => (mi.SUBri8 a, b)
+                }
                 GR32 a {
                     GR32  b => (mi.SUBrr32   a, b)
                     imm32 b => (mi.SUBri32   a, b) }
@@ -108,6 +112,9 @@ impl MISelector {
                 }
             }
             (ir.Mul a, b) {
+                GR8 a {
+                    GR8  b => (mi.IMULrr32 a, b)
+                    imm8 b => (mi.IMULrri8 a, b) }
                 GR32 a {
                     GR32  b => (mi.IMULrr32  a, b)
                     imm32 b => (mi.IMULrri32 a, b) }

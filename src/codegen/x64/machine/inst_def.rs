@@ -122,6 +122,24 @@ mod inst {
                 .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::XMM)])
                 .add_tie(DefOrUseReg::Def(0), DefOrUseReg::Use(0))
         };
+        pub static ref SUBrr8: TargetInstDef = {
+            TargetInstDef::new("sub", TargetOpcode::SUBrr8)
+                .set_uses(vec![
+                    TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR8)),
+                    TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR8)),
+                ])
+                .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR8)])
+                .add_tie(DefOrUseReg::Def(0), DefOrUseReg::Use(0))
+        };
+        pub static ref SUBri8: TargetInstDef = {
+            TargetInstDef::new("sub", TargetOpcode::SUBri8)
+                .set_uses(vec![
+                    TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR8)),
+                    TargetOperand::Immediate(TargetImmediate::I8),
+                ])
+                .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR8)])
+                .add_tie(DefOrUseReg::Def(0), DefOrUseReg::Use(0))
+        };
         pub static ref SUBrr32: TargetInstDef = {
             TargetInstDef::new("sub", TargetOpcode::SUBrr32)
                 .set_uses(vec![
@@ -166,6 +184,23 @@ mod inst {
                 ])
                 .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::XMM)])
                 .add_tie(DefOrUseReg::Def(0), DefOrUseReg::Use(0))
+        };
+        // pub static ref IMULrr8: TargetInstDef = {
+        //     TargetInstDef::new("imul", TargetOpcode::IMULrr8)
+        //         .set_uses(vec![
+        //             TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR8)),
+        //             TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR8)),
+        //         ])
+        //         .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR8)])
+        //         .add_tie(DefOrUseReg::Def(0), DefOrUseReg::Use(0))
+        // };
+        pub static ref IMULrri8: TargetInstDef = {
+            TargetInstDef::new("imul", TargetOpcode::IMULrri8)
+                .set_uses(vec![
+                    TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR8)),
+                    TargetOperand::Immediate(TargetImmediate::I8),
+                ])
+                .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR8)])
         };
         pub static ref IMULrr32: TargetInstDef = {
             TargetInstDef::new("imul", TargetOpcode::IMULrr32)
@@ -488,11 +523,15 @@ pub enum TargetOpcode {
     ADDr64i32,
     ADDSDrr,
     ADDSDrm,
+    SUBrr8,
+    SUBri8,
     SUBrr32,
     SUBri32,
     SUBr64i32,
     SUBSDrr,
     SUBSDrm,
+    // IMULrr8,
+    IMULrri8,
     IMULrr32,
     IMULrri32,
     IMULrr64i32,
@@ -569,11 +608,15 @@ impl TargetOpcode {
             Self::ADDr64i32 => Some(&*inst::ADDr64i32),
             Self::ADDSDrr => Some(&*inst::ADDSDrr),
             Self::ADDSDrm => Some(&*inst::ADDSDrm),
+            Self::SUBrr8 => Some(&*inst::SUBrr8),
+            Self::SUBri8 => Some(&*inst::SUBri8),
             Self::SUBrr32 => Some(&*inst::SUBrr32),
             Self::SUBri32 => Some(&*inst::SUBri32),
             Self::SUBr64i32 => Some(&*inst::SUBr64i32),
             Self::SUBSDrr => Some(&*inst::SUBSDrr),
             Self::SUBSDrm => Some(&*inst::SUBSDrm),
+            // Self::IMULrr8 => Some(&*inst::IMULrr8),
+            Self::IMULrri8 => Some(&*inst::IMULrri8),
             Self::IMULrr32 => Some(&*inst::IMULrr32),
             Self::IMULrri32 => Some(&*inst::IMULrri32),
             Self::IMULrr64i32 => Some(&*inst::IMULrr64i32),

@@ -51,14 +51,15 @@ mod x86_64 {
             .unwrap();
         assert!(compilation.success());
 
+        println!("{}", output_name);
         let execution = process::Command::new(output_name.as_str())
             .status()
             .unwrap();
         assert!(execution.success());
 
-        fs::remove_file(output_name).unwrap();
-        fs::remove_file(parent_name).unwrap();
-        fs::remove_file(target_name).unwrap();
+        // fs::remove_file(output_name).unwrap();
+        // fs::remove_file(parent_name).unwrap();
+        // fs::remove_file(target_name).unwrap();
     }
 
     fn compile_and_run(c_parent: &str, module: &mut Module) {
@@ -66,7 +67,7 @@ mod x86_64 {
         let mut printer = MachineAsmPrinter::new();
         // println!("{:?}", machine_module);
         printer.run_on_module(&machine_module);
-        // println!("{}", printer.output);
+        println!("{}", printer.output);
         assemble_and_run(c_parent, &printer.output);
     }
 
@@ -194,26 +195,70 @@ mod x86_64 {
     }
 
     #[test]
-    fn asm_var_i8() {
+    fn asm_load_store_i8() {
         let mut m = Module::new("cilk");
         cilk_ir!(m; define [i8] test [(i8)] {
             entry:
                 x = alloca i8;
-                a = add (%arg.0), (i8 1);
-                store (%a), (%x);
+                store (%arg.0), (%x);
                 y = load (%x);
                 ret (%y);
         });
         compile_and_run(
             "#include <assert.h>
         extern char test(char);
-        char test_ref(char x) {
-            char y = x + 1;
-            return y;
-        }
+        char test_ref(char x) { char y = x; return y; }
         int main() { 
-            for (int i = -128; i <= 127; i++) 
-                assert(test(i) == test_ref(i));
+            for (int i = -128; i <= 127; i++) assert(test(i) == test_ref(i));
+            return 0;
+        }",
+            &mut m,
+        );
+    }
+
+    #[test]
+    fn asm_arith_i8() {
+        let mut m = Module::new("cilk");
+        cilk_ir!(m; define [i8] test_add [(i8), (i8)] {
+            entry:
+                x = add (%arg.0), (%arg.1);
+                ret (%x);
+        });
+        cilk_ir!(m; define [i8] test_sub [(i8), (i8)] {
+            entry:
+                x = sub (%arg.0), (%arg.1);
+                ret (%x);
+        });
+        cilk_ir!(m; define [i8] test_mul [(i8), (i8)] {
+            entry:
+                x = mul (%arg.0), (%arg.1);
+                ret (%x);
+        });
+        cilk_ir!(m; define [i8] test_div [(i8), (i8)] {
+            entry:
+                x = div (%arg.0), (%arg.1);
+                ret (%x);
+        });
+        compile_and_run(
+            "#include <assert.h>
+            #include <stdio.h>
+             #include <stdlib.h>
+        extern char test_add(char, char);
+        extern char test_sub(char, char);
+        extern char test_mul(char, char);
+        extern char test_div(char, char);
+        char test_add_ref(char x, char y) { return x + y; }
+        char test_sub_ref(char x, char y) { return x - y; }
+        char test_mul_ref(char x, char y) { return x * y; }
+        char test_div_ref(char x, char y) { return x / y; }
+        int main() { 
+            for (int i = 0; i < 256; i++) {
+                char x = (char) rand(), y = (char) rand();
+                assert(test_add(x, y) == test_add_ref(x, y));
+                assert(test_sub(x, y) == test_sub_ref(x, y));
+                assert(test_mul(x, y) == test_mul_ref(x, y));
+                if (y != 0) assert(test_div(x, y) == test_div_ref(x, y));
+            }
             return 0;
         }",
             &mut m,

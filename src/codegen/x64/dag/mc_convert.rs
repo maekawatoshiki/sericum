@@ -173,15 +173,25 @@ impl<'a> ScheduleByBlock<'a> {
                 self.append_inst(phi_inst)
             }
             NodeKind::IR(IRNodeKind::Div) => {
-                let eax = self.cur_func.regs_info.get_phys_reg(GR32::EAX);
-                let edx = self.cur_func.regs_info.get_phys_reg(GR32::EDX);
+                let regs = match node.ty {
+                    Type::i8 => to_phys!(GR32::EAX, GR32::EDX),
+                    Type::i32 => to_phys!(GR32::EAX, GR32::EDX),
+                    // Type::i64 => to_phys!(GR64::RAX, GR64::RDX),
+                    _ => unimplemented!(),
+                };
+                let eax = self.cur_func.regs_info.get_phys_reg(regs[0]);
+                let edx = self.cur_func.regs_info.get_phys_reg(regs[1]);
 
                 let op1 = self.normal_operand(node.operand[0]);
                 let op2 = self.normal_operand(node.operand[1]);
 
                 self.append_inst(
-                    MachineInst::new_simple(mov_n_rx(32, &op1).unwrap(), vec![op1], self.cur_bb)
-                        .with_def(vec![eax]),
+                    MachineInst::new_simple(
+                        mov_r_x(regs[0].reg_class(), &op1).unwrap(),
+                        vec![op1],
+                        self.cur_bb,
+                    )
+                    .with_def(vec![eax]),
                 );
 
                 self.append_inst(
@@ -190,12 +200,12 @@ impl<'a> ScheduleByBlock<'a> {
                         .with_imp_use(eax),
                 );
 
-                assert_eq!(op2.get_type(&self.cur_func.regs_info), Some(Type::i32));
+                // assert_eq!(op2.get_type(&self.cur_func.regs_info), Some(Type::i32));
                 let inst1 = MachineInst::new(
                     &self.cur_func.regs_info,
-                    mov_n_rx(32, &op2).unwrap(),
+                    mov_r_x(regs[0].reg_class(), &op2).unwrap(),
                     vec![op2],
-                    Some(RegisterClassKind::GR32), // TODO: support other types
+                    Some(regs[0].reg_class()), // TODO: support other types
                     self.cur_bb,
                 );
                 let op2 = MachineOperand::Register(inst1.def[0]);
@@ -211,7 +221,7 @@ impl<'a> ScheduleByBlock<'a> {
                     &self.cur_func.regs_info,
                     MachineOpcode::Copy,
                     vec![MachineOperand::Register(eax)],
-                    Some(RegisterClassKind::GR32), // TODO
+                    Some(regs[0].reg_class()), // TODO
                     self.cur_bb,
                 );
                 self.append_inst(copy_inst)
@@ -682,6 +692,23 @@ impl<'a> ScheduleByBlock<'a> {
         let inst_id = self.inst_arena.alloc(&self.cur_func.regs_info, inst);
         self.iseq.push(inst_id);
         inst_id
+    }
+}
+
+pub fn mov_r_x(rc: RegisterClassKind, x: &MachineOperand) -> Option<MachineOpcode> {
+    let mov8rx = [MachineOpcode::MOVrr8, MachineOpcode::MOVri8];
+    let mov32rx = [MachineOpcode::MOVrr32, MachineOpcode::MOVri32];
+    let mov64rx = [MachineOpcode::MOVrr64, MachineOpcode::MOVri64];
+    let idx = match x {
+        MachineOperand::Register(_) => 0,
+        MachineOperand::Constant(_) => 1,
+        _ => return None,
+    };
+    match rc {
+        RegisterClassKind::GR8 => Some(mov8rx[idx]),
+        RegisterClassKind::GR32 => Some(mov32rx[idx]),
+        RegisterClassKind::GR64 => Some(mov64rx[idx]),
+        _ => None,
     }
 }
 
