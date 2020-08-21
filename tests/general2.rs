@@ -237,6 +237,38 @@ mod x86_64 {
     }
 
     #[test]
+    fn asm_strlen() {
+        let mut m = Module::new("cilk");
+        cilk_ir!(m; define [i32] mystrlen [(ptr ptr i8)] {
+            entry:
+                len = alloca i32;
+                store (i32 0), (%len);
+                br l1;
+            l1:
+                len_ = load (%len);
+                c = gep (%arg.0), [(i32 0), (%len_)];
+                c = load (%c);
+                c = icmp eq (%c), (i8 0);
+                br (%c) l3, l2;
+            l2:
+                a = add (%len_), (i32 1);
+                store (%a), (%len);
+                br l1;
+            l3:
+                ret (%len_);
+        });
+        compile_and_run(
+            "#include <assert.h>
+        extern int mystrlen(char*);
+        int main() { 
+            assert(mystrlen(\"hello\") == 5);
+            return 0;
+        }",
+            &mut m,
+        );
+    }
+
+    #[test]
     fn asm_arith_i8() {
         let mut m = Module::new("cilk");
         cilk_ir!(m; define [i8] test_add [(i8), (i8)] {
