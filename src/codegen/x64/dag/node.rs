@@ -6,6 +6,7 @@ pub enum MemNodeKind {
     BaseFiOff,
     BaseFiAlignOff,
     BaseAlignOff,
+    BaseOff,
     Base,
     Address,
     AddressOff,

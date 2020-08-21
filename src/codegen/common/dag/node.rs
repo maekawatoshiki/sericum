@@ -198,6 +198,16 @@ impl ConstantKind {
         }
     }
 
+    pub fn is_int(&self, i: i8) -> bool {
+        match self {
+            ConstantKind::Int8(x) if *x == i => true,
+            ConstantKind::Int32(x) if *x as i8 == i => true,
+            ConstantKind::Int64(x) if *x as i8 == i => true,
+            ConstantKind::F64(_) => false,
+            _ => false,
+        }
+    }
+
     pub fn as_i32(&self) -> i32 {
         match self {
             Self::Int32(i) => *i,

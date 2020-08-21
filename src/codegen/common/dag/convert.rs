@@ -562,8 +562,8 @@ impl<'a> ConvertToDAGNode<'a> {
                         vec![],
                         Type::i32,
                     ));
-                    let cast = sext_if_necessary(self.node_heap, idx, Type::i64);
-                    assert!(cast.ty == Type::i64);
+                    let cast = sext_if_necessary(&self.func.types, self.node_heap, idx, Type::i64);
+                    // assert!(cast.ty == Type::i64);
                     self.node_heap.alloc(DAGNode::new(
                         NodeKind::IR(IRNodeKind::Mul),
                         vec![cast, tysz],
@@ -621,8 +621,13 @@ impl<'a> ConvertToDAGNode<'a> {
     }
 }
 
-fn sext_if_necessary(heap: &mut DAGHeap, node: Raw<DAGNode>, to: Type) -> Raw<DAGNode> {
-    if node.ty == to {
+fn sext_if_necessary(
+    types: &Types,
+    heap: &mut DAGHeap,
+    node: Raw<DAGNode>,
+    to: Type,
+) -> Raw<DAGNode> {
+    if node.ty.size_in_bits(types) >= to.size_in_bits(types) {
         return node;
     }
 

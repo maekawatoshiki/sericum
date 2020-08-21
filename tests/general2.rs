@@ -217,6 +217,26 @@ mod x86_64 {
     }
 
     #[test]
+    fn asm_array_load_i8() {
+        let mut m = Module::new("cilk");
+        cilk_ir!(m; define [i8] test [(ptr ptr i8), (i32)] {
+            entry:
+                a = gep (%arg.0), [(i32 0), (%arg.1)];
+                b = load (%a);
+                ret (%b);
+        });
+        compile_and_run(
+            "#include <assert.h>
+        extern char test(char*, int);
+        int main() { 
+            assert(test(\"hello\", 1) == 'e');
+            return 0;
+        }",
+            &mut m,
+        );
+    }
+
+    #[test]
     fn asm_arith_i8() {
         let mut m = Module::new("cilk");
         cilk_ir!(m; define [i8] test_add [(i8), (i8)] {

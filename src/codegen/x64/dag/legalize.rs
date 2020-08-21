@@ -106,6 +106,19 @@ impl Legalize {
                 GR64 x {
                     (ir.Mul z, u) y {
                         imm32 u => (mi.MOVrm32 [BaseAlignOff x, u, z]) } } } }
+        (ir.Load dst): i8 {
+            (ir.Add x, y) dst {
+                (ir.FIAddr fi) x {
+                    imm32 y => (mi.MOVrm8 [BaseFiOff %rbp, fi, y])
+                    (ir.Mul z, u) y {
+                        imm32 u => (mi.MOVrm8 [BaseFiAlignOff %rbp, fi, u, z]) } }
+                (ir.GlobalAddr g) x {
+                    imm32 y => (mi.MOVrm8 [AddressOff g, y])
+                    (ir.Mul z, u) y {
+                        imm32 u => (mi.MOVrm8 [AddressAlignOff g, u, z]) } }
+                GR64 x {
+                    imm32 y => (mi.MOVrm8 [BaseOff x, y])
+                    GR64  y => (mi.MOVrm8 [BaseAlignOff x, $1, y]) } } }
         (ir.Load dst): f64 {
             (ir.Add x, y) dst {
                 (ir.FIAddr fi) x {
