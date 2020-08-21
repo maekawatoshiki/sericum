@@ -1,47 +1,33 @@
 use super::node::*;
-use crate::{
-    codegen::{
-        arch::machine::{abi::SystemV, register::*},
-        common::{dag::convert::ConvertToDAGNode, machine::calling_conv::ArgumentRegisterOrder},
+use crate::codegen::{
+    arch::machine::{abi::SystemV, register::*},
+    common::{
+        dag::convert::ConvertToDAGNode,
+        machine::calling_conv::{ArgumentRegisterOrder, CallingConv},
     },
-    ir::types::Type,
 };
 
 impl<'a> ConvertToDAGNode<'a> {
     // TODO: Refine
     pub fn copy_reg_args(&mut self) {
-        let mut arg_regs_order = ArgumentRegisterOrder::new(SystemV::new());
+        let abi = SystemV::new();
+        let mut arg_regs_order = ArgumentRegisterOrder::new(&abi);
 
         for i in 0..self.func.get_params_len() {
             let byval = self.func.get_param_attr(i).map_or(false, |attr| attr.byval);
             if let Some(ty) = self.func.get_param_type(i) {
                 if byval {
-                    let struct_ty = self.func.types.get_element_ty(ty, None).unwrap();
                     let base = &self.func.types.base.borrow();
-                    let struct_ty = base.as_struct_ty(struct_ty).unwrap();
+                    let struct_ty = base
+                        .as_struct_ty(base.get_element_ty(ty, None).unwrap())
+                        .unwrap();
                     let sz = struct_ty.size();
-
-                    if sz <= 16 {
-                        let mov8 = sz / 8;
-                        let mov4 = (sz - 8 * mov8) / 4;
-                        let mut off = 0;
-                        assert!((sz - 8 * mov8) % 4 == 0);
-
-                        for (c, s, rc) in vec![
-                            (mov8, 8, RegisterClassKind::GR64),
-                            (mov4, 4, RegisterClassKind::GR32),
-                        ] {
-                            for _ in 0..c {
-                                if struct_ty.get_type_at(off) == Some(&Type::f64) {
-                                    arg_regs_order.next(RegisterClassKind::XMM);
-                                } else {
-                                    arg_regs_order.next(rc);
-                                }
-                                off += s;
-                            }
+                    let regs_classes = SystemV::reg_classes_used_for_passing_byval(struct_ty);
+                    if sz <= 16 && arg_regs_order.regs_available_for(&regs_classes) {
+                        for rc in regs_classes {
+                            assert!(arg_regs_order.next(rc).is_some())
                         }
                     }
-
                     continue;
                 }
 

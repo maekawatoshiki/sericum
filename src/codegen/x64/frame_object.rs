@@ -1,6 +1,7 @@
 use super::exec::roundup;
 use super::machine::register::ty2rc;
 use crate::codegen::arch::machine::abi::SystemV;
+use crate::codegen::common::machine::calling_conv::CallingConv;
 use crate::codegen::common::machine::function::MachineFunction;
 pub use crate::codegen::common::machine::{calling_conv::ArgumentRegisterOrder, frame_object::*};
 use crate::ir::types::*;
@@ -24,16 +25,22 @@ impl FrameObjectsInfo {
         let base = &tys.base.borrow();
         let f_ty = base.as_function_ty(f.ty).unwrap();
 
-        let mut arg_reg_order = ArgumentRegisterOrder::new(SystemV::new());
+        let abi = SystemV::new();
+        let mut arg_reg_order = ArgumentRegisterOrder::new(&abi);
+
         for (i, param_ty) in f_ty.params_ty.iter().enumerate() {
             // TODO: Correct?
             let byval = f_ty.params_attr.get(&i).map_or(false, |attr| attr.byval);
             if byval {
-                let param_ty = base.get_element_ty(*param_ty, None).unwrap();
+                let param_ty = base.get_element_ty(*param_ty, None).unwrap(); // param_ty = StructType
+                let struct_ty = base.as_struct_ty(param_ty).unwrap();
                 let size = param_ty.size_in_byte(tys) as i32;
                 let align = param_ty.align_in_byte(tys) as i32;
                 offset += size + padding(offset, align);
                 offset_map.insert(FrameIndexKind::Arg(i), offset);
+                for rc in SystemV::reg_classes_used_for_passing_byval(struct_ty) {
+                    arg_reg_order.next(rc);
+                }
                 continue;
             }
 

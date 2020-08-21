@@ -1,5 +1,9 @@
-use crate::codegen::{arch::machine::register::*, common::machine::calling_conv::CallingConv};
+use crate::{
+    codegen::{arch::machine::register::*, common::machine::calling_conv::CallingConv},
+    ir::types::{StructType, Type},
+};
 
+#[derive(Clone)]
 pub struct SystemV {
     gr8: Vec<PhysReg>,
     gr32: Vec<PhysReg>,
@@ -28,5 +32,32 @@ impl CallingConv for SystemV {
             RegisterClassKind::XMM => self.xmm.get(nth),
         }
         .map_or(None, |r| Some(*r))
+    }
+
+    fn reg_classes_used_for_passing_byval(struct_ty: &StructType) -> Vec<RegisterClassKind> {
+        let sz = struct_ty.size();
+        let moves_by_8_bytes = sz / 8;
+        let moves_by_4_bytes = (sz - 8 * moves_by_8_bytes) / 4;
+        assert!((sz - 8 * moves_by_8_bytes) % 4 == 0);
+
+        let mut regs = vec![];
+
+        if sz <= 16 {
+            let mut off = 0;
+            for &(count, size, rc) in &[
+                (moves_by_8_bytes, 8, RegisterClassKind::GR64),
+                (moves_by_4_bytes, 4, RegisterClassKind::GR32),
+            ] {
+                for _ in 0..count {
+                    let float = struct_ty.get_type_at(off) == Some(&Type::f64);
+                    regs.push(if float { RegisterClassKind::XMM } else { rc });
+                    off += size;
+                }
+            }
+            return regs;
+        }
+
+        // the size of struct_ty is over 16, so put it onto stack
+        vec![]
     }
 }

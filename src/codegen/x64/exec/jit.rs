@@ -127,7 +127,8 @@ impl JITCompiler {
         args: Vec<GenericValue>,
     ) -> GenericValue {
         let entry = self.asm.offset();
-        let mut arg_reg_order = ArgumentRegisterOrder::new(SystemV::new());
+        let abi = SystemV::new();
+        let mut arg_reg_order = ArgumentRegisterOrder::new(&abi);
 
         for (_idx, arg) in args.iter().enumerate() {
             match arg {

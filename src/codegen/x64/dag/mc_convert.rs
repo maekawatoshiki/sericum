@@ -393,7 +393,8 @@ impl<'a> ScheduleByBlock<'a> {
             }
         }
 
-        let mut arg_regs_order = ArgumentRegisterOrder::new(SystemV::new());
+        let abi = SystemV::new();
+        let mut arg_regs_order = ArgumentRegisterOrder::new(&abi);
 
         for (i, arg) in args.into_iter().enumerate() {
             let (ty, byval) = {
@@ -524,41 +525,39 @@ impl<'a> ScheduleByBlock<'a> {
         let mov4 = (sz - 8 * mov8) / 4;
         let rbp = self.cur_func.regs_info.get_phys_reg(GR64::RBP);
         assert!((sz - 8 * mov8) % 4 == 0);
+        let regs_classes = SystemV::reg_classes_used_for_passing_byval(struct_ty);
 
-        if sz <= 16 {
+        if sz <= 16 && arg_regs_order.regs_available_for(&regs_classes) {
             let mut off = 0;
-            for (c, s, rc, op) in vec![
-                (mov8, 8, RegisterClassKind::GR64, MachineOpcode::MOVrm64),
-                (mov4, 4, RegisterClassKind::GR32, MachineOpcode::MOVrm32),
-            ]
-            .into_iter()
-            {
-                for _ in 0..c {
-                    let xmm = struct_ty.get_type_at(off) == Some(&Type::f64);
-                    let r = self.cur_func.regs_info.get_phys_reg(
-                        arg_regs_order
-                            .next(if xmm { RegisterClassKind::XMM } else { rc })
-                            .unwrap(),
-                    );
-                    arg_regs.push(r);
-                    let mem = if off == 0 {
-                        MachineOperand::Mem(MachineMemOperand::BaseFi(rbp, fi.clone()))
-                    } else {
-                        MachineOperand::Mem(MachineMemOperand::BaseFiOff(
-                            rbp,
-                            fi.clone(),
-                            off as i32,
-                        ))
-                    };
-                    off += s;
-                    let mov = MachineInst::new_simple(
-                        if xmm { MachineOpcode::MOVSDrm } else { op },
-                        vec![mem],
-                        self.cur_bb,
-                    )
-                    .with_def(vec![r]);
-                    self.append_inst(mov);
-                }
+            for &rc in &regs_classes {
+                let r = self
+                    .cur_func
+                    .regs_info
+                    .get_phys_reg(arg_regs_order.next(rc).unwrap());
+                arg_regs.push(r);
+
+                let mem = MachineOperand::Mem(if off == 0 {
+                    MachineMemOperand::BaseFi(rbp, fi.clone())
+                } else {
+                    MachineMemOperand::BaseFiOff(rbp, fi.clone(), off as i32)
+                });
+
+                let mov = MachineInst::new_simple(
+                    match rc {
+                        RegisterClassKind::GR32 => MachineOpcode::MOVrm32,
+                        RegisterClassKind::GR64 => MachineOpcode::MOVrm64,
+                        RegisterClassKind::XMM => MachineOpcode::MOVSDrm,
+                        RegisterClassKind::GR8 => unimplemented!(),
+                    },
+                    vec![mem],
+                    self.cur_bb,
+                )
+                .with_def(vec![r]);
+                self.append_inst(mov);
+                off += match rc {
+                    RegisterClassKind::XMM => 8,
+                    _ => rc.size_in_byte(),
+                };
             }
             return arg_regs;
         }

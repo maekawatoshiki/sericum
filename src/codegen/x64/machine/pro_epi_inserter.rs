@@ -201,7 +201,8 @@ impl<'a> CopyArgs<'a> {
     }
 
     pub fn copy(mut self) {
-        let mut arg_regs_order = ArgumentRegisterOrder::new(SystemV::new());
+        let abi = SystemV::new();
+        let mut arg_regs_order = ArgumentRegisterOrder::new(&abi);
         for (i, &ty) in self.params_ty.iter().enumerate() {
             let byval = self.params_attr.get(&i).map_or(false, |attr| attr.byval);
             if byval {
@@ -239,45 +240,41 @@ impl<'a> CopyArgs<'a> {
         let mov8 = sz / 8;
         let mov4 = (sz - 8 * mov8) / 4;
         assert!((sz - 8 * mov8) % 4 == 0);
-
         let rbp = self.builder.function.regs_info.get_phys_reg(GR64::RBP);
+        let reg_classes = SystemV::reg_classes_used_for_passing_byval(struct_ty);
 
-        if sz <= 16 {
+        if sz <= 16 && arg_regs_order.regs_available_for(&reg_classes) {
             let mut off = 0;
-
-            for (c, s, rc, op) in vec![
-                (mov8, 8, RegisterClassKind::GR64, MachineOpcode::MOVmr64),
-                (mov4, 4, RegisterClassKind::GR32, MachineOpcode::MOVmr32),
-            ]
-            .into_iter()
-            {
-                for _ in 0..c {
-                    let xmm = struct_ty.get_type_at(off) == Some(&Type::f64);
-                    let r = self.builder.function.regs_info.get_phys_reg(
-                        arg_regs_order
-                            .next(if xmm { RegisterClassKind::XMM } else { rc })
-                            .unwrap(),
-                    );
-                    let mem = if off == 0 {
-                        MachineOperand::Mem(MachineMemOperand::BaseFi(
-                            rbp,
-                            FrameIndexInfo::new(ty, FrameIndexKind::Arg(i)),
-                        ))
-                    } else {
-                        MachineOperand::Mem(MachineMemOperand::BaseFiOff(
-                            rbp,
-                            FrameIndexInfo::new(ty, FrameIndexKind::Arg(i)),
-                            off as i32,
-                        ))
-                    };
-                    off += s;
-                    let mov = MachineInst::new_simple(
-                        if xmm { MachineOpcode::MOVSDmr } else { op },
-                        vec![mem, MachineOperand::Register(r)],
-                        self.builder.get_cur_bb().unwrap(),
-                    );
-                    self.builder.insert(mov);
-                }
+            for rc in reg_classes {
+                let r = self
+                    .builder
+                    .function
+                    .regs_info
+                    .get_phys_reg(arg_regs_order.next(rc).unwrap());
+                let mem = MachineOperand::Mem(if off == 0 {
+                    MachineMemOperand::BaseFi(rbp, FrameIndexInfo::new(ty, FrameIndexKind::Arg(i)))
+                } else {
+                    MachineMemOperand::BaseFiOff(
+                        rbp,
+                        FrameIndexInfo::new(ty, FrameIndexKind::Arg(i)),
+                        off as i32,
+                    )
+                });
+                let mov = MachineInst::new_simple(
+                    match rc {
+                        RegisterClassKind::GR32 => MachineOpcode::MOVmr32,
+                        RegisterClassKind::GR64 => MachineOpcode::MOVmr64,
+                        RegisterClassKind::XMM => MachineOpcode::MOVSDmr,
+                        RegisterClassKind::GR8 => unimplemented!(),
+                    },
+                    vec![mem, MachineOperand::Register(r)],
+                    self.builder.get_cur_bb().unwrap(),
+                );
+                self.builder.insert(mov);
+                off += match rc {
+                    RegisterClassKind::XMM => 8,
+                    _ => rc.size_in_byte(),
+                };
             }
             return;
         }
