@@ -342,7 +342,8 @@ impl<'a> ScheduleByBlock<'a> {
             args.push(self.normal_operand(*operand));
         }
 
-        let mut arg_regs_order = ArgumentRegisterOrder::new(AAPCS64::new());
+        let abi = AAPCS64::new();
+        let mut arg_regs_order = ArgumentRegisterOrder::new(&abi);
 
         for (i, arg) in args.into_iter().enumerate() {
             let ty = arg.get_type(&self.cur_func.regs_info).unwrap();

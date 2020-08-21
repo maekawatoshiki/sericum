@@ -14,7 +14,8 @@ use std::mem;
 
 impl<'a> ConvertToDAGNode<'a> {
     pub fn copy_reg_args(&mut self) {
-        let mut arg_regs_order = ArgumentRegisterOrder::new(AAPCS64::new());
+        let abi = AAPCS64::new();
+        let mut arg_regs_order = ArgumentRegisterOrder::new(&abi);
 
         for i in 0..self.func.get_params_len() {
             if let Some(ty) = self.func.get_param_type(i) {

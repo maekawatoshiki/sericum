@@ -1,5 +1,9 @@
-use crate::codegen::{arch::machine::register::*, common::machine::calling_conv::CallingConv};
+use crate::{
+    codegen::{arch::machine::register::*, common::machine::calling_conv::CallingConv},
+    ir::types::StructType,
+};
 
+#[derive(Clone)]
 pub struct AAPCS64 {
     gr32: Vec<PhysReg>,
     gr64: Vec<PhysReg>,
@@ -24,5 +28,9 @@ impl CallingConv for AAPCS64 {
             RegisterClassKind::SP => None,
         }
         .map_or(None, |r| Some(*r))
+    }
+
+    fn reg_classes_used_for_passing_byval(_: &StructType) -> Vec<RegisterClassKind> {
+        unimplemented!()
     }
 }
