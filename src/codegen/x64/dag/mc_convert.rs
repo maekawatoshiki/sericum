@@ -199,11 +199,15 @@ impl<'a> ScheduleByBlock<'a> {
 
                 let mut op1 = self.normal_operand(node.operand[0]);
                 let mut op2 = self.normal_operand(node.operand[1]);
-                if let MachineOperand::Register(r) = &mut op1 {
-                    *r = r.fix(Some(RegisterClassKind::GR32))
-                }
-                if let MachineOperand::Register(r) = &mut op2 {
-                    *r = r.fix(Some(RegisterClassKind::GR32))
+
+                // TODO: special case
+                if node.ty == Type::i8 {
+                    if let MachineOperand::Register(r) = &mut op1 {
+                        *r = r.fix(Some(RegisterClassKind::GR32))
+                    }
+                    if let MachineOperand::Register(r) = &mut op2 {
+                        *r = r.fix(Some(RegisterClassKind::GR32))
+                    }
                 }
 
                 self.append_inst(

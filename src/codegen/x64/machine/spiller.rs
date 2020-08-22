@@ -86,7 +86,7 @@ impl<'a> Spiller<'a> {
                     let pos = def_inst
                         .operand
                         .iter()
-                        .position(|o| o.is_register() && o.as_register().kind == reg_id.kind)
+                        .position(|o| o.is_register() && o.as_register() == &reg_id)
                         .unwrap();
                     if inst_def.tie.iter().next().unwrap().1.as_use() == pos {
                         // old_src = Some(reg_id);
