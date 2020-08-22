@@ -465,7 +465,13 @@ impl MachineOperand {
             MachineOperand::FrameIndex(fi) => Some(fi.ty),
             MachineOperand::Mem(mem) => mem.get_type(),
             MachineOperand::None => None, // TODO
-            MachineOperand::Register(r) => Some(rc2ty(regs_info.arena_ref()[*r].reg_class)),
+            MachineOperand::Register(r) => {
+                if let Some(fix) = r.fix {
+                    Some(rc2ty(fix))
+                } else {
+                    Some(rc2ty(regs_info.arena_ref()[*r].reg_class))
+                }
+            }
         }
     }
 }
