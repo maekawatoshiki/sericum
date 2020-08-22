@@ -90,6 +90,10 @@ impl<'a> ScheduleByBlock<'a> {
 
         let reg_id = match node.kind {
             NodeKind::IR(IRNodeKind::Entry) => None,
+            NodeKind::IR(IRNodeKind::RegClass) => {
+                let val = self.normal_operand(node.operand[0]);
+                Some(val.as_register().fix(ty2rc(&node.ty)))
+            }
             _ => {
                 let inst_id = self.convert_node_to_inst(node);
                 self.inst_arena[inst_id].get_def_reg()
@@ -152,6 +156,17 @@ impl<'a> ScheduleByBlock<'a> {
                     self.cur_bb,
                 ))
             }
+            // NodeKind::IR(IRNodeKind::ExtractSubreg) => {
+            //     let val = self.normal_operand(node.operand[0]);
+            //     let inst = MachineInst::new(
+            //         &self.cur_func.regs_info,
+            //         MachineOpcode::ExtractSubreg,
+            //         vec![val],
+            //         ty2rc(&node.ty),
+            //         self.cur_bb,
+            //     );
+            //     self.append_inst(inst)
+            // }
             NodeKind::IR(IRNodeKind::Call) => self.convert_call_dag(&*node),
             NodeKind::IR(IRNodeKind::Phi) => {
                 let mut operands = vec![];
@@ -182,8 +197,14 @@ impl<'a> ScheduleByBlock<'a> {
                 let eax = self.cur_func.regs_info.get_phys_reg(regs[0]);
                 let edx = self.cur_func.regs_info.get_phys_reg(regs[1]);
 
-                let op1 = self.normal_operand(node.operand[0]);
-                let op2 = self.normal_operand(node.operand[1]);
+                let mut op1 = self.normal_operand(node.operand[0]);
+                let mut op2 = self.normal_operand(node.operand[1]);
+                if let MachineOperand::Register(r) = &mut op1 {
+                    *r = r.fix(Some(RegisterClassKind::GR32))
+                }
+                if let MachineOperand::Register(r) = &mut op2 {
+                    *r = r.fix(Some(RegisterClassKind::GR32))
+                }
 
                 self.append_inst(
                     MachineInst::new_simple(
@@ -703,6 +724,7 @@ pub fn mov_r_x(rc: RegisterClassKind, x: &MachineOperand) -> Option<MachineOpcod
     let mov8rx = [MachineOpcode::MOVrr8, MachineOpcode::MOVri8];
     let mov32rx = [MachineOpcode::MOVrr32, MachineOpcode::MOVri32];
     let mov64rx = [MachineOpcode::MOVrr64, MachineOpcode::MOVri64];
+    let movsdrx = [MachineOpcode::MOVSDrr, MachineOpcode::MOVSDrm64];
     let idx = match x {
         MachineOperand::Register(_) => 0,
         MachineOperand::Constant(_) => 1,
@@ -712,7 +734,7 @@ pub fn mov_r_x(rc: RegisterClassKind, x: &MachineOperand) -> Option<MachineOpcod
         RegisterClassKind::GR8 => Some(mov8rx[idx]),
         RegisterClassKind::GR32 => Some(mov32rx[idx]),
         RegisterClassKind::GR64 => Some(mov64rx[idx]),
-        _ => None,
+        RegisterClassKind::XMM => Some(movsdrx[idx]),
     }
 }
 

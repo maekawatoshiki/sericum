@@ -432,6 +432,7 @@ impl DefinitionConstructible for Registers {
                         RegisterId {
                             id,
                             kind: VirtOrPhys::Phys(r.as_phys_reg()),
+                            fix: None
                         }
                     }
                     #registers_info_new

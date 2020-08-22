@@ -2,7 +2,10 @@ use crate::codegen::arch::machine::{
     frame_object::*,
     inst::MachineMemOperand,
     inst_def::TargetOpcode,
-    register::{rc2ty, PhysReg, RegisterClassKind, RegisterId, RegistersInfo, TargetRegisterTrait},
+    register::{
+        rc2ty, PhysReg, RegisterClassKind, RegisterId, RegistersInfo, TargetRegisterTrait,
+        VirtOrPhys,
+    },
 };
 use crate::codegen::common::machine::{basic_block::*, const_data::DataId};
 use crate::ir::{global_val::GlobalVariableId, types::*};
@@ -243,8 +246,14 @@ impl MachineInst {
         for (i, o) in self.operand.iter_mut().enumerate() {
             for r in &mut o.registers_mut() {
                 if r.kind == from.kind {
+                    let fix = r.fix;
                     regs_info.arena_ref_mut()[**r].remove_use(self.id.unwrap());
                     **r = to;
+                    r.fix = fix;
+                    if r.is_phys_reg() {
+                        r.kind = VirtOrPhys::Phys(r.as_fixed_phys_reg());
+                        r.fix = None;
+                    }
                     regs_info.arena_ref_mut()[**r].add_use(self.id.unwrap());
                     replaced_operands_idx.push(i);
                 }

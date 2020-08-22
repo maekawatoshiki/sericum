@@ -584,6 +584,7 @@ pub enum TargetOpcode {
     Phi,
     Ret,
     Copy,
+    ExtractSubreg,
     BrCond,
     AdjStackDown,
     AdjStackUp,

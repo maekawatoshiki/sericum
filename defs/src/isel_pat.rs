@@ -50,6 +50,12 @@ struct Opcode(pub TS);
 struct Inst {
     opcode: Opcode,
     operands: Vec<Selected>,
+    ty: Option<TS>,
+}
+
+struct InstBase {
+    opcode: Opcode,
+    operands: Vec<Selected>,
 }
 
 fn parse_pattern(input: ParseStream) -> Result<Pattern, Error> {
@@ -84,7 +90,7 @@ impl Parse for Patterns {
 impl Parse for InstPattern {
     fn parse(input: ParseStream) -> Result<Self, Error> {
         let group = input.parse::<Group>()?;
-        let inst: Inst = syn::parse2(group.stream())?;
+        let inst: InstBase = syn::parse2(group.stream())?;
         let ty = parse_type(input)?;
         let parent = parse_parent(input)?;
         let body = parse_pattern(input)?;
@@ -130,8 +136,8 @@ impl Parse for Opcode {
 impl Parse for Selected {
     fn parse(input: ParseStream) -> Result<Self, Error> {
         if input.peek(token::Paren) {
-            let group = input.parse::<Group>()?;
-            return Ok(Selected::Inst(syn::parse2(group.stream())?));
+            let inst: Inst = input.parse::<Inst>()?;
+            return Ok(Selected::Inst(inst));
         }
 
         if let Ok(_) = input.parse::<Token![%]>() {
@@ -164,9 +170,22 @@ impl Parse for Selected {
 
 impl Parse for Inst {
     fn parse(input: ParseStream) -> Result<Self, Error> {
+        let group = input.parse::<Group>()?;
+        let inst_base: InstBase = syn::parse2(group.stream())?;
+        let ty = parse_type(input)?;
+        Ok(Inst {
+            opcode: inst_base.opcode,
+            operands: inst_base.operands,
+            ty,
+        })
+    }
+}
+
+impl Parse for InstBase {
+    fn parse(input: ParseStream) -> Result<Self, Error> {
         let opcode: Opcode = input.parse()?;
         let operands = parse_inst_operands(input)?;
-        Ok(Inst { opcode, operands })
+        Ok(InstBase { opcode, operands })
     }
 }
 
@@ -428,14 +447,25 @@ fn selected_operands(operands: &Vec<Selected>) -> (TS, TS) {
                 let (defs, ops) = selected_operands(&inst.operands);
                 let opcode = &inst.opcode.0;
                 let iname = str2ident(&format!("inst_{}", unique_name()));
-                def_operands_ts = quote! {
-                    #def_operands_ts
-                    #defs
-                    let #iname = heap.alloc(DAGNode::new(
-                        #opcode,
-                        vec![#ops],
-                        #opcode.as_mi().get_def_type()));
-                };
+                if let Some(ty) = &inst.ty {
+                    def_operands_ts = quote! {
+                        #def_operands_ts
+                        #defs
+                        let #iname = heap.alloc(DAGNode::new(
+                            #opcode,
+                            vec![#ops],
+                            #ty));
+                    };
+                } else {
+                    def_operands_ts = quote! {
+                        #def_operands_ts
+                        #defs
+                        let #iname = heap.alloc(DAGNode::new(
+                            #opcode,
+                            vec![#ops],
+                            #opcode.as_mi().get_def_type()));
+                    };
+                }
                 operands_ts = quote! {
                     #operands_ts #iname,
                 }

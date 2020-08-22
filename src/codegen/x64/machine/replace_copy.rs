@@ -1,7 +1,7 @@
-use super::super::dag::mc_convert::mov_rx;
+use super::super::dag::mc_convert::mov_r_x;
 use super::inst::MachineOpcode;
 use crate::codegen::common::machine::{function::MachineFunction, module::MachineModule};
-use crate::{ir::types::Types, traits::pass::ModulePassTrait};
+use crate::traits::pass::ModulePassTrait;
 
 pub struct ReplaceCopyWithProperMInst {}
 
@@ -24,11 +24,11 @@ impl ReplaceCopyWithProperMInst {
 
     pub fn run_on_module(&mut self, module: &mut MachineModule) {
         for (_, f) in &mut module.functions {
-            self.run_on_function(&module.types, f);
+            self.run_on_function(f);
         }
     }
 
-    pub fn run_on_function(&mut self, tys: &Types, f: &mut MachineFunction) {
+    pub fn run_on_function(&mut self, f: &mut MachineFunction) {
         if f.is_internal {
             return;
         }
@@ -41,7 +41,7 @@ impl ReplaceCopyWithProperMInst {
                     continue;
                 }
 
-                let mov = mov_rx(tys, &f.regs_info, &inst.operand[0]).unwrap();
+                let mov = mov_r_x(inst.def[0].as_phys_reg().reg_class(), &inst.operand[0]).unwrap();
                 inst.opcode = mov;
             }
         }

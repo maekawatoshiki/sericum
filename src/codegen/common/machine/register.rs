@@ -38,6 +38,7 @@ pub struct PhysReg(pub usize);
 pub struct RegisterId {
     pub id: Id<RegisterInfo>,
     pub kind: VirtOrPhys,
+    pub fix: Option<RegisterClassKind>,
 }
 
 #[derive(Clone, Debug)]
@@ -97,6 +98,7 @@ impl RegistersInfo {
         RegisterId {
             id,
             kind: VirtOrPhys::Virt(virt_reg),
+            fix: None,
         }
     }
 
@@ -173,6 +175,21 @@ impl RegisterId {
             VirtOrPhys::Phys(p) => p,
             VirtOrPhys::Virt(_) => panic!(),
         }
+    }
+
+    pub fn fix(mut self, fix: Option<RegisterClassKind>) -> Self {
+        self.fix = fix;
+        self
+    }
+
+    pub fn as_fixed_phys_reg(&self) -> PhysReg {
+        if let Some(fix) = self.fix {
+            return PhysReg(
+                self.as_phys_reg().retrieve() - self.as_phys_reg().reg_class() as usize
+                    + fix as usize,
+            );
+        }
+        self.as_phys_reg()
     }
 
     pub fn as_virt_reg(&self) -> VirtReg {
@@ -324,6 +341,9 @@ impl fmt::Debug for RegisterId {
         match self.kind {
             VirtOrPhys::Phys(p) => p.fmt(f)?,
             VirtOrPhys::Virt(v) => v.fmt(f)?,
+        }
+        if let Some(fix) = self.fix {
+            write!(f, ".{:?}", fix)?;
         }
         write!(f, ":{}", self.id.index())
     }

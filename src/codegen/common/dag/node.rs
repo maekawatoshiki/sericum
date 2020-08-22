@@ -83,6 +83,7 @@ pub enum IRNodeKind {
     StoreRegOff,
 
     CopyToLiveOut,
+    RegClass,
 }
 
 #[derive(Debug, Clone, PartialEq, Copy)]

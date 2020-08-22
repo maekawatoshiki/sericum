@@ -40,7 +40,8 @@ pub fn coalesce_function(matrix: &mut LiveRegMatrix, f: &mut MachineFunction) {
         // Remove p_A = Copy p_A
         if copy_dst.is_phys_reg()
             && copy_src.is_phys_reg()
-            && copy_dst.as_phys_reg() == copy_src.as_phys_reg()
+            && (copy_dst.as_phys_reg() == copy_src.as_phys_reg()
+                || copy_dst.as_fixed_phys_reg() == copy_src.as_fixed_phys_reg())
         {
             removal_list.insert(copy_id);
             continue;
@@ -57,7 +58,7 @@ pub fn coalesce_function(matrix: &mut LiveRegMatrix, f: &mut MachineFunction) {
 
         // p_dst = Copy v_src. v_src uses & defs may be replaced with p_dst
         // TODO: THE FOLLOWING CODE DOESN'T WORK
-        if copy_dst.is_phys_reg() && copy_src.is_virt_reg() {
+        if copy_dst.is_phys_reg() && copy_src.is_virt_reg() && copy_dst.fix == copy_src.fix {
             let can_eliminate_copy =
                 !matrix.interferes(copy_src.as_virt_reg(), copy_dst.as_phys_reg()) && {
                     let l = &f.body.basic_blocks.arena[copy.parent].liveness_ref();
@@ -76,7 +77,7 @@ pub fn coalesce_function(matrix: &mut LiveRegMatrix, f: &mut MachineFunction) {
         }
 
         // v_dst = Copy p_src. v_dst uses & defs may be replaced with p_src
-        if copy_dst.is_virt_reg() && copy_src.is_phys_reg() {
+        if copy_dst.is_virt_reg() && copy_src.is_phys_reg() && copy_dst.fix == copy_src.fix {
             let can_eliminate_copy = no_tied_use(f, &copy_dst)
                 && !matrix.interferes(copy_dst.as_virt_reg(), copy_src.as_phys_reg())
                 && {
@@ -97,7 +98,7 @@ pub fn coalesce_function(matrix: &mut LiveRegMatrix, f: &mut MachineFunction) {
         }
 
         // v_dst = Copy v_src. v_dst uses & defs may be replaced with v_src
-        if copy_dst.is_virt_reg() && copy_src.is_virt_reg() {
+        if copy_dst.is_virt_reg() && copy_src.is_virt_reg() && copy_dst.fix == copy_src.fix {
             let can_eliminate_copy = f.regs_info.arena_ref()[copy_dst].defs.len() == 1
                 && !matrix.interferes_virt_regs(copy_dst.as_virt_reg(), copy_src.as_virt_reg())
                 && no_tied_use(f, &copy_dst)

@@ -113,7 +113,7 @@ impl MISelector {
             }
             (ir.Mul a, b) {
                 GR8 a {
-                    GR8  b => (mi.IMULrr32 a, b)
+                    GR8  b => (ir.RegClass (mi.IMULrr32 (ir.RegClass a):i32, (ir.RegClass b):i32))
                     imm8 b => (mi.IMULrri8 a, b) }
                 GR32 a {
                     GR32  b => (mi.IMULrr32  a, b)

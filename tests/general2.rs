@@ -51,15 +51,14 @@ mod x86_64 {
             .unwrap();
         assert!(compilation.success());
 
-        println!("{}", output_name);
         let execution = process::Command::new(output_name.as_str())
             .status()
             .unwrap();
         assert!(execution.success());
 
-        // fs::remove_file(output_name).unwrap();
-        // fs::remove_file(parent_name).unwrap();
-        // fs::remove_file(target_name).unwrap();
+        fs::remove_file(output_name).unwrap();
+        fs::remove_file(parent_name).unwrap();
+        fs::remove_file(target_name).unwrap();
     }
 
     fn compile_and_run(c_parent: &str, module: &mut Module) {
@@ -67,7 +66,7 @@ mod x86_64 {
         let mut printer = MachineAsmPrinter::new();
         // println!("{:?}", machine_module);
         printer.run_on_module(&machine_module);
-        println!("{}", printer.output);
+        // println!("{}", printer.output);
         assemble_and_run(c_parent, &printer.output);
     }
 
@@ -304,7 +303,7 @@ mod x86_64 {
         char test_mul_ref(char x, char y) { return x * y; }
         char test_div_ref(char x, char y) { return x / y; }
         int main() { 
-            for (int i = 0; i < 256; i++) {
+            for (int i = 0; i < 1024; i++) {
                 char x = (char) rand(), y = (char) rand();
                 assert(test_add(x, y) == test_add_ref(x, y));
                 assert(test_sub(x, y) == test_sub_ref(x, y));
