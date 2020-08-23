@@ -41,7 +41,8 @@ impl ReplaceCopyWithProperMInst {
                     continue;
                 }
 
-                let mov = mov_r_x(inst.def[0].as_phys_reg().reg_class(), &inst.operand[0]).unwrap();
+                let mov =
+                    mov_r_x(inst.def[0].id.as_phys_reg().reg_class(), &inst.operand[0]).unwrap();
                 inst.opcode = mov;
             }
         }

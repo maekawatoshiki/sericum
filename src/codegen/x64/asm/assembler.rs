@@ -18,12 +18,12 @@ impl<'a> InstAssembler<'a> {
     }
 
     fn gen_push64(&mut self) {
-        let rd = reg_code(&self.inst.operand[0].as_register());
+        let rd = reg_code(&self.inst.operand[0].as_register().id);
         self.stream.push_u8(0x50 + rd);
     }
 
     fn gen_pop64(&mut self) {
-        let rd = reg_code(&self.inst.operand[0].as_register());
+        let rd = reg_code(&self.inst.operand[0].as_register().id);
         self.stream.push_u8(0x58 + rd);
     }
 
@@ -35,11 +35,11 @@ impl<'a> InstAssembler<'a> {
 
     fn gen_movrm32(&mut self) {
         self.stream.push_u8(0x8b); // TODO
-        let reg = reg_code(&self.inst.def[0]);
+        let reg = reg_code(&self.inst.def[0].id);
         let reg = reg << 3; // eax
         match self.inst.operand[0].as_mem() {
             MachineMemOperand::BaseFi(base, fi) => {
-                let base = reg_code(base);
+                let base = reg_code(&base.id);
                 let off = -self
                     .function
                     .frame_objects
@@ -68,7 +68,7 @@ impl<'a> InstAssembler<'a> {
 
         match self.inst.operand[0].as_mem() {
             MachineMemOperand::BaseFi(base, fi) => {
-                let base = reg_code(base);
+                let base = reg_code(&base.id);
                 let off = -self
                     .function
                     .frame_objects

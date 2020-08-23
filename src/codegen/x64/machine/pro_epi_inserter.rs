@@ -106,7 +106,9 @@ impl PrologueEpilogueInserter {
             )],
             builder.get_cur_bb().unwrap(),
         )
-        .with_def(vec![builder.function.regs_info.get_phys_reg(GR64::RBP)]);
+        .with_def(vec![RegisterOperand::new(
+            builder.function.regs_info.get_phys_reg(GR64::RBP),
+        )]);
         builder.insert(mov_rbp_rsp);
 
         if has_call {
@@ -119,7 +121,9 @@ impl PrologueEpilogueInserter {
                 ],
                 builder.get_cur_bb().unwrap(),
             )
-            .with_def(vec![builder.function.regs_info.get_phys_reg(GR64::RSP)]);
+            .with_def(vec![RegisterOperand::new(
+                builder.function.regs_info.get_phys_reg(GR64::RSP),
+            )]);
             builder.insert(sub_rsp);
         }
 
@@ -159,7 +163,9 @@ impl PrologueEpilogueInserter {
                     ],
                     bb_id,
                 )
-                .with_def(vec![cur_func.regs_info.get_phys_reg(GR64::RSP)]);
+                .with_def(vec![RegisterOperand::new(
+                    cur_func.regs_info.get_phys_reg(GR64::RSP),
+                )]);
                 iseq.push(cur_func.body.inst_arena.alloc(&cur_func.regs_info, i));
             }
 
@@ -240,7 +246,7 @@ impl<'a> CopyArgs<'a> {
         let mov8 = sz / 8;
         let mov4 = (sz - 8 * mov8) / 4;
         assert!((sz - 8 * mov8) % 4 == 0);
-        let rbp = self.builder.function.regs_info.get_phys_reg(GR64::RBP);
+        let rbp = RegisterOperand::new(self.builder.function.regs_info.get_phys_reg(GR64::RBP));
         let reg_classes = SystemV::reg_classes_used_for_passing_byval(struct_ty);
 
         if sz <= 16 && arg_regs_order.regs_available_for(&reg_classes) {
@@ -267,7 +273,7 @@ impl<'a> CopyArgs<'a> {
                         RegisterClassKind::XMM => MachineOpcode::MOVSDmr,
                         RegisterClassKind::GR8 => unimplemented!(),
                     },
-                    vec![mem, MachineOperand::Register(r)],
+                    vec![mem, MachineOperand::Register(RegisterOperand::new(r))],
                     self.builder.get_cur_bb().unwrap(),
                 );
                 self.builder.insert(mov);
@@ -279,7 +285,7 @@ impl<'a> CopyArgs<'a> {
             return;
         }
 
-        let rax = self.builder.function.regs_info.get_phys_reg(GR64::RAX);
+        let rax = RegisterOperand::new(self.builder.function.regs_info.get_phys_reg(GR64::RAX));
         let mut roff = 0;
         for (c, s, rm, mr) in vec![
             (mov8, 8, MachineOpcode::MOVrm64, MachineOpcode::MOVmr64),
@@ -300,12 +306,16 @@ impl<'a> CopyArgs<'a> {
                 self.builder.insert(mov);
                 let mem = if roff == 0 {
                     MachineMemOperand::BaseFi(
-                        self.builder.function.regs_info.get_phys_reg(GR64::RBP),
+                        RegisterOperand::new(
+                            self.builder.function.regs_info.get_phys_reg(GR64::RBP),
+                        ),
                         FrameIndexInfo::new(ty, FrameIndexKind::Arg(i)),
                     )
                 } else {
                     MachineMemOperand::BaseFiOff(
-                        self.builder.function.regs_info.get_phys_reg(GR64::RBP),
+                        RegisterOperand::new(
+                            self.builder.function.regs_info.get_phys_reg(GR64::RBP),
+                        ),
                         FrameIndexInfo::new(ty, FrameIndexKind::Arg(i)),
                         roff as i32,
                     )
@@ -331,16 +341,19 @@ impl<'a> CopyArgs<'a> {
         let src = match arg_regs_order.next(RegisterClassKind::XMM) {
             Some(_arg_reg) => return, // MachineOperand::phys_reg(&self.builder.function.regs_info, arg_reg),
             None => {
-                let ax = self.builder.function.regs_info.get_phys_reg(ret_reg);
+                let ax =
+                    RegisterOperand::new(self.builder.function.regs_info.get_phys_reg(ret_reg));
                 let inst = MachineInst::new_simple(
                     MachineOpcode::MOVSDrm,
                     vec![MachineOperand::Mem(MachineMemOperand::BaseOff(
-                        self.builder.function.regs_info.get_phys_reg(GR64::RBP),
+                        RegisterOperand::new(
+                            self.builder.function.regs_info.get_phys_reg(GR64::RBP),
+                        ),
                         self.offset,
                     ))],
                     self.builder.get_cur_bb().unwrap(),
                 )
-                .with_def(vec![ax.clone()]);
+                .with_def(vec![ax]);
                 self.builder.insert(inst);
                 self.offset += 8;
                 MachineOperand::Register(ax)
@@ -350,7 +363,7 @@ impl<'a> CopyArgs<'a> {
             MachineOpcode::MOVSDmr,
             vec![
                 MachineOperand::Mem(MachineMemOperand::BaseFi(
-                    self.builder.function.regs_info.get_phys_reg(GR64::RBP),
+                    RegisterOperand::new(self.builder.function.regs_info.get_phys_reg(GR64::RBP)),
                     dst,
                 )),
                 src,
@@ -391,11 +404,13 @@ impl<'a> CopyArgs<'a> {
         let src = match arg_regs_order.next(rc) {
             Some(_arg_reg) => return, // MachineOperand::phys_reg(&self.builder.function.regs_info, arg_reg),
             None => {
-                let ax = self.builder.function.regs_info.get_phys_reg(ax);
+                let ax = RegisterOperand::new(self.builder.function.regs_info.get_phys_reg(ax));
                 let inst = MachineInst::new_simple(
                     movrm,
                     vec![MachineOperand::Mem(MachineMemOperand::BaseOff(
-                        self.builder.function.regs_info.get_phys_reg(GR64::RBP),
+                        RegisterOperand::new(
+                            self.builder.function.regs_info.get_phys_reg(GR64::RBP),
+                        ),
                         self.offset,
                     ))],
                     self.builder.get_cur_bb().unwrap(),
@@ -410,7 +425,7 @@ impl<'a> CopyArgs<'a> {
             mov_mx(&self.builder.function.regs_info, &src).unwrap(),
             vec![
                 MachineOperand::Mem(MachineMemOperand::BaseFi(
-                    self.builder.function.regs_info.get_phys_reg(GR64::RBP),
+                    RegisterOperand::new(self.builder.function.regs_info.get_phys_reg(GR64::RBP)),
                     dst,
                 )),
                 src,

@@ -1,5 +1,7 @@
 use super::super::machine::register::RegisterId;
-use crate::codegen::common::machine::{basic_block::*, function::*, liveness::*};
+use crate::codegen::common::machine::{
+    basic_block::*, function::*, inst::RegisterOperand, liveness::*,
+};
 use rustc_hash::FxHashSet;
 use std::collections::VecDeque;
 
@@ -19,7 +21,7 @@ pub fn coalesce_function(matrix: &mut LiveRegMatrix, f: &mut MachineFunction) {
             match inst
                 .operand
                 .iter()
-                .position(|o| o.is_register() && o.as_register() == r)
+                .position(|o| o.is_register() && o.as_register().id == *r)
             {
                 Some(pos) => f.body.inst_arena[*u].opcode.inst_def().map_or(true, |i| {
                     assert!(i.tie.len() <= 1); // TODO: support for more than one tied register
@@ -38,19 +40,18 @@ pub fn coalesce_function(matrix: &mut LiveRegMatrix, f: &mut MachineFunction) {
         let copy_src = *copy.operand[0].as_register();
 
         // Remove p_A = Copy p_A
-        if copy_dst.is_phys_reg()
-            && copy_src.is_phys_reg()
-            && (copy_dst.as_phys_reg() == copy_src.as_phys_reg()
-                || copy_dst.as_fixed_phys_reg() == copy_src.as_fixed_phys_reg())
+        if copy_dst.id.is_phys_reg()
+            && copy_src.id.is_phys_reg()
+            && copy_dst.converted_id().as_phys_reg() == copy_src.converted_id().as_phys_reg()
         {
             removal_list.insert(copy_id);
             continue;
         }
 
         // Remove v_A = Copy v_A
-        if copy_dst.is_virt_reg()
-            && copy_src.is_virt_reg()
-            && copy_dst.as_virt_reg() == copy_src.as_virt_reg()
+        if copy_dst.id.is_virt_reg()
+            && copy_src.id.is_virt_reg()
+            && copy_dst.id.as_virt_reg() == copy_src.id.as_virt_reg()
         {
             removal_list.insert(copy_id);
             continue;
@@ -58,11 +59,14 @@ pub fn coalesce_function(matrix: &mut LiveRegMatrix, f: &mut MachineFunction) {
 
         // p_dst = Copy v_src. v_src uses & defs may be replaced with p_dst
         // TODO: THE FOLLOWING CODE DOESN'T WORK
-        if copy_dst.is_phys_reg() && copy_src.is_virt_reg() && copy_dst.fix == copy_src.fix {
+        if copy_dst.id.is_phys_reg()
+            && copy_src.id.is_virt_reg()
+            && copy_dst.sub_super == copy_src.sub_super
+        {
             let can_eliminate_copy =
-                !matrix.interferes(copy_src.as_virt_reg(), copy_dst.as_phys_reg()) && {
+                !matrix.interferes(copy_src.id.as_virt_reg(), copy_dst.id.as_phys_reg()) && {
                     let l = &f.body.basic_blocks.arena[copy.parent].liveness_ref();
-                    !l.live_in.contains(&copy_src) && !l.live_out.contains(&copy_src)
+                    !l.live_in.contains(&copy_src.id) && !l.live_out.contains(&copy_src.id)
                 };
             if !can_eliminate_copy {
                 continue;
@@ -70,20 +74,23 @@ pub fn coalesce_function(matrix: &mut LiveRegMatrix, f: &mut MachineFunction) {
 
             replace_regs(f, copy.parent, copy_src, copy_dst);
 
-            matrix.merge_regs(copy_dst.as_phys_reg(), copy_src.as_virt_reg());
+            matrix.merge_regs(copy_dst.id.as_phys_reg(), copy_src.id.as_virt_reg());
             removal_list.insert(copy_id);
             worklist.push_back(copy_id);
             continue;
         }
 
         // v_dst = Copy p_src. v_dst uses & defs may be replaced with p_src
-        if copy_dst.is_virt_reg() && copy_src.is_phys_reg() && copy_dst.fix == copy_src.fix {
-            let can_eliminate_copy = no_tied_use(f, &copy_dst)
-                && !matrix.interferes(copy_dst.as_virt_reg(), copy_src.as_phys_reg())
+        if copy_dst.id.is_virt_reg()
+            && copy_src.id.is_phys_reg()
+            && copy_dst.sub_super == copy_src.sub_super
+        {
+            let can_eliminate_copy = no_tied_use(f, &copy_dst.id)
+                && !matrix.interferes(copy_dst.id.as_virt_reg(), copy_src.id.as_phys_reg())
                 && {
                     let bb = &f.body.basic_blocks.arena[copy.parent];
                     let l = &bb.liveness_ref();
-                    !l.live_in.contains(&copy_dst) && !l.live_out.contains(&copy_dst)
+                    !l.live_in.contains(&copy_dst.id) && !l.live_out.contains(&copy_dst.id)
                 };
             if !can_eliminate_copy {
                 continue;
@@ -91,32 +98,40 @@ pub fn coalesce_function(matrix: &mut LiveRegMatrix, f: &mut MachineFunction) {
 
             replace_regs(f, copy.parent, copy_dst, copy_src);
 
-            matrix.merge_regs(copy_src.as_phys_reg(), copy_dst.as_virt_reg());
+            matrix.merge_regs(copy_src.id.as_phys_reg(), copy_dst.id.as_virt_reg());
             removal_list.insert(copy_id);
             worklist.push_back(copy_id);
             continue;
         }
 
         // v_dst = Copy v_src. v_dst uses & defs may be replaced with v_src
-        if copy_dst.is_virt_reg() && copy_src.is_virt_reg() && copy_dst.fix == copy_src.fix {
-            let can_eliminate_copy = f.regs_info.arena_ref()[copy_dst].defs.len() == 1
-                && !matrix.interferes_virt_regs(copy_dst.as_virt_reg(), copy_src.as_virt_reg())
-                && no_tied_use(f, &copy_dst)
-                && no_tied_use(f, &copy_src)
+        if copy_dst.id.is_virt_reg()
+            && copy_src.id.is_virt_reg()
+            && copy_dst.sub_super == copy_src.sub_super
+        {
+            let can_eliminate_copy = f.regs_info.arena_ref()[copy_dst.id].defs.len() == 1
+                && !matrix
+                    .interferes_virt_regs(copy_dst.id.as_virt_reg(), copy_src.id.as_virt_reg())
+                && no_tied_use(f, &copy_dst.id)
+                && no_tied_use(f, &copy_src.id)
                 && {
                     let bb = &f.body.basic_blocks.arena[copy.parent];
                     let l = &bb.liveness_ref();
-                    !l.live_in.contains(&copy_dst)
-                        && !l.live_out.contains(&copy_dst)
-                        && !l.live_in.contains(&copy_src)
-                        && !l.live_out.contains(&copy_src)
+                    !l.live_in.contains(&copy_dst.id)
+                        && !l.live_out.contains(&copy_dst.id)
+                        && !l.live_in.contains(&copy_src.id)
+                        && !l.live_out.contains(&copy_src.id)
                 };
             if !can_eliminate_copy {
                 continue;
             }
 
             replace_regs(f, copy.parent, copy_dst, copy_src);
-            matrix.merge_virt_regs(&f.regs_info, copy_src.as_virt_reg(), copy_dst.as_virt_reg());
+            matrix.merge_virt_regs(
+                &f.regs_info,
+                copy_src.id.as_virt_reg(),
+                copy_dst.id.as_virt_reg(),
+            );
 
             removal_list.insert(copy_id);
             worklist.push_back(copy_id);
@@ -132,20 +147,20 @@ pub fn coalesce_function(matrix: &mut LiveRegMatrix, f: &mut MachineFunction) {
 fn replace_regs(
     f: &mut MachineFunction,
     parent: MachineBasicBlockId,
-    from: RegisterId,
-    to: RegisterId,
+    from: RegisterOperand,
+    to: RegisterOperand,
 ) {
-    let defs = f.regs_info.arena_ref()[from].defs.clone();
-    let uses = f.regs_info.arena_ref()[from].uses.clone();
+    let defs = f.regs_info.arena_ref()[from.id].defs.clone();
+    let uses = f.regs_info.arena_ref()[from.id].uses.clone();
 
     for &def in &defs {
-        f.body.inst_arena[def].set_def(&f.regs_info, to.clone());
+        f.body.inst_arena[def].set_def(&f.regs_info, to);
     }
     for use_ in uses {
-        f.body.inst_arena[use_].replace_operand_register(&f.regs_info, from, to);
+        f.body.inst_arena[use_].replace_operand_register(&f.regs_info, from.id, to.id);
     }
-    if f.regs_info.arena_ref()[from].defs.len() == 0 {
+    if f.regs_info.arena_ref()[from.id].defs.len() == 0 {
         let bb = &f.body.basic_blocks.arena[parent];
-        bb.liveness_ref_mut().def.remove(&from);
+        bb.liveness_ref_mut().def.remove(&from.id);
     }
 }

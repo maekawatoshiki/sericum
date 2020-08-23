@@ -3,7 +3,7 @@ use super::super::{
     frame_object::FrameIndexInfo,
     machine::register::{rc2ty, RegisterId, VirtReg, GR64},
 };
-use super::inst::{MachineInst, MachineMemOperand, MachineOpcode, MachineOperand};
+use super::inst::{MachineInst, MachineMemOperand, MachineOpcode, MachineOperand, RegisterOperand};
 use crate::codegen::common::machine::{
     builder::{BuilderTrait, BuilderWithLiveInfoEdit},
     function::MachineFunction,
@@ -76,7 +76,7 @@ impl<'a> Spiller<'a> {
                 .add(new_reg.as_virt_reg(), LiveRange::new_empty())
                 .is_spillable = false;
 
-            def_inst.set_def(&self.func.regs_info, new_reg);
+            def_inst.set_def(&self.func.regs_info, RegisterOperand::new(new_reg));
 
             let mut tied = false;
             if let Some(inst_def) = def_inst.opcode.inst_def() {
@@ -86,7 +86,7 @@ impl<'a> Spiller<'a> {
                     let pos = def_inst
                         .operand
                         .iter()
-                        .position(|o| o.is_register() && o.as_register() == &reg_id)
+                        .position(|o| o.is_register() && o.as_register().id == reg_id)
                         .unwrap();
                     if inst_def.tie.iter().next().unwrap().1.as_use() == pos {
                         // old_src = Some(reg_id);
@@ -97,8 +97,8 @@ impl<'a> Spiller<'a> {
 
             let parent = self.func.body.inst_arena[def_id].parent;
             let dst = MachineOperand::FrameIndex(slot.clone());
-            let src = MachineOperand::Register(new_reg);
-            let rbp = self.func.regs_info.get_phys_reg(GR64::RBP);
+            let src = MachineOperand::Register(RegisterOperand::new(new_reg));
+            let rbp = RegisterOperand::new(self.func.regs_info.get_phys_reg(GR64::RBP));
             let store = MachineInst::new_simple(
                 mov_mx(&self.func.regs_info, &src).unwrap(),
                 vec![
@@ -111,7 +111,7 @@ impl<'a> Spiller<'a> {
                 ::std::mem::replace(&mut last, None).map_or(None, |src| {
                     Some(
                         MachineInst::new_simple(MachineOpcode::Copy, vec![src], parent)
-                            .with_def(vec![new_reg]),
+                            .with_def(vec![RegisterOperand::new(new_reg)]),
                     )
                 })
             } else {
@@ -173,14 +173,14 @@ impl<'a> Spiller<'a> {
             let parent = use_inst.parent;
             use_inst.replace_operand_register(&self.func.regs_info, reg_id, new_reg);
 
-            let rbp = self.func.regs_info.get_phys_reg(GR64::RBP);
+            let rbp = RegisterOperand::new(self.func.regs_info.get_phys_reg(GR64::RBP));
             let src = MachineOperand::Mem(MachineMemOperand::BaseFi(rbp, slot.clone()));
             let load = MachineInst::new_simple(
                 mov_rx(tys, &self.func.regs_info, &src).unwrap(),
                 vec![src],
                 parent,
             )
-            .with_def(vec![new_reg]);
+            .with_def(vec![RegisterOperand::new(new_reg)]);
 
             self.func.body.basic_blocks.arena[parent]
                 .liveness_ref_mut()

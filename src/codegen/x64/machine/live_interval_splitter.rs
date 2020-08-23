@@ -106,8 +106,8 @@ impl<'a> LiveIntervalSplitter<'a> {
         let before_load_pp = self.matrix.get_program_point(*before_load).unwrap();
 
         let parent = self.func.body.inst_arena[*after_store].parent;
-        let src = MachineOperand::Register(*reg);
-        let rbp = self.func.regs_info.get_phys_reg(GR64::RBP);
+        let src = MachineOperand::Register(RegisterOperand::new(*reg));
+        let rbp = RegisterOperand::new(self.func.regs_info.get_phys_reg(GR64::RBP));
         let mem = MachineOperand::Mem(MachineMemOperand::BaseFi(rbp, *slot));
         let store_id = self.func.alloc_inst(MachineInst::new_simple(
             mov_mx(&self.func.regs_info, &src).unwrap(),
@@ -161,7 +161,7 @@ impl<'a> LiveIntervalSplitter<'a> {
                 vec![src],
                 parent,
             )
-            .with_def(vec![new_reg]),
+            .with_def(vec![RegisterOperand::new(new_reg)]),
         );
         let load_pp = self.matrix.program_points.next_of(before_load_pp);
         self.matrix.id2pp.insert(load_id, load_pp);

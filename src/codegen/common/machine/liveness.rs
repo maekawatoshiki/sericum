@@ -786,10 +786,10 @@ impl LivenessAnalysis {
     fn set_def_on_inst(&mut self, bb: &MachineBasicBlock, inst: &MachineInst) {
         bb.liveness_ref_mut().has_call |= inst.opcode == MachineOpcode::CALL;
         for &reg in &inst.def {
-            bb.liveness.borrow_mut().add_def(reg);
+            bb.liveness.borrow_mut().add_def(reg.id);
         }
         for &reg in &inst.imp_def {
-            bb.liveness.borrow_mut().add_def(reg);
+            bb.liveness.borrow_mut().add_def(reg.id);
         }
     }
 
@@ -810,7 +810,7 @@ impl LivenessAnalysis {
         for operand in &inst.operand {
             // live_in and live_out should contain no assigned(physical) registers
             for r in operand.registers() {
-                self.propagate(cur_func, bb, *r);
+                self.propagate(cur_func, bb, r.id);
             }
         }
     }
@@ -884,14 +884,14 @@ impl LivenessAnalysis {
                 id2pp.insert(inst_id, cur_pp!());
 
                 for reg in inst.collect_used_regs() {
-                    if reg.is_phys_reg() && !is_callee_saved_reg(reg.as_phys_reg()) {
-                        let phys_reg = reg.as_phys_reg();
+                    if reg.id.is_phys_reg() && !is_callee_saved_reg(reg.id.as_phys_reg()) {
+                        let phys_reg = reg.id.as_phys_reg();
                         if let Some(range) = reg2range.get_mut(phys_reg) {
                             range.segments.last_mut().unwrap().end = cur_pp!();
                         }
-                    } else if reg.is_virt_reg() {
+                    } else if reg.id.is_virt_reg() {
                         vreg2range
-                            .get_mut(&reg.as_virt_reg())
+                            .get_mut(&reg.id.as_virt_reg())
                             .unwrap()
                             .segments
                             .last_mut()
@@ -915,14 +915,14 @@ impl LivenessAnalysis {
                 // }
 
                 for def in inst.collect_defined_regs() {
-                    if def.is_phys_reg() && !is_callee_saved_reg(def.as_phys_reg()) {
+                    if def.id.is_phys_reg() && !is_callee_saved_reg(def.id.as_phys_reg()) {
                         reg2range
-                            .get_or_create(def.as_phys_reg())
+                            .get_or_create(def.id.as_phys_reg())
                             .add_segment(LiveSegment::new(cur_pp!(), cur_pp!()));
-                    } else if def.is_virt_reg() {
-                        virt_regs.insert(def.as_virt_reg(), *def);
+                    } else if def.id.is_virt_reg() {
+                        virt_regs.insert(def.id.as_virt_reg(), def.id);
                         vreg2range
-                            .entry(def.as_virt_reg())
+                            .entry(def.id.as_virt_reg())
                             .or_insert_with(|| LiveRange::new_empty())
                             .add_segment(LiveSegment::new(cur_pp!(), cur_pp!()));
                     }

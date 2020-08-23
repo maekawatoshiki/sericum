@@ -158,10 +158,10 @@ impl MachineFunction {
         let (bb_id, pos) = self.find_inst_pos(inst_id).unwrap();
         // TODO: refine code
         for d in &self.body.inst_arena[inst_id].collect_defined_regs() {
-            self.regs_info.arena_ref_mut()[**d].remove_def(inst_id);
+            self.regs_info.arena_ref_mut()[d.id].remove_def(inst_id);
         }
         for u in &self.body.inst_arena[inst_id].collect_used_regs() {
-            self.regs_info.arena_ref_mut()[**u].remove_use(inst_id);
+            self.regs_info.arena_ref_mut()[u.id].remove_use(inst_id);
         }
         self.body.basic_blocks.arena[bb_id]
             .iseq_ref_mut()

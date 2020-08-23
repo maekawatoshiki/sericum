@@ -111,7 +111,7 @@ impl<'a> BuilderTrait for BuilderWithLiveInfoEdit<'a> {
             // update registers' use&def list. TODO: refine code
             let inst = &self.function.body.inst_arena[inst_id];
             for use_ in inst.collect_used_regs() {
-                let use_ = &self.function.regs_info.arena_ref()[*use_];
+                let use_ = &self.function.regs_info.arena_ref()[use_.id];
 
                 if let Some(use_) = use_.phys_reg {
                     let range = self.matrix.phys_reg_range.get_mut(use_);
@@ -140,7 +140,7 @@ impl<'a> BuilderTrait for BuilderWithLiveInfoEdit<'a> {
             }
 
             for &def in inst.collect_defined_regs() {
-                let def_ = &self.function.regs_info.arena_ref()[def];
+                let def_ = &self.function.regs_info.arena_ref()[def.id];
 
                 if let Some(phys_reg) = def_.phys_reg {
                     self.matrix
@@ -148,7 +148,7 @@ impl<'a> BuilderTrait for BuilderWithLiveInfoEdit<'a> {
                         .get_or_create(phys_reg)
                         .add_segment(LiveSegment::new(pp, pp));
                 } else {
-                    self.matrix.add_virt_reg(def);
+                    self.matrix.add_virt_reg(def.id);
                     if let Some(i) = self.matrix.virt_reg_interval.get_mut(&def_.virt_reg) {
                         i.range.add_segment(LiveSegment::new(pp, pp))
                     } else {
@@ -196,8 +196,8 @@ impl<'a> BuilderWithLiveInfoEdit<'a> {
             // update registers' use&def list. TODO: refine code
             let inst = &self.function.body.inst_arena[inst_id];
             for use_ in inst.collect_used_regs() {
-                if use_.is_phys_reg() {
-                    let range = self.matrix.phys_reg_range.get_mut(use_.as_phys_reg());
+                if use_.id.is_phys_reg() {
+                    let range = self.matrix.phys_reg_range.get_mut(use_.id.as_phys_reg());
                     if range.is_none() {
                         continue;
                     }
@@ -210,7 +210,7 @@ impl<'a> BuilderWithLiveInfoEdit<'a> {
                     let end_point = self
                         .matrix
                         .virt_reg_interval
-                        .get_mut(&use_.as_virt_reg())
+                        .get_mut(&use_.id.as_virt_reg())
                         .unwrap()
                         .end_point_mut()
                         .unwrap();
@@ -220,14 +220,14 @@ impl<'a> BuilderWithLiveInfoEdit<'a> {
                 }
             }
             for &def in inst.collect_defined_regs() {
-                let def_ = &self.function.regs_info.arena_ref()[def];
+                let def_ = &self.function.regs_info.arena_ref()[def.id];
                 if let Some(phys_reg) = def_.phys_reg {
                     self.matrix
                         .phys_reg_range
                         .get_or_create(phys_reg)
                         .add_segment(LiveSegment::new(pp, pp));
                 } else {
-                    self.matrix.add_virt_reg(def);
+                    self.matrix.add_virt_reg(def.id);
                     if let Some(i) = self.matrix.virt_reg_interval.get_mut(&def_.virt_reg) {
                         i.range.add_segment(LiveSegment::new(pp, pp))
                     } else {

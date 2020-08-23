@@ -19,7 +19,7 @@ pub struct ScheduleByBlock<'a> {
     types: &'a Types,
     cur_func: &'a DAGFunction,
     inst_arena: &'a mut InstructionArena,
-    node2reg: FxHashMap<Raw<DAGNode>, Option<RegisterId>>,
+    node2reg: FxHashMap<Raw<DAGNode>, Option<RegisterOperand>>,
     cur_bb: MachineBasicBlockId,
     iseq: &'a mut Vec<MachineInstId>,
     bb_map: &'a FxHashMap<DAGBasicBlockId, MachineBasicBlockId>,
@@ -83,29 +83,30 @@ pub fn convert_function(types: &Types, dag_func: DAGFunction) -> MachineFunction
 }
 
 impl<'a> ScheduleByBlock<'a> {
-    pub fn convert(&mut self, node: Raw<DAGNode>) -> Option<RegisterId> {
-        if let Some(reg_id) = self.node2reg.get(&node) {
-            return *reg_id;
+    pub fn convert(&mut self, node: Raw<DAGNode>) -> Option<RegisterOperand> {
+        if let Some(reg) = self.node2reg.get(&node) {
+            return *reg;
         }
 
-        let reg_id = match node.kind {
+        let reg = match node.kind {
             NodeKind::IR(IRNodeKind::Entry) => None,
             NodeKind::IR(IRNodeKind::RegClass) => {
                 let val = self.normal_operand(node.operand[0]);
-                Some(val.as_register().fix(ty2rc(&node.ty)))
+                Some(val.as_register().sub_super(ty2rc(&node.ty)))
+                // Some(val.as_register().fix(ty2rc(&node.ty)))
             }
             _ => {
                 let inst_id = self.convert_node_to_inst(node);
                 self.inst_arena[inst_id].get_def_reg()
             }
         };
-        self.node2reg.insert(node, reg_id);
+        self.node2reg.insert(node, reg);
 
         if let Some(next) = node.next {
             self.convert(next);
         }
 
-        reg_id
+        reg
     }
 
     fn convert_node_to_inst(&mut self, node: Raw<DAGNode>) -> MachineInstId {
@@ -118,7 +119,7 @@ impl<'a> ScheduleByBlock<'a> {
 
         let inst_id = match &node.kind {
             NodeKind::MI(_) => {
-                fn reg(inst: &MachineInst, x: &DefOrUseReg) -> RegisterId {
+                fn reg(inst: &MachineInst, x: &DefOrUseReg) -> RegisterOperand {
                     match x {
                         DefOrUseReg::Def(i) => inst.def[*i],
                         DefOrUseReg::Use(i) => *inst.operand[*i].as_register(),
@@ -146,7 +147,7 @@ impl<'a> ScheduleByBlock<'a> {
             NodeKind::IR(IRNodeKind::CopyToReg) => {
                 let val = self.normal_operand(node.operand[1]);
                 let dst = match &node.operand[0].kind {
-                    NodeKind::Operand(OperandNodeKind::Register(r)) => *r,
+                    NodeKind::Operand(OperandNodeKind::Register(r)) => RegisterOperand::new(*r),
                     _ => unreachable!(),
                 };
                 self.append_inst(MachineInst::new_with_def_reg(
@@ -194,8 +195,8 @@ impl<'a> ScheduleByBlock<'a> {
                     // Type::i64 => to_phys!(GR64::RAX, GR64::RDX),
                     _ => unimplemented!(),
                 };
-                let eax = self.cur_func.regs_info.get_phys_reg(regs[0]);
-                let edx = self.cur_func.regs_info.get_phys_reg(regs[1]);
+                let eax = RegisterOperand::new(self.cur_func.regs_info.get_phys_reg(regs[0]));
+                let edx = RegisterOperand::new(self.cur_func.regs_info.get_phys_reg(regs[1]));
 
                 let mut op1 = self.normal_operand(node.operand[0]);
                 let mut op2 = self.normal_operand(node.operand[1]);
@@ -203,10 +204,10 @@ impl<'a> ScheduleByBlock<'a> {
                 // TODO: special case
                 if node.ty == Type::i8 {
                     if let MachineOperand::Register(r) = &mut op1 {
-                        *r = r.fix(Some(RegisterClassKind::GR32))
+                        *r = r.sub_super(Some(RegisterClassKind::GR32))
                     }
                     if let MachineOperand::Register(r) = &mut op2 {
-                        *r = r.fix(Some(RegisterClassKind::GR32))
+                        *r = r.sub_super(Some(RegisterClassKind::GR32))
                     }
                 }
 
@@ -252,8 +253,8 @@ impl<'a> ScheduleByBlock<'a> {
                 self.append_inst(copy_inst)
             }
             NodeKind::IR(IRNodeKind::Rem) => {
-                let eax = self.cur_func.regs_info.get_phys_reg(GR32::EAX);
-                let edx = self.cur_func.regs_info.get_phys_reg(GR32::EDX);
+                let eax = RegisterOperand::new(self.cur_func.regs_info.get_phys_reg(GR32::EAX));
+                let edx = RegisterOperand::new(self.cur_func.regs_info.get_phys_reg(GR32::EDX));
 
                 let op1 = self.normal_operand(node.operand[0]);
                 let op2 = self.normal_operand(node.operand[1]);
@@ -387,7 +388,9 @@ impl<'a> ScheduleByBlock<'a> {
                 vec![val],
                 self.cur_bb,
             )
-            .with_def(vec![self.cur_func.regs_info.get_phys_reg(ret_reg)]);
+            .with_def(vec![RegisterOperand::new(
+                self.cur_func.regs_info.get_phys_reg(ret_reg),
+            )]);
             self.append_inst(set_ret_val);
         }
 
@@ -400,11 +403,14 @@ impl<'a> ScheduleByBlock<'a> {
 
     fn move2reg(&self, r: RegisterId, src: MachineOperand) -> MachineInst {
         let opcode = mov_rx(self.types, &self.cur_func.regs_info, &src).unwrap();
-        MachineInst::new_simple(opcode, vec![src], self.cur_bb).with_def(vec![r])
+        MachineInst::new_simple(opcode, vec![src], self.cur_bb)
+            .with_def(vec![RegisterOperand::new(r)])
     }
 
     fn convert_call_dag(&mut self, node: &DAGNode) -> MachineInstId {
-        let mut arg_regs = vec![self.cur_func.regs_info.get_phys_reg(GR64::RSP)]; // call uses RSP
+        let mut arg_regs = vec![RegisterOperand::new(
+            self.cur_func.regs_info.get_phys_reg(GR64::RSP),
+        )]; // call uses RSP
         let mut off = 0i32;
 
         // println!("T {:?}", self.types.to_string(node.operand[0].ty));
@@ -464,7 +470,7 @@ impl<'a> ScheduleByBlock<'a> {
             let inst = match arg_regs_order.next(reg_class) {
                 Some(arg_reg) => {
                     let r = self.cur_func.regs_info.get_phys_reg(arg_reg);
-                    arg_regs.push(r.clone());
+                    arg_regs.push(RegisterOperand::new(r));
                     self.move2reg(r, arg)
                 }
                 None => {
@@ -473,7 +479,9 @@ impl<'a> ScheduleByBlock<'a> {
                         mov_mx(&self.cur_func.regs_info, &arg).unwrap(),
                         vec![
                             MachineOperand::Mem(MachineMemOperand::BaseOff(
-                                self.cur_func.regs_info.get_phys_reg(GR64::RSP),
+                                RegisterOperand::new(
+                                    self.cur_func.regs_info.get_phys_reg(GR64::RSP),
+                                ),
                                 off,
                             )),
                             arg,
@@ -494,8 +502,12 @@ impl<'a> ScheduleByBlock<'a> {
                 vec![MachineOperand::imm_i32(off)],
                 self.cur_bb,
             )
-            .with_imp_def(self.cur_func.regs_info.get_phys_reg(GR64::RSP))
-            .with_imp_use(self.cur_func.regs_info.get_phys_reg(GR64::RSP)),
+            .with_imp_def(RegisterOperand::new(
+                self.cur_func.regs_info.get_phys_reg(GR64::RSP),
+            ))
+            .with_imp_use(RegisterOperand::new(
+                self.cur_func.regs_info.get_phys_reg(GR64::RSP),
+            )),
         );
 
         let callee = self.normal_operand(node.operand[0]);
@@ -508,9 +520,11 @@ impl<'a> ScheduleByBlock<'a> {
             MachineInst::new_simple(MachineOpcode::CALL, vec![callee], self.cur_bb)
                 .with_imp_uses(arg_regs)
                 .with_imp_defs({
-                    let mut defs = vec![self.cur_func.regs_info.get_phys_reg(GR64::RSP)];
+                    let mut defs = vec![RegisterOperand::new(
+                        self.cur_func.regs_info.get_phys_reg(GR64::RSP),
+                    )];
                     if node.ty != Type::Void {
-                        defs.push(ret_reg)
+                        defs.push(RegisterOperand::new(ret_reg))
                     }
                     defs
                 }),
@@ -522,8 +536,12 @@ impl<'a> ScheduleByBlock<'a> {
                 vec![MachineOperand::imm_i32(off)],
                 self.cur_bb,
             )
-            .with_imp_def(self.cur_func.regs_info.get_phys_reg(GR64::RSP))
-            .with_imp_use(self.cur_func.regs_info.get_phys_reg(GR64::RSP)),
+            .with_imp_def(RegisterOperand::new(
+                self.cur_func.regs_info.get_phys_reg(GR64::RSP),
+            ))
+            .with_imp_use(RegisterOperand::new(
+                self.cur_func.regs_info.get_phys_reg(GR64::RSP),
+            )),
         );
 
         if node.ty == Type::Void {
@@ -534,7 +552,7 @@ impl<'a> ScheduleByBlock<'a> {
         let copy = MachineInst::new(
             &self.cur_func.regs_info,
             MachineOpcode::Copy,
-            vec![MachineOperand::Register(ret_reg)],
+            vec![MachineOperand::Register(RegisterOperand::new(ret_reg))],
             Some(reg_class),
             self.cur_bb,
         );
@@ -547,7 +565,7 @@ impl<'a> ScheduleByBlock<'a> {
         off: &mut i32,
         ty: Type,
         fi: FrameIndexInfo,
-    ) -> Vec<RegisterId>
+    ) -> Vec<RegisterOperand>
     where
         ABI: CallingConv,
     {
@@ -558,17 +576,18 @@ impl<'a> ScheduleByBlock<'a> {
         let sz = struct_ty.size();
         let mov8 = sz / 8;
         let mov4 = (sz - 8 * mov8) / 4;
-        let rbp = self.cur_func.regs_info.get_phys_reg(GR64::RBP);
+        let rbp = RegisterOperand::new(self.cur_func.regs_info.get_phys_reg(GR64::RBP));
         assert!((sz - 8 * mov8) % 4 == 0);
         let regs_classes = SystemV::reg_classes_used_for_passing_byval(struct_ty);
 
         if sz <= 16 && arg_regs_order.regs_available_for(&regs_classes) {
             let mut off = 0;
             for &rc in &regs_classes {
-                let r = self
-                    .cur_func
-                    .regs_info
-                    .get_phys_reg(arg_regs_order.next(rc).unwrap());
+                let r = RegisterOperand::new(
+                    self.cur_func
+                        .regs_info
+                        .get_phys_reg(arg_regs_order.next(rc).unwrap()),
+                );
                 arg_regs.push(r);
 
                 let mem = MachineOperand::Mem(if off == 0 {
@@ -605,7 +624,7 @@ impl<'a> ScheduleByBlock<'a> {
         .into_iter()
         {
             for _ in 0..c {
-                let r = self.cur_func.regs_info.new_virt_reg(rc);
+                let r = RegisterOperand::new(self.cur_func.regs_info.new_virt_reg(rc));
                 let mem = if offset == 0 {
                     MachineOperand::Mem(MachineMemOperand::BaseFi(rbp, fi.clone()))
                 } else {
@@ -617,7 +636,7 @@ impl<'a> ScheduleByBlock<'a> {
                     MachineOpcode::MOVmr64,
                     vec![
                         MachineOperand::Mem(MachineMemOperand::BaseOff(
-                            self.cur_func.regs_info.get_phys_reg(GR64::RSP),
+                            RegisterOperand::new(self.cur_func.regs_info.get_phys_reg(GR64::RSP)),
                             *off + offset as i32,
                         )),
                         MachineOperand::Register(r),
@@ -656,7 +675,9 @@ impl<'a> ScheduleByBlock<'a> {
             NodeKind::Operand(OperandNodeKind::BasicBlock(id)) => {
                 MachineOperand::Branch(self.get_machine_bb(id))
             }
-            NodeKind::Operand(OperandNodeKind::Register(ref r)) => MachineOperand::Register(*r),
+            NodeKind::Operand(OperandNodeKind::Register(ref r)) => {
+                MachineOperand::Register(RegisterOperand::new(*r))
+            }
             NodeKind::Operand(OperandNodeKind::Mem(ref mem)) => match mem {
                 MemNodeKind::Base => MachineOperand::Mem(MachineMemOperand::Base(
                     *self.normal_operand(node.operand[0]).as_register(),
@@ -782,7 +803,13 @@ pub fn mov_rx(tys: &Types, regs_info: &RegistersInfo, x: &MachineOperand) -> Opt
         MachineOpcode::MOVrm64,
     ];
     let (bit, xidx) = match x {
-        MachineOperand::Register(r) => (regs_info.arena_ref()[*r].reg_class.size_in_bits(), 0),
+        MachineOperand::Register(r) => {
+            if let Some(sub_super) = r.sub_super {
+                (sub_super.size_in_bits(), 0)
+            } else {
+                (regs_info.arena_ref()[r.id].reg_class.size_in_bits(), 0)
+            }
+        }
         MachineOperand::Constant(c) => (c.size_in_bits(), 1),
         MachineOperand::Mem(m) => (m.get_type().unwrap().size_in_bits(tys), 2),
         _ => return None, // TODO: Support Address?
@@ -811,7 +838,13 @@ pub fn mov_mx(regs_info: &RegistersInfo, x: &MachineOperand) -> Option<MachineOp
     //     MachineOpcode::MOVrm64,
     // ];
     let (bit, n) = match x {
-        MachineOperand::Register(r) => (regs_info.arena_ref()[*r].reg_class.size_in_bits(), 0),
+        MachineOperand::Register(r) => {
+            if let Some(sub_super) = r.sub_super {
+                (sub_super.size_in_bits(), 0)
+            } else {
+                (regs_info.arena_ref()[r.id].reg_class.size_in_bits(), 0)
+            }
+        }
         MachineOperand::Constant(c) => (c.size_in_bits(), 1),
         _ => return None, // TODO: Support Address?
     };

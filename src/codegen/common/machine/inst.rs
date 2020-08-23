@@ -21,17 +21,18 @@ pub struct MachineInst {
     pub id: Option<MachineInstId>,
     pub opcode: MachineOpcode,
     pub operand: Vec<MachineOperand>,
-    pub def: Vec<RegisterId>,
-    pub tie: FxHashMap<RegisterId, RegisterId>, // def -> use
-    pub imp_use: Vec<RegisterId>,
-    pub imp_def: Vec<RegisterId>,
-    pub kills: Vec<RegisterId>,
+    pub def: Vec<RegisterOperand>,
+    pub tie: FxHashMap<RegisterOperand, RegisterOperand>, // def -> use
+    pub imp_use: Vec<RegisterOperand>,
+    pub imp_def: Vec<RegisterOperand>,
+    pub kills: Vec<RegisterOperand>,
     pub parent: MachineBasicBlockId,
 }
 
 #[derive(Debug, Clone)]
 pub enum MachineOperand {
-    Register(RegisterId),
+    // Register(RegisterId),
+    Register(RegisterOperand),
     Constant(MachineConstant),
     FrameIndex(FrameIndexInfo),
     Branch(MachineBasicBlockId),
@@ -39,17 +40,11 @@ pub enum MachineOperand {
     None,
 }
 
-// TODO: target dependent
-// #[derive(Debug, Clone)]
-// pub enum MachineMemOperand {
-//     BaseFi(RegisterId, FrameIndexInfo),
-//     BaseFiOff(RegisterId, FrameIndexInfo, i32), // base, fi, off
-//     BaseFiAlignOff(RegisterId, FrameIndexInfo, i32, RegisterId), // base, fi, align, off
-//     BaseAlignOff(RegisterId, i32, RegisterId),  // base, align, off
-//     BaseOff(RegisterId, i32),
-//     Base(RegisterId),
-//     Address(AddressKind),
-// }
+#[derive(Clone, Eq, Hash, PartialEq, Copy)]
+pub struct RegisterOperand {
+    pub id: RegisterId,
+    pub sub_super: Option<RegisterClassKind>,
+}
 
 #[derive(Clone)]
 pub enum AddressKind {
@@ -82,7 +77,7 @@ impl MachineInst {
             operand,
             def: match rc {
                 None => vec![],
-                Some(rc) => vec![regs_info.new_virt_reg(rc)],
+                Some(rc) => vec![RegisterOperand::new(regs_info.new_virt_reg(rc))],
             },
             tie: FxHashMap::default(),
             imp_def: vec![],
@@ -113,7 +108,7 @@ impl MachineInst {
     pub fn new_with_def_reg(
         opcode: MachineOpcode,
         operand: Vec<MachineOperand>,
-        def: Vec<RegisterId>,
+        def: Vec<RegisterOperand>,
         parent: MachineBasicBlockId,
     ) -> Self {
         Self {
@@ -132,8 +127,8 @@ impl MachineInst {
     pub fn new_with_imp_def_use(
         opcode: MachineOpcode,
         operand: Vec<MachineOperand>,
-        imp_def: Vec<RegisterId>,
-        imp_use: Vec<RegisterId>,
+        imp_def: Vec<RegisterOperand>,
+        imp_use: Vec<RegisterOperand>,
         parent: MachineBasicBlockId,
     ) -> Self {
         Self {
@@ -149,42 +144,42 @@ impl MachineInst {
         }
     }
 
-    pub fn with_def(mut self, def: Vec<RegisterId>) -> Self {
+    pub fn with_def(mut self, def: Vec<RegisterOperand>) -> Self {
         // At the moment this function is used, 'self.id' is None in most cases. Therefore we can't set
         // use-def information to 'def'.
         self.def = def;
         self
     }
 
-    pub fn with_imp_use(mut self, r: RegisterId) -> Self {
+    pub fn with_imp_use(mut self, r: RegisterOperand) -> Self {
         self.imp_use.push(r);
         self
     }
 
-    pub fn with_imp_def(mut self, r: RegisterId) -> Self {
+    pub fn with_imp_def(mut self, r: RegisterOperand) -> Self {
         self.imp_def.push(r);
         self
     }
 
-    pub fn with_imp_uses(mut self, mut rs: Vec<RegisterId>) -> Self {
+    pub fn with_imp_uses(mut self, mut rs: Vec<RegisterOperand>) -> Self {
         self.imp_use.append(&mut rs);
         self
     }
 
-    pub fn with_imp_defs(mut self, mut rs: Vec<RegisterId>) -> Self {
+    pub fn with_imp_defs(mut self, mut rs: Vec<RegisterOperand>) -> Self {
         self.imp_def.append(&mut rs);
         self
     }
 
-    pub fn with_kills(mut self, mut rs: Vec<RegisterId>) -> Self {
+    pub fn with_kills(mut self, mut rs: Vec<RegisterOperand>) -> Self {
         self.kills.append(&mut rs);
         self
     }
 
-    pub fn set_def(&mut self, regs_info: &RegistersInfo, r: RegisterId) {
-        regs_info.arena_ref_mut()[self.def[0]].remove_def(self.id.unwrap());
+    pub fn set_def(&mut self, regs_info: &RegistersInfo, r: RegisterOperand) {
+        regs_info.arena_ref_mut()[self.def[0].id].remove_def(self.id.unwrap());
         self.def[0] = r;
-        regs_info.arena_ref_mut()[self.def[0]].add_def(self.id.unwrap());
+        regs_info.arena_ref_mut()[self.def[0].id].add_def(self.id.unwrap());
     }
 
     pub fn set_id(&mut self, regs_info: &RegistersInfo, id: MachineInstId) {
@@ -198,13 +193,13 @@ impl MachineInst {
         let id = self.id.unwrap();
 
         for reg in self.operand.iter().flat_map(|o| o.registers()) {
-            let reg = &mut regs_info.arena_ref_mut()[*reg];
+            let reg = &mut regs_info.arena_ref_mut()[reg.id];
             some_then!(id, old_id, reg.remove_use(id));
             reg.add_use(id);
         }
 
         for reg in &self.imp_use {
-            let reg = &mut regs_info.arena_ref_mut()[*reg];
+            let reg = &mut regs_info.arena_ref_mut()[reg.id];
             some_then!(id, old_id, reg.remove_use(id));
             reg.add_use(id);
         }
@@ -214,13 +209,13 @@ impl MachineInst {
         let id = self.id.unwrap();
 
         for reg in &self.def {
-            let reg = &mut regs_info.arena_ref_mut()[*reg];
+            let reg = &mut regs_info.arena_ref_mut()[reg.id];
             some_then!(id, old_id, reg.remove_def(id));
             reg.add_def(id);
         }
 
         for reg in &self.imp_def {
-            let reg = &mut regs_info.arena_ref_mut()[*reg];
+            let reg = &mut regs_info.arena_ref_mut()[reg.id];
             some_then!(id, old_id, reg.remove_def(id));
             reg.add_def(id);
         }
@@ -245,16 +240,10 @@ impl MachineInst {
         // TODO: This loop may run once at most
         for (i, o) in self.operand.iter_mut().enumerate() {
             for r in &mut o.registers_mut() {
-                if r.kind == from.kind {
-                    let fix = r.fix;
-                    regs_info.arena_ref_mut()[**r].remove_use(self.id.unwrap());
-                    **r = to;
-                    r.fix = fix;
-                    if r.is_phys_reg() {
-                        r.kind = VirtOrPhys::Phys(r.as_fixed_phys_reg());
-                        r.fix = None;
-                    }
-                    regs_info.arena_ref_mut()[**r].add_use(self.id.unwrap());
+                if r.id.kind == from.kind {
+                    regs_info.arena_ref_mut()[r.id].remove_use(self.id.unwrap());
+                    r.set_id(to);
+                    regs_info.arena_ref_mut()[r.id].add_use(self.id.unwrap());
                     replaced_operands_idx.push(i);
                 }
             }
@@ -270,24 +259,24 @@ impl MachineInst {
     ) {
         let op = &mut self.operand[nth];
         for &r in op.registers() {
-            regs_info.arena_ref_mut()[r].remove_use(self.id.unwrap());
+            regs_info.arena_ref_mut()[r.id].remove_use(self.id.unwrap());
         }
         for &r in to.registers() {
-            regs_info.arena_ref_mut()[r].add_use(self.id.unwrap());
+            regs_info.arena_ref_mut()[r.id].add_use(self.id.unwrap());
         }
         *op = to;
     }
 
-    pub fn tie_regs(&mut self, def: RegisterId, use_: RegisterId) {
+    pub fn tie_regs(&mut self, def: RegisterOperand, use_: RegisterOperand) {
         self.tie.insert(def, use_);
     }
 
-    pub fn set_tie(mut self, def: RegisterId, use_: RegisterId) -> Self {
+    pub fn set_tie(mut self, def: RegisterOperand, use_: RegisterOperand) -> Self {
         self.tie.insert(def, use_);
         self
     }
 
-    pub fn set_tie_with_def(self, use_: RegisterId) -> Self {
+    pub fn set_tie_with_def(self, use_: RegisterOperand) -> Self {
         let def = self.def[0];
         self.set_tie(def, use_)
     }
@@ -307,27 +296,27 @@ impl MachineInst {
     // }
 
     pub fn get_reg(&self) -> Option<PhysReg> {
-        Some(self.def[0].as_phys_reg())
+        Some(self.def[0].id.as_phys_reg())
     }
 
     pub fn has_def_reg(&self) -> bool {
         self.def.len() > 0
     }
 
-    pub fn get_def_reg(&self) -> Option<RegisterId> {
+    pub fn get_def_reg(&self) -> Option<RegisterOperand> {
         if !self.has_def_reg() {
             return None;
         }
         Some(self.def[0])
     }
 
-    pub fn collect_defined_regs(&self) -> Vec<&RegisterId> {
-        let mut regs: Vec<&RegisterId> = self.def.iter().collect();
+    pub fn collect_defined_regs(&self) -> Vec<&RegisterOperand> {
+        let mut regs: Vec<&RegisterOperand> = self.def.iter().collect();
         regs.extend(&mut self.imp_def.iter());
         regs
     }
 
-    pub fn collect_used_regs(&self) -> Vec<&RegisterId> {
+    pub fn collect_used_regs(&self) -> Vec<&RegisterOperand> {
         let mut regs = vec![];
         for operand in &self.operand {
             regs.append(&mut operand.registers())
@@ -338,7 +327,7 @@ impl MachineInst {
         regs
     }
 
-    pub fn collect_all_regs_mut(&mut self) -> Vec<&mut RegisterId> {
+    pub fn collect_all_regs_mut(&mut self) -> Vec<&mut RegisterOperand> {
         let mut regs = vec![];
 
         for operand in &mut self.operand {
@@ -363,14 +352,14 @@ impl MachineInst {
 
 impl MachineOperand {
     pub fn phys_reg<T: TargetRegisterTrait>(regs_info: &RegistersInfo, r: T) -> MachineOperand {
-        MachineOperand::Register(regs_info.get_phys_reg(r))
+        MachineOperand::Register(RegisterOperand::new(regs_info.get_phys_reg(r)))
     }
 
     pub fn imm_i32(i: i32) -> Self {
         MachineOperand::Constant(MachineConstant::Int32(i))
     }
 
-    pub fn registers(&self) -> Vec<&RegisterId> {
+    pub fn registers(&self) -> Vec<&RegisterOperand> {
         match self {
             Self::Register(r) => vec![r],
             Self::Mem(mem) => mem.registers(),
@@ -378,7 +367,7 @@ impl MachineOperand {
         }
     }
 
-    pub fn registers_mut(&mut self) -> Vec<&mut RegisterId> {
+    pub fn registers_mut(&mut self) -> Vec<&mut RegisterOperand> {
         match self {
             Self::Register(r) => vec![r],
             Self::Mem(mem) => mem.registers_mut(),
@@ -393,7 +382,7 @@ impl MachineOperand {
         }
     }
 
-    pub fn as_register(&self) -> &RegisterId {
+    pub fn as_register(&self) -> &RegisterOperand {
         match self {
             MachineOperand::Register(r) => r,
             _ => panic!(),
@@ -423,7 +412,7 @@ impl MachineOperand {
 
     pub fn is_virtual_register(&self) -> bool {
         match self {
-            MachineOperand::Register(r) => r.is_virt_reg(),
+            MachineOperand::Register(RegisterOperand { id, .. }) => id.is_virt_reg(),
             _ => false,
         }
     }
@@ -466,41 +455,51 @@ impl MachineOperand {
             MachineOperand::Mem(mem) => mem.get_type(),
             MachineOperand::None => None, // TODO
             MachineOperand::Register(r) => {
-                if let Some(fix) = r.fix {
-                    Some(rc2ty(fix))
+                if let Some(sub_super) = r.sub_super {
+                    Some(rc2ty(sub_super))
                 } else {
-                    Some(rc2ty(regs_info.arena_ref()[*r].reg_class))
+                    Some(rc2ty(regs_info.arena_ref()[r.id].reg_class))
                 }
             }
         }
     }
 }
 
+impl RegisterOperand {
+    pub fn new(id: RegisterId) -> Self {
+        Self {
+            id,
+            sub_super: None,
+        }
+    }
+
+    pub fn set_id(&mut self, id: RegisterId) {
+        self.id = id;
+        self.id = self.converted_id();
+        self.sub_super = None;
+    }
+
+    pub fn sub_super(mut self, sub_super: Option<RegisterClassKind>) -> Self {
+        self.sub_super = sub_super;
+        self
+    }
+
+    pub fn converted_id(&self) -> RegisterId {
+        match self.sub_super {
+            Some(sub_super) => RegisterId {
+                id: self.id.id,
+                kind: match self.id.kind {
+                    VirtOrPhys::Virt(v) => VirtOrPhys::Virt(v),
+                    VirtOrPhys::Phys(p) => VirtOrPhys::Phys(p.reg_class_as(sub_super)),
+                },
+                fix: None,
+            },
+            None => self.id,
+        }
+    }
+}
+
 impl MachineMemOperand {
-    //     pub fn registers(&self) -> Vec<&RegisterId> {
-    //         match self {
-    //             MachineMemOperand::BaseFi(r, _)
-    //             | MachineMemOperand::BaseFiOff(r, _, _)
-    //             | MachineMemOperand::BaseOff(r, _)
-    //             | MachineMemOperand::Base(r) => vec![r],
-    //             MachineMemOperand::BaseAlignOff(r, _, r2)
-    //             | MachineMemOperand::BaseFiAlignOff(r, _, _, r2) => vec![r, r2],
-    //             MachineMemOperand::Address(_) => vec![],
-    //         }
-    //     }
-    //
-    //     pub fn registers_mut(&mut self) -> Vec<&mut RegisterId> {
-    //         match self {
-    //             MachineMemOperand::BaseFi(r, _)
-    //             | MachineMemOperand::BaseFiOff(r, _, _)
-    //             | MachineMemOperand::BaseOff(r, _)
-    //             | MachineMemOperand::Base(r) => vec![r],
-    //             MachineMemOperand::BaseAlignOff(r, _, r2)
-    //             | MachineMemOperand::BaseFiAlignOff(r, _, _, r2) => vec![r, r2],
-    //             MachineMemOperand::Address(_) => vec![],
-    //         }
-    //     }
-    //
     pub fn as_address(&self) -> &AddressKind {
         match self {
             Self::Address(kind) => kind,
@@ -641,6 +640,16 @@ impl MachineOperand {
             MachineOperand::Mem(mem) => write!(f, "{:?}", mem),
             MachineOperand::None => write!(f, "!"),
         }
+    }
+}
+
+impl fmt::Debug for RegisterOperand {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.id.fmt(f)?;
+        if let Some(sub_super) = self.sub_super {
+            write!(f, ".{:?}", sub_super)?;
+        }
+        Ok(())
     }
 }
 

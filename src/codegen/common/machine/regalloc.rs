@@ -150,9 +150,9 @@ impl RegisterAllocator {
             for inst_id in &*bb.iseq_ref() {
                 let inst = &mut cur_func.body.inst_arena[*inst_id];
                 for reg in inst.collect_all_regs_mut() {
-                    let r = &mut arena[*reg];
-                    if reg.is_phys_reg() {
-                        liveness.add_phys_def(reg.as_phys_reg());
+                    let r = &mut arena[reg.id];
+                    if reg.id.is_phys_reg() {
+                        liveness.add_phys_def(reg.id.as_phys_reg());
                         continue;
                     }
 
@@ -162,9 +162,11 @@ impl RegisterAllocator {
                         .unwrap()
                         .reg
                         .unwrap();
-                    let p = reg.fix.map_or(p, |fix| p.reg_class_as(fix));
+                    let p = reg
+                        .sub_super
+                        .map_or(p, |sub_super| p.reg_class_as(sub_super));
                     r.phys_reg = Some(p);
-                    reg.kind = VirtOrPhys::Phys(p);
+                    reg.id.kind = VirtOrPhys::Phys(p);
                     liveness.add_phys_def(p);
                 }
             }
@@ -213,9 +215,9 @@ impl RegisterAllocator {
             for def in cur_func.body.inst_arena[call_inst_id]
                 .collect_defined_regs()
                 .iter()
-                .filter(|def| def.is_phys_reg())
+                .filter(|def| def.id.is_phys_reg())
             {
-                regs_that_may_interfere.remove(def);
+                regs_that_may_interfere.remove(&def.id);
             }
             let range = LiveRange::new(vec![LiveSegment::new(call_inst_pp, call_inst_pp)]);
             for r in &regs_that_may_interfere {
@@ -325,8 +327,8 @@ impl<'a> AllocationOrder<'a> {
             .find_map(|&use_| {
                 let inst = &self.func.body.inst_arena[use_];
                 // println!(" I {:?}", inst);
-                if inst.opcode.is_copy_like() && inst.operand[0].as_register().fix == None {
-                    return self.func.regs_info.arena_ref()[inst.def[0]].phys_reg;
+                if inst.opcode.is_copy_like() && inst.operand[0].as_register().sub_super == None {
+                    return self.func.regs_info.arena_ref()[inst.def[0].id].phys_reg;
                 }
                 None
             });

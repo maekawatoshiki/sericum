@@ -1,4 +1,4 @@
-use super::super::machine::register::RegisterId;
+// use super::super::machine::register::RegisterId;
 use super::frame_object::*;
 pub use super::inst_def::TargetOpcode;
 pub use crate::codegen::common::machine::{basic_block::MachineBasicBlockId, inst::*};
@@ -6,15 +6,15 @@ use crate::ir::types::Type;
 
 #[derive(Debug, Clone)]
 pub enum MachineMemOperand {
-    BaseFi(RegisterId, FrameIndexInfo),
-    BaseFiOff(RegisterId, FrameIndexInfo, i32), // base, fi, off
-    BaseFiAlignOff(RegisterId, FrameIndexInfo, i32, RegisterId), // base, fi, align, off
-    BaseAlignOff(RegisterId, i32, RegisterId),  // base, align, off
-    BaseOff(RegisterId, i32),
-    Base(RegisterId),
+    BaseFi(RegisterOperand, FrameIndexInfo),
+    BaseFiOff(RegisterOperand, FrameIndexInfo, i32), // base, fi, off
+    BaseFiAlignOff(RegisterOperand, FrameIndexInfo, i32, RegisterOperand), // base, fi, align, off
+    BaseAlignOff(RegisterOperand, i32, RegisterOperand), // base, align, off
+    BaseOff(RegisterOperand, i32),
+    Base(RegisterOperand),
     Address(AddressKind),
     AddressOff(AddressKind, i32),
-    AddressAlignOff(AddressKind, i32, RegisterId),
+    AddressAlignOff(AddressKind, i32, RegisterOperand),
 }
 
 impl MachineOpcode {
@@ -109,7 +109,7 @@ impl MachineInst {
 }
 
 impl MachineMemOperand {
-    pub fn registers(&self) -> Vec<&RegisterId> {
+    pub fn registers(&self) -> Vec<&RegisterOperand> {
         match self {
             MachineMemOperand::BaseFi(r, _)
             | MachineMemOperand::BaseFiOff(r, _, _)
@@ -122,7 +122,7 @@ impl MachineMemOperand {
         }
     }
 
-    pub fn registers_mut(&mut self) -> Vec<&mut RegisterId> {
+    pub fn registers_mut(&mut self) -> Vec<&mut RegisterOperand> {
         match self {
             MachineMemOperand::BaseFi(r, _)
             | MachineMemOperand::BaseFiOff(r, _, _)
