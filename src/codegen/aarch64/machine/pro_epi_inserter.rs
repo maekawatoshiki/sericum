@@ -75,11 +75,11 @@ impl PrologueEpilogueInserter {
     fn insert_prologue(
         &mut self,
         /* tys: &Types, */ cur_func: &mut MachineFunction,
-        saved_regs: &[PhysReg],
+        _saved_regs: &[PhysReg],
         frame_objects: &FrameObjectsInfo,
     ) {
         let adjust = frame_objects.total_size();
-        let callee_saved_regs_adjust = frame_objects.aligned_callee_saved_regs_byte();
+        let _callee_saved_regs_adjust = frame_objects.aligned_callee_saved_regs_byte();
         // [0,504], [505, 4096], [4096, oo)
         let stackdown1 = adjust <= 504;
         let stackdown2 = 504 < adjust && bits_within(adjust, 12);
@@ -179,12 +179,12 @@ impl PrologueEpilogueInserter {
     fn insert_epilogue(
         &mut self,
         cur_func: &mut MachineFunction,
-        saved_regs: &[PhysReg],
+        _saved_regs: &[PhysReg],
         frame_objects: &FrameObjectsInfo,
     ) {
         // ldp x29, x30, [sp], adjust
         let adjust = frame_objects.total_size();
-        let callee_saved_regs_adjust = frame_objects.aligned_callee_saved_regs_byte();
+        let _callee_saved_regs_adjust = frame_objects.aligned_callee_saved_regs_byte();
         // [0,504], [505, 4096], [4096, oo)
         let stackdown1 = adjust <= 504;
         let stackdown2 = 504 < adjust && bits_within(adjust, 12);

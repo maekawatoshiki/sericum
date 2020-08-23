@@ -1,32 +1,13 @@
-// TODO: dirty code
 use super::{node, node::*};
-use crate::codegen::arch::frame_object::FrameIndexInfo;
 use crate::codegen::arch::machine::abi::AAPCS64;
 use crate::codegen::arch::machine::inst::*;
 use crate::codegen::arch::machine::register::*;
 pub use crate::codegen::common::dag::mc_convert::*;
-use crate::codegen::common::machine::calling_conv::{ArgumentRegisterOrder, CallingConv};
+use crate::codegen::common::machine::calling_conv::ArgumentRegisterOrder;
 use crate::codegen::common::machine::inst_def::DefOrUseReg;
 use crate::codegen::common::machine::{inst, inst::*, register::*};
 use crate::ir::types::*;
 use crate::util::allocator::*;
-
-// use super::super::machine::register::*;
-// use super::super::machine::{inst, inst::*};
-// use crate::codegen::arch::{
-//     dag::{node, node::*},
-//     machine::abi::AAPCS64,
-// };
-// use crate::codegen::common::dag::{basic_block::DAGBasicBlockId, function::*, module::*};
-// use crate::codegen::common::machine::{
-//     basic_block::*, calling_conv::ArgumentRegisterOrder, function::*, inst_def::DefOrUseReg,
-//     module::*,
-// };
-// use crate::ir::types::Type;
-// use crate::util::allocator::*;
-// use id_arena::*;
-// use rustc_hash::FxHashMap;
-// use std::cell::RefCell;
 
 impl<'a> ScheduleByBlock<'a> {
     pub fn convert_node_to_inst(&mut self, node: Raw<DAGNode>) -> MachineInstId {
@@ -162,26 +143,6 @@ impl<'a> ScheduleByBlock<'a> {
             .with_def(vec![RegisterOperand::new(r)])
     }
 
-    fn move2reg_if_necessary(
-        &self,
-        src: MachineOperand,
-    ) -> Result<(RegisterId, MachineInst), MachineOperand> {
-        match src {
-            MachineOperand::Register(_) => Err(src),
-            _ => {
-                let r = self
-                    .cur_func
-                    .regs_info
-                    .new_virt_reg(ty2rc(&src.get_type(&self.cur_func.regs_info).unwrap()).unwrap());
-                Ok((
-                    r,
-                    MachineInst::new_simple(opcode_copy2reg(&src), vec![src], self.cur_bb)
-                        .with_def(vec![RegisterOperand::new(r)]),
-                ))
-            }
-        }
-    }
-
     fn convert_call_dag(&mut self, node: &DAGNode) -> MachineInstId {
         let mut arg_regs = vec![RegisterOperand::new(
             self.cur_func.regs_info.get_phys_reg(GR64::X30),
@@ -196,7 +157,7 @@ impl<'a> ScheduleByBlock<'a> {
         let abi = AAPCS64::new();
         let mut arg_regs_order = ArgumentRegisterOrder::new(&abi);
 
-        for (i, arg) in args.into_iter().enumerate() {
+        for (_, arg) in args.into_iter().enumerate() {
             let ty = arg.get_type(&self.cur_func.regs_info).unwrap();
 
             if !matches!(
@@ -257,7 +218,7 @@ impl<'a> ScheduleByBlock<'a> {
             MachineInst::new_simple(MachineOpcode::CALL, vec![callee], self.cur_bb)
                 .with_imp_uses(arg_regs)
                 .with_imp_defs({
-                    let mut imp_defs = match node.ty {
+                    let imp_defs = match node.ty {
                         Type::Void => vec![],
                         _ => vec![ret_reg],
                     };

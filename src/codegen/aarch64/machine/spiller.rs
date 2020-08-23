@@ -4,29 +4,29 @@ use crate::codegen::common::machine::{function::MachineFunction, liveness::LiveR
 use crate::ir::types::Types;
 
 pub struct Spiller<'a> {
-    func: &'a mut MachineFunction,
-    matrix: &'a mut LiveRegMatrix,
+    _func: &'a mut MachineFunction,
+    _matrix: &'a mut LiveRegMatrix,
 }
 
 impl<'a> Spiller<'a> {
-    pub fn new(func: &'a mut MachineFunction, matrix: &'a mut LiveRegMatrix) -> Self {
-        Self { func, matrix }
+    pub fn new(_func: &'a mut MachineFunction, _matrix: &'a mut LiveRegMatrix) -> Self {
+        Self { _func, _matrix }
     }
 
-    pub fn insert_evict(&mut self, reg_id: RegisterId, slot: &FrameIndexInfo) -> Vec<VirtReg> {
+    pub fn insert_evict(&mut self, _reg_id: RegisterId, _slot: &FrameIndexInfo) -> Vec<VirtReg> {
         unimplemented!()
     }
 
     pub fn insert_reload(
         &mut self,
-        tys: &Types,
-        reg_id: RegisterId,
-        slot: &FrameIndexInfo,
+        _tys: &Types,
+        _reg_id: RegisterId,
+        _slot: &FrameIndexInfo,
     ) -> Vec<VirtReg> {
         unimplemented!()
     }
 
-    pub fn spill(&mut self, tys: &Types, vreg: VirtReg) -> Vec<VirtReg> {
+    pub fn spill(&mut self, _tys: &Types, _vreg: VirtReg) -> Vec<VirtReg> {
         unimplemented!()
     }
 }

@@ -1,16 +1,8 @@
 use super::node::*;
-use crate::codegen::arch::{frame_object::*, machine::abi::AAPCS64, machine::register::*};
+use crate::codegen::arch::{machine::abi::AAPCS64, machine::register::*};
 use crate::codegen::common::{
-    dag::{basic_block::*, convert::ConvertToDAGNode, function::*, module::*},
-    machine::calling_conv::ArgumentRegisterOrder,
+    dag::convert::ConvertToDAGNode, machine::calling_conv::ArgumentRegisterOrder,
 };
-use crate::ir::{
-    basic_block::*, function::*, liveness::*, module::*, opcode::*, types::*, value::*,
-};
-use crate::util::allocator::Raw;
-use id_arena::*;
-use rustc_hash::FxHashMap;
-use std::mem;
 
 impl<'a> ConvertToDAGNode<'a> {
     pub fn copy_reg_args(&mut self) {

@@ -38,7 +38,7 @@ impl FrameObjectsInfo {
         // }
         // }
 
-        for FrameIndexInfo { idx, ty } in &f.local_mgr.locals {
+        for FrameIndexInfo { ty, .. } in &f.local_mgr.locals {
             let size = ty.size_in_byte(tys) as i32;
             let align = ty.align_in_byte(tys) as i32;
             total_size += size + padding(total_size, align);
