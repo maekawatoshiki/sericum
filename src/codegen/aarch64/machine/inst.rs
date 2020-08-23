@@ -1,4 +1,3 @@
-use super::super::machine::register::RegisterId;
 use super::frame_object::*;
 pub use super::inst_def::TargetOpcode;
 pub use crate::codegen::common::machine::{basic_block::MachineBasicBlockId, inst::*};
@@ -6,11 +5,11 @@ use crate::ir::types::Type;
 
 #[derive(Debug, Clone)]
 pub enum MachineMemOperand {
-    RegFi(RegisterId, FrameIndexInfo),
-    PreIndex(RegisterId, i32),
-    PostIndex(RegisterId, i32),
-    Reg(RegisterId),
-    // ImmReg(i32, RegisterId),
+    RegFi(RegisterOperand, FrameIndexInfo),
+    PreIndex(RegisterOperand, i32),
+    PostIndex(RegisterOperand, i32),
+    Reg(RegisterOperand),
+    // ImmReg(i32, RegisterOperand),
     Address(AddressKind),
 }
 
@@ -83,7 +82,7 @@ impl MachineInst {
 }
 
 impl MachineMemOperand {
-    pub fn registers(&self) -> Vec<&RegisterId> {
+    pub fn registers(&self) -> Vec<&RegisterOperand> {
         match self {
             Self::PostIndex(r, _) | Self::PreIndex(r, _) | Self::Reg(r) | Self::RegFi(r, _) => {
                 vec![r]
@@ -92,7 +91,7 @@ impl MachineMemOperand {
         }
     }
 
-    pub fn registers_mut(&mut self) -> Vec<&mut RegisterId> {
+    pub fn registers_mut(&mut self) -> Vec<&mut RegisterOperand> {
         match self {
             Self::PostIndex(r, _) | Self::PreIndex(r, _) | Self::Reg(r) | Self::RegFi(r, _) => {
                 vec![r]

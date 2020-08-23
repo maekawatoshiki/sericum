@@ -90,7 +90,7 @@ impl<'s> MachineAsmPrinter<'s> {
         self.output.push(' ');
 
         for (i, r) in inst.def.iter().enumerate() {
-            self.output.push_str(r.as_phys_reg().name());
+            self.output.push_str(r.id.as_phys_reg().name());
             if i != inst.def.len() - 1 {
                 self.output.push_str(", ");
             }
@@ -123,27 +123,27 @@ impl<'s> MachineAsmPrinter<'s> {
             MachineOperand::Constant(MachineConstant::Int8(i)) => {
                 self.output.push_str(format!("{}", i).as_str())
             }
-            MachineOperand::Register(r) => self.output.push_str(r.as_phys_reg().name()),
+            MachineOperand::Register(r) => self.output.push_str(r.id.as_phys_reg().name()),
             MachineOperand::FrameIndex(i) => self
                 .output
                 .push_str(format!("{}", fo.offset(i.idx).unwrap()).as_str()),
             MachineOperand::Mem(MachineMemOperand::RegFi(r, fi)) => self.output.push_str(
                 format!(
                     "[{}, {}]",
-                    r.as_phys_reg().name(),
+                    r.id.as_phys_reg().name(),
                     fo.offset(fi.idx).unwrap()
                 )
                 .as_str(),
             ),
             MachineOperand::Mem(MachineMemOperand::Reg(r)) => self
                 .output
-                .push_str(format!("[{}]", r.as_phys_reg().name(),).as_str()),
+                .push_str(format!("[{}]", r.id.as_phys_reg().name(),).as_str()),
             MachineOperand::Mem(MachineMemOperand::PreIndex(r, off)) => self
                 .output
-                .push_str(format!("[{}, {}]!", r.as_phys_reg().name(), off).as_str()),
+                .push_str(format!("[{}, {}]!", r.id.as_phys_reg().name(), off).as_str()),
             MachineOperand::Mem(MachineMemOperand::PostIndex(r, off)) => self
                 .output
-                .push_str(format!("[{}], {}", r.as_phys_reg().name(), off).as_str()),
+                .push_str(format!("[{}], {}", r.id.as_phys_reg().name(), off).as_str()),
             MachineOperand::Mem(MachineMemOperand::Address(AddressKind::FunctionName(name))) => {
                 self.output.push_str(name.replace('.', "_").as_str())
             }

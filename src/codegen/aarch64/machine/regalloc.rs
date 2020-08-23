@@ -7,7 +7,7 @@ pub use crate::codegen::common::machine::regalloc::*;
 use crate::codegen::common::machine::{
     basic_block::MachineBasicBlockId,
     function::MachineFunction,
-    inst::{MachineInst, MachineInstId, MachineOperand},
+    inst::{MachineInst, MachineInstId, MachineOperand, RegisterOperand},
 };
 
 impl RegisterAllocator {
@@ -18,8 +18,8 @@ impl RegisterAllocator {
         frinfo: FrameIndexInfo,
         parent: MachineBasicBlockId,
     ) -> (MachineInstId, MachineInstId) {
-        let src = MachineOperand::Register(reg);
-        let x29 = f.regs_info.get_phys_reg(GR64::X29);
+        let src = MachineOperand::Register(RegisterOperand::new(reg));
+        let x29 = RegisterOperand::new(f.regs_info.get_phys_reg(GR64::X29));
         let store_inst_id = f.alloc_inst(MachineInst::new(
             &f.regs_info,
             MachineOpcode::STR,
@@ -37,7 +37,7 @@ impl RegisterAllocator {
                 vec![MachineOperand::Mem(MachineMemOperand::RegFi(x29, frinfo))],
                 parent,
             )
-            .with_def(vec![reg]),
+            .with_def(vec![RegisterOperand::new(reg)]),
         );
 
         (store_inst_id, load_inst_id)

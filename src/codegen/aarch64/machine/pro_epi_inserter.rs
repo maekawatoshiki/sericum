@@ -87,10 +87,10 @@ impl PrologueEpilogueInserter {
         let mut builder = Builder::new(cur_func);
         builder.set_insert_point_at_entry_block();
 
-        let sp = builder.function.regs_info.get_phys_reg(SP::SP);
-        let x16 = builder.function.regs_info.get_phys_reg(GR64::X16);
-        let x29 = builder.function.regs_info.get_phys_reg(GR64::X29);
-        let x30 = builder.function.regs_info.get_phys_reg(GR64::X30);
+        let sp = RegisterOperand::new(builder.function.regs_info.get_phys_reg(SP::SP));
+        let x16 = RegisterOperand::new(builder.function.regs_info.get_phys_reg(GR64::X16));
+        let x29 = RegisterOperand::new(builder.function.regs_info.get_phys_reg(GR64::X29));
+        let x30 = RegisterOperand::new(builder.function.regs_info.get_phys_reg(GR64::X30));
 
         if stackdown1 {
             // stp x29, x30, [sp, -adjust]
@@ -192,11 +192,10 @@ impl PrologueEpilogueInserter {
 
         let mut bb_iseq = vec![];
         // let has_call = cur_func.body.has_call();
-        let sp = cur_func.regs_info.get_phys_reg(SP::SP);
-        let x16 = cur_func.regs_info.get_phys_reg(GR64::X16);
-        let x29 = cur_func.regs_info.get_phys_reg(GR64::X29);
-        let x30 = cur_func.regs_info.get_phys_reg(GR64::X30);
-        let sp = cur_func.regs_info.get_phys_reg(SP::SP);
+        let sp = RegisterOperand::new(cur_func.regs_info.get_phys_reg(SP::SP));
+        let x16 = RegisterOperand::new(cur_func.regs_info.get_phys_reg(GR64::X16));
+        let x29 = RegisterOperand::new(cur_func.regs_info.get_phys_reg(GR64::X29));
+        let x30 = RegisterOperand::new(cur_func.regs_info.get_phys_reg(GR64::X30));
 
         for (bb_id, bb) in cur_func.body.basic_blocks.id_and_block() {
             let last_inst_id = *bb.iseq_ref().last().unwrap();

@@ -21,7 +21,7 @@ pub struct ScheduleByBlock<'a> {
     // types: &'a Types,
     cur_func: &'a DAGFunction,
     machine_inst_arena: &'a mut InstructionArena,
-    node_to_reg: FxHashMap<Raw<DAGNode>, Option<RegisterId>>,
+    node2reg: FxHashMap<Raw<DAGNode>, Option<RegisterOperand>>,
     cur_bb: MachineBasicBlockId,
     iseq: &'a mut Vec<MachineInstId>,
     bb_map: &'a FxHashMap<DAGBasicBlockId, MachineBasicBlockId>,
@@ -70,7 +70,7 @@ pub fn convert_function(/*types: &Types,*/ dag_func: DAGFunction) -> MachineFunc
             // types,
             cur_func: &dag_func,
             machine_inst_arena: &mut machine_inst_arena,
-            node_to_reg: FxHashMap::default(),
+            node2reg: FxHashMap::default(),
             cur_bb: bb_id,
             iseq: &mut iseq,
             bb_map: &bb_map,
@@ -85,25 +85,33 @@ pub fn convert_function(/*types: &Types,*/ dag_func: DAGFunction) -> MachineFunc
 }
 
 impl<'a> ScheduleByBlock<'a> {
-    pub fn convert(&mut self, node: Raw<DAGNode>) -> Option<RegisterId> {
-        if let Some(reg_id) = self.node_to_reg.get(&node) {
-            return *reg_id;
+    pub fn convert(&mut self, node: Raw<DAGNode>) -> Option<RegisterOperand> {
+        if let Some(reg) = self.node2reg.get(&node) {
+            return *reg;
         }
 
-        let reg_id = match self.convert_node_to_inst(node) {
-            Some(id) => {
-                let inst = &self.machine_inst_arena[id];
-                inst.get_def_reg()
+        let reg = match node.kind {
+            NodeKind::IR(IRNodeKind::Entry) => None,
+            NodeKind::IR(IRNodeKind::RegClass) => {
+                let val = self.normal_operand(node.operand[0]);
+                Some(val.as_register().sub_super(ty2rc(&node.ty)))
+                // Some(val.as_register().fix(ty2rc(&node.ty)))
             }
-            None => None,
+            _ => {
+                if let Some(inst_id) = self.convert_node_to_inst(node) {
+                    self.machine_inst_arena[inst_id].get_def_reg()
+                } else {
+                    None
+                }
+            }
         };
-        self.node_to_reg.insert(node, reg_id);
+        self.node2reg.insert(node, reg);
 
-        some_then!(next, node.next, {
+        if let Some(next) = node.next {
             self.convert(next);
-        });
+        }
 
-        reg_id
+        reg
     }
 
     fn convert_node_to_inst(&mut self, node: Raw<DAGNode>) -> Option<MachineInstId> {
@@ -117,7 +125,7 @@ impl<'a> ScheduleByBlock<'a> {
         // there should be no NodeKind::IRs here
         let machine_inst_id = match &node.kind {
             NodeKind::MI(_) => {
-                fn reg(inst: &MachineInst, x: &DefOrUseReg) -> RegisterId {
+                fn reg(inst: &MachineInst, x: &DefOrUseReg) -> RegisterOperand {
                     match x {
                         DefOrUseReg::Def(i) => inst.def[*i],
                         DefOrUseReg::Use(i) => *inst.operand[*i].as_register(),
@@ -146,7 +154,7 @@ impl<'a> ScheduleByBlock<'a> {
             NodeKind::IR(IRNodeKind::CopyToReg) => {
                 let val = self.normal_operand(node.operand[1]);
                 let dst = match &node.operand[0].kind {
-                    NodeKind::Operand(OperandNodeKind::Register(r)) => *r,
+                    NodeKind::Operand(OperandNodeKind::Register(r)) => RegisterOperand::new(*r),
                     _ => unreachable!(),
                 };
                 Some(self.push_inst(MachineInst::new_with_def_reg(
@@ -310,7 +318,8 @@ impl<'a> ScheduleByBlock<'a> {
     }
 
     fn move2reg(&self, r: RegisterId, src: MachineOperand) -> MachineInst {
-        MachineInst::new_simple(opcode_copy2reg(&src), vec![src], self.cur_bb).with_def(vec![r])
+        MachineInst::new_simple(opcode_copy2reg(&src), vec![src], self.cur_bb)
+            .with_def(vec![RegisterOperand::new(r)])
     }
 
     fn move2reg_if_necessary(
@@ -327,14 +336,16 @@ impl<'a> ScheduleByBlock<'a> {
                 Ok((
                     r,
                     MachineInst::new_simple(opcode_copy2reg(&src), vec![src], self.cur_bb)
-                        .with_def(vec![r]),
+                        .with_def(vec![RegisterOperand::new(r)]),
                 ))
             }
         }
     }
 
     fn convert_call_dag(&mut self, node: &DAGNode) -> MachineInstId {
-        let mut arg_regs = vec![self.cur_func.regs_info.get_phys_reg(GR64::X30)];
+        let mut arg_regs = vec![RegisterOperand::new(
+            self.cur_func.regs_info.get_phys_reg(GR64::X30),
+        )];
         // let mut off = 0;
 
         let mut args = vec![];
@@ -359,7 +370,7 @@ impl<'a> ScheduleByBlock<'a> {
             let inst = match arg_regs_order.next(reg_class) {
                 Some(arg_reg) => {
                     let r = self.cur_func.regs_info.get_phys_reg(arg_reg);
-                    arg_regs.push(r);
+                    arg_regs.push(RegisterOperand::new(r));
                     self.move2reg(r, arg)
                 }
                 None => {
@@ -395,10 +406,12 @@ impl<'a> ScheduleByBlock<'a> {
         // );
 
         let callee = self.normal_operand(node.operand[0]);
-        let ret_reg = self.cur_func.regs_info.get_phys_reg(
-            ty2rc(&node.ty)
-                .unwrap_or(RegisterClassKind::GR64)
-                .return_value_register(),
+        let ret_reg = RegisterOperand::new(
+            self.cur_func.regs_info.get_phys_reg(
+                ty2rc(&node.ty)
+                    .unwrap_or(RegisterClassKind::GR64)
+                    .return_value_register(),
+            ),
         );
         let call_inst = self.push_inst(
             MachineInst::new_simple(MachineOpcode::CALL, vec![callee], self.cur_bb)
@@ -426,7 +439,7 @@ impl<'a> ScheduleByBlock<'a> {
             return call_inst;
         }
 
-        let reg_class = self.cur_func.regs_info.arena_ref()[ret_reg].reg_class;
+        let reg_class = self.cur_func.regs_info.arena_ref()[ret_reg.id].reg_class;
         let copy = MachineInst::new(
             &self.cur_func.regs_info,
             MachineOpcode::Copy,
@@ -457,7 +470,9 @@ impl<'a> ScheduleByBlock<'a> {
             NodeKind::Operand(OperandNodeKind::BasicBlock(bb)) => {
                 MachineOperand::Branch(self.get_machine_bb(bb))
             }
-            NodeKind::Operand(OperandNodeKind::Register(ref r)) => MachineOperand::Register(*r),
+            NodeKind::Operand(OperandNodeKind::Register(ref r)) => {
+                MachineOperand::Register(RegisterOperand::new(*r))
+            }
             NodeKind::Operand(OperandNodeKind::Mem(ref mem)) => match mem {
                 MemNodeKind::Reg => MachineOperand::Mem(MachineMemOperand::Reg(
                     *self.normal_operand(node.operand[0]).as_register(),
