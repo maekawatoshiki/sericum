@@ -83,6 +83,10 @@ impl PhysReg {
     pub fn retrieve(&self) -> usize {
         self.0
     }
+
+    pub fn reg_class_as(self, rc: RegisterClassKind) -> Self {
+        PhysReg(self.retrieve() - self.reg_class() as usize + rc as usize)
+    }
 }
 
 impl RegistersInfo {
@@ -184,10 +188,7 @@ impl RegisterId {
 
     pub fn as_fixed_phys_reg(&self) -> PhysReg {
         if let Some(fix) = self.fix {
-            return PhysReg(
-                self.as_phys_reg().retrieve() - self.as_phys_reg().reg_class() as usize
-                    + fix as usize,
-            );
+            return self.as_phys_reg().reg_class_as(fix);
         }
         self.as_phys_reg()
     }

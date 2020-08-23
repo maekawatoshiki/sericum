@@ -162,11 +162,7 @@ impl RegisterAllocator {
                         .unwrap()
                         .reg
                         .unwrap();
-                    let p = if let Some(fix) = reg.fix {
-                        PhysReg(p.retrieve() - p.reg_class() as usize + fix as usize)
-                    } else {
-                        p
-                    };
+                    let p = reg.fix.map_or(p, |fix| p.reg_class_as(fix));
                     r.phys_reg = Some(p);
                     reg.kind = VirtOrPhys::Phys(p);
                     liveness.add_phys_def(p);
