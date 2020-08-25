@@ -1,25 +1,30 @@
 use super::exec::roundup;
-use super::machine::register::ty2rc;
+use super::machine::register::{ty2rc, GR64};
 use crate::codegen::arch::machine::abi::SystemV;
 use crate::codegen::common::machine::calling_conv::CallingConv;
 use crate::codegen::common::machine::function::MachineFunction;
+use crate::codegen::common::machine::register::TargetRegisterTrait;
 pub use crate::codegen::common::machine::{calling_conv::ArgumentRegisterOrder, frame_object::*};
 use crate::ir::types::*;
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 impl FrameObjectsInfo {
     pub fn new(tys: &Types, f: &MachineFunction) -> Self {
         let mut offset_map = FxHashMap::default();
         let mut offset = 0i32;
-        let callee_saved_regs_byte: usize = f
+        let has_call = f.body.has_call();
+        let mut saved_regs = f
             .body
             .appeared_phys_regs()
             .containing_callee_saved_regs()
             .to_phys_set()
-            .len()
-            * 8;
-        let has_call = f.body.has_call(); // push rbp -> 16 byte aligned
-
+            .into_iter()
+            .map(|r| r.superest_reg())
+            .collect::<FxHashSet<_>>();
+        if has_call {
+            saved_regs.insert(GR64::RBP.as_phys_reg());
+        }
+        let saved_regs_byte = saved_regs.len() * 8;
         let padding = |off, align| -> i32 { (align - off % align) % align };
 
         let base = &tys.base.borrow();
@@ -62,21 +67,17 @@ impl FrameObjectsInfo {
         }
 
         let stack_down = Self::calc_max_adjust_stack_down(f);
-        offset = roundup(
-            offset
-                + stack_down as i32
-                + if has_call || (offset + stack_down == 0) {
-                    0
-                } else {
-                    8
-                },
-            16,
-        );
+        offset = roundup(offset + stack_down as i32, 16)
+            + if saved_regs_byte as i32 % 16 == 0 {
+                8
+            } else {
+                0
+            };
 
         Self {
             offset_map,
             total_size: offset,
-            callee_saved_regs_byte,
+            callee_saved_regs_byte: saved_regs_byte,
         }
     }
 

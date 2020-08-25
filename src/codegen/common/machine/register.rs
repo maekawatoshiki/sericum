@@ -87,6 +87,14 @@ impl PhysReg {
     pub fn reg_class_as(self, rc: RegisterClassKind) -> Self {
         PhysReg(self.retrieve() - self.reg_class() as usize + rc as usize)
     }
+
+    pub fn superest_reg(&self) -> Self {
+        let mut r = *self;
+        while let Some(s) = r.super_reg() {
+            r = s;
+        }
+        r
+    }
 }
 
 impl RegistersInfo {

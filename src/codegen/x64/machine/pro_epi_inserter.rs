@@ -11,7 +11,7 @@ use crate::codegen::common::machine::{
     module::MachineModule,
 };
 use crate::{ir::types::*, traits::pass::ModulePassTrait};
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 pub struct PrologueEpilogueInserter {}
 
@@ -50,11 +50,21 @@ impl PrologueEpilogueInserter {
             return;
         }
 
+        let mut saved_regs = cur_func
+            .body
+            .appeared_phys_regs()
+            .containing_callee_saved_regs()
+            .to_phys_set()
+            .into_iter()
+            .map(|r| r.superest_reg())
+            .collect::<FxHashSet<_>>();
+        saved_regs.insert(GR64::RBP.as_phys_reg());
+        let saved_regs = saved_regs.into_iter().collect::<Vec<_>>();
         let frame_objects = FrameObjectsInfo::new(tys, cur_func);
         let adjust = frame_objects.total_size();
         Self::remove_adjust_stack_inst(cur_func);
-        self.insert_prologue(tys, cur_func, adjust);
-        self.insert_epilogue(cur_func, adjust);
+        self.insert_prologue(tys, cur_func, &saved_regs, adjust);
+        self.insert_epilogue(cur_func, &saved_regs, adjust);
         cur_func.frame_objects = Some(frame_objects);
     }
 
@@ -75,22 +85,24 @@ impl PrologueEpilogueInserter {
         }
     }
 
-    fn insert_prologue(&mut self, tys: &Types, cur_func: &mut MachineFunction, adjust: i32) {
+    fn insert_prologue(
+        &mut self,
+        tys: &Types,
+        cur_func: &mut MachineFunction,
+        saved_regs: &[PhysReg],
+        adjust: i32,
+    ) {
         let has_call = cur_func.body.has_call();
         let mut builder = Builder::new(cur_func);
         builder.set_insert_point_at_entry_block();
 
-        if has_call || adjust > 0 {
-            // push rbp
-            let push_rbp = MachineInst::new_simple(
+        for r in saved_regs {
+            let push = MachineInst::new_simple(
                 MachineOpcode::PUSH64,
-                vec![MachineOperand::phys_reg(
-                    &builder.function.regs_info,
-                    GR64::RBP,
-                )],
+                vec![MachineOperand::phys_reg(&builder.function.regs_info, *r)],
                 builder.get_cur_bb().unwrap(),
             );
-            builder.insert(push_rbp);
+            builder.insert(push);
         }
 
         if adjust == 0 {
@@ -127,19 +139,34 @@ impl PrologueEpilogueInserter {
             builder.insert(sub_rsp);
         }
 
-        self.insert_arg_copy(&tys.base.borrow(), &mut builder);
+        self.insert_arg_copy(
+            &tys.base.borrow(),
+            &mut builder,
+            saved_regs.len() as i32 * 8,
+        );
     }
 
-    fn insert_arg_copy<'a>(&mut self, tys: &'a TypesBase, builder: &'a mut Builder<'a>) {
+    fn insert_arg_copy<'a>(
+        &mut self,
+        tys: &'a TypesBase,
+        builder: &'a mut Builder<'a>,
+        saved_regs_bytes: i32,
+    ) {
         CopyArgs::new(
             builder,
             &tys.as_function_ty(builder.function.ty).unwrap().params_ty,
             &tys.as_function_ty(builder.function.ty).unwrap().params_attr,
+            saved_regs_bytes + 8, /*8=call*/
         )
         .copy();
     }
 
-    fn insert_epilogue(&mut self, cur_func: &mut MachineFunction, adjust: i32) {
+    fn insert_epilogue(
+        &mut self,
+        cur_func: &mut MachineFunction,
+        saved_regs: &[PhysReg],
+        adjust: i32,
+    ) {
         let mut bb_iseq = vec![];
         let has_call = cur_func.body.has_call();
 
@@ -169,14 +196,13 @@ impl PrologueEpilogueInserter {
                 iseq.push(cur_func.body.inst_arena.alloc(&cur_func.regs_info, i));
             }
 
-            if has_call || adjust > 0 {
-                // pop rbp
-                let i = MachineInst::new_simple(
+            for r in saved_regs.iter().rev() {
+                let pop = MachineInst::new_simple(
                     MachineOpcode::POP64,
-                    vec![MachineOperand::phys_reg(&cur_func.regs_info, GR64::RBP)],
+                    vec![MachineOperand::phys_reg(&cur_func.regs_info, *r)],
                     bb_id,
                 );
-                iseq.push(cur_func.body.inst_arena.alloc(&cur_func.regs_info, i));
+                iseq.push(cur_func.body.inst_arena.alloc(&cur_func.regs_info, pop));
             }
 
             bb_iseq.push((last_inst_id, iseq));
@@ -197,12 +223,13 @@ impl<'a> CopyArgs<'a> {
         builder: &'a mut Builder<'a>,
         params_ty: &'a Vec<Type>,
         params_attr: &'a FxHashMap<usize, ParamAttribute>,
+        init_off: i32,
     ) -> Self {
         Self {
             builder,
             params_ty,
             params_attr,
-            offset: 16, // call + push rbp. TODO: this may vary if there're more pushes
+            offset: init_off, // call + push rbp. TODO: this may vary if there're more pushes
         }
     }
 

@@ -36,10 +36,10 @@ registers! {
     order arg XMM  { XMM0, XMM1, XMM2, XMM3, XMM4, XMM5, XMM6, XMM7 }
 
     // Normal order of general-purpose registers
-    order gp GR8  { AL, CL, DL, R8B, R9B, R10B, R11B }
-    order gp GR32 { EAX, ECX, EDX, R8D, R9D, R10D, R11D }
-    order gp GR64 { RAX, RCX, RDX, R8, R9, R10, R11 }
-    order gp XMM { XMM0, XMM1, XMM2, XMM3, XMM4, XMM5 }
+    order gp GR8  { AL,  CL,  DL,  R8B, R9B, R10B, R11B, BL, R12B, R13B, R14B, R15B }
+    order gp GR32 { EAX, ECX, EDX, R8D, R9D, R10D, R11D, EBX,R12D, R13D, R14D, R15D }
+    order gp GR64 { RAX, RCX, RDX, R8,  R9,  R10,  R11,  RBX,R12,  R13,  R14,  R15  }
+    order gp XMM { XMM0, XMM1, XMM2, XMM3, XMM4, XMM5, XMM6, XMM7, XMM8, XMM15 }
 }
 
 thread_local! {
