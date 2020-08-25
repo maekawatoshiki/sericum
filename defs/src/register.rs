@@ -310,11 +310,16 @@ impl DefinitionConstructible for Registers {
                         .1
                         .body
                         .0[i];
+                    let name = str2ident(r.to_string().as_str());
                     if let Some(super_) = super_ {
                         *super_ = quote! {
                             #super_
                             #class_name::#name => #super_name::#name2.as_phys_reg(),
                         };
+                    } else {
+                        *super_ = Some(quote! {
+                            #class_name::#name => #super_name::#name2.as_phys_reg(),
+                        });
                     }
                     let sub = &mut reg_sub_super.get_mut(super_name_str).unwrap().sub;
                     if let Some(sub) = sub {
@@ -322,6 +327,10 @@ impl DefinitionConstructible for Registers {
                             #sub
                             #super_name::#name2 => #class_name::#name.as_phys_reg(),
                         };
+                    } else {
+                        *sub = Some(quote! {
+                            #super_name::#name2 => #class_name::#name.as_phys_reg(),
+                        });
                     }
                 }
             }
