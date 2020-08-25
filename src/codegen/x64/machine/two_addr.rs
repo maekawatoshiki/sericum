@@ -78,7 +78,8 @@ impl TwoAddressConverter {
                 vec![MachineOperand::Register(use_)],
                 inst_bb,
             )
-            .with_def(vec![def]);
+            .with_def(vec![def])
+            .copy_for_two_addr(Some(inst_id));
 
             let mut builder = Builder::new(f);
             builder.set_insert_point_before_inst(inst_id).unwrap();

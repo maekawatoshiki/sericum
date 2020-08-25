@@ -22,10 +22,11 @@ pub struct MachineInst {
     pub opcode: MachineOpcode,
     pub operand: Vec<MachineOperand>,
     pub def: Vec<RegisterOperand>,
-    pub tie: FxHashMap<RegisterOperand, RegisterOperand>, // def -> use
     pub imp_use: Vec<RegisterOperand>,
     pub imp_def: Vec<RegisterOperand>,
     pub kills: Vec<RegisterOperand>,
+    pub tie: FxHashMap<RegisterOperand, RegisterOperand>, // def -> use
+    pub copy_for_two_addr: Option<MachineInstId>,         // id for two addr inst
     pub parent: MachineBasicBlockId,
 }
 
@@ -83,6 +84,7 @@ impl MachineInst {
             imp_def: vec![],
             imp_use: vec![],
             kills: vec![],
+            copy_for_two_addr: None,
             parent,
         }
     }
@@ -101,6 +103,7 @@ impl MachineInst {
             imp_def: vec![],
             imp_use: vec![],
             kills: vec![],
+            copy_for_two_addr: None,
             parent,
         }
     }
@@ -120,6 +123,7 @@ impl MachineInst {
             imp_def: vec![],
             imp_use: vec![],
             kills: vec![],
+            copy_for_two_addr: None,
             parent,
         }
     }
@@ -140,6 +144,7 @@ impl MachineInst {
             imp_def,
             imp_use,
             kills: vec![],
+            copy_for_two_addr: None,
             parent,
         }
     }
@@ -173,6 +178,11 @@ impl MachineInst {
 
     pub fn with_kills(mut self, mut rs: Vec<RegisterOperand>) -> Self {
         self.kills.append(&mut rs);
+        self
+    }
+
+    pub fn copy_for_two_addr(mut self, x: Option<MachineInstId>) -> Self {
+        self.copy_for_two_addr = x;
         self
     }
 

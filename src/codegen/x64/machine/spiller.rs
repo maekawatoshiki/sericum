@@ -3,14 +3,14 @@ use super::super::{
     frame_object::FrameIndexInfo,
     machine::register::{rc2ty, RegisterId, VirtReg, GR64},
 };
-use super::inst::{MachineInst, MachineMemOperand, MachineOpcode, MachineOperand, RegisterOperand};
+use super::inst::{MachineInst, MachineMemOperand, MachineOperand, RegisterOperand};
 use crate::codegen::common::machine::{
     builder::{BuilderTrait, BuilderWithLiveInfoEdit},
     function::MachineFunction,
     liveness::{LiveRange, LiveRegMatrix, LiveSegment},
 };
 use crate::ir::types::Types;
-use rustc_hash::FxHashSet;
+use rustc_hash::FxHashMap;
 
 pub struct Spiller<'a> {
     func: &'a mut MachineFunction,
@@ -39,6 +39,7 @@ impl<'a> Spiller<'a> {
         // a = c
         // a = add a, b
         //
+        // a = c
         // new_reg = add a, b
         // mov [mem], new_reg
         //
@@ -46,56 +47,48 @@ impl<'a> Spiller<'a> {
         // new_reg = add new_reg, b
         // mov [mem], new_reg
 
-        let mut ties = FxHashSet::default();
-        for &def in &defs {
-            let def_inst = &self.func.body.inst_arena[def];
-            if let Some(i) = def_inst.opcode.inst_def() {
-                if i.tie.len() > 0 {
-                    ties.insert(def_inst.def[0]);
-                }
-            }
-        }
+        let mut two_addrs = FxHashMap::default();
 
-        // println!("ties {:?}", ties);
-
-        let mut last = None;
         for &def_id in &defs {
-            let def_inst = &self.func.body.inst_arena[def_id];
-            if last.is_none() && ties.contains(&def_inst.def[0]) {
-                last = Some(def_inst.operand[0].clone());
-                self.func.remove_inst(def_id);
-                continue;
-            }
-
             let def_inst = &mut self.func.body.inst_arena[def_id];
-            let new_reg = self.func.regs_info.new_virt_reg_from(&reg_id);
-            new_regs.push(new_reg.as_virt_reg());
-            self.matrix.add_virt_reg(new_reg);
-            self.matrix
-                .virt_reg_interval
-                .add(new_reg.as_virt_reg(), LiveRange::new_empty())
-                .is_spillable = false;
+            let new_reg = if let Some(r) = two_addrs.remove(&def_id) {
+                def_inst.set_def(&self.func.regs_info, RegisterOperand::new(r));
+                r
+            } else {
+                let new_reg = self.func.regs_info.new_virt_reg_from(&reg_id);
+                new_regs.push(new_reg.as_virt_reg());
+                self.matrix.add_virt_reg(new_reg);
+                self.matrix
+                    .virt_reg_interval
+                    .add(new_reg.as_virt_reg(), LiveRange::new_empty())
+                    .is_spillable = false;
+                def_inst.set_def(&self.func.regs_info, RegisterOperand::new(new_reg));
+                self.func.body.basic_blocks.arena[def_inst.parent]
+                    .liveness_ref_mut()
+                    .add_def(new_reg);
 
-            def_inst.set_def(&self.func.regs_info, RegisterOperand::new(new_reg));
+                let start = self.matrix.get_program_point(def_id).unwrap();
+                self.matrix
+                    .virt_reg_interval
+                    .get_mut(&new_reg.as_virt_reg())
+                    .unwrap()
+                    .range
+                    .add_segment(LiveSegment::new(start, start));
 
-            let mut tied = false;
+                if let Some(i) = def_inst.copy_for_two_addr {
+                    two_addrs.insert(i, new_reg);
+                }
+
+                new_reg
+            };
+
             if let Some(inst_def) = def_inst.opcode.inst_def() {
-                assert!(inst_def.tie.len() <= 1); // TODO: support for more than one tied register
+                assert!(inst_def.tie.len() <= 1); // TODO: support more than one tied register
                 if inst_def.tie.len() == 1 {
-                    tied = true;
-                    let pos = def_inst
-                        .operand
-                        .iter()
-                        .position(|o| o.is_register() && o.as_register().id == reg_id)
-                        .unwrap();
-                    if inst_def.tie.iter().next().unwrap().1.as_use() == pos {
-                        // old_src = Some(reg_id);
-                        def_inst.replace_operand_register(&self.func.regs_info, reg_id, new_reg);
-                    }
+                    def_inst.replace_operand_register(&self.func.regs_info, reg_id, new_reg);
                 }
             }
 
-            let parent = self.func.body.inst_arena[def_id].parent;
             let dst = MachineOperand::FrameIndex(slot.clone());
             let src = MachineOperand::Register(RegisterOperand::new(new_reg));
             let rbp = RegisterOperand::new(self.func.regs_info.get_phys_reg(GR64::RBP));
@@ -105,36 +98,10 @@ impl<'a> Spiller<'a> {
                     MachineOperand::Mem(MachineMemOperand::BaseFi(rbp, *dst.as_frame_index())),
                     src.clone(),
                 ],
-                parent,
+                def_inst.parent,
             );
-            let copy = if tied {
-                ::std::mem::replace(&mut last, None).map_or(None, |src| {
-                    Some(
-                        MachineInst::new_simple(MachineOpcode::Copy, vec![src], parent)
-                            .with_def(vec![RegisterOperand::new(new_reg)]),
-                    )
-                })
-            } else {
-                None
-            };
-
-            self.func.body.basic_blocks.arena[parent]
-                .liveness_ref_mut()
-                .add_def(new_reg);
-
-            let start = self.matrix.get_program_point(def_id).unwrap();
-            self.matrix
-                .virt_reg_interval
-                .get_mut(&new_reg.as_virt_reg())
-                .unwrap()
-                .range
-                .add_segment(LiveSegment::new(start, start));
 
             let mut builder = BuilderWithLiveInfoEdit::new(self.matrix, self.func);
-            if let Some(copy) = copy {
-                builder.set_insert_point_before_inst(def_id).unwrap();
-                builder.insert(copy);
-            }
             builder.set_insert_point_after_inst(def_id).unwrap();
             builder.insert(store);
         }
@@ -151,18 +118,11 @@ impl<'a> Spiller<'a> {
         slot: &FrameIndexInfo,
     ) -> Vec<VirtReg> {
         let mut new_regs = vec![];
-        let mut uses = self.func.regs_info.arena_ref()[reg_id]
+        let uses = self.func.regs_info.arena_ref()[reg_id]
             .uses
             .clone()
             .into_iter()
             .collect::<Vec<_>>();
-
-        // TODO: Need sort because BuilderWithLiveInfoEdit is stupid
-        uses.sort_by(|x, y| {
-            let x = self.matrix.get_program_point(*x).unwrap();
-            let y = self.matrix.get_program_point(*y).unwrap();
-            x.cmp(&y)
-        });
 
         for use_id in uses {
             let new_reg = self.func.regs_info.new_virt_reg_from(&reg_id);
@@ -215,7 +175,7 @@ impl<'a> Spiller<'a> {
         let slot = self
             .func
             .local_mgr
-            .alloc(&rc2ty(self.func.regs_info.arena_ref()[reg_id].reg_class)); // TODO
+            .alloc(&rc2ty(self.func.regs_info.arena_ref()[reg_id].reg_class)); // TODO: May allocate redundant stack slot
 
         let mut new_regs = self.insert_evict(reg_id, &slot);
         new_regs.append(&mut self.insert_reload(tys, reg_id, &slot));
