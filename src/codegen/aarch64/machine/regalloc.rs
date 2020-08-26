@@ -42,4 +42,19 @@ impl RegisterAllocator {
 
         (store_inst_id, load_inst_id)
     }
+
+    pub fn get_regs_used_to_preserve(
+        &mut self,
+        func: &mut MachineFunction,
+        store_id: MachineInstId,
+        load_id: MachineInstId,
+    ) -> Vec<(RegisterId, RegisterId)> {
+        let store = &func.body.inst_arena[store_id];
+        let r1 = store.operand[0].as_register().id;
+
+        let load = &func.body.inst_arena[load_id];
+        let r2 = load.def[0].id;
+
+        vec![(r1, r2)]
+    }
 }

@@ -5,7 +5,7 @@ use super::super::{
 };
 use super::inst::*;
 use crate::analysis::{dom_tree::DominatorTree, loops::Loops};
-use crate::codegen::common::machine::{basic_block::*, function::*, liveness::*};
+use crate::codegen::common::machine::{basic_block::*, function::*, liveness::*, regalloc::*};
 use crate::ir::types::Types;
 
 pub struct LiveIntervalSplitter<'a> {
@@ -14,7 +14,11 @@ pub struct LiveIntervalSplitter<'a> {
 }
 
 impl<'a> LiveIntervalSplitter<'a> {
-    pub fn new(_func: &'a mut MachineFunction, _matrix: &'a mut LiveRegMatrix) -> Self {
+    pub fn new(
+        _func: &'a mut MachineFunction,
+        _matrix: &'a mut LiveRegMatrix,
+        _: &'a mut Vec<PreserveStoreLoad>,
+    ) -> Self {
         Self { _func, _matrix }
     }
 

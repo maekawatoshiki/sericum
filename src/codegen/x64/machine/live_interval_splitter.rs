@@ -5,18 +5,29 @@ use super::super::{
 };
 use super::inst::*;
 use crate::analysis::{dom_tree::DominatorTree, loops::Loops};
-use crate::codegen::common::machine::{basic_block::*, builder::*, function::*, liveness::*};
+use crate::codegen::common::machine::{
+    basic_block::*, builder::*, function::*, liveness::*, regalloc::*,
+};
 use crate::ir::types::Types;
 use rustc_hash::FxHashSet;
 
 pub struct LiveIntervalSplitter<'a> {
     func: &'a mut MachineFunction,
     matrix: &'a mut LiveRegMatrix,
+    preserve_insts: &'a mut Vec<PreserveStoreLoad>,
 }
 
 impl<'a> LiveIntervalSplitter<'a> {
-    pub fn new(func: &'a mut MachineFunction, matrix: &'a mut LiveRegMatrix) -> Self {
-        Self { func, matrix }
+    pub fn new(
+        func: &'a mut MachineFunction,
+        matrix: &'a mut LiveRegMatrix,
+        preserve_insts: &'a mut Vec<PreserveStoreLoad>,
+    ) -> Self {
+        Self {
+            func,
+            matrix,
+            preserve_insts,
+        }
     }
 
     // TODO: REFINE CODE
@@ -181,6 +192,9 @@ impl<'a> LiveIntervalSplitter<'a> {
 
         builder.set_insert_point_after_inst(*before_load);
         builder.insert(load_id);
+
+        self.preserve_insts
+            .push(PreserveStoreLoad(store_id, load_id));
 
         // TODO: We need a suitable way to calculate spill weight
         let weight = self

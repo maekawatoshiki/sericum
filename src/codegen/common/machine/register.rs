@@ -95,6 +95,10 @@ impl PhysReg {
         }
         r
     }
+
+    pub fn is_callee_saved_reg(&self) -> bool {
+        CALLEE_SAVED_REGS.with(|rs| rs.0[0] & (1 << self.retrieve())) != 0
+    }
 }
 
 impl RegistersInfo {

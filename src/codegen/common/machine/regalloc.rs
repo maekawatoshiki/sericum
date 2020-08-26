@@ -18,6 +18,8 @@ pub struct AllocationOrder<'a> {
     func: &'a MachineFunction,
 }
 
+pub struct PreserveStoreLoad(pub MachineInstId, pub MachineInstId);
+
 impl ModulePassTrait for RegisterAllocator {
     type M = MachineModule;
 
@@ -51,7 +53,7 @@ impl RegisterAllocator {
         let mut matrix = LivenessAnalysis::new().analyze_function(cur_func);
         calc_spill_weight(cur_func, &mut matrix);
 
-        self.preserve_reg_uses_across_call(tys, cur_func, &mut matrix);
+        let preserve_insts = self.preserve_reg_uses_across_call(tys, cur_func, &mut matrix);
         coalesce_function(&mut matrix, cur_func);
 
         self.queue = matrix.collect_virt_regs().into_iter().collect();
@@ -113,7 +115,30 @@ impl RegisterAllocator {
 
         self.rewrite_vregs(cur_func, &matrix);
 
+        self.delete_redundant_store_load(cur_func, preserve_insts);
+
         coalesce_function(&mut matrix, cur_func); // spilling may cause another coalesce needs
+    }
+
+    pub fn delete_redundant_store_load(
+        &mut self,
+        func: &mut MachineFunction,
+        preserve_insts: Vec<PreserveStoreLoad>,
+    ) {
+        for PreserveStoreLoad(store, load) in preserve_insts {
+            let regs = self.get_regs_used_to_preserve(func, store, load);
+            for (r_s, r_l) in regs {
+                let r_s = func.regs_info.arena_ref()[r_s].phys_reg.unwrap();
+                let r_l = func.regs_info.arena_ref()[r_l].phys_reg.unwrap();
+                if r_s != r_l {
+                    continue;
+                }
+                if r_s.is_callee_saved_reg() {
+                    func.remove_inst(store);
+                    func.remove_inst(load);
+                }
+            }
+        }
     }
 
     pub fn sort_queue(&mut self, matrix: &LiveRegMatrix) {
@@ -179,6 +204,7 @@ impl RegisterAllocator {
         cur_func: &mut MachineFunction,
         matrix: &mut LiveRegMatrix,
         occupied: &mut FxHashSet<FrameIndexKind>,
+        preserve_insts: &mut Vec<PreserveStoreLoad>,
         call_inst_id: MachineInstId,
     ) {
         // TODO: Refine code. It's hard to understand.
@@ -241,7 +267,7 @@ impl RegisterAllocator {
         let loops = LoopsConstructor::new(&dom_tree, &cur_func.body.basic_blocks).analyze();
 
         for (frinfo, reg) in slots_to_save_regs.into_iter().zip(regs_to_save.into_iter()) {
-            if let Some(_) = LiveIntervalSplitter::new(cur_func, matrix).split(
+            if let Some(_) = LiveIntervalSplitter::new(cur_func, matrix, preserve_insts).split(
                 tys,
                 &dom_tree,
                 &loops,
@@ -255,6 +281,8 @@ impl RegisterAllocator {
 
             let (store_id, load_id) =
                 self.store_and_load_for_reg_preservation(cur_func, reg, frinfo, call_inst_parent);
+
+            preserve_insts.push(PreserveStoreLoad(store_id, load_id));
 
             let mut builder = BuilderWithLiveInfoEdit::new(matrix, cur_func);
 
@@ -271,7 +299,7 @@ impl RegisterAllocator {
         tys: &Types,
         cur_func: &mut MachineFunction,
         matrix: &mut LiveRegMatrix,
-    ) {
+    ) -> Vec<PreserveStoreLoad> {
         let mut call_inst_id = vec![];
 
         for (_, bb) in cur_func.body.basic_blocks.id_and_block() {
@@ -309,9 +337,20 @@ impl RegisterAllocator {
             .map(|l| l.idx)
             .collect::<FxHashSet<_>>();
 
+        let mut preserve_insts = vec![];
+
         for inst_id in call_inst_id {
-            self.insert_inst_to_save_reg(tys, cur_func, matrix, &mut occupied.clone(), inst_id);
+            self.insert_inst_to_save_reg(
+                tys,
+                cur_func,
+                matrix,
+                &mut occupied.clone(),
+                &mut preserve_insts,
+                inst_id,
+            );
         }
+
+        preserve_insts
     }
 }
 
