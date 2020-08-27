@@ -8,7 +8,6 @@ use crate::analysis::{dom_tree::DominatorTree, loops::Loops};
 use crate::codegen::common::machine::{
     basic_block::*, builder::*, function::*, liveness::*, regalloc::*,
 };
-use crate::ir::types::Types;
 use rustc_hash::FxHashSet;
 
 pub struct LiveIntervalSplitter<'a> {
@@ -33,7 +32,6 @@ impl<'a> LiveIntervalSplitter<'a> {
     // TODO: REFINE CODE
     pub fn split(
         &mut self,
-        tys: &Types,
         dom_tree: &DominatorTree<MachineBasicBlock>,
         loops: &Loops<MachineBasicBlock>,
         reg: &RegisterId,
@@ -168,7 +166,7 @@ impl<'a> LiveIntervalSplitter<'a> {
         let src = MachineOperand::Mem(MachineMemOperand::BaseFi(rbp, *slot));
         let load_id = self.func.alloc_inst(
             MachineInst::new_simple(
-                mov_rx(tys, &self.func.regs_info, &src).unwrap(),
+                mov_rx(&self.func.types, &self.func.regs_info, &src).unwrap(),
                 vec![src],
                 parent,
             )

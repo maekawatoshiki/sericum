@@ -6,7 +6,6 @@ use super::super::{
 use super::inst::*;
 use crate::analysis::{dom_tree::DominatorTree, loops::Loops};
 use crate::codegen::common::machine::{basic_block::*, function::*, liveness::*, regalloc::*};
-use crate::ir::types::Types;
 
 pub struct LiveIntervalSplitter<'a> {
     _func: &'a mut MachineFunction,
@@ -25,7 +24,6 @@ impl<'a> LiveIntervalSplitter<'a> {
     // TODO: REFINE CODE
     pub fn split(
         &mut self,
-        _tys: &Types,
         _dom_tree: &DominatorTree<MachineBasicBlock>,
         _loops: &Loops<MachineBasicBlock>,
         _reg: &RegisterId,

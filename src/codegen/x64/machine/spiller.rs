@@ -9,7 +9,6 @@ use crate::codegen::common::machine::{
     function::MachineFunction,
     liveness::{LiveRange, LiveRegMatrix, LiveSegment},
 };
-use crate::ir::types::Types;
 use rustc_hash::FxHashMap;
 
 pub struct Spiller<'a> {
@@ -111,12 +110,7 @@ impl<'a> Spiller<'a> {
         new_regs
     }
 
-    pub fn insert_reload(
-        &mut self,
-        tys: &Types,
-        reg_id: RegisterId,
-        slot: &FrameIndexInfo,
-    ) -> Vec<VirtReg> {
+    pub fn insert_reload(&mut self, reg_id: RegisterId, slot: &FrameIndexInfo) -> Vec<VirtReg> {
         let mut new_regs = vec![];
         let uses = self.func.regs_info.arena_ref()[reg_id]
             .uses
@@ -136,7 +130,7 @@ impl<'a> Spiller<'a> {
             let rbp = RegisterOperand::new(self.func.regs_info.get_phys_reg(GR64::RBP));
             let src = MachineOperand::Mem(MachineMemOperand::BaseFi(rbp, slot.clone()));
             let load = MachineInst::new_simple(
-                mov_rx(tys, &self.func.regs_info, &src).unwrap(),
+                mov_rx(&self.func.types, &self.func.regs_info, &src).unwrap(),
                 vec![src],
                 parent,
             )
@@ -170,7 +164,7 @@ impl<'a> Spiller<'a> {
         new_regs
     }
 
-    pub fn spill(&mut self, tys: &Types, vreg: VirtReg) -> Vec<VirtReg> {
+    pub fn spill(&mut self, vreg: VirtReg) -> Vec<VirtReg> {
         let reg_id = *self.matrix.get_entity_by_vreg(vreg).unwrap();
         let slot = self
             .func
@@ -178,7 +172,7 @@ impl<'a> Spiller<'a> {
             .alloc(&rc2ty(self.func.regs_info.arena_ref()[reg_id].reg_class)); // TODO: May allocate redundant stack slot
 
         let mut new_regs = self.insert_evict(reg_id, &slot);
-        new_regs.append(&mut self.insert_reload(tys, reg_id, &slot));
+        new_regs.append(&mut self.insert_reload(reg_id, &slot));
 
         let r = self.matrix.virt_regs.remove(&vreg).unwrap();
         self.func.body.basic_blocks.remove_reg_from_live_info(&r);

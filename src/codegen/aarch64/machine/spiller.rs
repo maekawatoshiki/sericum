@@ -1,7 +1,6 @@
 use crate::codegen::arch::{frame_object::FrameIndexInfo, machine::register::*};
 pub use crate::codegen::common::machine::regalloc::*;
 use crate::codegen::common::machine::{function::MachineFunction, liveness::LiveRegMatrix};
-use crate::ir::types::Types;
 
 pub struct Spiller<'a> {
     _func: &'a mut MachineFunction,
@@ -17,16 +16,11 @@ impl<'a> Spiller<'a> {
         unimplemented!()
     }
 
-    pub fn insert_reload(
-        &mut self,
-        _tys: &Types,
-        _reg_id: RegisterId,
-        _slot: &FrameIndexInfo,
-    ) -> Vec<VirtReg> {
+    pub fn insert_reload(&mut self, _reg_id: RegisterId, _slot: &FrameIndexInfo) -> Vec<VirtReg> {
         unimplemented!()
     }
 
-    pub fn spill(&mut self, _tys: &Types, _vreg: VirtReg) -> Vec<VirtReg> {
+    pub fn spill(&mut self, _vreg: VirtReg) -> Vec<VirtReg> {
         unimplemented!()
     }
 }

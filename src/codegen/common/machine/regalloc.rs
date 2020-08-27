@@ -5,7 +5,7 @@ use crate::codegen::arch::machine::reg_coalescer::coalesce_function;
 use crate::codegen::arch::machine::{inst::*, spiller::Spiller};
 use crate::codegen::arch::{frame_object::*, machine::register::*};
 use crate::codegen::common::machine::{builder::*, function::*, liveness::*, module::*};
-use crate::{ir::types::Types, traits::pass::ModulePassTrait};
+use crate::traits::pass::ModulePassTrait;
 use rustc_hash::FxHashSet;
 use std::collections::VecDeque;
 
@@ -41,11 +41,11 @@ impl RegisterAllocator {
 
     pub fn run_on_module(&mut self, module: &mut MachineModule) {
         for (_, func) in &mut module.functions {
-            self.run_on_function(&module.types, func);
+            self.run_on_function(func);
         }
     }
 
-    pub fn run_on_function(&mut self, tys: &Types, cur_func: &mut MachineFunction) {
+    pub fn run_on_function(&mut self, cur_func: &mut MachineFunction) {
         if cur_func.is_internal {
             return;
         }
@@ -53,7 +53,7 @@ impl RegisterAllocator {
         let mut matrix = LivenessAnalysis::new().analyze_function(cur_func);
         calc_spill_weight(cur_func, &mut matrix);
 
-        let preserve_insts = self.preserve_reg_uses_across_call(tys, cur_func, &mut matrix);
+        let preserve_insts = self.preserve_reg_uses_across_call(cur_func, &mut matrix);
         coalesce_function(&mut matrix, cur_func);
 
         self.queue = matrix.collect_virt_regs().into_iter().collect();
@@ -100,7 +100,7 @@ impl RegisterAllocator {
                     continue;
                 }
                 let r = matrix.unassign_reg(reg2spill).unwrap();
-                let new_regs = Spiller::new(cur_func, &mut matrix).spill(tys, reg2spill);
+                let new_regs = Spiller::new(cur_func, &mut matrix).spill(reg2spill);
                 for &new_reg in &new_regs {
                     self.queue.push_front(new_reg);
                 }
@@ -130,10 +130,7 @@ impl RegisterAllocator {
             for (r_s, r_l) in regs {
                 let r_s = func.regs_info.arena_ref()[r_s].phys_reg.unwrap();
                 let r_l = func.regs_info.arena_ref()[r_l].phys_reg.unwrap();
-                if r_s != r_l {
-                    continue;
-                }
-                if r_s.is_callee_saved_reg() {
+                if r_s == r_l && r_s.is_callee_saved_reg() {
                     func.remove_inst(store);
                     func.remove_inst(load);
                 }
@@ -200,7 +197,6 @@ impl RegisterAllocator {
 
     pub fn insert_inst_to_save_reg(
         &mut self,
-        tys: &Types,
         cur_func: &mut MachineFunction,
         matrix: &mut LiveRegMatrix,
         occupied: &mut FxHashSet<FrameIndexKind>,
@@ -231,13 +227,13 @@ impl RegisterAllocator {
         let call_inst_pp = matrix.get_program_point(call_inst_id).unwrap();
         let mut regs_to_save = FxHashSet::default();
 
-        // TODO: So slow. Any better algorithms?
+        // TODO: Slow. Any better algorithms?
         {
             let bb_containing_call =
                 &cur_func.body.basic_blocks.arena[cur_func.body.inst_arena[call_inst_id].parent];
             let liveness = bb_containing_call.liveness_ref();
             let mut regs_that_may_interfere = &liveness.def | &liveness.live_in;
-            // remove registers like rbp, rsp, rax...
+            // remove registers defined by call like rbp, rsp, rax...
             for def in cur_func.body.inst_arena[call_inst_id]
                 .collect_defined_regs()
                 .iter()
@@ -267,8 +263,8 @@ impl RegisterAllocator {
         let loops = LoopsConstructor::new(&dom_tree, &cur_func.body.basic_blocks).analyze();
 
         for (frinfo, reg) in slots_to_save_regs.into_iter().zip(regs_to_save.into_iter()) {
+            // If possible, do live range splitting.
             if let Some(_) = LiveIntervalSplitter::new(cur_func, matrix, preserve_insts).split(
-                tys,
                 &dom_tree,
                 &loops,
                 &reg,
@@ -296,7 +292,6 @@ impl RegisterAllocator {
 
     pub fn preserve_reg_uses_across_call(
         &mut self,
-        tys: &Types,
         cur_func: &mut MachineFunction,
         matrix: &mut LiveRegMatrix,
     ) -> Vec<PreserveStoreLoad> {
@@ -326,7 +321,7 @@ impl RegisterAllocator {
                 (rinfo.defs.len() + rinfo.uses.len()) < count
             };
             if spill_makes_less_mem_access {
-                Spiller::new(cur_func, matrix).spill(tys, v);
+                Spiller::new(cur_func, matrix).spill(v);
             }
         }
 
@@ -341,7 +336,6 @@ impl RegisterAllocator {
 
         for inst_id in call_inst_id {
             self.insert_inst_to_save_reg(
-                tys,
                 cur_func,
                 matrix,
                 &mut occupied.clone(),

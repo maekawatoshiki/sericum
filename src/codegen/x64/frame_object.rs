@@ -49,7 +49,6 @@ impl FrameObjectsInfo {
                 continue;
             }
 
-            // TODO: bug
             let rc = ty2rc(param_ty).unwrap();
             if arg_reg_order.next(rc).is_none() {
                 let size = param_ty.size_in_byte(tys) as i32;
