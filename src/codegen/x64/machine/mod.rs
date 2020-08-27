@@ -1,5 +1,6 @@
 pub mod abi;
 pub mod calc_spill_weight;
+pub mod eliminate_fi;
 pub mod inst;
 pub mod inst_def;
 pub mod live_interval_splitter;

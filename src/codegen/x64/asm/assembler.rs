@@ -51,6 +51,12 @@ impl<'a> InstAssembler<'a> {
                 self.stream.push_u8(0b01000000 + reg + rm);
                 self.stream.push_u8(off as u32 as u8);
             }
+            MachineMemOperand::BaseOff(base, off) => {
+                let base = reg_code(&base.id);
+                let rm = base;
+                self.stream.push_u8(0b01000000 + reg + rm);
+                self.stream.push_u8(*off as u32 as u8);
+            }
             _ => unimplemented!(),
         }
     }
@@ -80,6 +86,13 @@ impl<'a> InstAssembler<'a> {
                 let rm = base;
                 self.stream.push_u8(0b01000000 + reg + rm);
                 self.stream.push_u8(off as u32 as u8);
+            }
+            MachineMemOperand::BaseOff(base, off) => {
+                let base = reg_code(&base.id);
+                let reg = 0 << 3;
+                let rm = base;
+                self.stream.push_u8(0b01000000 + reg + rm);
+                self.stream.push_u8(*off as u32 as u8);
             }
             _ => unimplemented!(),
         }

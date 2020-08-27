@@ -42,7 +42,7 @@ impl FrameObjectsInfo {
                 let size = param_ty.size_in_byte(tys) as i32;
                 let align = param_ty.align_in_byte(tys) as i32;
                 offset += size + padding(offset, align);
-                offset_map.insert(FrameIndexKind::Arg(i), offset);
+                offset_map.insert(FrameIndexKind::Arg(i), -offset);
                 for rc in SystemV::reg_classes_used_for_passing_byval(struct_ty) {
                     arg_reg_order.next(rc);
                 }
@@ -54,7 +54,7 @@ impl FrameObjectsInfo {
                 let size = param_ty.size_in_byte(tys) as i32;
                 let align = param_ty.align_in_byte(tys) as i32;
                 offset += size + padding(offset, align);
-                offset_map.insert(FrameIndexKind::Arg(i), offset);
+                offset_map.insert(FrameIndexKind::Arg(i), -offset);
             }
         }
 
@@ -62,7 +62,7 @@ impl FrameObjectsInfo {
             let size = ty.size_in_byte(tys) as i32;
             let align = ty.align_in_byte(tys) as i32;
             offset += size + padding(offset, align);
-            offset_map.insert(*idx, offset);
+            offset_map.insert(*idx, -offset);
         }
 
         let stack_down = Self::calc_max_adjust_stack_down(f);

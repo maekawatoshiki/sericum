@@ -7,7 +7,7 @@ pub mod machine;
 use crate::{
     codegen::common::{
         dag::{combine, convert},
-        machine::{branch_folding, module::MachineModule, phi_elimination},
+        machine::{branch_folding, eliminate_fi, module::MachineModule, phi_elimination},
     },
     ir,
     ir::module::Module,
@@ -117,6 +117,7 @@ pub fn standard_conversion_into_machine_module(module: &mut Module) -> MachineMo
     pass_mgr.add_pass(machine::pro_epi_inserter::PrologueEpilogueInserter::new());
     pass_mgr.add_pass(machine::replace_copy::ReplaceCopyWithProperMInst::new());
     pass_mgr.add_pass(machine::replace_data::ReplaceConstFPWithMemoryRef::new());
+    pass_mgr.add_pass(eliminate_fi::EliminateFrameIndex::new());
     pass_mgr.run_on_module(&mut machine_module);
 
     machine_module

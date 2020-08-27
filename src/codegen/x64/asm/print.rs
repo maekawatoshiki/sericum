@@ -155,7 +155,7 @@ impl MachineAsmPrinter {
                 .push_str(format!("{} ptr [{}]", word, self.global_var_name(id)).as_str()),
             MachineOperand::Mem(MachineMemOperand::AddressOff(AddressKind::Global(id), off)) => {
                 self.output.push_str(
-                    format!("{} ptr [{} + {}]", word, self.global_var_name(id), off).as_str(),
+                    format!("{} ptr [{}+{}]", word, self.global_var_name(id), off).as_str(),
                 )
             }
             MachineOperand::Mem(MachineMemOperand::AddressAlignOff(
@@ -164,7 +164,7 @@ impl MachineAsmPrinter {
                 off,
             )) => self.output.push_str(
                 format!(
-                    "{} ptr [{} + {}*{}]",
+                    "{} ptr [{}+{}*{}]",
                     word,
                     self.global_var_name(id),
                     align,
@@ -176,13 +176,13 @@ impl MachineAsmPrinter {
                 let base = base.id.as_phys_reg();
                 let offset = fo.offset(fi.idx).unwrap();
                 self.output
-                    .push_str(format!("{} ptr [{} - {}]", word, base.name(), offset).as_str());
+                    .push_str(format!("{} ptr [{}{}]", word, base.name(), off_s(offset)).as_str());
             }
             MachineOperand::Mem(MachineMemOperand::BaseAlignOff(base, align, off)) => {
                 let base = base.id.as_phys_reg();
                 let reg = off.id.as_phys_reg();
                 self.output.push_str(
-                    format!("{} ptr [{} + {}*{}]", word, base.name(), align, reg.name()).as_str(),
+                    format!("{} ptr [{}+{}*{}]", word, base.name(), align, reg.name()).as_str(),
                 );
             }
             MachineOperand::Mem(MachineMemOperand::BaseFiAlignOff(base, fi, align, off)) => {
@@ -191,12 +191,12 @@ impl MachineAsmPrinter {
                 let reg = off.id.as_phys_reg();
                 self.output.push_str(
                     format!(
-                        "{} ptr [{} + {}*{} - {}]",
+                        "{} ptr [{}+{}*{}{}]",
                         word,
                         base.name(),
                         align,
                         reg.name(),
-                        offset
+                        off_s(offset)
                     )
                     .as_str(),
                 );
@@ -205,10 +205,9 @@ impl MachineAsmPrinter {
                 let base = base.id.as_phys_reg();
                 let off1 = fo.offset(fi.idx).unwrap();
                 let off2 = *off;
-                assert!(off1 >= off2);
-                let offset = off1 - off2;
+                let offset = off1 + off2;
                 self.output
-                    .push_str(format!("{} ptr [{} - {}]", word, base.name(), offset).as_str());
+                    .push_str(format!("{} ptr [{}{}]", word, base.name(), off_s(offset)).as_str());
             }
             MachineOperand::Mem(MachineMemOperand::Base(base)) => {
                 let base = base.id.as_phys_reg();
@@ -218,7 +217,7 @@ impl MachineAsmPrinter {
             MachineOperand::Mem(MachineMemOperand::BaseOff(base, off)) => {
                 let base = base.id.as_phys_reg();
                 self.output
-                    .push_str(format!("{} ptr [{} + {}]", word, base.name(), off).as_str());
+                    .push_str(format!("{} ptr [{}{}]", word, base.name(), off_s(*off)).as_str());
             }
             e => panic!("{:?}", e),
         }
@@ -238,6 +237,14 @@ impl MachineAsmPrinter {
 
     fn global_var_name(&self, id: &GlobalVariableId) -> &String {
         self.id_to_global_name.get(id).unwrap()
+    }
+}
+
+fn off_s(off: i32) -> String {
+    if off < 0 {
+        format!("-{}", -off)
+    } else {
+        format!("+{}", off)
     }
 }
 

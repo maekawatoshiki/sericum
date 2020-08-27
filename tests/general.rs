@@ -529,13 +529,13 @@ fibo:
 .L2:
   mov edi, eax
   sub edi, 1
-  mov dword ptr [rbp - 4], eax
+  mov dword ptr [rbp-4], eax
   call fibo
-  mov edi, dword ptr [rbp - 4]
+  mov edi, dword ptr [rbp-4]
   sub edi, 2
-  mov dword ptr [rbp - 4], eax
+  mov dword ptr [rbp-4], eax
   call fibo
-  mov ecx, dword ptr [rbp - 4]
+  mov ecx, dword ptr [rbp-4]
   add ecx, eax
   mov eax, ecx
 .L3:
