@@ -10,6 +10,7 @@ pub enum MachineMemOperand {
     BaseFiOff(RegisterOperand, FrameIndexInfo, i32), // base, fi, off
     BaseFiAlignOff(RegisterOperand, FrameIndexInfo, i32, RegisterOperand), // base, fi, align, off
     BaseAlignOff(RegisterOperand, i32, RegisterOperand), // base, align, off
+    BaseOffAlignOff(RegisterOperand, i32, i32, RegisterOperand), // base+off+align*off_
     BaseOff(RegisterOperand, i32),
     Base(RegisterOperand),
     Address(AddressKind),
@@ -117,7 +118,8 @@ impl MachineMemOperand {
             | MachineMemOperand::Base(r)
             | Self::AddressAlignOff(_, _, r) => vec![r],
             MachineMemOperand::BaseAlignOff(r, _, r2)
-            | MachineMemOperand::BaseFiAlignOff(r, _, _, r2) => vec![r, r2],
+            | MachineMemOperand::BaseFiAlignOff(r, _, _, r2)
+            | MachineMemOperand::BaseOffAlignOff(r, _, _, r2) => vec![r, r2],
             MachineMemOperand::Address(_) | MachineMemOperand::AddressOff(_, _) => vec![],
         }
     }
@@ -130,7 +132,8 @@ impl MachineMemOperand {
             | MachineMemOperand::Base(r)
             | Self::AddressAlignOff(_, _, r) => vec![r],
             MachineMemOperand::BaseAlignOff(r, _, r2)
-            | MachineMemOperand::BaseFiAlignOff(r, _, _, r2) => vec![r, r2],
+            | MachineMemOperand::BaseFiAlignOff(r, _, _, r2)
+            | MachineMemOperand::BaseOffAlignOff(r, _, _, r2) => vec![r, r2],
             MachineMemOperand::Address(_) | MachineMemOperand::AddressOff(_, _) => vec![],
         }
     }
@@ -140,6 +143,7 @@ impl MachineMemOperand {
             Self::BaseFi(_, fi) => Some(fi.ty),
             Self::BaseFiOff(_, _, _) => None,
             Self::BaseFiAlignOff(_, _, _, _) => None,
+            Self::BaseOffAlignOff(_, _, _, _) => None,
             Self::Base(_)
             | Self::BaseAlignOff(_, _, _)
             | Self::BaseOff(_, _)

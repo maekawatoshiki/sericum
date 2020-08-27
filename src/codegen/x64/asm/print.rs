@@ -201,6 +201,21 @@ impl MachineAsmPrinter {
                     .as_str(),
                 );
             }
+            MachineOperand::Mem(MachineMemOperand::BaseOffAlignOff(base, off1, align, off2)) => {
+                let base = base.id.as_phys_reg();
+                let reg = off2.id.as_phys_reg();
+                self.output.push_str(
+                    format!(
+                        "{} ptr [{}+{}*{}{}]",
+                        word,
+                        base.name(),
+                        align,
+                        reg.name(),
+                        off1
+                    )
+                    .as_str(),
+                );
+            }
             MachineOperand::Mem(MachineMemOperand::BaseFiOff(base, fi, off)) => {
                 let base = base.id.as_phys_reg();
                 let off1 = fo.offset(fi.idx).unwrap();

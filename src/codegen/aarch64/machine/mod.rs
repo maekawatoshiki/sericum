@@ -1,4 +1,5 @@
 pub mod calc_spill_weight;
+pub mod eliminate_fi;
 pub mod inst;
 // pub mod phi_elimination;
 pub mod pro_epi_inserter;

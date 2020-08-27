@@ -33,9 +33,14 @@ impl<'a> EliminateFrameIndexOnFunction<'a> {
                         frame_objects.offset(fi.idx).unwrap() + *off,
                     ))
                 }
-                // MachineOperand::Mem(MachineMemOperand::BaseFiAlignOff(base, fi, align, off)) => {
-                //     * op = MachineOperand::Mem(MachineMemOperand::Base align*off
-                // }
+                MachineOperand::Mem(MachineMemOperand::BaseFiAlignOff(base, fi, align, off)) => {
+                    *op = MachineOperand::Mem(MachineMemOperand::BaseOffAlignOff(
+                        *base,
+                        frame_objects.offset(fi.idx).unwrap(),
+                        *align,
+                        *off,
+                    ));
+                }
                 _ => {}
             }
         }
