@@ -4,6 +4,10 @@ pub struct IRLivenessAnalyzer<'a> {
     module: &'a Module,
 }
 
+pub struct LivenessAnalyzerOnFunction<'a> {
+    func: &'a Function,
+}
+
 impl<'a> IRLivenessAnalyzer<'a> {
     pub fn new(module: &'a Module) -> Self {
         Self { module }
@@ -11,20 +15,34 @@ impl<'a> IRLivenessAnalyzer<'a> {
 
     pub fn analyze(&mut self) {
         for (_, f) in &self.module.functions {
-            self.set_def(f);
-            self.visit(&f);
+            if f.is_internal {
+                continue;
+            }
+
+            LivenessAnalyzerOnFunction::new(f).analyze();
         }
     }
+}
 
-    pub fn set_def(&mut self, f: &Function) {
-        for (_, bb) in &f.basic_blocks.arena {
+impl<'a> LivenessAnalyzerOnFunction<'a> {
+    pub fn new(func: &'a Function) -> Self {
+        Self { func }
+    }
+
+    pub fn analyze(&mut self) {
+        self.set_def();
+        self.visit();
+    }
+
+    pub fn set_def(&mut self) {
+        for (_, bb) in &self.func.basic_blocks.arena {
             let def = &mut bb.liveness.borrow_mut().def;
 
             for inst_val in &*bb.iseq.borrow() {
                 let inst_id = inst_val.get_inst_id().unwrap();
-                let inst = &f.inst_table[inst_id];
+                let inst = &self.func.inst_table[inst_id];
 
-                if inst.opcode == Opcode::Call && f.get_return_type() != Type::Void {
+                if inst.opcode == Opcode::Call && self.func.get_return_type() != Type::Void {
                     def.insert(inst_id);
                     continue;
                 }
@@ -36,22 +54,16 @@ impl<'a> IRLivenessAnalyzer<'a> {
         }
     }
 
-    pub fn visit(&mut self, f: &Function) {
-        for (bb_id, bb) in &f.basic_blocks.arena {
+    pub fn visit(&mut self) {
+        for (bb_id, bb) in &self.func.basic_blocks.arena {
             for inst_val in &*bb.iseq.borrow() {
-                let inst = &f.inst_table[inst_val.get_inst_id().unwrap()];
-                self.visit_operands(f, bb_id, &inst.operands, inst.opcode == Opcode::Phi);
+                let inst = &self.func.inst_table[inst_val.get_inst_id().unwrap()];
+                self.visit_operands(bb_id, &inst.operands, inst.opcode == Opcode::Phi);
             }
         }
     }
 
-    pub fn visit_operands(
-        &mut self,
-        f: &Function,
-        cur_bb: BasicBlockId,
-        operands: &[Operand],
-        is_phi: bool,
-    ) {
+    pub fn visit_operands(&mut self, cur_bb: BasicBlockId, operands: &[Operand], is_phi: bool) {
         for i in 0..operands.len() {
             match &operands[i] {
                 Operand::BasicBlock(_)
@@ -61,10 +73,10 @@ impl<'a> IRLivenessAnalyzer<'a> {
                 Operand::Value(v) if is_phi => some_then!(
                     id,
                     v.get_inst_id(),
-                    self.propagate(f, cur_bb, id, Some(*operands[i + 1].as_basic_block()))
+                    self.propagate(cur_bb, id, Some(*operands[i + 1].as_basic_block()))
                 ),
                 Operand::Value(v) => {
-                    some_then!(id, v.get_inst_id(), self.propagate(f, cur_bb, id, None));
+                    some_then!(id, v.get_inst_id(), self.propagate(cur_bb, id, None));
                 }
             }
         }
@@ -72,12 +84,11 @@ impl<'a> IRLivenessAnalyzer<'a> {
 
     pub fn propagate(
         &mut self,
-        f: &Function,
         bb_id: BasicBlockId,
         inst_id: InstructionId,
         phi_incoming: Option<BasicBlockId>,
     ) {
-        let bb = &f.basic_blocks.arena[bb_id];
+        let bb = &self.func.basic_blocks.arena[bb_id];
 
         {
             let mut bb_liveness = bb.liveness.borrow_mut();
@@ -93,24 +104,19 @@ impl<'a> IRLivenessAnalyzer<'a> {
         }
 
         if let Some(phi_incoming) = phi_incoming {
-            self.propagate_if_necessary(f, phi_incoming, inst_id);
+            self.propagate_if_necessary(phi_incoming, inst_id);
         } else {
             for pred_id in &bb.pred {
-                self.propagate_if_necessary(f, *pred_id, inst_id);
+                self.propagate_if_necessary(*pred_id, inst_id);
             }
         }
     }
 
-    fn propagate_if_necessary(
-        &mut self,
-        f: &Function,
-        pred_id: BasicBlockId,
-        inst_id: InstructionId,
-    ) {
-        let pred = &f.basic_blocks.arena[pred_id];
+    fn propagate_if_necessary(&mut self, pred_id: BasicBlockId, inst_id: InstructionId) {
+        let pred = &self.func.basic_blocks.arena[pred_id];
         if pred.liveness.borrow_mut().live_out.insert(inst_id) {
             // live_out didn't have the value inst_id
-            self.propagate(f, pred_id, inst_id, None);
+            self.propagate(pred_id, inst_id, None);
         }
     }
 }

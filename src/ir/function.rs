@@ -60,6 +60,21 @@ impl Function {
         id
     }
 
+    pub fn append_basic_block_before(&mut self, block: BasicBlockId) -> BasicBlockId {
+        let id = self.basic_blocks.arena.alloc(BasicBlock::new());
+        if let Some(pos) = self
+            .basic_blocks
+            .order
+            .iter()
+            .position(|&block_| block == block_)
+        {
+            self.basic_blocks.order.insert(pos, id);
+        } else {
+            self.basic_blocks.order.push(id);
+        }
+        id
+    }
+
     // pub fn append_existing_basic_block(&mut self, bb_id: BasicBlockId) {
     //     self.basic_blocks.order.push(bb_id);
     // }
