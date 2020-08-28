@@ -19,10 +19,10 @@ pub struct Loops<BB: BasicBlockTrait> {
 
 #[derive(Debug)]
 pub struct Loop<BB: BasicBlockTrait> {
-    parent: Option<Id<Loop<BB>>>,
-    header: Id<BB>,
-    sub_loops: Vec<Id<Loop<BB>>>,
-    set: FxHashSet<Id<BB>>,
+    pub parent: Option<Id<Loop<BB>>>,
+    pub header: Id<BB>,
+    pub sub_loops: Vec<Id<Loop<BB>>>,
+    pub set: FxHashSet<Id<BB>>,
 }
 
 impl<'a, BBS: BasicBlocksTrait> LoopsConstructor<'a, BBS> {
@@ -122,6 +122,7 @@ impl<'a, BBS: BasicBlocksTrait> LoopsConstructor<'a, BBS> {
         }
 
         let mut sub_loop = sub_loop;
+        self.loops.arena[sub_loop].set.insert(bb);
         while let Some(parent) = self.loops.arena[sub_loop].parent {
             self.loops.arena[parent].set.insert(bb);
             sub_loop = parent;
@@ -167,5 +168,11 @@ impl<BB: BasicBlockTrait> Loops<BB> {
 
     pub fn set_loop_for(&mut self, bb: Id<BB>, loop_id: Id<Loop<BB>>) {
         self.bb_to_loop.insert(bb, loop_id);
+    }
+}
+
+impl<BB: BasicBlockTrait> Loop<BB> {
+    pub fn contains(&self, bb: &Id<BB>) -> bool {
+        self.set.contains(bb)
     }
 }
