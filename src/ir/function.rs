@@ -138,6 +138,11 @@ impl Function {
         self.inst_table[inst_id].remove(&self.inst_table);
     }
 
+    pub fn remove_inst_from_block(&self, inst_id: InstructionId) -> Value {
+        let (block_id, pos) = self.find_inst_pos(inst_id).unwrap();
+        self.basic_blocks.arena[block_id].iseq_ref_mut().remove(pos)
+    }
+
     pub fn alloc_inst(&mut self, inst: Instruction) -> InstructionId {
         // TODO
         let id = self.inst_table.alloc(inst);

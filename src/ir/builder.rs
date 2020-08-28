@@ -344,6 +344,10 @@ impl<F: FuncRef> Builder<F> {
         })
     }
 
+    pub fn insert(&mut self, inst: Value) {
+        self.append_inst_to_cur_bb(inst)
+    }
+
     // Utils
 
     fn create_inst_value(&mut self, opcode: Opcode, operands: Vec<Operand>, ret_ty: Type) -> Value {

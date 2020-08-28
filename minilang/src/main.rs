@@ -358,6 +358,7 @@ fn ray_tracing() {
 
     cilk::ir::mem2reg::Mem2Reg::new().run_on_module(&mut codegen.module);
     cilk::ir::cse::CommonSubexprElimination::new().run_on_module(&mut codegen.module);
+    cilk::ir::licm::LoopInvariantCodeMotion::new().run_on_module(&mut codegen.module);
 
     println!("{:?}", codegen.module);
 

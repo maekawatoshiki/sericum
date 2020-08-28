@@ -158,7 +158,7 @@ impl<BB: BasicBlockTrait> Loops<BB> {
             parent: None,
             header,
             sub_loops: vec![],
-            set: FxHashSet::default(),
+            set: vec![header].into_iter().collect::<FxHashSet<Id<BB>>>(),
         })
     }
 
