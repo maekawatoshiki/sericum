@@ -14,6 +14,7 @@ use crate::{
 };
 use id_arena::Id;
 use rustc_hash::FxHashMap;
+use std::collections::VecDeque;
 
 pub struct LoopInvariantCodeMotion {}
 
@@ -45,45 +46,9 @@ impl<'a> LoopInvariantCodeMotionOnFunction<'a> {
         let dom_tree = DominatorTreeConstructor::new(&self.func.basic_blocks).construct();
         let mut loops = LoopsConstructor::new(&dom_tree, &self.func.basic_blocks).analyze();
 
-        let mut count = 0;
         let pre_headers = self.insert_pre_headers(&mut loops);
 
-        for (id, loop_) in &loops.arena {
-            let mut insts_to_hoist = vec![];
-            for &bb_id in &loop_.set {
-                let bb = &self.func.basic_blocks.arena[bb_id];
-                for inst_id in bb.iseq.borrow().iter().map(|v| v.as_instruction().id) {
-                    let inst = &self.func.inst_table[inst_id];
-                    if inst.opcode.access_memory() || inst.opcode == Opcode::Call {
-                        continue;
-                    }
-                    let invariant = inst.operands.iter().all(|operand| match operand {
-                        Operand::Value(Value::Instruction(InstructionValue { id, .. })) => {
-                            let inst = &self.func.inst_table[*id];
-                            !loop_.contains(&inst.parent)
-                        }
-                        Operand::Value(_) => true,
-                        _ => false,
-                    });
-                    if invariant {
-                        count += 1;
-                        insts_to_hoist.push(inst_id);
-                    }
-                }
-            }
-
-            for inst_id in insts_to_hoist {
-                let pre_header = pre_headers[&id];
-                let val = self.func.remove_inst_from_block(inst_id);
-                let inst = &mut self.func.inst_table[inst_id];
-                inst.parent = pre_header;
-                let mut builder = Builder::new(FunctionEntity(self.func));
-                builder.set_insert_point_before_terminator(pre_header);
-                builder.insert(val);
-            }
-        }
-
-        debug!(println!("LICM: {} invariants hoisted", count));
+        self.hoist_invariants(&loops, &pre_headers);
     }
 
     fn insert_pre_headers(
@@ -146,5 +111,63 @@ impl<'a> LoopInvariantCodeMotionOnFunction<'a> {
         builder.build_br(loop_.header);
 
         pre_header
+    }
+
+    fn hoist_invariants(
+        &mut self,
+        loops: &Loops<BasicBlock>,
+        pre_headers: &FxHashMap<Id<Loop<BasicBlock>>, BasicBlockId>,
+    ) {
+        let mut count = 0;
+
+        for (id, loop_) in &loops.arena {
+            let mut worklist = VecDeque::new();
+
+            for &bb_id in &loop_.set {
+                let bb = &self.func.basic_blocks.arena[bb_id];
+                for inst_id in bb.iseq.borrow().iter().map(|v| v.as_instruction().id) {
+                    worklist.push_back(inst_id);
+                }
+            }
+
+            while worklist.len() > 0 {
+                let mut insts_to_hoist = vec![];
+                while let Some(inst_id) = worklist.pop_front() {
+                    let inst = &self.func.inst_table[inst_id];
+                    if inst.opcode.access_memory() || inst.opcode == Opcode::Call {
+                        continue;
+                    }
+                    let invariant = inst.operands.iter().all(|operand| match operand {
+                        Operand::Value(Value::Instruction(InstructionValue { id, .. })) => {
+                            let inst = &self.func.inst_table[*id];
+                            !loop_.contains(&inst.parent)
+                        }
+                        Operand::Value(_) => true,
+                        _ => false,
+                    });
+                    if invariant {
+                        count += 1;
+                        insts_to_hoist.push(inst_id);
+                    }
+                }
+
+                for inst_id in insts_to_hoist {
+                    let pre_header = pre_headers[&id];
+                    let val = self.func.remove_inst_from_block(inst_id);
+                    let inst = &mut self.func.inst_table[inst_id];
+                    inst.parent = pre_header;
+
+                    for &user in &*inst.users.borrow() {
+                        worklist.push_back(user);
+                    }
+
+                    let mut builder = Builder::new(FunctionEntity(self.func));
+                    builder.set_insert_point_before_terminator(pre_header);
+                    builder.insert(val);
+                }
+            }
+        }
+
+        debug!(println!("LICM: {} invariants hoisted", count));
     }
 }
