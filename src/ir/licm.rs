@@ -12,6 +12,7 @@ use crate::{
         value::*,
     },
 };
+use id_arena::Id;
 use rustc_hash::FxHashMap;
 
 pub struct LoopInvariantCodeMotion {}
@@ -42,16 +43,12 @@ impl<'a> LoopInvariantCodeMotionOnFunction<'a> {
 
     pub fn run(&mut self) {
         let dom_tree = DominatorTreeConstructor::new(&self.func.basic_blocks).construct();
-        let loops = LoopsConstructor::new(&dom_tree, &self.func.basic_blocks).analyze();
+        let mut loops = LoopsConstructor::new(&dom_tree, &self.func.basic_blocks).analyze();
 
         let mut count = 0;
-        let pre_headers = self.insert_pre_headers(&loops);
+        let pre_headers = self.insert_pre_headers(&mut loops);
 
-        // TODO: VERY INEFFICIENT!
-        let dom_tree = DominatorTreeConstructor::new(&self.func.basic_blocks).construct();
-        let loops = LoopsConstructor::new(&dom_tree, &self.func.basic_blocks).analyze();
-
-        for (_id, loop_) in &loops.arena {
+        for (id, loop_) in &loops.arena {
             let mut insts_to_hoist = vec![];
             for &bb_id in &loop_.set {
                 let bb = &self.func.basic_blocks.arena[bb_id];
@@ -76,7 +73,7 @@ impl<'a> LoopInvariantCodeMotionOnFunction<'a> {
             }
 
             for inst_id in insts_to_hoist {
-                let pre_header = pre_headers[&loop_.header];
+                let pre_header = pre_headers[&id];
                 let val = self.func.remove_inst_from_block(inst_id);
                 let inst = &mut self.func.inst_table[inst_id];
                 inst.parent = pre_header;
@@ -91,13 +88,21 @@ impl<'a> LoopInvariantCodeMotionOnFunction<'a> {
 
     fn insert_pre_headers(
         &mut self,
-        loops: &Loops<BasicBlock>,
-    ) -> FxHashMap<BasicBlockId, BasicBlockId> /* header -> pre header */ {
+        loops: &mut Loops<BasicBlock>,
+    ) -> FxHashMap<Id<Loop<BasicBlock>>, BasicBlockId> /* loop id -> pre header */ {
         let mut pre_headers = FxHashMap::default();
 
-        for (_id, loop_) in &loops.arena {
-            let pre_header = self.insert_pre_header(loop_);
-            pre_headers.insert(loop_.header, pre_header);
+        for (id, loop_) in &loops.arena {
+            let pre_header = self.insert_pre_header(&loop_);
+            pre_headers.insert(id, pre_header);
+        }
+
+        for (id, &pre_header) in &pre_headers {
+            let mut id = *id;
+            while let Some(parent) = loops.arena[id].parent {
+                loops.arena[parent].set.insert(pre_header);
+                id = parent;
+            }
         }
 
         pre_headers
