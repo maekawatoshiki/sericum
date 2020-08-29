@@ -1,6 +1,6 @@
 use crate::{
     analysis::{
-        dom_tree::{DominatorTree, DominatorTreeConstructor},
+        dom_tree::DominatorTreeConstructor,
         loops::{Loop, Loops, LoopsConstructor},
     },
     ir::{
@@ -12,7 +12,6 @@ use crate::{
         value::*,
     },
 };
-use id_arena::Id;
 use rustc_hash::FxHashMap;
 
 pub struct LoopInvariantCodeMotion {}
@@ -52,7 +51,7 @@ impl<'a> LoopInvariantCodeMotionOnFunction<'a> {
         let dom_tree = DominatorTreeConstructor::new(&self.func.basic_blocks).construct();
         let loops = LoopsConstructor::new(&dom_tree, &self.func.basic_blocks).analyze();
 
-        for (id, loop_) in &loops.arena {
+        for (_id, loop_) in &loops.arena {
             let mut insts_to_hoist = vec![];
             for &bb_id in &loop_.set {
                 let bb = &self.func.basic_blocks.arena[bb_id];
@@ -62,13 +61,11 @@ impl<'a> LoopInvariantCodeMotionOnFunction<'a> {
                         continue;
                     }
                     let invariant = inst.operands.iter().all(|operand| match operand {
-                        Operand::Value(v) => match v {
-                            Value::Instruction(InstructionValue { id, .. }) => {
-                                let inst = &self.func.inst_table[*id];
-                                !loop_.contains(&inst.parent)
-                            }
-                            _ => true,
-                        },
+                        Operand::Value(Value::Instruction(InstructionValue { id, .. })) => {
+                            let inst = &self.func.inst_table[*id];
+                            !loop_.contains(&inst.parent)
+                        }
+                        Operand::Value(_) => true,
                         _ => false,
                     });
                     if invariant {
@@ -84,7 +81,7 @@ impl<'a> LoopInvariantCodeMotionOnFunction<'a> {
                 let inst = &mut self.func.inst_table[inst_id];
                 inst.parent = pre_header;
                 let mut builder = Builder::new(FunctionEntity(self.func));
-                builder.set_insert_point_at(0, pre_header);
+                builder.set_insert_point_before_terminator(pre_header);
                 builder.insert(val);
             }
         }
@@ -95,10 +92,10 @@ impl<'a> LoopInvariantCodeMotionOnFunction<'a> {
     fn insert_pre_headers(
         &mut self,
         loops: &Loops<BasicBlock>,
-    ) -> FxHashMap<BasicBlockId, BasicBlockId> {
+    ) -> FxHashMap<BasicBlockId, BasicBlockId> /* header -> pre header */ {
         let mut pre_headers = FxHashMap::default();
 
-        for (id, loop_) in &loops.arena {
+        for (_id, loop_) in &loops.arena {
             let pre_header = self.insert_pre_header(loop_);
             pre_headers.insert(loop_.header, pre_header);
         }

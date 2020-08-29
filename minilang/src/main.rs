@@ -372,6 +372,7 @@ fn ray_tracing() {
     let mut printer = MachineAsmPrinter::new();
     // println!("{:?}", machine_module);
     printer.run_on_module(&machine_module);
+    // println!("{}", printer.output);
     assemble_and_run(
         "
     #include <stdio.h>

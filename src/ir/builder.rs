@@ -84,6 +84,23 @@ impl<F: FuncRef> Builder<F> {
         Some(())
     }
 
+    pub fn set_insert_point_before_terminator(&mut self, id: BasicBlockId) {
+        self.cur_bb = Some(id);
+        let func = self.func.func_ref();
+        let iseq_ref = func.basic_block_ref(id).iseq_ref();
+        self.insert_point = iseq_ref.len();
+        for inst in iseq_ref
+            .iter()
+            .rev()
+            .map(|v| &func.inst_table[v.as_instruction().id])
+        {
+            if !inst.opcode.is_terminator() {
+                break;
+            }
+            self.insert_point -= 1;
+        }
+    }
+
     pub fn build_alloca(&mut self, ty: Type) -> Value {
         let ptr_ty = self.func.func_ref_mut().types.new_pointer_ty(ty);
         let inst = self.create_inst_value(Opcode::Alloca, vec![Operand::Type(ty)], ptr_ty);
