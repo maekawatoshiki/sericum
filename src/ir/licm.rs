@@ -80,9 +80,23 @@ impl<'a> LoopInvariantCodeMotionOnFunction<'a> {
         preds.retain(|p| !loop_.contains(p));
         let preds_not_in_loop = preds;
 
-        let header_preds = &mut self.func.basic_blocks.arena[loop_.header].pred;
+        assert!(preds_not_in_loop.len() == 1);
+
+        let header_bb = &mut self.func.basic_blocks.arena[loop_.header];
+        let header_preds = &mut header_bb.pred;
         header_preds.retain(|p| !preds_not_in_loop.contains(p)); // retain preds in loop
         header_preds.insert(pre_header);
+        for &id in header_bb.iseq_ref().iter().rev() {
+            let id = id.as_instruction().id;
+            if self.func.inst_table[id].opcode == Opcode::Phi {
+                Instruction::replace_operand(
+                    &mut self.func.inst_table,
+                    id,
+                    &Operand::BasicBlock(*preds_not_in_loop.iter().next().unwrap()),
+                    Operand::BasicBlock(pre_header),
+                );
+            }
+        }
 
         for &pred in &preds_not_in_loop {
             let block = &mut self.func.basic_blocks.arena[pred];
@@ -144,6 +158,9 @@ impl<'a> LoopInvariantCodeMotionOnFunction<'a> {
                         }
                         Operand::Value(_) => true,
                         _ => false,
+                    }) && inst.users.borrow().iter().all(|id| {
+                        let inst = &self.func.inst_table[*id];
+                        inst.opcode != Opcode::Phi
                     });
                     if invariant {
                         count += 1;

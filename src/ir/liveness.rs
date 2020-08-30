@@ -36,6 +36,8 @@ impl<'a> LivenessAnalyzerOnFunction<'a> {
 
     pub fn set_def(&mut self) {
         for (_, bb) in &self.func.basic_blocks.arena {
+            *bb.liveness.borrow_mut() = LivenessInfo::new();
+
             let def = &mut bb.liveness.borrow_mut().def;
 
             for inst_val in &*bb.iseq.borrow() {
@@ -73,10 +75,10 @@ impl<'a> LivenessAnalyzerOnFunction<'a> {
                 Operand::Value(v) if is_phi => some_then!(
                     id,
                     v.get_inst_id(),
-                    self.propagate(cur_bb, id, Some(*operands[i + 1].as_basic_block()))
+                    self.propagate(cur_bb, id, Some(*operands[i + 1].as_basic_block()), true)
                 ),
                 Operand::Value(v) => {
-                    some_then!(id, v.get_inst_id(), self.propagate(cur_bb, id, None));
+                    some_then!(id, v.get_inst_id(), self.propagate(cur_bb, id, None, false));
                 }
             }
         }
@@ -87,6 +89,7 @@ impl<'a> LivenessAnalyzerOnFunction<'a> {
         bb_id: BasicBlockId,
         inst_id: InstructionId,
         phi_incoming: Option<BasicBlockId>,
+        phi: bool,
     ) {
         let bb = &self.func.basic_blocks.arena[bb_id];
 
@@ -97,26 +100,26 @@ impl<'a> LivenessAnalyzerOnFunction<'a> {
                 return;
             }
 
-            if !bb_liveness.live_in.insert(inst_id) {
+            if !bb_liveness.live_in.insert(inst_id) && !phi {
                 // live_in already had the value inst_id
                 return;
             }
         }
 
         if let Some(phi_incoming) = phi_incoming {
-            self.propagate_if_necessary(phi_incoming, inst_id);
+            self.propagate_if_necessary(phi_incoming, inst_id, phi);
         } else {
             for pred_id in &bb.pred {
-                self.propagate_if_necessary(*pred_id, inst_id);
+                self.propagate_if_necessary(*pred_id, inst_id, phi);
             }
         }
     }
 
-    fn propagate_if_necessary(&mut self, pred_id: BasicBlockId, inst_id: InstructionId) {
+    fn propagate_if_necessary(&mut self, pred_id: BasicBlockId, inst_id: InstructionId, phi: bool) {
         let pred = &self.func.basic_blocks.arena[pred_id];
         if pred.liveness.borrow_mut().live_out.insert(inst_id) {
             // live_out didn't have the value inst_id
-            self.propagate(pred_id, inst_id, None);
+            self.propagate(pred_id, inst_id, None, phi);
         }
     }
 }
