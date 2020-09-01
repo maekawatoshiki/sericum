@@ -124,7 +124,11 @@ impl BranchFolding {
             }
             let inst = &f.body.inst_arena[block.iseq_ref()[0]];
             if inst.opcode.is_unconditional_jmp() && inst.operand[0].is_basic_block() {
-                worklist.push((id, inst.operand[0].as_basic_block()));
+                let b = inst.operand[0].as_basic_block();
+                if f.body.basic_blocks.arena[id].pred.len() > 1 {
+                    continue;
+                }
+                worklist.push((id, b));
             }
         }
 

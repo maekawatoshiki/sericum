@@ -390,6 +390,59 @@ extern int cilk_printch_i32(int x) { putchar(x); }
 }
 
 #[test]
+#[ignore]
+fn loop_licm() {
+    let input = r#"
+        function test(): i32 {
+            var i: i32;
+            var k: i32;
+            var s: i32;
+            var j: i32;
+            j = 0;
+            s = 0;
+            i = 0; while i < 100000 {
+                k = 0; while k < 100000 {
+                    s = i * 2 + j;
+                    k = k + 1;
+                }
+                j = j + 2;
+                i = i + 1;
+            }
+            return s;
+        }
+    "#;
+    let mut codegen = codegen::CodeGenerator::new();
+    codegen.run(input);
+
+    cilk::ir::mem2reg::Mem2Reg::new().run_on_module(&mut codegen.module);
+    cilk::ir::cse::CommonSubexprElimination::new().run_on_module(&mut codegen.module);
+    cilk::ir::licm::LoopInvariantCodeMotion::new().run_on_module(&mut codegen.module);
+
+    println!("{:?}", codegen.module);
+
+    // let mut jit = cilk::codegen::x64::exec::jit::JITExecutor::new(&mut codegen.module);
+    // let func = jit.find_function_by_name("main").unwrap();
+    // println!("Result: {:?}", jit.run(func, vec![]));
+
+    use cilk::codegen::x64::asm::print::MachineAsmPrinter;
+    use cilk::codegen::x64::standard_conversion_into_machine_module;
+    let machine_module = standard_conversion_into_machine_module(&mut codegen.module);
+    let mut printer = MachineAsmPrinter::new();
+    println!("{:?}", machine_module);
+    printer.run_on_module(&machine_module);
+    println!("{}", printer.output);
+    assemble_and_run(
+        "
+        #include <stdio.h>
+        extern int test();
+        int main() { test(); return 0; }
+            ",
+        printer.output.as_str(),
+        None,
+    );
+}
+
+#[test]
 fn pass_struct() {
     let input = r#"
     struct A {
@@ -846,18 +899,22 @@ fn assemble_and_run(c_lib: &str, s_target: &str, md5hash: Option<&str>) {
     assert!(compilation.success());
 
     if let Some(md5hash) = md5hash {
+        let start = ::std::time::Instant::now();
         let execution = process::Command::new(output_name.as_str())
             .stdout(::std::process::Stdio::piped())
             .spawn()
             .unwrap();
         let mut s = String::new();
         execution.stdout.unwrap().read_to_string(&mut s).unwrap();
+        println!("duration {:?}", ::std::time::Instant::now() - start);
         assert_eq!(format!("{:?}", md5::compute(s)).as_str(), md5hash);
     } else {
+        let start = ::std::time::Instant::now();
         let execution = process::Command::new(output_name.as_str())
             // .stdout(::std::process::Stdio::piped())
             .status()
             .unwrap();
         assert!(execution.success());
+        println!("duration {:?}", ::std::time::Instant::now() - start);
     }
 }
