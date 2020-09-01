@@ -354,17 +354,10 @@ impl<'a> AllocationOrder<'a> {
     }
 
     pub fn get_order(&self, vreg: VirtReg) -> Option<RegisterOrder> {
-        let reg = self.func.regs_info.arena_ref()[*self.matrix.get_entity_by_vreg(vreg).unwrap()]
-            .uses
-            .iter()
-            .find_map(|&use_| {
-                let inst = &self.func.body.inst_arena[use_];
-                // println!(" I {:?}", inst);
-                if inst.opcode.is_copy_like() && inst.operand[0].as_register().sub_super == None {
-                    return self.func.regs_info.arena_ref()[inst.def[0].id].phys_reg;
-                }
-                None
-            });
+        let reg = self.get_preferred_reg(
+            *self.matrix.get_entity_by_vreg(vreg).unwrap(),
+            &mut FxHashSet::default(),
+        );
         let mut order = self.func.regs_info.arena_ref()[*self.matrix.get_entity_by_vreg(vreg)?]
             .reg_class
             .get_reg_order();
@@ -374,5 +367,36 @@ impl<'a> AllocationOrder<'a> {
         }
 
         Some(order)
+    }
+
+    pub fn get_preferred_reg(
+        &self,
+        r: RegisterId,
+        visited: &mut FxHashSet<RegisterId>,
+    ) -> Option<PhysReg> {
+        if !visited.insert(r) {
+            return None;
+        }
+
+        for &use_ in self.func.regs_info.arena_ref()[r].uses.iter() {
+            let inst = &self.func.body.inst_arena[use_];
+            if inst.opcode.is_copy_like() && inst.operand[0].as_register().sub_super == None {
+                if let Some(p) = self.func.regs_info.arena_ref()[inst.def[0].id].phys_reg {
+                    return Some(p);
+                }
+
+                if let Some(LiveInterval { reg: Some(p), .. }) = self
+                    .matrix
+                    .virt_reg_interval
+                    .get(&inst.def[0].id.as_virt_reg())
+                {
+                    return Some(*p);
+                }
+
+                return self.get_preferred_reg(inst.def[0].id, visited);
+            }
+        }
+
+        None
     }
 }
