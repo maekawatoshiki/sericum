@@ -590,6 +590,15 @@ impl<'a> ScheduleByBlock<'a> {
                         *self.normal_operand(node.operand[3]).as_register(),
                     ))
                 }
+                MemNodeKind::BaseFiAlignOffOff => {
+                    MachineOperand::Mem(MachineMemOperand::BaseFiAlignOffOff(
+                        *self.normal_operand(node.operand[0]).as_register(),
+                        *self.normal_operand(node.operand[1]).as_frame_index(),
+                        self.normal_operand(node.operand[2]).as_constant().as_i32(),
+                        *self.normal_operand(node.operand[3]).as_register(),
+                        self.normal_operand(node.operand[4]).as_constant().as_i32(),
+                    ))
+                }
                 MemNodeKind::BaseFiOff => MachineOperand::Mem(MachineMemOperand::BaseFiOff(
                     *self.normal_operand(node.operand[0]).as_register(),
                     *self.normal_operand(node.operand[1]).as_frame_index(),

@@ -9,7 +9,8 @@ impl<'a> EliminateFrameIndexOnFunction<'a> {
             match op {
                 MachineOperand::Mem(MachineMemOperand::BaseFi(_, fi))
                 | MachineOperand::Mem(MachineMemOperand::BaseFiOff(_, fi, _))
-                | MachineOperand::Mem(MachineMemOperand::BaseFiAlignOff(_, fi, _, _)) => {
+                | MachineOperand::Mem(MachineMemOperand::BaseFiAlignOff(_, fi, _, _))
+                | MachineOperand::Mem(MachineMemOperand::BaseFiAlignOffOff(_, fi, _, _, _)) => {
                     return Some(fi)
                 }
                 _ => {}
@@ -37,6 +38,20 @@ impl<'a> EliminateFrameIndexOnFunction<'a> {
                     *op = MachineOperand::Mem(MachineMemOperand::BaseOffAlignOff(
                         *base,
                         frame_objects.offset(fi.idx).unwrap(),
+                        *align,
+                        *off,
+                    ));
+                }
+                MachineOperand::Mem(MachineMemOperand::BaseFiAlignOffOff(
+                    base,
+                    fi,
+                    align,
+                    off,
+                    off2,
+                )) => {
+                    *op = MachineOperand::Mem(MachineMemOperand::BaseOffAlignOff(
+                        *base,
+                        frame_objects.offset(fi.idx).unwrap() + *off2,
                         *align,
                         *off,
                     ));

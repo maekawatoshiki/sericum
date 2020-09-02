@@ -5,6 +5,7 @@ pub enum MemNodeKind {
     BaseFi,
     BaseFiOff,
     BaseFiAlignOff,
+    BaseFiAlignOffOff,
     BaseAlignOff,
     BaseOff,
     Base,

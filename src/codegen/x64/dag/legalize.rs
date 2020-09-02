@@ -96,6 +96,41 @@ impl Legalize {
         (ir.Load dst): i32 {
             (ir.Add x, y) dst {
                 (ir.FIAddr fi) x {
+                    (ir.Mul z, u) y {
+                        imm32 u {
+                            (ir.Sext q) z {
+                                (ir.Add w, e) q {
+                                    imm32 e => { {
+                                        let fi = self.run_on_node(tys, regs_info, heap, fi);
+                                        let w = self.run_on_node(tys, regs_info, heap, w);
+                                        let rbp = heap.alloc_phys_reg(regs_info, GR64::RBP);
+                                        let off = e.kind.as_operand().as_constant().as_i32()
+                                            * u.kind.as_operand().as_constant().as_i32();
+                                        let off = heap.alloc(DAGNode::new(
+                                            NodeKind::Operand(OperandNodeKind::Constant(ConstantKind::Int32(off))),
+                                            vec![],
+                                            Type::i32
+                                        ));
+                                        let m = heap.alloc(DAGNode::new_mem(
+                                            MemNodeKind::BaseFiAlignOffOff,
+                                            vec![rbp, fi, u, w, off],
+                                        ));
+                                        heap.alloc(DAGNode::new(
+                                            NodeKind::MI(MINodeKind::MOVrm32),
+                                            vec![m],
+                                            Type::i32
+                                        ))
+                                        // mov [rbp + fi + w*u + e * u]
+                                    } }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            (ir.Add x, y) dst {
+                (ir.FIAddr fi) x {
                     imm32 y => (mi.MOVrm32 [BaseFiOff %rbp, fi, y])
                     (ir.Mul z, u) y {
                         imm32 u => (mi.MOVrm32 [BaseFiAlignOff %rbp, fi, u, z]) } }
@@ -105,7 +140,9 @@ impl Legalize {
                         imm32 u => (mi.MOVrm32 [AddressAlignOff g, u, z]) } }
                 GR64 x {
                     (ir.Mul z, u) y {
-                        imm32 u => (mi.MOVrm32 [BaseAlignOff x, u, z]) } } } }
+                        imm32 u => (mi.MOVrm32 [BaseAlignOff x, u, z]) } }
+            }
+        }
         (ir.Load dst): i8 {
             (ir.Add x, y) dst {
                 (ir.FIAddr fi) x {
@@ -153,14 +190,42 @@ impl Legalize {
                             imm32   src => (mi.MOVmi32 [BaseFiOff %rbp, fi, a2], src)
                             XMM     src => (mi.MOVSDmr [BaseFiOff %rbp, fi, a2], src)
                             imm_f64 src => (mi.MOVSDmr [BaseFiOff %rbp, fi, a2], (mi.MOVSDrm64 src)) } }
-                    mem32 fi {
+                    mem fi {
                         imm32 a2 {
                             GR32  src => (mi.MOVmr32 [BaseFiOff %rbp, fi, a2], src)
                             imm32 src => (mi.MOVmi32 [BaseFiOff %rbp, fi, a2], src) }
                         (ir.Mul m1, m2) a2 {
                             imm32 m2 {
+                                (ir.Sext q) m1 {
+                                    (ir.Add w, e) q {
+                                        imm32 e => { {
+                                            // panic!()
+                                        let fi = self.run_on_node(tys, regs_info, heap, fi);
+                                        let w = self.run_on_node(tys, regs_info, heap, w);
+                                        let rbp = heap.alloc_phys_reg(regs_info, GR64::RBP);
+                                        let off = e.kind.as_operand().as_constant().as_i32()
+                                            * m2.kind.as_operand().as_constant().as_i32();
+                                        let off = heap.alloc(DAGNode::new(
+                                            NodeKind::Operand(OperandNodeKind::Constant(ConstantKind::Int32(off))),
+                                            vec![],
+                                            Type::i32
+                                        ));
+                                        let m = heap.alloc(DAGNode::new_mem(
+                                            MemNodeKind::BaseFiAlignOffOff,
+                                            vec![rbp, fi, m2, w, off],
+                                        ));
+                                        heap.alloc(DAGNode::new(
+                                            NodeKind::MI(MINodeKind::MOVmr32),
+                                            vec![m, src],
+                                            Type::Void
+                                        ))
+                                        } }
+                                    }
+                                }
                                 GR32  src => (mi.MOVmr32 [BaseFiAlignOff %rbp, fi, m2, m1], src)
-                                imm32 src => (mi.MOVmi32 [BaseFiAlignOff %rbp, fi, m2, m1], src) } } } }
+                                imm32 src => (mi.MOVmi32 [BaseFiAlignOff %rbp, fi, m2, m1], src)
+                            }
+                        } } }
                 (ir.GlobalAddr g) a1 {
                     imm32 a2 {
                         GR32  src => (mi.MOVmr32 [AddressOff g, a2], src)
@@ -272,7 +337,7 @@ impl Legalize {
         {
             let op = self.run_on_node(tys, regs_info, heap, node.operand[0]);
             return heap.alloc(DAGNode::new(
-                NodeKind::MI(MINodeKind::MOVSXDr64r32),
+                NodeKind::IR(IRNodeKind::RegClass),
                 vec![op],
                 node.ty,
             ));

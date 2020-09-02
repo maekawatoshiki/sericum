@@ -129,9 +129,10 @@ impl Function {
     }
 
     pub fn remove_inst(&self, inst_id: InstructionId) {
-        let (bb_id, pos) = self.find_inst_pos(inst_id).unwrap();
-        self.inst_table[inst_id].remove(&self.inst_table);
-        self.basic_blocks.arena[bb_id].iseq_ref_mut().remove(pos);
+        if let Some((bb_id, pos)) = self.find_inst_pos(inst_id) {
+            self.inst_table[inst_id].remove(&self.inst_table);
+            self.basic_blocks.arena[bb_id].iseq_ref_mut().remove(pos);
+        }
     }
 
     fn remove_inst_left_in_bb(&self, inst_id: InstructionId) {

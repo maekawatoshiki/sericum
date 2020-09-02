@@ -406,6 +406,13 @@ impl OperandNodeKind {
             Self::Mem(mem) => write!(f, "{:?}", mem),
         }
     }
+
+    pub fn as_constant(&self) -> &ConstantKind {
+        match self {
+            Self::Constant(c) => c,
+            _ => panic!(),
+        }
+    }
 }
 
 impl NodeKind {
