@@ -148,7 +148,11 @@ impl<'a> LoopInvariantCodeMotionOnFunction<'a> {
                 let mut insts_to_hoist = vec![];
                 while let Some(inst_id) = worklist.pop_front() {
                     let inst = &self.func.inst_table[inst_id];
-                    if inst.opcode.access_memory() || inst.opcode == Opcode::Call {
+                    if inst.opcode.access_memory()
+                        || inst.opcode == Opcode::Call
+                        // TODO: Remove the line below after implementing CodeGenPrepare
+                        || inst.opcode == Opcode::GetElementPtr
+                    {
                         continue;
                     }
                     let invariant = inst.operands.iter().all(|operand| match operand {
@@ -158,9 +162,6 @@ impl<'a> LoopInvariantCodeMotionOnFunction<'a> {
                         }
                         Operand::Value(_) => true,
                         _ => false,
-                    }) && inst.users.borrow().iter().all(|id| {
-                        let inst = &self.func.inst_table[*id];
-                        inst.opcode != Opcode::Phi
                     });
                     if invariant {
                         count += 1;
@@ -177,6 +178,7 @@ impl<'a> LoopInvariantCodeMotionOnFunction<'a> {
                     for &user in &*inst.users.borrow() {
                         worklist.push_back(user);
                     }
+                    // worklist.push_back(inst_id);
 
                     let mut builder = Builder::new(FunctionEntity(self.func));
                     builder.set_insert_point_before_terminator(pre_header);
