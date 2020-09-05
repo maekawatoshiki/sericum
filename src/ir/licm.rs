@@ -22,6 +22,8 @@ struct LoopInvariantCodeMotionOnFunction<'a> {
     func: &'a mut Function,
 }
 
+// TODO: Move to 'simplify_loop.rs'
+// TODO: Implement pre-header insertion
 struct SimplifyLoopOnFunction<'a> {
     func: &'a mut Function,
 }
