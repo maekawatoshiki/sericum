@@ -478,6 +478,17 @@ impl JITCompiler {
                     _ => unimplemented!(),
                 }
             }
+            MachineOperand::Mem(MachineMemOperand::BaseOffAlignOff(base, off, align, off2)) => {
+                let r0 = phys_reg_to_dynasm_reg(base.id.as_phys_reg());
+                let m1 = *off;
+                let i2 = align;
+                let r3 = phys_reg_to_dynasm_reg(off2.id.as_phys_reg());
+                let i4 = inst.operand[1].as_constant().as_i32();
+                match i2 {
+                    4 => dynasm!(self.asm; mov DWORD [Rq(r0) + m1 + 4*Rq(r3)], i4),
+                    _ => unimplemented!(),
+                }
+            }
             MachineOperand::Mem(MachineMemOperand::BaseFiOff(base, fi, off)) => {
                 let r0 = phys_reg_to_dynasm_reg(base.id.as_phys_reg());
                 let m1 = fo.offset(fi.idx).unwrap();

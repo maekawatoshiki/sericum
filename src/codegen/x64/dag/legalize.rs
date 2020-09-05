@@ -101,6 +101,7 @@ impl Legalize {
                             (ir.Sext q) z {
                                 (ir.Add w, e) q {
                                     imm32 e => { {
+                                        // TODO: Refactoring
                                         let fi = self.run_on_node(tys, regs_info, heap, fi);
                                         let w = self.run_on_node(tys, regs_info, heap, w);
                                         let rbp = heap.alloc_phys_reg(regs_info, GR64::RBP);
@@ -199,26 +200,26 @@ impl Legalize {
                                 (ir.Sext q) m1 {
                                     (ir.Add w, e) q {
                                         imm32 e => { {
-                                            // panic!()
-                                        let fi = self.run_on_node(tys, regs_info, heap, fi);
-                                        let w = self.run_on_node(tys, regs_info, heap, w);
-                                        let rbp = heap.alloc_phys_reg(regs_info, GR64::RBP);
-                                        let off = e.kind.as_operand().as_constant().as_i32()
-                                            * m2.kind.as_operand().as_constant().as_i32();
-                                        let off = heap.alloc(DAGNode::new(
-                                            NodeKind::Operand(OperandNodeKind::Constant(ConstantKind::Int32(off))),
-                                            vec![],
-                                            Type::i32
-                                        ));
-                                        let m = heap.alloc(DAGNode::new_mem(
-                                            MemNodeKind::BaseFiAlignOffOff,
-                                            vec![rbp, fi, m2, w, off],
-                                        ));
-                                        heap.alloc(DAGNode::new(
-                                            NodeKind::MI(MINodeKind::MOVmr32),
-                                            vec![m, src],
-                                            Type::Void
-                                        ))
+                                            // TODO: Refactoring
+                                            let fi = self.run_on_node(tys, regs_info, heap, fi);
+                                            let w = self.run_on_node(tys, regs_info, heap, w);
+                                            let rbp = heap.alloc_phys_reg(regs_info, GR64::RBP);
+                                            let off = e.kind.as_operand().as_constant().as_i32()
+                                                * m2.kind.as_operand().as_constant().as_i32();
+                                            let off = heap.alloc(DAGNode::new(
+                                                NodeKind::Operand(OperandNodeKind::Constant(ConstantKind::Int32(off))),
+                                                vec![],
+                                                Type::i32
+                                            ));
+                                            let m = heap.alloc(DAGNode::new_mem(
+                                                MemNodeKind::BaseFiAlignOffOff,
+                                                vec![rbp, fi, m2, w, off],
+                                            ));
+                                            heap.alloc(DAGNode::new(
+                                                NodeKind::MI(MINodeKind::MOVmr32),
+                                                vec![m, src],
+                                                Type::Void
+                                            ))
                                         } }
                                     }
                                 }
