@@ -65,6 +65,16 @@ impl<T: BasicBlockTrait> DominatorTree<T> {
     pub fn get_level_of(&self, bb: Id<T>) -> usize {
         *self.level.get(&bb).unwrap()
     }
+
+    pub fn post_ordered_blocks(&self, root: Option<Id<T>>) -> Vec<Id<T>> {
+        let mut blocks = vec![];
+        let root = root.unwrap_or_else(|| self.root.unwrap());
+        for &child in self.tree.get(&root).unwrap_or(&FxHashSet::default()) {
+            blocks.append(&mut self.post_ordered_blocks(Some(child)));
+        }
+        blocks.push(root);
+        blocks
+    }
 }
 
 macro_rules! cmp {

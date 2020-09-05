@@ -35,7 +35,7 @@ impl<'a, BBS: BasicBlocksTrait> LoopsConstructor<'a, BBS> {
     }
 
     pub fn analyze(mut self) -> Loops<BBS::BB> {
-        let post_order = self.get_post_ordered_blocks(self.dom_tree.root.unwrap());
+        let post_order = self.dom_tree.post_ordered_blocks(None);
 
         for node in &post_order {
             let mut back_edges = vec![];
@@ -127,20 +127,6 @@ impl<'a, BBS: BasicBlocksTrait> LoopsConstructor<'a, BBS> {
             self.loops.arena[parent].set.insert(bb);
             sub_loop = parent;
         }
-    }
-
-    fn get_post_ordered_blocks(&self, root: Id<BBS::BB>) -> Vec<Id<BBS::BB>> {
-        let mut blocks = vec![];
-        for &child in self
-            .dom_tree
-            .tree
-            .get(&root)
-            .unwrap_or(&FxHashSet::default())
-        {
-            blocks.append(&mut self.get_post_ordered_blocks(child));
-        }
-        blocks.push(root);
-        blocks
     }
 }
 
