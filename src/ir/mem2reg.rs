@@ -196,6 +196,7 @@ impl<'a> Mem2RegOnFunction<'a> {
         stores_and_indexes.sort_by(|(_, idx0), (_, idx1)| idx0.cmp(idx1)); // sort to make it more efficient to find
 
         let mut all_access_removable = true;
+        let mut stores_to_remove = FxHashSet::default();
         for (load_id, load_users) in loads {
             let load_idx = self.inst_indexes.get_index(&self.cur_func, load_id);
             let nearest_store_id = match find_nearest_store(&stores_and_indexes, load_idx) {
@@ -209,7 +210,7 @@ impl<'a> Mem2RegOnFunction<'a> {
             let nearest_store = &self.cur_func.inst_table[nearest_store_id];
             let src = nearest_store.operands[0];
 
-            self.cur_func.remove_inst(nearest_store_id);
+            stores_to_remove.insert(nearest_store_id);
             self.cur_func.remove_inst(load_id);
 
             // remove loads and replace them with src
@@ -220,6 +221,10 @@ impl<'a> Mem2RegOnFunction<'a> {
 
         if all_access_removable {
             self.cur_func.remove_inst(alloca_id);
+        }
+
+        for s in stores_to_remove {
+            self.cur_func.remove_inst(s)
         }
     }
 
