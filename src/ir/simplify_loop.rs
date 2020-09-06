@@ -9,9 +9,10 @@ use crate::{
     },
 };
 
+// Make sure a natural loop has a single backedge.
+// TODO: Should this pass do pre-header insertion?
 pub struct SimplifyLoop {}
 
-// TODO: Implement pre-header insertion
 pub struct SimplifyLoopOnFunction<'a> {
     func: &'a mut Function,
 }

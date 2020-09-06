@@ -87,9 +87,15 @@ impl<'a> GlobalCommonSubexprEliminationOnFunction<'a> {
             let inst = &self.func.inst_table[inst_id];
             if matches!(
                 inst.opcode,
-                // TODO: Uncomment the line below after implementing CodeGenPrepare
-                // Opcode::GetElementPtr
-                Opcode::Add | Opcode::Sub | Opcode::Mul | Opcode::Div | Opcode::Rem
+                Opcode::Add
+                    | Opcode::Sub
+                    | Opcode::Mul
+                    | Opcode::Div
+                    | Opcode::Rem
+                    | Opcode::Shl
+                    | Opcode::SIToFP
+                    | Opcode::FPToSI
+                    | Opcode::Sext
             ) {
                 commons
                     .entry(inst.opcode)
