@@ -10,6 +10,7 @@ pub mod mem2reg;
 pub mod merge_ret;
 pub mod module;
 pub mod opcode;
+pub mod simplify_loop;
 pub mod types;
 pub mod value;
 
