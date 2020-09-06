@@ -1,10 +1,14 @@
 // TODO: refactoring!!!
 
-use crate::traits::basic_block::{BasicBlockTrait, BasicBlocksTrait};
+use crate::{
+    analysis::Analysis,
+    traits::basic_block::{BasicBlockTrait, BasicBlocksTrait},
+};
 use id_arena::Id;
 use rustc_hash::{FxHashMap, FxHashSet};
+use std::any::Any;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct DominatorTree<T: BasicBlockTrait> {
     pub root: Option<Id<T>>,
     pub tree: FxHashMap<Id<T>, FxHashSet<Id<T>>>,
@@ -25,6 +29,16 @@ pub struct DominatorTreeConstructor<'a, BBS: BasicBlocksTrait> {
     samedom: Map<Id<BBS::BB>>,
     parent: Map<Id<BBS::BB>>,
     best: Map<Id<BBS::BB>>,
+}
+
+impl<T: BasicBlockTrait + Clone + 'static> Analysis for DominatorTree<T> {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn Any {
+        self
+    }
 }
 
 impl<T: BasicBlockTrait> DominatorTree<T> {

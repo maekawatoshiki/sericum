@@ -1,11 +1,11 @@
 use crate::{
     analysis::{
-        dom_tree::{DominatorTree, DominatorTreeConstructor},
+        dom_tree::DominatorTreeConstructor,
         loops::{Loop, Loops, LoopsConstructor},
     },
     ir::{
         basic_block::{BasicBlock, BasicBlockId},
-        builder::{Builder, FuncRef, FunctionEntity},
+        builder::{Builder, FunctionEntity},
         function::Function,
         module::Module,
         opcode::{Instruction, Opcode, Operand},

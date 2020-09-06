@@ -19,6 +19,7 @@ extern crate defs;
 #[cfg(feature = "x86_64")]
 #[macro_use]
 extern crate dynasm;
+extern crate dyn_clone;
 extern crate dynasmrt;
 extern crate num;
 #[macro_use]

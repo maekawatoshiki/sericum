@@ -1,4 +1,5 @@
 use super::{basic_block::*, module::Module, opcode::*, types::*, value::*, DumpToString};
+use crate::analysis::Analysis;
 use crate::codegen::is_internal_function;
 use crate::traits::function::FunctionTrait;
 use id_arena::*;
@@ -19,7 +20,7 @@ impl<'a> From<&'a str> for FunctionName<'a> {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Function {
     /// Function name
     pub name: String,
@@ -35,6 +36,8 @@ pub struct Function {
 
     pub id: Option<FunctionId>,
 
+    pub analyses: Vec<Box<dyn Analysis>>,
+
     pub types: Types,
 
     pub is_internal: bool,
@@ -49,6 +52,7 @@ impl Function {
             basic_blocks: BasicBlocks::new(),
             inst_table: Arena::new(),
             id: None,
+            analyses: vec![],
             types: module.types.clone(),
             is_internal: is_internal_function(name),
         })
@@ -163,6 +167,38 @@ impl Function {
         self.inst_table[id] = inst;
         let inst = &self.inst_table[id];
         inst.set_users(&self.inst_table);
+    }
+
+    pub fn get_analysis<T: 'static>(&self) -> Option<&T> {
+        self.analyses
+            .iter()
+            .find_map(|analysis| analysis.as_any().downcast_ref::<T>())
+    }
+
+    pub fn get_analysis_mut<T: 'static>(&mut self) -> Option<&mut T> {
+        self.analyses
+            .iter_mut()
+            .find_map(|analysis| analysis.as_any_mut().downcast_mut::<T>())
+    }
+
+    pub fn add_analysis<T: 'static + Analysis>(&mut self, a: T) {
+        if let Some(analysis) = self.get_analysis_mut::<T>() {
+            *analysis = a;
+            return;
+        }
+
+        self.analyses.push(Box::new(a))
+    }
+
+    pub fn remove_analysis<T: Analysis + 'static>(&mut self) -> Option<Box<dyn Analysis>> {
+        if let Some(i) = self
+            .analyses
+            .iter()
+            .position(|a| a.as_any().downcast_ref::<T>().is_some())
+        {
+            return Some(self.analyses.remove(i));
+        }
+        None
     }
 }
 
