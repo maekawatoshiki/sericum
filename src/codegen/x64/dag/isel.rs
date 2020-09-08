@@ -176,7 +176,7 @@ impl MISelector {
                     }
                 }
                 (ir.GlobalAddr c) a {
-                    imm32 b   => (mi.MOVmr32 [Address c], b)
+                    imm32 b   => (mi.MOVmi32 [Address c], b)
                     GR32 b    => (mi.MOVmr32 [Address c], b)
                     GR64  b   => (mi.MOVmr64 [Address c], b)
                     imm_f64 b => (mi.MOVSDmr [Address c], (mi.MOVSDrm64 b))
