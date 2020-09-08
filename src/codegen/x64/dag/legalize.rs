@@ -141,7 +141,7 @@ impl Legalize {
                         imm32 u => (mi.MOVrm32 [AddressAlignOff g, u, z]) } }
                 GR64 x {
                     (ir.Mul z, u) y {
-                        imm32 u => (mi.MOVrm32 [BaseAlignOff x, u, z]) } }
+                        imm32 u => (mi.MOVrm32 [BaseAlignOff x, u, (ir.RegClass z):i64]) } }
             }
         }
         (ir.Load dst): i8 {
@@ -238,8 +238,8 @@ impl Legalize {
                 GR64 a1 {
                     (ir.Mul m1, m2) a2 {
                         imm32 m2 {
-                            GR32  src => (mi.MOVmr32 [BaseAlignOff a1, m2, m1], src)
-                            imm32 src => (mi.MOVmi32 [BaseAlignOff a1, m2, m1], src) } } } } } }
+                            GR32  src => (mi.MOVmr32 [BaseAlignOff a1, m2, (ir.RegClass m1):i64], src)
+                            imm32 src => (mi.MOVmi32 [BaseAlignOff a1, m2, (ir.RegClass m1):i64], src) } } } } } }
     }
 
     fn run_on_node_add(

@@ -486,7 +486,6 @@ impl RegisterOperand {
     pub fn set_id(&mut self, id: RegisterId) {
         self.id = id;
         self.id = self.converted_id();
-        self.sub_super = None;
     }
 
     pub fn sub_super(mut self, sub_super: Option<RegisterClassKind>) -> Self {

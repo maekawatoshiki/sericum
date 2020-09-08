@@ -390,6 +390,68 @@ extern int cilk_printch_i32(int x) { putchar(x); }
 }
 
 #[test]
+fn eratosthenes_sieve() {
+    let input = r#"
+        function eratosthenes_sieve(arr: ** i32, max: i32): i32 {
+            var i: i32;
+            var k: i32;
+            arr[0] = 0;
+            i = 1; while i < max {
+                arr[i] = 1;
+                i = i + 1;
+            }
+            i = 0; while i * i < max {
+                if arr[i] == 1 {
+                    k = i + 1; while (i + 1) * k <= max {
+                        arr[(i + 1) * k - 1] = 0;
+                        k = k + 1;
+                    }
+                }
+                i = i + 1;
+            }
+            return 0;
+        }
+    "#;
+    let mut codegen = codegen::CodeGenerator::new();
+    codegen.run(input);
+
+    cilk::ir::mem2reg::Mem2Reg::new().run_on_module(&mut codegen.module);
+    cilk::ir::cse::CommonSubexprElimination::new().run_on_module(&mut codegen.module);
+    cilk::ir::licm::LoopInvariantCodeMotion::new().run_on_module(&mut codegen.module);
+
+    // println!("{:?}", codegen.module);
+
+    use cilk::codegen::x64::asm::print::MachineAsmPrinter;
+    use cilk::codegen::x64::standard_conversion_into_machine_module;
+    let machine_module = standard_conversion_into_machine_module(&mut codegen.module);
+    let mut printer = MachineAsmPrinter::new();
+    // println!("{:?}", machine_module);
+    printer.run_on_module(&machine_module);
+    // println!("{}", printer.output);
+
+    assemble_and_run(
+        "
+        #include <stdio.h>
+        #include <assert.h>
+        extern int eratosthenes_sieve(int arr[], int max);
+        const int max = 20;
+        int arr[max];
+        int primes[] = {2, 3, 5, 7, 11, 13, 17, 19, 0};
+        int main() { 
+            int *p = primes;
+            eratosthenes_sieve(arr, max); 
+            for (int i = 1; i < max; i++)
+                if (arr[i]) assert(*p++ == i + 1);
+            assert(*p == 0);
+            return 0; 
+        }
+            ",
+        printer.output.as_str(),
+        None,
+    );
+}
+
+#[test]
 #[ignore]
 fn loop_licm() {
     let input = r#"
