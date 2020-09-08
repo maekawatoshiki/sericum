@@ -32,6 +32,7 @@ impl<'a> ConstantFoldingOnFunction<'a> {
 
     pub fn run(&mut self) {
         let mut foldable = VecDeque::new();
+        // TODO: Had better implement a conversion from Mul/Div to Shl/Shr in instcombine pass
         let mut to_shift = VecDeque::new();
 
         for &id in &self.cur_func.basic_blocks.order {

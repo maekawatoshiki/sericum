@@ -129,7 +129,7 @@ impl Combine {
         heap: &mut DAGHeap,
         mut node: Raw<DAGNode>,
     ) -> Raw<DAGNode> {
-        // (C * any) -> (any * C)
+        // (C * !C) -> (!C * C)
         if node.operand[0].is_constant() && !node.operand[1].is_constant() {
             node.operand.swap(0, 1);
         }
@@ -139,27 +139,10 @@ impl Combine {
             return node.operand[1];
         }
 
+        // (N * 1) -> N
         if node.operand[1].is_constant() && node.operand[1].as_constant().is_int(1) {
             return node.operand[0];
         }
-
-        // TODO: Implement IR-level combine
-        // (N(int) * 2^n) -> N(int) << n
-        // if node.operand[0].ty.is_integer() && node.operand[1].is_constant() {
-        //     if let Some(n) = node.operand[1].as_constant().is_power_of_two() {
-        //         let n = heap.alloc(DAGNode::new(
-        //             NodeKind::Operand(OperandNodeKind::Constant(ConstantKind::Int8(n as i8))),
-        //             vec![],
-        //             Type::Int8,
-        //         ));
-        //         let x = self.combine_node(replace, heap, node.operand[0]);
-        //         return heap.alloc(DAGNode::new(
-        //             NodeKind::IR(IRNodeKind::Shl),
-        //             vec![x, n],
-        //             node.ty,
-        //         ));
-        //     }
-        // }
 
         self.combine_operands(replace, heap, node)
     }

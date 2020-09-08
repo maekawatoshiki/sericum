@@ -77,6 +77,22 @@ mod inst {
                 .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR32)])
                 .add_tie(DefOrUseReg::Def(0), DefOrUseReg::Use(0))
         };
+        pub static ref ADDmr32: TargetInstDef = {
+            TargetInstDef::new("add", TargetOpcode::ADDmr32)
+                .set_uses(vec![
+                    TargetOperand::Mem,
+                    TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR32)),
+                ])
+                .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR32)])
+        };
+        pub static ref ADDmi32: TargetInstDef = {
+            TargetInstDef::new("add", TargetOpcode::ADDmi32)
+                .set_uses(vec![
+                    TargetOperand::Mem,
+                    TargetOperand::Immediate(TargetImmediate::I32)
+                ])
+                .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR32)])
+        };
         pub static ref ADDrr64: TargetInstDef = {
             TargetInstDef::new("add", TargetOpcode::ADDrr64)
                 .set_uses(vec![
@@ -166,6 +182,22 @@ mod inst {
                 ])
                 .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR64)])
                 .add_tie(DefOrUseReg::Def(0), DefOrUseReg::Use(0))
+        };
+        pub static ref SUBmr32: TargetInstDef = {
+            TargetInstDef::new("sub", TargetOpcode::SUBmr32)
+                .set_uses(vec![
+                    TargetOperand::Mem,
+                    TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR32)),
+                ])
+                .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR32)])
+        };
+        pub static ref SUBmi32: TargetInstDef = {
+            TargetInstDef::new("sub", TargetOpcode::SUBmi32)
+                .set_uses(vec![
+                    TargetOperand::Mem,
+                    TargetOperand::Immediate(TargetImmediate::I32)
+                ])
+                .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR32)])
         };
         pub static ref SUBSDrr: TargetInstDef = {
             TargetInstDef::new("subsd", TargetOpcode::SUBSDrr)
@@ -518,6 +550,8 @@ pub enum TargetOpcode {
     ADDrr8,
     ADDri8,
     ADDrr32,
+    ADDmr32,
+    ADDmi32,
     ADDrr64,
     ADDri32,
     ADDr64i32,
@@ -526,6 +560,8 @@ pub enum TargetOpcode {
     SUBrr8,
     SUBri8,
     SUBrr32,
+    SUBmr32,
+    SUBmi32,
     SUBri32,
     SUBr64i32,
     SUBSDrr,
@@ -604,6 +640,8 @@ impl TargetOpcode {
             Self::ADDrr8 => Some(&*inst::ADDrr8),
             Self::ADDri8 => Some(&*inst::ADDri8),
             Self::ADDrr32 => Some(&*inst::ADDrr32),
+            Self::ADDmr32 => Some(&*inst::ADDmr32),
+            Self::ADDmi32 => Some(&*inst::ADDmi32),
             Self::ADDrr64 => Some(&*inst::ADDrr64),
             Self::ADDri32 => Some(&*inst::ADDri32),
             Self::ADDr64i32 => Some(&*inst::ADDr64i32),
@@ -613,6 +651,8 @@ impl TargetOpcode {
             Self::SUBri8 => Some(&*inst::SUBri8),
             Self::SUBrr32 => Some(&*inst::SUBrr32),
             Self::SUBri32 => Some(&*inst::SUBri32),
+            Self::SUBmr32 => Some(&*inst::SUBmr32),
+            Self::SUBmi32 => Some(&*inst::SUBmi32),
             Self::SUBr64i32 => Some(&*inst::SUBr64i32),
             Self::SUBSDrr => Some(&*inst::SUBSDrr),
             Self::SUBSDrm => Some(&*inst::SUBSDrm),
