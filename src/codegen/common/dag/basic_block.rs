@@ -17,12 +17,16 @@ pub struct DAGBasicBlock {
 
     /// Entry node
     pub entry: Option<Raw<DAGNode>>,
+
+    /// Root node
+    pub root: Option<Raw<DAGNode>>,
 }
 
 impl DAGBasicBlock {
     pub fn new() -> Self {
         Self {
             entry: None,
+            root: None,
             pred: FxHashSet::default(),
             succ: FxHashSet::default(),
         }
@@ -30,6 +34,10 @@ impl DAGBasicBlock {
 
     pub fn set_entry(&mut self, entry: Raw<DAGNode>) {
         self.entry = Some(entry);
+    }
+
+    pub fn set_root(&mut self, root: Raw<DAGNode>) {
+        self.root = Some(root);
     }
 
     pub fn debug(&self, f: &mut fmt::Formatter<'_>, tys: &Types, bb_idx: usize) -> fmt::Result {

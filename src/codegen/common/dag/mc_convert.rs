@@ -88,6 +88,7 @@ impl<'a> ScheduleByBlock<'a> {
 
         let reg = match node.kind {
             NodeKind::IR(IRNodeKind::Entry) => None,
+            NodeKind::IR(IRNodeKind::Root) => None,
             NodeKind::IR(IRNodeKind::RegClass) => {
                 let val = self.normal_operand(node.operand[0]);
                 Some(val.as_register().sub_super(ty2rc(&node.ty)))

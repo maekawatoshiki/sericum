@@ -20,6 +20,7 @@ pub struct DAGNode {
     pub operand: Vec<Raw<DAGNode>>,
     pub ty: Type,
     pub next: Option<Raw<DAGNode>>,
+    pub chain: Option<Raw<DAGNode>>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -49,6 +50,7 @@ pub enum OperandNodeKind {
 #[derive(Debug, Clone, PartialEq)]
 pub enum IRNodeKind {
     Entry,
+    Root,
 
     Load,
     Store,
@@ -223,6 +225,7 @@ impl DAGNode {
             kind,
             ty,
             next: None,
+            chain: None,
             operand,
         }
     }
@@ -232,6 +235,7 @@ impl DAGNode {
             kind: NodeKind::None,
             ty: Type::Void,
             next: None,
+            chain: None,
             operand: vec![],
         }
     }
@@ -241,6 +245,7 @@ impl DAGNode {
             kind: NodeKind::Operand(OperandNodeKind::Register(regs_info.get_phys_reg(reg))),
             ty: rc2ty(reg.as_phys_reg().reg_class()),
             next: None,
+            chain: None,
             operand: vec![],
         }
     }
@@ -255,6 +260,11 @@ impl DAGNode {
 
     pub fn set_next(mut self, next: Raw<DAGNode>) -> Self {
         self.next = Some(next);
+        self
+    }
+
+    pub fn set_chain(mut self, chain: Raw<DAGNode>) -> Self {
+        self.chain = Some(chain);
         self
     }
 
