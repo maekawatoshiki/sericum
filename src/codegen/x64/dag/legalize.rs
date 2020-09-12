@@ -254,10 +254,10 @@ impl Legalize {
         mut node: Raw<DAGNode>,
     ) -> Raw<DAGNode> {
         isel_pat! {
-            (ir.Add x, y) {
-                (ir.FIAddr fi) x {
-                    imm32 y => (mi.LEAr64m [BaseFiOff %rbp, fi, y])
-                    GR64 y => (mi.LEAr64m [BaseFiAlignOff %rbp, fi, $1, y]) } } }
+        (ir.Add x, y) {
+            (ir.FIAddr fi) x {
+                imm32 y => (mi.LEAr64m [BaseFiOff %rbp, fi, y])
+                GR64 y => (mi.LEAr64m [BaseFiAlignOff %rbp, fi, $1, y]) } } }
     }
 
     fn run_on_node_sext(
@@ -267,22 +267,22 @@ impl Legalize {
         heap: &mut DAGHeap,
         node: Raw<DAGNode>,
     ) -> Raw<DAGNode> {
-        if node.ty == Type::i64
-            && node.operand[0].kind == NodeKind::IR(IRNodeKind::Load)
-            && node.operand[0].ty == Type::i32
-            && node.operand[0].operand[0].kind == NodeKind::IR(IRNodeKind::FIAddr)
-        {
-            let rbp = heap.alloc_phys_reg(regs_info, GR64::RBP);
-            let mem = heap.alloc(DAGNode::new_mem(
-                MemNodeKind::BaseFi,
-                vec![rbp, node.operand[0].operand[0].operand[0]],
-            ));
-            return heap.alloc(DAGNode::new(
-                NodeKind::MI(MINodeKind::MOVSXDr64m32),
-                vec![mem],
-                node.ty.clone(),
-            ));
-        }
+        // if node.ty == Type::i64
+        //     && node.operand[0].kind == NodeKind::IR(IRNodeKind::Load)
+        //     && node.operand[0].ty == Type::i32
+        //     && node.operand[0].operand[0].kind == NodeKind::IR(IRNodeKind::FIAddr)
+        // {
+        //     let rbp = heap.alloc_phys_reg(regs_info, GR64::RBP);
+        //     let mem = heap.alloc(DAGNode::new_mem(
+        //         MemNodeKind::BaseFi,
+        //         vec![rbp, node.operand[0].operand[0].operand[0]],
+        //     ));
+        //     return heap.alloc(DAGNode::new(
+        //         NodeKind::MI(MINodeKind::MOVSXDr64m32),
+        //         vec![mem],
+        //         node.ty.clone(),
+        //     ));
+        // }
 
         if node.ty == Type::i64 && !node.operand[0].is_constant() && node.operand[0].ty == Type::i32
         // && node.operand[0].operand[0].kind == NodeKind::IR(IRNodeKind::FIAddr)

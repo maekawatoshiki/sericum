@@ -52,7 +52,7 @@ pub struct JITCompiler {
 impl JITExecutor {
     pub fn new(module: &mut ir::module::Module) -> Self {
         let machine_module = standard_conversion_into_machine_module(module);
-        // println!("{:?}", machine_module);
+        println!("{:?}", machine_module);
 
         // use crate::codegen::x64::asm::print::MachineAsmPrinter;
         // let mut printer = MachineAsmPrinter::new();
@@ -1211,13 +1211,12 @@ impl JITCompiler {
         dynasm!(self.asm; subsd Rx(r0), Rx(r1));
     }
 
-    fn compile_subsd_rm(&mut self, fo: &FrameObjectsInfo, inst: &MachineInst) {
+    fn compile_subsd_rm(&mut self, _fo: &FrameObjectsInfo, inst: &MachineInst) {
         let r0 = phys_reg_to_dynasm_reg(inst.def[0].id.as_phys_reg());
         match &inst.operand[1] {
-            MachineOperand::Mem(MachineMemOperand::BaseFi(base, fi)) => {
+            MachineOperand::Mem(MachineMemOperand::BaseOff(base, off)) => {
                 let r1 = phys_reg_to_dynasm_reg(base.id.as_phys_reg());
-                let m2 = fi.idx;
-                dynasm!(self.asm; subsd Rx(r0), [Rq(r1) + fo.offset(m2).unwrap()]);
+                dynasm!(self.asm; subsd Rx(r0), [Rq(r1) + *off]);
             }
             _ => unimplemented!(),
         }
@@ -1257,6 +1256,10 @@ impl JITCompiler {
                 let r1 = phys_reg_to_dynasm_reg(base.id.as_phys_reg());
                 let m2 = fi.idx;
                 dynasm!(self.asm; mulsd Rx(r0), [Rq(r1) + fo.offset(m2).unwrap()]);
+            }
+            MachineOperand::Mem(MachineMemOperand::BaseOff(base, off)) => {
+                let r1 = phys_reg_to_dynasm_reg(base.id.as_phys_reg());
+                dynasm!(self.asm; mulsd Rx(r0), [Rq(r1) + *off]);
             }
             _ => unimplemented!(),
         }

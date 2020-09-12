@@ -175,7 +175,6 @@ impl<'a> ConvertToDAGNode<'a> {
                     ));
                     self.inst_to_node.insert(inst_id, fiaddr);
                 }
-
                 Opcode::Load => {
                     let v = *inst.operands[0].as_value();
                     let v = self.get_node_from_value(&v);
@@ -184,13 +183,13 @@ impl<'a> ConvertToDAGNode<'a> {
                         DAGNode::new(NodeKind::IR(IRNodeKind::Load), vec![v], inst.ty),
                     );
                     // TODO
-                    // if self.block.liveness.borrow().live_out.contains(&inst_id) {
-                    let copy_from_reg = self.make_chain_with_copying(load_id);
-                    self.inst_to_node.insert(inst_id, copy_from_reg);
-                    // } else {
-                    // self.make_chain_without_updating_last_chain(load_id);
-                    // self.inst_to_node.insert(inst_id, load_id);
-                    // }
+                    if self.block.liveness.borrow().live_out.contains(&inst_id) {
+                        let copy_from_reg = self.make_chain_with_copying(load_id);
+                        self.inst_to_node.insert(inst_id, copy_from_reg);
+                    } else {
+                        self.make_chain(load_id);
+                        self.inst_to_node.insert(inst_id, load_id);
+                    }
                 }
                 Opcode::Store => {
                     let src = self.get_node_from_value(inst.operands[0].as_value());
@@ -620,36 +619,36 @@ impl<'a> ConvertToDAGNode<'a> {
         node
     }
 
-    fn make_chain_with_copying_without_updating_last_chain(
-        &mut self,
-        mut node: Raw<DAGNode>,
-    ) -> Raw<DAGNode> {
-        let kind = NodeKind::Operand(OperandNodeKind::Register(
-            self.regs_info.new_virt_reg(ty2rc(&node.ty).unwrap()),
-        ));
-        let reg = self.node_heap.alloc(DAGNode::new(kind, vec![], node.ty));
-        let old_node = self
-            .node_heap
-            .alloc(mem::replace(&mut *node, (*reg).clone()));
-        let mut copy = self.node_heap.alloc(DAGNode::new(
-            NodeKind::IR(IRNodeKind::CopyToReg),
-            vec![reg, old_node],
-            Type::Void,
-        ));
+    // fn make_chain_with_copying_without_updating_last_chain(
+    //     &mut self,
+    //     mut node: Raw<DAGNode>,
+    // ) -> Raw<DAGNode> {
+    //     let kind = NodeKind::Operand(OperandNodeKind::Register(
+    //         self.regs_info.new_virt_reg(ty2rc(&node.ty).unwrap()),
+    //     ));
+    //     let reg = self.node_heap.alloc(DAGNode::new(kind, vec![], node.ty));
+    //     let old_node = self
+    //         .node_heap
+    //         .alloc(mem::replace(&mut *node, (*reg).clone()));
+    //     let mut copy = self.node_heap.alloc(DAGNode::new(
+    //         NodeKind::IR(IRNodeKind::CopyToReg),
+    //         vec![reg, old_node],
+    //         Type::Void,
+    //     ));
+    //
+    //     if let Some(last_chained_node) = &mut self.last_chained_node {
+    //         copy.chain = Some(*last_chained_node);
+    //     }
+    //
+    //     node
+    // }
 
-        if let Some(last_chained_node) = &mut self.last_chained_node {
-            copy.chain = Some(*last_chained_node);
-        }
-
-        node
-    }
-
-    fn make_chain_without_updating_last_chain(&mut self, mut node: Raw<DAGNode>) -> Raw<DAGNode> {
-        if let Some(last_chained_node) = &mut self.last_chained_node {
-            node.chain = Some(*last_chained_node);
-        }
-        node
-    }
+    // fn make_chain_without_updating_last_chain(&mut self, mut node: Raw<DAGNode>) -> Raw<DAGNode> {
+    //     if let Some(last_chained_node) = &mut self.last_chained_node {
+    //         node.chain = Some(*last_chained_node);
+    //     }
+    //     node
+    // }
 
     pub fn alloc_node(&mut self, new: DAGNode) -> Raw<DAGNode> {
         self.node_heap.alloc(new)
