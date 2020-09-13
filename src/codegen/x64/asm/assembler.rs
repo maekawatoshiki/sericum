@@ -18,6 +18,8 @@ impl<'a> InstAssembler<'a> {
 
             MachineOpcode::SUBri32 => self.gen_sub_ri32(),
 
+            MachineOpcode::IMULrri32 => self.gen_imul_rri32(),
+
             MachineOpcode::RET => self.gen_ret(),
             _ => unimplemented!(),
         }
@@ -103,6 +105,17 @@ impl<'a> InstAssembler<'a> {
             .push_u8(mod_rm(Mod::Reg, 5, reg_code(&self.inst.def[0].id)));
         self.stream
             .push_u32_le(self.inst.operand[1].as_constant().as_i32() as u32)
+    }
+
+    fn gen_imul_rri32(&mut self) {
+        self.stream.push_u8(0x69);
+        self.stream.push_u8(mod_rm(
+            Mod::Reg,
+            reg_code(&self.inst.def[0].id),
+            reg_code(&self.inst.operand[0].as_register().id),
+        ));
+        self.stream
+            .push_u32_le(self.inst.operand[1].as_constant().as_i32() as u32);
     }
 
     fn gen_ret(&mut self) {

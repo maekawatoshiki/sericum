@@ -105,13 +105,18 @@ mod x86_64 {
         cilk_ir!(m; define [i32] sub [(i32)] {
             entry: x = sub (%arg.0), (i32 2);
                    ret (%x); });
+        cilk_ir!(m; define [i32] mul [(i32)] {
+            entry: x = mul (%arg.0), (i32 3);
+                   ret (%x); });
         compile(
             "#include <assert.h>
                  extern int add(int); 
                  extern int sub(int); 
+                 extern int mul(int); 
                  int main() { 
                      assert(add(2) == 4); 
                      assert(sub(4) == 2); 
+                     assert(mul(2) == 6);
                      return 0; 
                  }",
             &mut m,
