@@ -95,4 +95,26 @@ mod x86_64 {
             &mut m,
         );
     }
+
+    #[test]
+    fn asmer_arith_ri() {
+        let mut m = Module::new("cilk");
+        cilk_ir!(m; define [i32] add [(i32)] {
+            entry: x = add (%arg.0), (i32 2);
+                   ret (%x); });
+        cilk_ir!(m; define [i32] sub [(i32)] {
+            entry: x = sub (%arg.0), (i32 2);
+                   ret (%x); });
+        compile(
+            "#include <assert.h>
+                 extern int add(int); 
+                 extern int sub(int); 
+                 int main() { 
+                     assert(add(2) == 4); 
+                     assert(sub(4) == 2); 
+                     return 0; 
+                 }",
+            &mut m,
+        );
+    }
 }

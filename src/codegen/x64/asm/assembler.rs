@@ -7,10 +7,17 @@ impl<'a> InstAssembler<'a> {
         match self.inst.opcode {
             MachineOpcode::PUSH64 => self.gen_push64(),
             MachineOpcode::POP64 => self.gen_pop64(),
+
             MachineOpcode::MOVri32 => self.gen_movri32(),
             MachineOpcode::MOVrm32 => self.gen_movrm32(),
+            MachineOpcode::MOVrr32 => self.gen_mov_rr32(),
             MachineOpcode::MOVrr64 => self.gen_movrr64(),
             MachineOpcode::MOVmi32 => self.gen_movmi32(),
+
+            MachineOpcode::ADDri32 => self.gen_add_ri32(),
+
+            MachineOpcode::SUBri32 => self.gen_sub_ri32(),
+
             MachineOpcode::RET => self.gen_ret(),
             _ => unimplemented!(),
         }
@@ -39,21 +46,31 @@ impl<'a> InstAssembler<'a> {
         let reg = reg << 3; // eax
         match self.inst.operand[0].as_mem() {
             MachineMemOperand::BaseOff(base, off) => {
-                let base = reg_code(&base.id);
-                let rm = base;
-                self.stream.push_u8(0b01000000 + reg + rm);
+                self.stream
+                    .push_u8(mod_rm(Mod::BaseDisp8, reg, reg_code(&base.id)));
                 self.stream.push_u8(*off as u32 as u8);
             }
             _ => unimplemented!(),
         }
     }
 
+    fn gen_mov_rr32(&mut self) {
+        self.stream.push_u8(0x89);
+        self.stream.push_u8(mod_rm(
+            Mod::Reg,
+            reg_code(&self.inst.operand[0].as_register().id),
+            reg_code(&self.inst.def[0].id),
+        ));
+    }
+
     fn gen_movrr64(&mut self) {
         self.stream.push_u8(0b01001000); // REX.W
         self.stream.push_u8(0x89);
-        let reg = 4 << 3; // rsp
-        let rm = 5; // rbp
-        self.stream.push_u8(0b11000000 + reg + rm);
+        self.stream.push_u8(mod_rm(
+            Mod::Reg,
+            reg_code(&self.inst.operand[0].as_register().id),
+            reg_code(&self.inst.def[0].id),
+        ));
     }
 
     fn gen_movmi32(&mut self) {
@@ -61,10 +78,8 @@ impl<'a> InstAssembler<'a> {
 
         match self.inst.operand[0].as_mem() {
             MachineMemOperand::BaseOff(base, off) => {
-                let base = reg_code(&base.id);
-                let reg = 0 << 3;
-                let rm = base;
-                self.stream.push_u8(0b01000000 + reg + rm);
+                self.stream
+                    .push_u8(mod_rm(Mod::BaseDisp8, 0, reg_code(&base.id)));
                 self.stream.push_u8(*off as u32 as u8);
             }
             _ => unimplemented!(),
@@ -72,6 +87,22 @@ impl<'a> InstAssembler<'a> {
 
         self.stream
             .push_u32_le(self.inst.operand[1].as_constant().as_i32() as u32);
+    }
+
+    fn gen_add_ri32(&mut self) {
+        self.stream.push_u8(0x81);
+        self.stream
+            .push_u8(mod_rm(Mod::Reg, 0, reg_code(&self.inst.def[0].id)));
+        self.stream
+            .push_u32_le(self.inst.operand[1].as_constant().as_i32() as u32)
+    }
+
+    fn gen_sub_ri32(&mut self) {
+        self.stream.push_u8(0x81);
+        self.stream
+            .push_u8(mod_rm(Mod::Reg, 5, reg_code(&self.inst.def[0].id)));
+        self.stream
+            .push_u32_le(self.inst.operand[1].as_constant().as_i32() as u32)
     }
 
     fn gen_ret(&mut self) {
@@ -83,4 +114,21 @@ impl<'a> InstAssembler<'a> {
 fn reg_code(r: &RegisterId) -> u8 {
     let r = r.as_phys_reg();
     (r.retrieve() - r.reg_class() as usize) as u8
+}
+
+enum Mod {
+    Reg,
+    Base,
+    BaseDisp8,
+    BaseDisp32,
+}
+
+fn mod_rm(mod_: Mod, reg: u8, rm: u8) -> u8 {
+    let mod_ = match mod_ {
+        Mod::Reg => 0b11,
+        Mod::Base => 0b00,
+        Mod::BaseDisp8 => 0b01,
+        Mod::BaseDisp32 => 0b10,
+    };
+    (mod_ << 6) + (reg << 3) + rm
 }
