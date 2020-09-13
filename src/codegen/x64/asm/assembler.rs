@@ -38,19 +38,6 @@ impl<'a> InstAssembler<'a> {
         let reg = reg_code(&self.inst.def[0].id);
         let reg = reg << 3; // eax
         match self.inst.operand[0].as_mem() {
-            MachineMemOperand::BaseFi(base, fi) => {
-                let base = reg_code(&base.id);
-                let off = -self
-                    .function
-                    .frame_objects
-                    .as_ref()
-                    .unwrap()
-                    .offset(fi.idx)
-                    .unwrap();
-                let rm = base;
-                self.stream.push_u8(0b01000000 + reg + rm);
-                self.stream.push_u8(off as u32 as u8);
-            }
             MachineMemOperand::BaseOff(base, off) => {
                 let base = reg_code(&base.id);
                 let rm = base;
@@ -73,20 +60,6 @@ impl<'a> InstAssembler<'a> {
         self.stream.push_u8(0xc7);
 
         match self.inst.operand[0].as_mem() {
-            MachineMemOperand::BaseFi(base, fi) => {
-                let base = reg_code(&base.id);
-                let off = -self
-                    .function
-                    .frame_objects
-                    .as_ref()
-                    .unwrap()
-                    .offset(fi.idx)
-                    .unwrap();
-                let reg = 0 << 3;
-                let rm = base;
-                self.stream.push_u8(0b01000000 + reg + rm);
-                self.stream.push_u8(off as u32 as u8);
-            }
             MachineMemOperand::BaseOff(base, off) => {
                 let base = reg_code(&base.id);
                 let reg = 0 << 3;

@@ -58,7 +58,9 @@ impl PrologueEpilogueInserter {
             .into_iter()
             .map(|r| r.superest_reg())
             .collect::<FxHashSet<_>>();
-        saved_regs.insert(GR64::RBP.as_phys_reg());
+        if cur_func.body.has_call() {
+            saved_regs.insert(GR64::RBP.as_phys_reg());
+        }
         let saved_regs = saved_regs.into_iter().collect::<Vec<_>>();
         let frame_objects = FrameObjectsInfo::new(tys, cur_func);
         let adjust = frame_objects.total_size();
