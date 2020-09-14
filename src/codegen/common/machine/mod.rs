@@ -1,6 +1,7 @@
 pub mod basic_block;
 pub mod branch_folding;
 pub mod builder;
+pub mod reg_coalescer;
 pub mod calling_conv;
 pub mod const_data;
 pub mod eliminate_fi;

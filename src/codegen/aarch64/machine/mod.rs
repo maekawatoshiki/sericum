@@ -3,7 +3,6 @@ pub mod eliminate_fi;
 pub mod inst;
 // pub mod phi_elimination;
 pub mod pro_epi_inserter;
-pub mod reg_coalescer;
 pub mod regalloc;
 pub mod replace_copy;
 // pub mod validate_frame_index;

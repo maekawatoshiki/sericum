@@ -1,9 +1,9 @@
 use crate::analysis::{dom_tree::DominatorTreeConstructor, loops::LoopsConstructor};
 use crate::codegen::arch::machine::calc_spill_weight::calc_spill_weight;
 use crate::codegen::arch::machine::live_interval_splitter::LiveIntervalSplitter;
-use crate::codegen::arch::machine::reg_coalescer::coalesce_function;
 use crate::codegen::arch::machine::{inst::*, spiller::Spiller};
 use crate::codegen::arch::{frame_object::*, machine::register::*};
+use crate::codegen::common::machine::reg_coalescer::coalesce_function;
 use crate::codegen::common::machine::{builder::*, function::*, liveness::*, module::*};
 use crate::traits::pass::ModulePassTrait;
 use rustc_hash::FxHashSet;

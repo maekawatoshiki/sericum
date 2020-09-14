@@ -5,7 +5,6 @@ pub mod inst;
 pub mod inst_def;
 pub mod live_interval_splitter;
 pub mod pro_epi_inserter;
-pub mod reg_coalescer;
 pub mod regalloc;
 pub mod register;
 pub mod replace_copy;
