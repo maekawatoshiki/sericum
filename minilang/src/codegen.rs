@@ -306,22 +306,33 @@ impl<'a> CodeGeneratorForFunction<'a> {
                 let (e, _) = self.run_on_node(e);
                 (self.builder.build_ret(e), parser::Type::Void)
             }
-            Node::Eq(lhs, rhs) | Node::Lt(lhs, rhs) | Node::Le(lhs, rhs) => {
+            Node::Eq(lhs, rhs)
+            | Node::Lt(lhs, rhs)
+            | Node::Le(lhs, rhs)
+            | Node::Ne(lhs, rhs)
+            | Node::Gt(lhs, rhs)
+            | Node::Ge(lhs, rhs) => {
                 let (lhs, ty) = self.run_on_node(lhs);
                 let (rhs, _) = self.run_on_node(rhs);
                 if ty.is_integer() {
                     let cmp = match node {
                         Node::Eq(_, _) => cilk::opcode::ICmpKind::Eq,
+                        Node::Ne(_, _) => cilk::opcode::ICmpKind::Ne,
                         Node::Lt(_, _) => cilk::opcode::ICmpKind::Lt,
                         Node::Le(_, _) => cilk::opcode::ICmpKind::Le,
+                        Node::Gt(_, _) => cilk::opcode::ICmpKind::Gt,
+                        Node::Ge(_, _) => cilk::opcode::ICmpKind::Ge,
                         _ => unreachable!(),
                     };
                     (self.builder.build_icmp(cmp, lhs, rhs), parser::Type::Int1)
                 } else {
                     let cmp = match node {
                         Node::Eq(_, _) => cilk::opcode::FCmpKind::UEq,
+                        Node::Ne(_, _) => cilk::opcode::FCmpKind::UNe,
                         Node::Lt(_, _) => cilk::opcode::FCmpKind::ULt,
                         Node::Le(_, _) => cilk::opcode::FCmpKind::ULe,
+                        Node::Gt(_, _) => cilk::opcode::FCmpKind::UGt,
+                        Node::Ge(_, _) => cilk::opcode::FCmpKind::UGe,
                         _ => unreachable!(),
                     };
                     (self.builder.build_fcmp(cmp, lhs, rhs), parser::Type::Int1)

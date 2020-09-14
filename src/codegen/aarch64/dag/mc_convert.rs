@@ -102,11 +102,11 @@ impl<'a> ScheduleByBlock<'a> {
                 self.append_inst(MachineInst::new_simple(
                     match cond_kind!(node.operand[0]) {
                         CondKind::Eq => MachineOpcode::B_EQ,
+                        CondKind::Ne => MachineOpcode::B_NE,
                         CondKind::Le => MachineOpcode::B_LE,
                         CondKind::Lt => MachineOpcode::B_LT,
-                        // CondKind::Lt => MachineOpcode::JL,
-                        // CondKind::Ge => MachineOpcode::JGE,
-                        // CondKind::Gt => MachineOpcode::JG,
+                        CondKind::Ge => MachineOpcode::B_GE,
+                        CondKind::Gt => MachineOpcode::B_GT,
                         _ => unreachable!(),
                     },
                     vec![dst],

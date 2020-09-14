@@ -19,11 +19,11 @@ pub enum Node {
     Identifier(String),
     VarDecl(String, Type), // name, type
     Eq(Box<Node>, Box<Node>),
-    // Ne(Box<Node>, Box<Node>),
+    Ne(Box<Node>, Box<Node>),
     Lt(Box<Node>, Box<Node>),
     Le(Box<Node>, Box<Node>),
-    // Gt(Box<Node>, Box<Node>),
-    // Ge(Box<Node>, Box<Node>),
+    Gt(Box<Node>, Box<Node>),
+    Ge(Box<Node>, Box<Node>),
     Add(Box<Node>, Box<Node>),
     Sub(Box<Node>, Box<Node>),
     Mul(Box<Node>, Box<Node>),
@@ -127,11 +127,11 @@ peg::parser!(pub grammar parser() for str {
 
     rule binary_op(assign:bool) -> Node = precedence!{
         a:(@) _ "==" _ b:@ { Node::Eq(Box::new(a), Box::new(b)) }
-        // a:@ _ "!=" _ b:(@) { Node::Ne(Box::new(a), Box::new(b)) }
+        a:@ _ "!=" _ b:(@) { Node::Ne(Box::new(a), Box::new(b)) }
         a:(@) _ "<"  _ b:@ { Node::Lt(Box::new(a), Box::new(b)) }
         a:(@) _ "<=" _ b:@ { Node::Le(Box::new(a), Box::new(b)) }
-        // a:@ _ ">"  _ b:(@) { Node::Gt(Box::new(a), Box::new(b)) }
-        // a:@ _ ">=" _ b:(@) { Node::Ge(Box::new(a), Box::new(b)) }
+        a:@ _ ">"  _ b:(@) { Node::Gt(Box::new(a), Box::new(b)) }
+        a:@ _ ">=" _ b:(@) { Node::Ge(Box::new(a), Box::new(b)) }
         --
         a:(@) _ "+" _ b:@ { Node::Add(Box::new(a), Box::new(b)) }
         a:(@) _ "-" _ b:@ { Node::Sub(Box::new(a), Box::new(b)) }

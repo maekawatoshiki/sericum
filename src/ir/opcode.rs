@@ -54,16 +54,22 @@ pub enum Operand {
 #[derive(Clone, Debug, Copy, PartialEq, Hash, Eq)]
 pub enum ICmpKind {
     Eq,
+    Ne,
     Le,
     Lt,
+    Ge,
+    Gt,
     // Ne,
 }
 
 #[derive(Clone, Debug, Copy, PartialEq, Hash, Eq)]
 pub enum FCmpKind {
     UEq,
+    UNe,
     ULe,
     ULt,
+    UGe,
+    UGt,
     // Ne,
 }
 
@@ -334,8 +340,11 @@ impl ICmpKind {
     pub fn as_str(&self) -> &'static str {
         match self {
             ICmpKind::Eq => "eq",
+            ICmpKind::Ne => "ne",
             ICmpKind::Lt => "lt",
             ICmpKind::Le => "le",
+            ICmpKind::Gt => "gt",
+            ICmpKind::Ge => "ge",
         }
     }
 }
@@ -344,8 +353,11 @@ impl FCmpKind {
     pub fn as_str(&self) -> &'static str {
         match self {
             FCmpKind::UEq => "ueq",
+            FCmpKind::UNe => "une",
             FCmpKind::ULt => "ult",
             FCmpKind::ULe => "ule",
+            FCmpKind::UGt => "ugt",
+            FCmpKind::UGe => "uge",
         }
     }
 }

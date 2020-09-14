@@ -222,6 +222,7 @@ impl<'a> ScheduleByBlock<'a> {
                 self.append_inst(MachineInst::new_simple(
                     match cond_kind!(node.operand[0]) {
                         CondKind::Eq => MachineOpcode::JE,
+                        CondKind::Ne => MachineOpcode::JNE,
                         CondKind::Le => MachineOpcode::JLE,
                         CondKind::Lt => MachineOpcode::JL,
                         CondKind::Ge => MachineOpcode::JGE,
@@ -247,6 +248,7 @@ impl<'a> ScheduleByBlock<'a> {
                 self.append_inst(MachineInst::new_simple(
                     match cond_kind!(node.operand[0]) {
                         CondKind::UEq => MachineOpcode::JE,
+                        CondKind::UNe => MachineOpcode::JNE,
                         CondKind::ULe => MachineOpcode::JBE,
                         CondKind::ULt => MachineOpcode::JB,
                         CondKind::UGe => MachineOpcode::JAE,

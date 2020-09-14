@@ -99,11 +99,13 @@ pub enum ConstantKind {
 #[derive(Debug, Clone, PartialEq, Copy)]
 pub enum CondKind {
     Eq,
+    Ne,
     Le,
     Lt,
     Ge,
     Gt,
     UEq,
+    UNe,
     ULe,
     ULt,
     UGe,
@@ -120,8 +122,11 @@ impl Into<CondKind> for ICmpKind {
     fn into(self) -> CondKind {
         match self {
             ICmpKind::Eq => CondKind::Eq,
+            ICmpKind::Ne => CondKind::Ne,
             ICmpKind::Le => CondKind::Le,
             ICmpKind::Lt => CondKind::Lt,
+            ICmpKind::Ge => CondKind::Ge,
+            ICmpKind::Gt => CondKind::Gt,
         }
     }
 }
@@ -130,8 +135,11 @@ impl Into<CondKind> for FCmpKind {
     fn into(self) -> CondKind {
         match self {
             FCmpKind::UEq => CondKind::UEq,
+            FCmpKind::UNe => CondKind::UNe,
             FCmpKind::ULe => CondKind::ULe,
             FCmpKind::ULt => CondKind::ULt,
+            FCmpKind::UGe => CondKind::UGe,
+            FCmpKind::UGt => CondKind::UGt,
         }
     }
 }
