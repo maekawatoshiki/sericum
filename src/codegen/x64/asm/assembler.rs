@@ -129,6 +129,7 @@ fn reg_code(r: &RegisterId) -> u8 {
     (r.retrieve() - r.reg_class() as usize) as u8
 }
 
+#[allow(dead_code)]
 enum Mod {
     Reg,
     Base,

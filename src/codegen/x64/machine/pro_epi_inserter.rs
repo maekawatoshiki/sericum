@@ -111,19 +111,21 @@ impl PrologueEpilogueInserter {
             return;
         }
 
-        // mov rbp, rsp
-        let mov_rbp_rsp = MachineInst::new_simple(
-            MachineOpcode::MOVrr64,
-            vec![MachineOperand::phys_reg(
-                &builder.function.regs_info,
-                GR64::RSP,
-            )],
-            builder.get_cur_bb().unwrap(),
-        )
-        .with_def(vec![RegisterOperand::new(
-            builder.function.regs_info.get_phys_reg(GR64::RBP),
-        )]);
-        builder.insert(mov_rbp_rsp);
+        if saved_regs.contains(&GR64::RBP.as_phys_reg()) {
+            // mov rbp, rsp
+            let mov_rbp_rsp = MachineInst::new_simple(
+                MachineOpcode::MOVrr64,
+                vec![MachineOperand::phys_reg(
+                    &builder.function.regs_info,
+                    GR64::RSP,
+                )],
+                builder.get_cur_bb().unwrap(),
+            )
+            .with_def(vec![RegisterOperand::new(
+                builder.function.regs_info.get_phys_reg(GR64::RBP),
+            )]);
+            builder.insert(mov_rbp_rsp);
+        }
 
         if has_call {
             // sub rsp, adjust
