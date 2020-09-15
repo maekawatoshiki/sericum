@@ -2,7 +2,10 @@
 mod x86_64 {
     use cilk::{
         cilk_ir,
-        codegen::x64::{asm::assembler::Assembler, standard_conversion_into_machine_module},
+        codegen::x64::{
+            asm::assembler::Assembler, exec::executor::Executor,
+            standard_conversion_into_machine_module,
+        },
         ir::{builder, /*global_val,*/ types, value},
         module::Module,
         *, // for macro
@@ -61,6 +64,25 @@ mod x86_64 {
             .status()
             .unwrap();
         assert!(execution.success());
+    }
+
+    #[test]
+    fn jit_asm() {
+        let mut m = Module::new("cilk");
+        cilk_ir!(m; define [i32] add [(i32)] {
+            entry: x = add (%arg.0), (i32 2);
+                   ret (%x);
+        });
+
+        cilk_ir!(m; define [i32] main [(i32)] {
+            entry: x = call add [(%arg.0)];
+                   ret (%x);
+        });
+
+        let machine_module = standard_conversion_into_machine_module(&mut m);
+        // println!("{:?}", machine_module);
+
+        Executor::new(machine_module).compile();
     }
 
     #[test]

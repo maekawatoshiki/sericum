@@ -3,17 +3,23 @@ use crate::codegen::common::machine::{
     module::MachineModule,
 };
 use faerie::*;
+use id_arena::{Arena, Id};
+// use rustc_hash::FxHashMap;
 use std::str::FromStr;
 use std::{fmt, fs::File, path::Path};
 
+pub type LabelId = Id<Label>;
+
 pub struct Assembler<'a> {
     module: &'a MachineModule,
+    pub labels: Arena<Label>,
     artifact: Artifact,
 }
 
 pub struct FunctionAssembler<'a> {
     module: &'a MachineModule,
     function: &'a MachineFunction,
+    pub labels: &'a mut Arena<Label>,
     pub stream: InstructionStream,
 }
 
@@ -21,6 +27,7 @@ pub struct BlockAssembler<'a> {
     module: &'a MachineModule,
     function: &'a MachineFunction,
     block: &'a MachineBasicBlock,
+    pub labels: &'a mut Arena<Label>,
     pub stream: InstructionStream,
 }
 
@@ -29,7 +36,13 @@ pub struct InstAssembler<'a> {
     pub function: &'a MachineFunction,
     pub block: &'a MachineBasicBlock,
     pub inst: &'a MachineInst,
+    pub labels: &'a mut Arena<Label>,
     pub stream: &'a mut InstructionStream,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct Label {
+    pub offset: usize,
 }
 
 pub struct InstructionStream {
@@ -40,6 +53,7 @@ impl<'a> Assembler<'a> {
     pub fn new(module: &'a MachineModule) -> Self {
         Self {
             module,
+            labels: Arena::new(),
             artifact: ArtifactBuilder::new(triple!("x86_64-unknown-unknown-unknown-elf"))
                 .name(module.name.to_owned())
                 .finish(),
@@ -54,7 +68,7 @@ impl<'a> Assembler<'a> {
         }
 
         for (_id, func) in &self.module.functions {
-            let mut func_asmer = FunctionAssembler::new(self.module, func);
+            let mut func_asmer = FunctionAssembler::new(self.module, func, &mut self.labels);
             func_asmer.assemble();
             self.artifact
                 .define(func.name.as_str(), func_asmer.stream.bytes)
@@ -69,17 +83,23 @@ impl<'a> Assembler<'a> {
 }
 
 impl<'a> FunctionAssembler<'a> {
-    pub fn new(module: &'a MachineModule, function: &'a MachineFunction) -> Self {
+    pub fn new(
+        module: &'a MachineModule,
+        function: &'a MachineFunction,
+        labels: &'a mut Arena<Label>,
+    ) -> Self {
         Self {
             module,
             function,
+            labels,
             stream: InstructionStream::new(),
         }
     }
 
     pub fn assemble(&mut self) {
         for (_block_id, block) in self.function.body.basic_blocks.id_and_block() {
-            let mut block_asmer = BlockAssembler::new(self.module, self.function, block);
+            let mut block_asmer =
+                BlockAssembler::new(self.module, self.function, block, self.labels);
             block_asmer.assemble();
             self.stream.append(&mut block_asmer.stream);
         }
@@ -93,11 +113,13 @@ impl<'a> BlockAssembler<'a> {
         module: &'a MachineModule,
         function: &'a MachineFunction,
         block: &'a MachineBasicBlock,
+        labels: &'a mut Arena<Label>,
     ) -> Self {
         Self {
             module,
             function,
             block,
+            labels,
             stream: InstructionStream::new(),
         }
     }
@@ -109,6 +131,7 @@ impl<'a> BlockAssembler<'a> {
                 self.module,
                 self.function,
                 self.block,
+                self.labels,
                 &mut self.stream,
                 inst,
             );
@@ -122,6 +145,7 @@ impl<'a> InstAssembler<'a> {
         module: &'a MachineModule,
         function: &'a MachineFunction,
         block: &'a MachineBasicBlock,
+        labels: &'a mut Arena<Label>,
         stream: &'a mut InstructionStream,
         inst: &'a MachineInst,
     ) -> Self {
@@ -129,6 +153,7 @@ impl<'a> InstAssembler<'a> {
             module,
             function,
             block,
+            labels,
             inst,
             stream,
         }

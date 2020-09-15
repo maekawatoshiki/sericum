@@ -1,5 +1,6 @@
-use crate::codegen::common::asm::assembler::FunctionAssembler;
+use crate::codegen::common::asm::assembler::{FunctionAssembler, Label};
 use crate::codegen::common::machine::{function::MachineFunctionId, module::MachineModule};
+use id_arena::Arena;
 use mmap::{MapOption, MemoryMap};
 
 pub struct Executor {
@@ -8,6 +9,7 @@ pub struct Executor {
 
 pub struct Assembler<'a> {
     module: &'a MachineModule,
+    labels: Arena<Label>,
 }
 
 impl Executor {
@@ -31,12 +33,15 @@ impl Executor {
 
 impl<'a> Assembler<'a> {
     pub fn new(module: &'a MachineModule) -> Self {
-        Self { module }
+        Self {
+            module,
+            labels: Arena::new(),
+        }
     }
 
     pub fn assemble(&mut self) {
         for (_, func) in &self.module.functions {
-            let mut func_asmer = FunctionAssembler::new(self.module, func);
+            let mut func_asmer = FunctionAssembler::new(self.module, func, &mut self.labels);
             func_asmer.assemble();
 
             let mem = MemoryMap::new(
