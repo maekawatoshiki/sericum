@@ -21,6 +21,7 @@ extern crate defs;
 extern crate dynasm;
 extern crate dyn_clone;
 extern crate dynasmrt;
+extern crate mmap;
 extern crate num;
 #[macro_use]
 extern crate enum_primitive;

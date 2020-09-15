@@ -14,7 +14,7 @@ pub struct Assembler<'a> {
 pub struct FunctionAssembler<'a> {
     module: &'a MachineModule,
     function: &'a MachineFunction,
-    stream: InstructionStream,
+    pub stream: InstructionStream,
 }
 
 pub struct BlockAssembler<'a> {
@@ -157,6 +157,10 @@ impl InstructionStream {
 
     pub fn append(&mut self, x: &mut Self) {
         self.bytes.append(&mut x.bytes)
+    }
+
+    pub fn data(&self) -> &Vec<u8> {
+        &self.bytes
     }
 }
 
