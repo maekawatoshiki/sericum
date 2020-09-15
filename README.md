@@ -22,7 +22,8 @@ Do not expect too much stuff!
 ```sh
 cargo test --features x86_64 # build for x86_64
 cargo test brainfuxk --features x86_64 -- --nocapture # this is fun. just try it.
-cargo test --features riscv64 # build for riscv64. very few features are implemented.
+cargo test --features aarch64 # build for aarch64. a few features are implemented.
+cargo test --features riscv64 # currently it doesn't work. need help.
 ```
 
 # Example
