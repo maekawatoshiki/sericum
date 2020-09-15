@@ -74,10 +74,10 @@ mod x86_64 {
                    ret (%x);
         });
 
-        cilk_ir!(m; define [i32] main [(i32)] {
-            entry: x = call add [(%arg.0)];
-                   ret (%x);
-        });
+        // cilk_ir!(m; define [i32] main [(i32)] {
+        //     entry: x = call add [(%arg.0)];
+        //            ret (%x);
+        // });
 
         let machine_module = standard_conversion_into_machine_module(&mut m);
         // println!("{:?}", machine_module);

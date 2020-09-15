@@ -12,14 +12,14 @@ pub type LabelId = Id<Label>;
 
 pub struct Assembler<'a> {
     module: &'a MachineModule,
-    pub labels: Arena<Label>,
+    pub labels: Labels,
     artifact: Artifact,
 }
 
 pub struct FunctionAssembler<'a> {
     module: &'a MachineModule,
     function: &'a MachineFunction,
-    pub labels: &'a mut Arena<Label>,
+    pub labels: &'a mut Labels,
     pub stream: InstructionStream,
 }
 
@@ -27,8 +27,8 @@ pub struct BlockAssembler<'a> {
     module: &'a MachineModule,
     function: &'a MachineFunction,
     block: &'a MachineBasicBlock,
-    pub labels: &'a mut Arena<Label>,
-    pub stream: InstructionStream,
+    pub labels: &'a mut Labels,
+    pub stream: &'a mut InstructionStream,
 }
 
 pub struct InstAssembler<'a> {
@@ -36,13 +36,18 @@ pub struct InstAssembler<'a> {
     pub function: &'a MachineFunction,
     pub block: &'a MachineBasicBlock,
     pub inst: &'a MachineInst,
-    pub labels: &'a mut Arena<Label>,
+    pub labels: &'a mut Labels,
     pub stream: &'a mut InstructionStream,
 }
 
 #[derive(Debug, Clone, Copy)]
 pub struct Label {
     pub offset: usize,
+}
+
+pub struct Labels {
+    arena: Arena<Label>,
+    cur_offset: usize,
 }
 
 pub struct InstructionStream {
@@ -53,7 +58,7 @@ impl<'a> Assembler<'a> {
     pub fn new(module: &'a MachineModule) -> Self {
         Self {
             module,
-            labels: Arena::new(),
+            labels: Labels::new(),
             artifact: ArtifactBuilder::new(triple!("x86_64-unknown-unknown-unknown-elf"))
                 .name(module.name.to_owned())
                 .finish(),
@@ -86,7 +91,7 @@ impl<'a> FunctionAssembler<'a> {
     pub fn new(
         module: &'a MachineModule,
         function: &'a MachineFunction,
-        labels: &'a mut Arena<Label>,
+        labels: &'a mut Labels,
     ) -> Self {
         Self {
             module,
@@ -98,10 +103,14 @@ impl<'a> FunctionAssembler<'a> {
 
     pub fn assemble(&mut self) {
         for (_block_id, block) in self.function.body.basic_blocks.id_and_block() {
-            let mut block_asmer =
-                BlockAssembler::new(self.module, self.function, block, self.labels);
+            let mut block_asmer = BlockAssembler::new(
+                self.module,
+                self.function,
+                block,
+                self.labels,
+                &mut self.stream,
+            );
             block_asmer.assemble();
-            self.stream.append(&mut block_asmer.stream);
         }
 
         debug!(println!("inst stream: {:?}", self.stream));
@@ -113,14 +122,15 @@ impl<'a> BlockAssembler<'a> {
         module: &'a MachineModule,
         function: &'a MachineFunction,
         block: &'a MachineBasicBlock,
-        labels: &'a mut Arena<Label>,
+        labels: &'a mut Labels,
+        stream: &'a mut InstructionStream,
     ) -> Self {
         Self {
             module,
             function,
             block,
             labels,
-            stream: InstructionStream::new(),
+            stream,
         }
     }
 
@@ -145,7 +155,7 @@ impl<'a> InstAssembler<'a> {
         module: &'a MachineModule,
         function: &'a MachineFunction,
         block: &'a MachineBasicBlock,
-        labels: &'a mut Arena<Label>,
+        labels: &'a mut Labels,
         stream: &'a mut InstructionStream,
         inst: &'a MachineInst,
     ) -> Self {
@@ -161,6 +171,23 @@ impl<'a> InstAssembler<'a> {
 
     // pub fn assemble(&mut self) {
     //     debug!(println!("{:?}", self.inst));
+    // }
+}
+
+impl Labels {
+    pub fn new() -> Self {
+        Self {
+            arena: Arena::new(),
+            cur_offset: 0,
+        }
+    }
+
+    pub fn add_offset(&mut self, off: usize) {
+        self.cur_offset += off;
+    }
+
+    // pub fn new_label_at(&mut self) -> Label {
+    //     self.arena.alloc(Label { offset: 0 })
     // }
 }
 

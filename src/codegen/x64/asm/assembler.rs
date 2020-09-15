@@ -4,6 +4,7 @@ use crate::codegen::x64::machine::register::RegisterId;
 
 impl<'a> InstAssembler<'a> {
     pub fn assemble(&mut self) {
+        let start = self.stream.data().len();
         match self.inst.opcode {
             MachineOpcode::PUSH64 => self.gen_push64(),
             MachineOpcode::POP64 => self.gen_pop64(),
@@ -22,7 +23,9 @@ impl<'a> InstAssembler<'a> {
 
             MachineOpcode::RET => self.gen_ret(),
             _ => unimplemented!(),
-        }
+        };
+        let end = self.stream.data().len();
+        self.labels.add_offset(end - start);
         // debug!(println!("{:?}", self.inst));
     }
 

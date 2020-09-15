@@ -1,4 +1,4 @@
-use crate::codegen::common::asm::assembler::{FunctionAssembler, Label};
+use crate::codegen::common::asm::assembler::{FunctionAssembler, InstructionStream, Label, Labels};
 use crate::codegen::common::machine::{function::MachineFunctionId, module::MachineModule};
 use id_arena::Arena;
 use mmap::{MapOption, MemoryMap};
@@ -9,7 +9,7 @@ pub struct Executor {
 
 pub struct Assembler<'a> {
     module: &'a MachineModule,
-    labels: Arena<Label>,
+    labels: Labels,
 }
 
 impl Executor {
@@ -35,7 +35,7 @@ impl<'a> Assembler<'a> {
     pub fn new(module: &'a MachineModule) -> Self {
         Self {
             module,
-            labels: Arena::new(),
+            labels: Labels::new(),
         }
     }
 
