@@ -21,6 +21,8 @@ impl<'a> InstAssembler<'a> {
 
             MachineOpcode::IMULrri32 => self.gen_imul_rri32(),
 
+            MachineOpcode::CALL => self.gen_call(),
+
             MachineOpcode::RET => self.gen_ret(),
             _ => unimplemented!(),
         };
@@ -119,6 +121,28 @@ impl<'a> InstAssembler<'a> {
         ));
         self.stream
             .push_u32_le(self.inst.operand[1].as_constant().as_i32() as u32);
+    }
+
+    fn gen_call(&mut self) {
+        self.stream.push_u8(0xe8);
+
+        let callee_id = self
+            .module
+            .find_function_by_name(match &self.inst.operand[0] {
+                MachineOperand::Mem(MachineMemOperand::Address(AddressKind::FunctionName(n))) => {
+                    n.as_str()
+                }
+                _ => unimplemented!(),
+            })
+            .unwrap();
+        let label = self.labels.get_func_label(callee_id);
+        self.labels.add_disp32_to_replace(
+            self.function.id.unwrap(),
+            self.stream.data().len(),
+            label,
+        );
+
+        self.stream.push_u32_le(0);
     }
 
     fn gen_ret(&mut self) {

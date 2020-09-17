@@ -27,7 +27,9 @@ pub struct ScheduleByBlock<'a> {
 pub fn convert_module(module: DAGModule) -> MachineModule {
     let mut functions = Arena::new();
     for (_, func) in module.functions {
-        functions.alloc(convert_function(&module.types, func));
+        // TODO: refine code
+        let id = functions.alloc(convert_function(&module.types, func));
+        functions[id].id = Some(id);
     }
     MachineModule::new(module.name, functions, module.types, module.global_vars)
 }

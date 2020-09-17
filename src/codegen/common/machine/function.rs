@@ -14,6 +14,9 @@ pub type MachineFunctionId = Id<MachineFunction>;
 
 // TODO: Documents in detail
 pub struct MachineFunction {
+    /// Id
+    pub id: Option<MachineFunctionId>,
+
     /// Function name
     pub name: String,
 
@@ -128,6 +131,7 @@ impl MachineFunction {
         inst_arena: InstructionArena,
     ) -> Self {
         Self {
+            id: None,
             is_internal: f.is_internal,
             name: f.name,
             ty: f.ty,

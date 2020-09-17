@@ -26,7 +26,9 @@ impl MachineModule {
     }
 
     pub fn add_function(&mut self, f: MachineFunction) -> MachineFunctionId {
-        self.functions.alloc(f)
+        let id = self.functions.alloc(f);
+        self.function_ref_mut(id).id = Some(id);
+        id
     }
 
     pub fn function_ref(&self, id: MachineFunctionId) -> &MachineFunction {

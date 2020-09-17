@@ -1,10 +1,12 @@
 use crate::codegen::common::machine::{
-    basic_block::MachineBasicBlock, function::MachineFunction, inst::MachineInst,
+    basic_block::MachineBasicBlock,
+    function::{MachineFunction, MachineFunctionId},
+    inst::MachineInst,
     module::MachineModule,
 };
 use faerie::*;
 use id_arena::{Arena, Id};
-// use rustc_hash::FxHashMap;
+use rustc_hash::FxHashMap;
 use std::str::FromStr;
 use std::{fmt, fs::File, path::Path};
 
@@ -42,12 +44,15 @@ pub struct InstAssembler<'a> {
 
 #[derive(Debug, Clone, Copy)]
 pub struct Label {
+    pub func_id: MachineFunctionId,
     pub offset: usize,
 }
 
 pub struct Labels {
-    arena: Arena<Label>,
-    cur_offset: usize,
+    pub arena: Arena<Label>,
+    pub cur_offset: usize,
+    pub func_label: FxHashMap<MachineFunctionId, LabelId>,
+    pub replace_disp32: Vec<(MachineFunctionId, LabelId, usize)>,
 }
 
 pub struct InstructionStream {
@@ -102,6 +107,8 @@ impl<'a> FunctionAssembler<'a> {
     }
 
     pub fn assemble(&mut self) {
+        self.labels.get_func_label(self.function.id.unwrap());
+
         for (_block_id, block) in self.function.body.basic_blocks.id_and_block() {
             let mut block_asmer = BlockAssembler::new(
                 self.module,
@@ -179,11 +186,31 @@ impl Labels {
         Self {
             arena: Arena::new(),
             cur_offset: 0,
+            func_label: FxHashMap::default(),
+            replace_disp32: vec![],
         }
     }
 
     pub fn add_offset(&mut self, off: usize) {
         self.cur_offset += off;
+    }
+
+    pub fn new_label(&mut self, func_id: MachineFunctionId) -> LabelId {
+        self.arena.alloc(Label { func_id, offset: 0 })
+    }
+
+    pub fn get_func_label(&mut self, func_id: MachineFunctionId) -> LabelId {
+        if let Some(id) = self.func_label.get(&func_id) {
+            return *id;
+        }
+
+        let id = self.arena.alloc(Label { func_id, offset: 0 });
+        self.func_label.insert(func_id, id);
+        id
+    }
+
+    pub fn add_disp32_to_replace(&mut self, cur: MachineFunctionId, off: usize, dst: LabelId) {
+        self.replace_disp32.push((cur, dst, off));
     }
 
     // pub fn new_label_at(&mut self) -> Label {
