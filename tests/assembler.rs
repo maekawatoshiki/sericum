@@ -82,7 +82,9 @@ mod x86_64 {
         let machine_module = standard_conversion_into_machine_module(&mut m);
         // println!("{:?}", machine_module);
 
-        Executor::new(machine_module).compile();
+        let mut exec = Executor::new(machine_module);
+        exec.compile();
+        exec.execute();
     }
 
     #[test]

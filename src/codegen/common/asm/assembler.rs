@@ -57,6 +57,7 @@ pub struct Labels {
     pub replace_disp32: Vec<(Offset, LabelId)>,
 }
 
+#[derive(Clone)]
 pub struct InstructionStream {
     bytes: Vec<u8>,
 }
@@ -227,12 +228,23 @@ impl InstructionStream {
         self.bytes.push(((u & 0xff000000) >> 24) as u8);
     }
 
+    pub fn insert_u32_le(&mut self, pt: usize, x: u32) {
+        self.bytes[pt + 0] = (x & 0x000000ff) as u8;
+        self.bytes[pt + 1] = ((x & 0x0000ff00) >> 8) as u8;
+        self.bytes[pt + 2] = ((x & 0x00ff0000) >> 16) as u8;
+        self.bytes[pt + 3] = ((x & 0xff000000) >> 24) as u8;
+    }
+
     pub fn append(&mut self, x: &mut Self) {
         self.bytes.append(&mut x.bytes)
     }
 
     pub fn data(&self) -> &Vec<u8> {
         &self.bytes
+    }
+
+    pub fn data_mut(&mut self) -> &mut Vec<u8> {
+        &mut self.bytes
     }
 }
 
