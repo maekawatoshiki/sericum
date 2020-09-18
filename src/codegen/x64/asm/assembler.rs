@@ -1,10 +1,9 @@
-pub use crate::codegen::common::asm::assembler::{Assembler, InstAssembler};
+pub use crate::codegen::common::asm::assembler::{Assembler, InstAssembler, Offset};
 use crate::codegen::x64::machine::inst::*;
 use crate::codegen::x64::machine::register::RegisterId;
 
 impl<'a> InstAssembler<'a> {
     pub fn assemble(&mut self) {
-        let start = self.stream.data().len();
         match self.inst.opcode {
             MachineOpcode::PUSH64 => self.gen_push64(),
             MachineOpcode::POP64 => self.gen_pop64(),
@@ -26,9 +25,6 @@ impl<'a> InstAssembler<'a> {
             MachineOpcode::RET => self.gen_ret(),
             _ => unimplemented!(),
         };
-        let end = self.stream.data().len();
-        self.labels.add_offset(end - start);
-        // debug!(println!("{:?}", self.inst));
     }
 
     fn gen_push64(&mut self) {
@@ -135,10 +131,10 @@ impl<'a> InstAssembler<'a> {
                 _ => unimplemented!(),
             })
             .unwrap();
+
         let label = self.labels.get_func_label(callee_id);
         self.labels.add_disp32_to_replace(
-            self.function.id.unwrap(),
-            self.stream.data().len(),
+            Offset(self.function.id.unwrap(), self.stream.data().len()),
             label,
         );
 

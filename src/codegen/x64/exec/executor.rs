@@ -1,6 +1,5 @@
 use crate::codegen::common::asm::assembler::{FunctionAssembler, InstructionStream, Label, Labels};
 use crate::codegen::common::machine::{function::MachineFunctionId, module::MachineModule};
-use id_arena::Arena;
 use mmap::{MapOption, MemoryMap};
 use rustc_hash::FxHashMap;
 
@@ -42,28 +41,26 @@ impl<'a> Assembler<'a> {
 
     pub fn assemble(&mut self) {
         let mut stream = vec![];
-        let mut offset = 0;
+        let mut global_offset = 0;
         let mut func_offset = FxHashMap::default();
+
         for (id, func) in &self.module.functions {
-            func_offset.insert(id, offset);
+            func_offset.insert(id, global_offset);
             let mut func_asmer = FunctionAssembler::new(self.module, func, &mut self.labels);
             func_asmer.assemble();
-            offset += func_asmer.stream.data().len();
+            global_offset += func_asmer.stream.data().len();
             stream.append(&mut func_asmer.stream.data().clone());
         }
 
-        for (func, label, off) in &self.labels.replace_disp32 {
-            let offset = func_offset[func] + *off;
-            let label = &self.labels.arena[*label];
-            let label = func_offset[&label.func_id] + label.offset;
-            let u = label as i32 - (offset as i32 + 4);
-            println!("{}", u);
-            let u = u as u32;
-            println!("{}", u);
-            stream[offset + 0] = (u & 0x000000ff) as u8;
-            stream[offset + 1] = ((u & 0x0000ff00) >> 8) as u8;
-            stream[offset + 2] = ((u & 0x00ff0000) >> 16) as u8;
-            stream[offset + 3] = ((u & 0xff000000) >> 24) as u8;
+        for (off, label) in &self.labels.replace_disp32 {
+            let insert_pt = func_offset[&off.func_id()] + off.offset();
+            let label = self.labels.arena[*label].as_func_offset();
+            let label = func_offset[&label.func_id()] + label.offset();
+            let x = (label as i32 - (insert_pt as i32 + 4)) as u32;
+            stream[insert_pt + 0] = (x & 0x000000ff) as u8;
+            stream[insert_pt + 1] = ((x & 0x0000ff00) >> 8) as u8;
+            stream[insert_pt + 2] = ((x & 0x00ff0000) >> 16) as u8;
+            stream[insert_pt + 3] = ((x & 0xff000000) >> 24) as u8;
         }
 
         let id = self.module.find_function_by_name("main").unwrap();

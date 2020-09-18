@@ -43,16 +43,18 @@ pub struct InstAssembler<'a> {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct Label {
-    pub func_id: MachineFunctionId,
-    pub offset: usize,
+pub struct Offset(pub MachineFunctionId, pub usize);
+
+#[derive(Debug, Clone, Copy)]
+pub enum Label {
+    FuncOffset(Offset),
+    // TODO
 }
 
 pub struct Labels {
     pub arena: Arena<Label>,
-    pub cur_offset: usize,
     pub func_label: FxHashMap<MachineFunctionId, LabelId>,
-    pub replace_disp32: Vec<(MachineFunctionId, LabelId, usize)>,
+    pub replace_disp32: Vec<(Offset, LabelId)>,
 }
 
 pub struct InstructionStream {
@@ -185,18 +187,13 @@ impl Labels {
     pub fn new() -> Self {
         Self {
             arena: Arena::new(),
-            cur_offset: 0,
             func_label: FxHashMap::default(),
             replace_disp32: vec![],
         }
     }
 
-    pub fn add_offset(&mut self, off: usize) {
-        self.cur_offset += off;
-    }
-
-    pub fn new_label(&mut self, func_id: MachineFunctionId) -> LabelId {
-        self.arena.alloc(Label { func_id, offset: 0 })
+    pub fn new_label(&mut self, label: Label) -> LabelId {
+        self.arena.alloc(label)
     }
 
     pub fn get_func_label(&mut self, func_id: MachineFunctionId) -> LabelId {
@@ -204,18 +201,14 @@ impl Labels {
             return *id;
         }
 
-        let id = self.arena.alloc(Label { func_id, offset: 0 });
-        self.func_label.insert(func_id, id);
-        id
+        let label = self.new_label(Label::FuncOffset(Offset(func_id, 0)));
+        self.func_label.insert(func_id, label);
+        label
     }
 
-    pub fn add_disp32_to_replace(&mut self, cur: MachineFunctionId, off: usize, dst: LabelId) {
-        self.replace_disp32.push((cur, dst, off));
+    pub fn add_disp32_to_replace(&mut self, off: Offset, dst: LabelId) {
+        self.replace_disp32.push((off, dst))
     }
-
-    // pub fn new_label_at(&mut self) -> Label {
-    //     self.arena.alloc(Label { offset: 0 })
-    // }
 }
 
 impl InstructionStream {
@@ -240,6 +233,25 @@ impl InstructionStream {
 
     pub fn data(&self) -> &Vec<u8> {
         &self.bytes
+    }
+}
+
+impl Label {
+    pub fn as_func_offset(&self) -> &Offset {
+        match self {
+            Self::FuncOffset(off) => off,
+            // _ => panic!(),
+        }
+    }
+}
+
+impl Offset {
+    pub fn func_id(&self) -> MachineFunctionId {
+        self.0
+    }
+
+    pub fn offset(&self) -> usize {
+        self.1
     }
 }
 
