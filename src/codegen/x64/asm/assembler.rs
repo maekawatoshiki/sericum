@@ -22,6 +22,11 @@ impl<'a> InstAssembler<'a> {
 
             MachineOpcode::CALL => self.gen_call(),
 
+            MachineOpcode::CMPri => self.gen_cmp_ri(),
+
+            MachineOpcode::JMP => self.gen_jmp(),
+            MachineOpcode::JNE => self.gen_jne(),
+
             MachineOpcode::RET => self.gen_ret(),
             _ => unimplemented!(),
         };
@@ -137,6 +142,52 @@ impl<'a> InstAssembler<'a> {
             Offset(self.function.id.unwrap(), self.stream.data().len()),
             label,
         );
+
+        self.stream.push_u32_le(0);
+    }
+
+    fn gen_cmp_ri(&mut self) {
+        self.stream.push_u8(0x81);
+        self.stream.push_u8(mod_rm(
+            Mod::Reg,
+            7,
+            reg_code(&self.inst.operand[0].as_register().id),
+        ));
+        self.stream
+            .push_u32_le(self.inst.operand[1].as_constant().as_i32() as u32);
+    }
+
+    fn gen_jmp(&mut self) {
+        self.stream.push_u8(0xe9);
+
+        match &self.inst.operand[0] {
+            MachineOperand::Branch(b) => {
+                let label = self.labels.get_label_for(self.function.id.unwrap(), *b);
+                self.labels.add_disp32_to_replace(
+                    Offset(self.function.id.unwrap(), self.stream.data().len()),
+                    label,
+                );
+            }
+            _ => unimplemented!(),
+        }
+
+        self.stream.push_u32_le(0);
+    }
+
+    fn gen_jne(&mut self) {
+        self.stream.push_u8(0x0f);
+        self.stream.push_u8(0x85);
+
+        match &self.inst.operand[0] {
+            MachineOperand::Branch(b) => {
+                let label = self.labels.get_label_for(self.function.id.unwrap(), *b);
+                self.labels.add_disp32_to_replace(
+                    Offset(self.function.id.unwrap(), self.stream.data().len()),
+                    label,
+                );
+            }
+            _ => unimplemented!(),
+        }
 
         self.stream.push_u32_le(0);
     }

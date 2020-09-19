@@ -47,6 +47,7 @@ mod x86_64 {
 
         let obj_name = unique_file_name(".o");
         asmer.write_to_file(&obj_name);
+        println!("{}", obj_name);
 
         let output_name = unique_file_name("out");
         let compilation = process::Command::new("clang")
@@ -59,6 +60,7 @@ mod x86_64 {
             .status()
             .unwrap();
         assert!(compilation.success());
+        // println!("{}", output_name);
 
         let execution = process::Command::new(output_name.as_str())
             .status()
@@ -118,6 +120,54 @@ mod x86_64 {
                  int main() { assert(test() == 42); return 0; }",
             &mut m,
         );
+    }
+
+    #[test]
+    fn asmer_br() {
+        let mut m = Module::new("cilk");
+        cilk_ir!(m; define [i32] test [(i32)] {
+            entry:
+                c = icmp eq (%arg.0), (i32 1);
+                br (%c) label1, label2;
+            label1:
+                ret (i32 1);
+            label2:
+                ret (i32 0);
+        });
+
+        compile(
+            "#include <assert.h>
+             extern int test(int);
+             int main() {
+                assert(test(0) == 0);
+                assert(test(1) == 1);
+                return 0;
+             }",
+            &mut m,
+        )
+    }
+
+    #[test]
+    fn asmer_call() {
+        let mut m = Module::new("cilk");
+        cilk_ir!(m; define [i32] add [(i32)] {
+            entry: x = add (%arg.0), (i32 2);
+                   ret (%x);
+        });
+        cilk_ir!(m; define [i32] caller [(i32)] {
+            entry: x = call add [(%arg.0)];
+                   ret (%x);
+        });
+
+        compile(
+            "#include <assert.h>
+             extern int caller(int);
+             int main() {
+                assert(caller(10) == 12);
+                return 0;
+             }",
+            &mut m,
+        )
     }
 
     #[test]

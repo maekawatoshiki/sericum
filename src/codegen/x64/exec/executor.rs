@@ -87,6 +87,6 @@ impl Assembler {
         }
 
         let f = unsafe { ::std::mem::transmute::<*mut u8, fn(i32) -> i32>(mem.data().add(off)) };
-        println!(">>> {}", f(10));
+        println!(">>> {}", f(1));
     }
 }

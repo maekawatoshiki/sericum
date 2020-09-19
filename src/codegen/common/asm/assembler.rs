@@ -1,5 +1,5 @@
 use crate::codegen::common::machine::{
-    basic_block::MachineBasicBlock,
+    basic_block::{MachineBasicBlock, MachineBasicBlockId},
     function::{MachineFunction, MachineFunctionId},
     inst::MachineInst,
     module::MachineModule,
@@ -54,6 +54,7 @@ pub enum Label {
 pub struct Labels {
     pub arena: Arena<Label>,
     pub func_label: FxHashMap<MachineFunctionId, LabelId>,
+    pub block_label: FxHashMap<MachineBasicBlockId, LabelId>,
     pub replace_disp32: Vec<(Offset, LabelId)>,
 }
 
@@ -80,12 +81,43 @@ impl<'a> Assembler<'a> {
                 .unwrap();
         }
 
-        for (_id, func) in &self.module.functions {
+        let mut global_offset = 0;
+        let mut func_global_offset = FxHashMap::default();
+        let mut streams = FxHashMap::default();
+
+        for (id, func) in &self.module.functions {
+            func_global_offset.insert(id, global_offset);
             let mut func_asmer = FunctionAssembler::new(self.module, func, &mut self.labels);
             func_asmer.assemble();
+            global_offset += func_asmer.stream.data().len();
+            streams.insert(id, func_asmer.stream);
+        }
+
+        for (off, label) in &self.labels.replace_disp32 {
+            let insert_pt = off.offset();
+            let label = self.labels.arena[*label].as_func_offset();
             self.artifact
-                .define(func.name.as_str(), func_asmer.stream.bytes)
+                .link(Link {
+                    from: self.module.functions[off.func_id()].name.as_str(),
+                    to: self.module.functions[label.func_id()].name.as_str(),
+                    at: insert_pt as u64,
+                })
                 .unwrap();
+        }
+
+        let a: Vec<_> = self.module.functions.iter().collect();
+
+        for (i, a) in a.windows(2).enumerate() {
+            let stream = streams.remove(&a[0].0).unwrap();
+            self.artifact
+                .define(a[0].1.name.as_str(), stream.bytes.clone())
+                .unwrap();
+            if a.len() - 2 == i {
+                let stream = streams.remove(&a[1].0).unwrap();
+                self.artifact
+                    .define(a[1].1.name.as_str(), stream.bytes.clone())
+                    .unwrap();
+            }
         }
     }
 
@@ -112,7 +144,11 @@ impl<'a> FunctionAssembler<'a> {
     pub fn assemble(&mut self) {
         self.labels.get_func_label(self.function.id.unwrap());
 
-        for (_block_id, block) in self.function.body.basic_blocks.id_and_block() {
+        for (block_id, block) in self.function.body.basic_blocks.id_and_block() {
+            self.labels
+                .get_label_for(self.function.id.unwrap(), block_id);
+            self.labels.set_offset(block_id, self.stream.data().len());
+
             let mut block_asmer = BlockAssembler::new(
                 self.module,
                 self.function,
@@ -189,12 +225,23 @@ impl Labels {
         Self {
             arena: Arena::new(),
             func_label: FxHashMap::default(),
+            block_label: FxHashMap::default(),
             replace_disp32: vec![],
         }
     }
 
     pub fn new_label(&mut self, label: Label) -> LabelId {
         self.arena.alloc(label)
+    }
+
+    pub fn get_label_for(&mut self, func: MachineFunctionId, bb: MachineBasicBlockId) -> LabelId {
+        if let Some(label) = self.block_label.get(&bb) {
+            return *label;
+        }
+
+        let label = self.new_label(Label::FuncOffset(Offset(func, 0)));
+        self.block_label.insert(bb, label);
+        label
     }
 
     pub fn get_func_label(&mut self, func_id: MachineFunctionId) -> LabelId {
@@ -205,6 +252,11 @@ impl Labels {
         let label = self.new_label(Label::FuncOffset(Offset(func_id, 0)));
         self.func_label.insert(func_id, label);
         label
+    }
+
+    pub fn set_offset(&mut self, bb: MachineBasicBlockId, offset: usize) {
+        let id = *self.block_label.get_mut(&bb).unwrap();
+        self.arena[id].as_func_offset_mut().1 = offset;
     }
 
     pub fn add_disp32_to_replace(&mut self, off: Offset, dst: LabelId) {
@@ -250,6 +302,13 @@ impl InstructionStream {
 
 impl Label {
     pub fn as_func_offset(&self) -> &Offset {
+        match self {
+            Self::FuncOffset(off) => off,
+            // _ => panic!(),
+        }
+    }
+
+    pub fn as_func_offset_mut(&mut self) -> &mut Offset {
         match self {
             Self::FuncOffset(off) => off,
             // _ => panic!(),
