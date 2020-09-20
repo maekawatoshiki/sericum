@@ -81,21 +81,28 @@ impl<'a> Assembler<'a> {
                 .unwrap();
         }
 
-        let mut global_offset = 0;
-        let mut func_global_offset = FxHashMap::default();
-        let mut streams = FxHashMap::default();
+        let mut func_streams = FxHashMap::default();
 
         for (id, func) in &self.module.functions {
-            func_global_offset.insert(id, global_offset);
             let mut func_asmer = FunctionAssembler::new(self.module, func, &mut self.labels);
             func_asmer.assemble();
-            global_offset += func_asmer.stream.data().len();
-            streams.insert(id, func_asmer.stream);
+            func_streams.insert(id, func_asmer.stream);
         }
 
         for (off, label) in &self.labels.replace_disp32 {
-            let insert_pt = off.offset();
             let label = self.labels.arena[*label].as_func_offset();
+
+            if off.func_id() == label.func_id() {
+                let insert_pt = off.offset();
+                let label = label.offset();
+                func_streams
+                    .get_mut(&off.func_id())
+                    .unwrap()
+                    .insert_u32_le(insert_pt, (label as i32 - (off.offset() as i32 + 4)) as u32);
+                continue;
+            }
+
+            let insert_pt = off.offset();
             self.artifact
                 .link(Link {
                     from: self.module.functions[off.func_id()].name.as_str(),
@@ -105,19 +112,11 @@ impl<'a> Assembler<'a> {
                 .unwrap();
         }
 
-        let a: Vec<_> = self.module.functions.iter().collect();
-
-        for (i, a) in a.windows(2).enumerate() {
-            let stream = streams.remove(&a[0].0).unwrap();
+        for (id, func) in &self.module.functions {
+            let stream = func_streams.remove(&id).unwrap();
             self.artifact
-                .define(a[0].1.name.as_str(), stream.bytes.clone())
+                .define(func.name.as_str(), stream.bytes)
                 .unwrap();
-            if a.len() - 2 == i {
-                let stream = streams.remove(&a[1].0).unwrap();
-                self.artifact
-                    .define(a[1].1.name.as_str(), stream.bytes.clone())
-                    .unwrap();
-            }
         }
     }
 
