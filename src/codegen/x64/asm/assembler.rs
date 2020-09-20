@@ -57,7 +57,7 @@ impl<'a> InstAssembler<'a> {
     fn gen_movrm32(&mut self) {
         self.stream.push_u8(0x8b); // TODO
         let reg = reg_code(&self.inst.def[0].id);
-        let reg = reg << 3; // eax
+        let reg = reg; // eax
         match self.inst.operand[0].as_mem() {
             MachineMemOperand::BaseOff(base, off) => {
                 self.stream
@@ -217,20 +217,20 @@ impl<'a> InstAssembler<'a> {
     }
 }
 
-fn reg_code(r: &RegisterId) -> u8 {
+pub fn reg_code(r: &RegisterId) -> u8 {
     let r = r.as_phys_reg();
     (r.retrieve() - r.reg_class() as usize) as u8
 }
 
 #[allow(dead_code)]
-enum Mod {
+pub enum Mod {
     Reg,
     Base,
     BaseDisp8,
     BaseDisp32,
 }
 
-fn mod_rm(mod_: Mod, reg: u8, rm: u8) -> u8 {
+pub fn mod_rm(mod_: Mod, reg: u8, rm: u8) -> u8 {
     let mod_ = match mod_ {
         Mod::Reg => 0b11,
         Mod::Base => 0b00,

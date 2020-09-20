@@ -3,7 +3,8 @@ mod x86_64 {
     use cilk::{
         cilk_ir,
         codegen::x64::{
-            asm::assembler::Assembler, exec::executor::Executor,
+            asm::assembler::Assembler,
+            exec::executor::{Executor, GenericValue},
             standard_conversion_into_machine_module,
         },
         ir::{builder, /*global_val,*/ types, value},
@@ -69,7 +70,7 @@ mod x86_64 {
     }
 
     #[test]
-    fn jit_call() {
+    fn asmer_jit_call() {
         let mut m = Module::new("cilk");
         cilk_ir!(m; define [i32] add [(i32)] {
             entry: x = add (%arg.0), (i32 2);
@@ -86,7 +87,30 @@ mod x86_64 {
 
         let mut exec = Executor::new(machine_module);
         exec.compile();
-        exec.execute();
+        let f = exec.find_function_by_name("main").unwrap();
+        assert_eq!(
+            GenericValue::i32(4),
+            exec.execute(f, vec![GenericValue::i32(2)])
+        );
+    }
+
+    #[test]
+    fn asmer_jit_local_var() {
+        let mut m = Module::new("cilk");
+        cilk_ir!(m; define [i32] test [] {
+            entry:
+                a = alloca i32;
+                store (i32 2), (%a);
+                x = load (%a);
+                ret (%x);
+        });
+
+        let machine_module = standard_conversion_into_machine_module(&mut m);
+
+        let mut exec = Executor::new(machine_module);
+        exec.compile();
+        let f = exec.find_function_by_name("test").unwrap();
+        assert_eq!(exec.execute(f, vec![]), GenericValue::i32(2));
     }
 
     #[test]

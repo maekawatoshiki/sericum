@@ -1,5 +1,11 @@
+use crate::codegen::arch::asm::assembler::{mod_rm, Mod};
+use crate::codegen::arch::machine::register::RegisterClassKind;
 use crate::codegen::common::asm::assembler::{FunctionAssembler, InstructionStream, Labels};
 use crate::codegen::common::machine::{function::MachineFunctionId, module::MachineModule};
+use crate::codegen::{
+    arch::machine::abi::SystemV, common::machine::calling_conv::ArgumentRegisterOrder,
+};
+use crate::ir::types::Type;
 use mmap::{MapOption, MemoryMap};
 use rustc_hash::FxHashMap;
 
@@ -10,8 +16,15 @@ pub struct Executor {
 pub struct Assembler {
     pub module: MachineModule,
     labels: Labels,
-    func_global_offset: FxHashMap<MachineFunctionId, usize>,
+    pub func_global_offset: FxHashMap<MachineFunctionId, usize>,
     stream: InstructionStream,
+}
+
+#[allow(non_camel_case_types)]
+#[derive(Debug, Clone, PartialEq)]
+pub enum GenericValue {
+    i32(i32),
+    None,
 }
 
 impl Executor {
@@ -29,8 +42,8 @@ impl Executor {
         self.asm.assemble();
     }
 
-    pub fn execute(&mut self) {
-        self.asm.execute()
+    pub fn execute(&mut self, id: MachineFunctionId, args: Vec<GenericValue>) -> GenericValue {
+        self.asm.execute(id, args)
     }
 }
 
@@ -64,11 +77,50 @@ impl Assembler {
         }
     }
 
-    pub fn execute(&mut self) {
-        let id = self.module.find_function_by_name("main").unwrap();
-        let off = self.func_global_offset[&id];
+    pub fn execute(&mut self, func_id: MachineFunctionId, args: Vec<GenericValue>) -> GenericValue {
+        let abi = SystemV::new();
+        let mut arg_reg_order = ArgumentRegisterOrder::new(&abi);
 
-        let mem = MemoryMap::new(
+        let start = self.stream.data().len();
+
+        for (_idx, arg) in args.iter().enumerate() {
+            match arg {
+                GenericValue::i32(i) => {
+                    let r = arg_reg_order.next(RegisterClassKind::GR32).unwrap();
+                    // mov r, i
+                    self.stream.push_u8(0xc7);
+                    self.stream.push_u8(mod_rm(
+                        Mod::Reg,
+                        0,
+                        r.retrieve() as u8 - r.reg_class() as u8,
+                    ));
+                    self.stream.push_u32_le(*i as u32);
+                }
+                GenericValue::None => unreachable!(),
+            }
+        }
+
+        let func_off = self.func_global_offset[&func_id];
+
+        // sub rsp, 8
+        self.stream.push_u8(0x48);
+        self.stream.push_u8(0x83);
+        self.stream.push_u8(0xec);
+        self.stream.push_u8(8);
+        // call
+        self.stream.push_u8(0xe8);
+        self.stream
+            .push_u32_le((func_off as i32 - (self.stream.data().len() as i32 + 4)) as u32);
+        // add rsp, 8
+        self.stream.push_u8(0x48);
+        self.stream.push_u8(0x83);
+        self.stream.push_u8(0xc4);
+        self.stream.push_u8(8);
+        // ret
+        self.stream.push_u8(0xc3);
+
+        // TODO: Allocating memory every time is inefficient
+        let memory = MemoryMap::new(
             self.stream.data().len(),
             &[
                 MapOption::MapReadable,
@@ -81,12 +133,25 @@ impl Assembler {
         unsafe {
             ::std::ptr::copy(
                 self.stream.data().as_ptr() as *const u8,
-                mem.data(),
+                memory.data(),
                 self.stream.data().len(),
             );
         }
 
-        let f = unsafe { ::std::mem::transmute::<*mut u8, fn(i32) -> i32>(mem.data().add(off)) };
-        println!(">>> {}", f(1));
+        match self
+            .module
+            .types
+            .base
+            .borrow()
+            .as_function_ty(self.module.function_ref(func_id).ty)
+            .unwrap()
+            .ret_ty
+        {
+            Type::i32 => GenericValue::i32(unsafe {
+                ::std::mem::transmute::<*mut u8, fn() -> i32>(memory.data().add(start))
+            }()),
+            Type::Void => GenericValue::None,
+            _ => unimplemented!(),
+        }
     }
 }
