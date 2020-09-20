@@ -20,6 +20,10 @@ impl<'a> InstAssembler<'a> {
 
             MachineOpcode::IMULrri32 => self.gen_imul_rri32(),
 
+            MachineOpcode::IDIV => self.gen_idiv(),
+
+            MachineOpcode::CDQ => self.gen_cdq(),
+
             MachineOpcode::CALL => self.gen_call(),
 
             MachineOpcode::CMPri => self.gen_cmp_ri(),
@@ -28,7 +32,7 @@ impl<'a> InstAssembler<'a> {
             MachineOpcode::JNE => self.gen_jne(),
 
             MachineOpcode::RET => self.gen_ret(),
-            _ => unimplemented!(),
+            op => unimplemented!("{:?}", op),
         };
     }
 
@@ -43,7 +47,9 @@ impl<'a> InstAssembler<'a> {
     }
 
     fn gen_movri32(&mut self) {
-        self.stream.push_u8(0xb8);
+        self.stream.push_u8(0xc7);
+        self.stream
+            .push_u8(mod_rm(Mod::Reg, 0, reg_code(&self.inst.def[0].id)));
         self.stream
             .push_u32_le(self.inst.operand[0].as_constant().as_i32() as u32);
     }
@@ -122,6 +128,19 @@ impl<'a> InstAssembler<'a> {
         ));
         self.stream
             .push_u32_le(self.inst.operand[1].as_constant().as_i32() as u32);
+    }
+
+    fn gen_idiv(&mut self) {
+        self.stream.push_u8(0xf7);
+        self.stream.push_u8(mod_rm(
+            Mod::Reg,
+            7,
+            reg_code(&self.inst.operand[0].as_register().id),
+        ));
+    }
+
+    fn gen_cdq(&mut self) {
+        self.stream.push_u8(0x99);
     }
 
     fn gen_call(&mut self) {

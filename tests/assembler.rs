@@ -45,7 +45,7 @@ mod x86_64 {
         let mut asmer = Assembler::new(&machine_module);
         asmer.assemble();
 
-        let obj_name = unique_file_name(".o");
+        let obj_name = unique_file_name("o");
         asmer.write_to_file(&obj_name);
         println!("{}", obj_name);
 
@@ -69,7 +69,7 @@ mod x86_64 {
     }
 
     #[test]
-    fn jit_asm() {
+    fn jit_call() {
         let mut m = Module::new("cilk");
         cilk_ir!(m; define [i32] add [(i32)] {
             entry: x = add (%arg.0), (i32 2);
@@ -182,15 +182,21 @@ mod x86_64 {
         cilk_ir!(m; define [i32] mul [(i32)] {
             entry: x = mul (%arg.0), (i32 3);
                    ret (%x); });
+        cilk_ir!(m; define [i32] div [(i32)] {
+            entry: x = div (%arg.0), (i32 3);
+                   ret (%x); });
         compile(
             "#include <assert.h>
                  extern int add(int); 
                  extern int sub(int); 
                  extern int mul(int); 
+                 extern int div(int); 
                  int main() { 
                      assert(add(2) == 4); 
                      assert(sub(4) == 2); 
                      assert(mul(2) == 6);
+                     // printf(\">%d\\n\", div(6));
+                     assert(div(6) == 2);
                      return 0; 
                  }",
             &mut m,
