@@ -183,7 +183,7 @@ mod x86_64 {
         builder.set_insert_point(entry);
 
         // tape and index
-        let tape_len = 2048;
+        let tape_len = 30000;
         let ary_ty = builder
             .func
             .module
@@ -291,6 +291,7 @@ mod x86_64 {
         // Comment out and get faster
         ir::mem2reg::Mem2Reg::new().run_on_module(&mut m);
         ir::cse::CommonSubexprElimination::new().run_on_module(&mut m);
+        ir::licm::LoopInvariantCodeMotion::new().run_on_module(&mut m);
 
         // println!("IR: {}", m.dump(f_id));
 
@@ -298,7 +299,7 @@ mod x86_64 {
         // use cilk::codegen::x64::standard_conversion_into_machine_module;
         // let machine_module = standard_conversion_into_machine_module(&mut m);
         // let mut printer = MachineAsmPrinter::new();
-        // println!("{:?}", machine_module);
+        // // println!("{:?}", machine_module);
         // printer.run_on_module(&machine_module);
         // println!("{}", printer.output);
 
@@ -636,7 +637,7 @@ mod aarch64 {
     };
 
     #[test]
-    // #[ignore]
+    #[ignore]
     fn brainfuxk() {
         // let code = "+++++++++[>++++++++>+++++++++++>+++>+<<<<-]>.>++.+++++++..+++.>+++++.<<
         //     +++++++++++++++.>.+++.------.--------.>+.>+.";
