@@ -35,6 +35,11 @@ impl<'a> CodegenPrepareOnFunction<'a> {
             }
         }
 
+        debug!(println!(
+            "CodegenPrepare: {} GEPs to be sunk",
+            geps_to_be_sunk.len()
+        ));
+
         for gep_id in geps_to_be_sunk {
             let gep_val = self.func.remove_inst_from_block(gep_id);
             let gep = &self.func.inst_table[gep_id];
