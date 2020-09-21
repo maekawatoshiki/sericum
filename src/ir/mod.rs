@@ -5,6 +5,7 @@ pub mod const_folding;
 pub mod cse;
 pub mod function;
 pub mod global_val;
+pub mod inst_combine;
 pub mod licm;
 pub mod liveness;
 pub mod mem2reg;

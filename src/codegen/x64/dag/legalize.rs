@@ -103,6 +103,7 @@ impl Legalize {
                                         // TODO: Refactoring
                                         let fi = self.run_on_node(tys, regs_info, heap, fi);
                                         let w = self.run_on_node(tys, regs_info, heap, w);
+                                        let w = heap.alloc(DAGNode::new(NodeKind::IR(IRNodeKind::RegClass), vec![w], Type::i64));
                                         let rbp = heap.alloc_phys_reg(regs_info, GR64::RBP);
                                         let off = e.kind.as_operand().as_constant().as_i32()
                                             * u.kind.as_operand().as_constant().as_i32();
@@ -203,6 +204,7 @@ impl Legalize {
                                             let src = self.run_on_node(tys, regs_info, heap, src);
                                             let fi = self.run_on_node(tys, regs_info, heap, fi);
                                             let w = self.run_on_node(tys, regs_info, heap, w);
+                                            let w = heap.alloc(DAGNode::new(NodeKind::IR(IRNodeKind::RegClass), vec![w], Type::i64));
                                             let rbp = heap.alloc_phys_reg(regs_info, GR64::RBP);
                                             let off = e.kind.as_operand().as_constant().as_i32()
                                                 * m2.kind.as_operand().as_constant().as_i32();
