@@ -151,10 +151,8 @@ impl<'a> LoopInvariantCodeMotionOnFunction<'a> {
                 let mut insts_to_hoist = vec![];
                 while let Some(inst_id) = worklist.pop_front() {
                     let inst = &self.func.inst_table[inst_id];
-                    if inst.opcode.access_memory()
-                        || inst.opcode == Opcode::Call
-                        // TODO: Remove the line below after implementing CodeGenPrepare
-                        || inst.opcode == Opcode::GetElementPtr
+                    if inst.opcode.access_memory() || inst.opcode == Opcode::Call
+                    // TODO: Remove the line below after implementing CodeGenPrepare
                     {
                         continue;
                     }

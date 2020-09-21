@@ -203,6 +203,10 @@ impl Instruction {
         }
     }
 
+    pub fn has_one_use(&self) -> bool {
+        self.users.borrow().len() == 1
+    }
+
     pub fn to_string(&self, parent: &Module) -> String {
         let mut output = self.opcode.to_string().to_owned();
         for (i, operand) in self.operands.iter().enumerate() {
