@@ -2,7 +2,6 @@ use crate::ir::{
     function::Function,
     module::Module,
     opcode::{Instruction, Opcode, Operand},
-    types::Type,
     value::Value,
 };
 use std::collections::VecDeque;
