@@ -12,6 +12,8 @@ fn main(
     /// Input files (*.c) 
     files: Vec<PathBuf>,
 ) {
-    println!("cilkcc {:?}", files);
-    compile(&files[0])
+    for file in files {
+        compile(file)
+    }
+    ()
 }
