@@ -7,3 +7,6 @@ defs/Cargo.lock
 minilang/target
 minilang/**/*.rs.bk
 minilang/Cargo.lock
+cilkcc/target
+cilkcc/**/*.rs.bk
+cilkcc/Cargo.lock
