@@ -1,3 +1,4 @@
+extern crate id_arena;
 extern crate rustc_hash;
 
 use std::path::PathBuf;

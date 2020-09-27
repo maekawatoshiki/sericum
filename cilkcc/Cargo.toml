@@ -9,3 +9,4 @@ cilk       = { path = "../", features = ["x86_64"] }
 argopt     = "= 0.1.1"
 structopt  = "= 0.3.18"
 rustc-hash = "= 1.1.0"
+id-arena   = "= 2.2.1"
