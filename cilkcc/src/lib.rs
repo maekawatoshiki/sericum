@@ -7,5 +7,15 @@ pub mod lexer;
 pub mod token;
 
 pub fn compile(path: PathBuf) {
-    let _lexer = lexer::Lexer::new(path);
+    let mut lexer = lexer::Lexer::new(path);
+    println!("{:?}", lexer.read_token());
+    println!("{:?}", lexer.read_token());
+    println!("{:?}", lexer.read_token());
+    println!("{:?}", lexer.read_token());
+    println!("{:?}", lexer.read_token());
+    println!("{:?}", lexer.read_token());
+    println!("{:?}", lexer.read_token());
+    println!("{:?}", lexer.read_token());
+    println!("{:?}", lexer.read_token());
+    println!("{:?}", lexer.read_token());
 }

@@ -1,6 +1,6 @@
-use super::token::{Keyword, SourceLoc, Symbol, Token, TokenKind};
+use super::token::{SourceLoc, Symbol, Token, TokenKind};
 use id_arena::{Arena, Id};
-use std::cell::RefCell;
+use std::cell::{Ref, RefCell};
 use std::collections::VecDeque;
 use std::fs;
 use std::path::PathBuf;
@@ -43,91 +43,39 @@ impl Lexer {
         }
     }
 
+    pub fn add_lexer(&mut self, path: PathBuf) {
+        self.sub_lexers
+            .push_back(FileLexer::new(self.path_arena.clone(), path))
+    }
+
     // reading token
 
-    // pub fn do_read_token(&mut self) -> Result<Token> {
-    // match self.sub_lexers.back_mut().unwrap().do_read_token() {
-    //     Ok(token) => Ok(token),
-    //     Err(LexerError::EOF) => {
-    //         self.sub_lexers.pop_back().unwrap();
-    //         return self.do_read_token();
-    //     }
-    //     Err(_) => {}
-    // }
+    pub fn do_read_token(&mut self) -> Result<Token> {
+        if self.sub_lexers.len() == 0 {
+            return Err(LexerError::EOF);
+        }
 
-    // if let Some(tok) = self.buf.back_mut().unwrap().pop_back() {
-    //     return Ok(tok);
-    // }
-    // if self.buf.len() > 1 {
-    //     return Err(Error::EOF);
-    // }
-    //
-    // match self.peek_next() {
-    //     Ok(c) => {
-    //         match c {
-    //             'a'...'z' | 'A'...'Z' | '_' => self.read_identifier(c),
-    //             ' ' | '\t' => {
-    //                 self.do_read_token()
-    //                     // set a leading space
-    //                     .and_then(|tok| {
-    //                         let mut t = tok;
-    //                         t.space = true;
-    //                         Ok(t)
-    //                     })
-    //             }
-    //             '0'...'9' => self.read_number_literal(c),
-    //             '\"' => self.read_string_literal(),
-    //             '\'' => self.read_char_literal(),
-    //             '\n' => self.read_newline(),
-    //             '\\' => {
-    //                 while try!(self.peek_next()) != '\n' {}
-    //                 self.do_read_token()
-    //             }
-    //             '/' => {
-    //                 if try!(self.peek_char_is('*')) {
-    //                     try!(self.peek_next()); // *
-    //                     let mut last = ' ';
-    //                     while !(last == '*' && try!(self.peek_char_is('/'))) {
-    //                         last = try!(self.peek_next());
-    //                     }
-    //                     try!(self.peek_next()); // /
-    //                     self.do_read_token()
-    //                 } else if try!(self.peek_char_is('/')) {
-    //                     try!(self.peek_next()); // /
-    //                     while !try!(self.peek_char_is('\n')) {
-    //                         try!(self.peek_next());
-    //                     }
-    //                     // try!(self.peek_next()); // \n
-    //                     self.do_read_token()
-    //                 } else {
-    //                     self.read_symbol(c)
-    //                 }
-    //             }
-    //             _ => self.read_symbol(c),
-    //         }
-    //     }
-    //     _ => {
-    //         if self.peek.len() > 1 {
-    //             self.peek.pop_back();
-    //             self.peek_pos.pop_back();
-    //             self.filename.pop_back();
-    //             self.cur_line.pop_back();
-    //             self.do_read_token()
-    //         } else {
-    //             Err(Error::EOF)
-    //         }
-    //     }
-    // }
-    // }
+        match self.sub_lexers.back_mut().unwrap().do_read_token() {
+            Ok(token) => Ok(token),
+            Err(LexerError::EOF) => {
+                self.sub_lexers.pop_back().unwrap();
+                if self.sub_lexers.len() == 0 {
+                    return Err(LexerError::EOF);
+                }
+                return self.do_read_token();
+            }
+            Err(e) => return Err(e),
+        }
+    }
 
-    // pub fn read_token(&mut self) -> Result<Token> {
-    //     let token = self.do_read_token();
-    //     token.and_then(|tok| match tok.kind {
-    //         TokenKind::Newline => self.read_token(),
-    //         TokenKind::Identifier(_) => Ok(convert_to_symbol(tok)),
-    //         _ => Ok(tok),
-    //     })
-    // }
+    pub fn read_token(&mut self) -> Result<Token> {
+        let token = self.do_read_token();
+        token.and_then(|tok| match tok.kind {
+            TokenKind::Newline => self.read_token(),
+            TokenKind::Identifier(_) => Ok(convert_to_symbol(tok)),
+            _ => Ok(tok),
+        })
+    }
 }
 
 impl FileLexer {
@@ -143,6 +91,10 @@ impl FileLexer {
         }
     }
 
+    pub fn file_path(&self) -> Ref<Arena<PathBuf>> {
+        self.path_arena.borrow()
+    }
+
     // reading char
 
     pub fn get_char(&mut self) -> Result<char> {
@@ -150,6 +102,16 @@ impl FileLexer {
             return Err(LexerError::EOF);
         }
         self.source[self.loc.pos..]
+            .chars()
+            .next()
+            .map_or(Err(LexerError::EOF), |c| Ok(c))
+    }
+
+    pub fn get_char2(&mut self) -> Result<char> {
+        if self.loc.pos + 1 >= self.source.len() {
+            return Err(LexerError::EOF);
+        }
+        self.source[self.loc.pos + 1..]
             .chars()
             .next()
             .map_or(Err(LexerError::EOF), |c| Ok(c))
@@ -180,6 +142,61 @@ impl FileLexer {
     }
 
     // reading token
+
+    pub fn do_read_token(&mut self) -> Result<Token> {
+        if let Some(tok) = self.buf.pop_back() {
+            return Ok(tok);
+        }
+
+        match self.get_char()? {
+            'a'..='z' | 'A'..='Z' | '_' => self.read_identifier(),
+            ' ' | '\t' => {
+                self.next_char()?;
+                self.do_read_token()
+                    // set a leading space
+                    .and_then(|tok| Ok(tok.leading_space(true)))
+            }
+            '0'..='9' => self.read_number_literal(),
+            '\"' => self.read_string_literal(),
+            '\'' => self.read_char_literal(),
+            '\n' => self.read_newline(),
+            '\\' => {
+                while self.next_char()? != '\n' {}
+                self.do_read_token()
+            }
+            '/' => {
+                if self.get_char2()? == '*' {
+                    assert_eq!(self.next_char()?, '/');
+                    assert_eq!(self.next_char()?, '*');
+                    let mut last = ' ';
+                    while !(last == '*' && self.get_char()? == '/') {
+                        last = self.next_char()?;
+                    }
+                    self.next_char()?; // /
+                    self.do_read_token()
+                } else if self.get_char2()? == '/' {
+                    assert_eq!(self.next_char()?, '/'); // /
+                    assert_eq!(self.next_char()?, '/'); // /
+                    while self.get_char()? != '\n' {
+                        self.next_char()?;
+                    }
+                    self.do_read_token()
+                } else {
+                    self.read_symbol()
+                }
+            }
+            _ => self.read_symbol(),
+        }
+    }
+
+    pub fn read_token(&mut self) -> Result<Token> {
+        let token = self.do_read_token();
+        token.and_then(|tok| match tok.kind {
+            TokenKind::Newline => self.read_token(),
+            TokenKind::Identifier(_) => Ok(convert_to_symbol(tok)),
+            _ => Ok(tok),
+        })
+    }
 
     pub fn read_identifier(&mut self) -> Result<Token> {
         let mut ident = "".to_string();
@@ -445,52 +462,52 @@ fn convert_to_symbol(token: Token) -> Token {
     Token::new(symbol, token.loc)
 }
 
-fn maybe_convert_to_keyword(token: Token) -> Token {
-    let ident = match token.kind {
-        TokenKind::Identifier(ref ident) => ident,
-        _ => panic!(),
-    };
-    let keyw = match ident.as_str() {
-        "typedef" => TokenKind::Keyword(Keyword::Typedef),
-        "extern" => TokenKind::Keyword(Keyword::Extern),
-        "auto" => TokenKind::Keyword(Keyword::Auto),
-        "register" => TokenKind::Keyword(Keyword::Register),
-        "static" => TokenKind::Keyword(Keyword::Static),
-        "restrict" => TokenKind::Keyword(Keyword::Restrict),
-        "const" => TokenKind::Keyword(Keyword::Const),
-        "constexpr" => TokenKind::Keyword(Keyword::ConstExpr),
-        "volatile" => TokenKind::Keyword(Keyword::Volatile),
-        "void" => TokenKind::Keyword(Keyword::Void),
-        "signed" => TokenKind::Keyword(Keyword::Signed),
-        "unsigned" => TokenKind::Keyword(Keyword::Unsigned),
-        "char" => TokenKind::Keyword(Keyword::Char),
-        "int" => TokenKind::Keyword(Keyword::Int),
-        "bool" => TokenKind::Keyword(Keyword::Int),
-        "short" => TokenKind::Keyword(Keyword::Short),
-        "long" => TokenKind::Keyword(Keyword::Long),
-        "float" => TokenKind::Keyword(Keyword::Float),
-        "double" => TokenKind::Keyword(Keyword::Double),
-        "struct" => TokenKind::Keyword(Keyword::Struct),
-        "union" => TokenKind::Keyword(Keyword::Union),
-        "enum" => TokenKind::Keyword(Keyword::Enum),
-        "inline" => TokenKind::Keyword(Keyword::Inline),
-        "noreturn" => TokenKind::Keyword(Keyword::Noreturn),
-        "if" => TokenKind::Keyword(Keyword::If),
-        "else" => TokenKind::Keyword(Keyword::Else),
-        "for" => TokenKind::Keyword(Keyword::For),
-        "while" => TokenKind::Keyword(Keyword::While),
-        "do" => TokenKind::Keyword(Keyword::Do),
-        "switch" => TokenKind::Keyword(Keyword::Switch),
-        "case" => TokenKind::Keyword(Keyword::Case),
-        "default" => TokenKind::Keyword(Keyword::Default),
-        "goto" => TokenKind::Keyword(Keyword::Goto),
-        "break" => TokenKind::Keyword(Keyword::Break),
-        "continue" => TokenKind::Keyword(Keyword::Continue),
-        "return" => TokenKind::Keyword(Keyword::Return),
-        _ => return token,
-    };
-    Token::new(keyw, token.loc)
-}
+// fn maybe_convert_to_keyword(token: Token) -> Token {
+//     let ident = match token.kind {
+//         TokenKind::Identifier(ref ident) => ident,
+//         _ => panic!(),
+//     };
+//     let keyw = match ident.as_str() {
+//         "typedef" => TokenKind::Keyword(Keyword::Typedef),
+//         "extern" => TokenKind::Keyword(Keyword::Extern),
+//         "auto" => TokenKind::Keyword(Keyword::Auto),
+//         "register" => TokenKind::Keyword(Keyword::Register),
+//         "static" => TokenKind::Keyword(Keyword::Static),
+//         "restrict" => TokenKind::Keyword(Keyword::Restrict),
+//         "const" => TokenKind::Keyword(Keyword::Const),
+//         "constexpr" => TokenKind::Keyword(Keyword::ConstExpr),
+//         "volatile" => TokenKind::Keyword(Keyword::Volatile),
+//         "void" => TokenKind::Keyword(Keyword::Void),
+//         "signed" => TokenKind::Keyword(Keyword::Signed),
+//         "unsigned" => TokenKind::Keyword(Keyword::Unsigned),
+//         "char" => TokenKind::Keyword(Keyword::Char),
+//         "int" => TokenKind::Keyword(Keyword::Int),
+//         "bool" => TokenKind::Keyword(Keyword::Int),
+//         "short" => TokenKind::Keyword(Keyword::Short),
+//         "long" => TokenKind::Keyword(Keyword::Long),
+//         "float" => TokenKind::Keyword(Keyword::Float),
+//         "double" => TokenKind::Keyword(Keyword::Double),
+//         "struct" => TokenKind::Keyword(Keyword::Struct),
+//         "union" => TokenKind::Keyword(Keyword::Union),
+//         "enum" => TokenKind::Keyword(Keyword::Enum),
+//         "inline" => TokenKind::Keyword(Keyword::Inline),
+//         "noreturn" => TokenKind::Keyword(Keyword::Noreturn),
+//         "if" => TokenKind::Keyword(Keyword::If),
+//         "else" => TokenKind::Keyword(Keyword::Else),
+//         "for" => TokenKind::Keyword(Keyword::For),
+//         "while" => TokenKind::Keyword(Keyword::While),
+//         "do" => TokenKind::Keyword(Keyword::Do),
+//         "switch" => TokenKind::Keyword(Keyword::Switch),
+//         "case" => TokenKind::Keyword(Keyword::Case),
+//         "default" => TokenKind::Keyword(Keyword::Default),
+//         "goto" => TokenKind::Keyword(Keyword::Goto),
+//         "break" => TokenKind::Keyword(Keyword::Break),
+//         "continue" => TokenKind::Keyword(Keyword::Continue),
+//         "return" => TokenKind::Keyword(Keyword::Return),
+//         _ => return token,
+//     };
+//     Token::new(keyw, token.loc)
+// }
 
 impl SourceLoc {
     pub fn new(file: Id<PathBuf>) -> Self {

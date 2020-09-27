@@ -2,6 +2,7 @@ use id_arena::Id;
 use rustc_hash::FxHashSet;
 use std::path::PathBuf;
 
+#[derive(Debug, Clone)]
 pub struct Token {
     pub kind: TokenKind,
     pub leading_space: bool,
@@ -128,5 +129,10 @@ impl Token {
             loc,
             hideset: FxHashSet::default(),
         }
+    }
+
+    pub fn leading_space(mut self, x: bool) -> Self {
+        self.leading_space = x;
+        self
     }
 }
