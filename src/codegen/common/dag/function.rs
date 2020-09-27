@@ -61,17 +61,17 @@ impl DAGFunction {
         }
     }
 
-    pub fn debug(&self, f: &mut fmt::Formatter, tys: &Types) -> fmt::Result {
+    pub fn debug(&self, f: &mut fmt::Formatter) -> fmt::Result {
         writeln!(
             f,
             "DAGFunc(name: {}, ty: {}):",
             self.name,
-            tys.to_string(self.ty)
+            self.types.to_string(self.ty)
         )?;
 
         for bb_id in &self.dag_basic_blocks {
             let bb = &self.dag_basic_block_arena[*bb_id];
-            bb.debug(f, tys, bb_id.index())?;
+            bb.debug(f, &self.types, bb_id.index())?;
         }
 
         fmt::Result::Ok(())

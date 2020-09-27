@@ -361,13 +361,13 @@ impl DAGNode {
         &self,
         f: &mut fmt::Formatter<'_>,
         tys: &Types,
-        s: &mut FxHashMap<Raw<DAGNode>, usize>,
+        s: &mut FxHashMap<Raw<DAGNode>, (usize, bool)>,
         self_id: usize, // 0 is entry
         indent: usize,
     ) -> fmt::Result {
         #[rustfmt::skip]
         macro_rules! id4op { ($op:expr) => {{
-            let l=s.len()+1; s.entry($op).or_insert(l)
+            let l=s.len()+1; s.entry($op).or_insert((l, false))
         }}}
         write!(f, "{}", " ".repeat(indent))?;
         write!(f, "id{}({}) = ", self_id, tys.to_string(self.ty))?;
@@ -380,7 +380,7 @@ impl DAGNode {
                 continue;
             }
             if op.may_contain_children() {
-                write!(f, " id{}", id4op!(*op))?;
+                write!(f, " id{}", id4op!(*op).0)?;
             } else {
                 write!(f, " ")?;
                 op.kind.as_operand().debug(f, tys)?;
@@ -392,11 +392,15 @@ impl DAGNode {
             if !op.may_contain_children() || op.kind == NodeKind::None {
                 continue;
             }
-            let id = *id4op!(*op);
-            op.debug(f, tys, s, id, indent + 2)?;
+            let id = id4op!(*op).0;
+            if !s[op].1 {
+                s.get_mut(op).unwrap().1 = true;
+                op.debug(f, tys, s, id, indent + 2)?;
+            }
         }
         if let Some(next) = self.next {
-            let id = *id4op!(next);
+            let id = id4op!(next).0;
+            s.get_mut(&next).unwrap().1 = true;
             next.debug(f, tys, s, id, indent)?;
         }
         fmt::Result::Ok(())
