@@ -1,6 +1,6 @@
 #include <sample.h>
-#define main sample
+#define master(x, y) main(int x, char ** y)
 
-int main() {
+int master(argc, argv) {
   return 0;
 }

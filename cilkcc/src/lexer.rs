@@ -24,6 +24,7 @@ pub struct SubLexer {
     buf: VecDeque<Token>,
     source: String,
     loc: SourceLoc,
+    is_temporary: bool,
 }
 
 pub type Result<T> = result::Result<T, LexerError>;
@@ -49,6 +50,15 @@ macro_rules! retrieve_ident {
     };
 }
 
+macro_rules! retrieve_ident_mut {
+    ($e:expr) => {
+        match &mut $e.kind {
+            &mut TokenKind::Identifier(ref mut ident) => ident,
+            _ => panic!(),
+        }
+    };
+}
+
 macro_rules! retrieve_str {
     ($e:expr) => {
         match &$e.kind {
@@ -57,11 +67,10 @@ macro_rules! retrieve_str {
         }
     };
 }
-
 fn retrieve_ident(tok: Token) -> Result<(SourceLoc, String)> {
     match tok.kind {
         TokenKind::Identifier(ident) => Ok((tok.loc, ident)),
-        _ => return Err(LexerError::msg(tok.loc, "expected identifier")),
+        _ => panic!(), //return Err(LexerError::msg(tok.loc, "expected identifier")),
     }
 }
 
@@ -130,9 +139,8 @@ impl Lexer {
                 self.do_get_token()
             }
             _ => Ok(tok),
-        });
-        tok
-        // self.expand(tok)
+        })?;
+        self.expand(tok)
     }
 
     pub fn unget(&mut self, t: Token) {
@@ -151,8 +159,8 @@ impl Lexer {
         match self.sub_lexers.back_mut().unwrap().do_read_token() {
             Ok(token) => Ok(token),
             Err(LexerError::EOF) => {
-                self.sub_lexers.pop_back().unwrap();
-                if self.sub_lexers.len() == 0 {
+                let is_temporary = self.sub_lexers.pop_back().unwrap().is_temporary;
+                if is_temporary || self.sub_lexers.len() == 0 {
                     return Err(LexerError::EOF);
                 }
                 return self.do_read_token();
@@ -260,7 +268,8 @@ impl Lexer {
             "/usr/include/",
             "/usr/include/linux/",
             "/usr/include/x86_64-linux-gnu/",
-            "./include/",
+            "./include/", // todo
+            "./examples", // todo
             "",
         ];
         header_paths
@@ -299,7 +308,7 @@ impl Lexer {
                 if arg != "," {
                     return Err(LexerError::msg(loc, "expected comma"));
                 }
-                arg = self.try_read_ident()?.1;
+                arg = retrieve_ident!(self.do_read_token()?);
             }
             params.insert(arg, count);
             count += 1;
@@ -313,7 +322,7 @@ impl Lexer {
                 break;
             }
 
-            let maybe_macro_name = self.try_read_ident()?.1;
+            let maybe_macro_name = retrieve_ident!(tok);
             if let Some(&nth) = params.get(maybe_macro_name.as_str()) {
                 let mut macro_param = tok;
                 macro_param.kind = TokenKind::MacroParam { nth };
@@ -337,8 +346,12 @@ impl Lexer {
             }
             body.push(t);
         }
-        self.register_funclike_macro(name, body);
+        self.register_obj_macro(name, body);
         Ok(())
+    }
+
+    fn register_obj_macro(&mut self, name: String, body: Vec<Token>) {
+        self.macros.insert(name, Macro::Object(body));
     }
 
     fn register_funclike_macro(&mut self, name: String, body: Vec<Token>) {
@@ -421,15 +434,14 @@ impl Lexer {
         let mut sub_lexer = SubLexer::new_expr(
             self.path_arena.clone(),
             self.sub_lexers.back().unwrap().path,
-        );
+        )
+        .temporary(true);
         sub_lexer.unget(Token::new(
             TokenKind::Symbol(Symbol::Semicolon),
             SourceLoc::new(self.sub_lexers.back().unwrap().path),
         ));
         sub_lexer.unget_all(expr);
-
         self.sub_lexers.push_back(sub_lexer);
-
         // let node = parser::Parser::new(self).run_as_expr().ok().unwrap();
         todo!();
         // Ok(false)
@@ -472,16 +484,16 @@ impl Lexer {
     }
 
     fn expand(&mut self, tok: Token) -> Result<Token> {
-        let (loc, name) = retrieve_ident(tok.clone())?;
+        let name = retrieve_ident!(tok.clone());
 
         match name.as_str() {
             "__LINE__" => {
                 return Ok(Token::new(
                     TokenKind::Int {
-                        n: loc.line as i64,
+                        n: tok.loc.line as i64,
                         bits: 32,
                     },
-                    loc,
+                    tok.loc,
                 ));
             }
             "__FILE__" => {
@@ -492,7 +504,7 @@ impl Lexer {
                             .display()
                             .to_string(),
                     ),
-                    loc,
+                    tok.loc,
                 ));
             }
             _ => {}
@@ -524,8 +536,96 @@ impl Lexer {
     }
 
     fn expand_func_macro(&mut self, tok: Token, name: String, body: Vec<Token>) -> Result<()> {
+        let paren = self.read_token()?;
+        if paren.kind != TokenKind::Symbol(Symbol::OpeningParen) {
+            return Err(LexerError::msg(paren.loc, "expected '('"));
+        }
+
+        let mut args = vec![];
+        loop {
+            let (arg, is_end) = self.read_one_arg()?;
+            args.push(arg);
+            if is_end {
+                break;
+            }
+        }
+
+        let mut expanded = vec![];
+        let mut is_stringize = false;
+        let mut is_combine = false;
+
+        for mcro_tok in body {
+            if retrieve_ident!(mcro_tok.clone()) == "#" {
+                if is_stringize {
+                    is_stringize = false;
+                    is_combine = true;
+                } else {
+                    is_stringize = true;
+                }
+                continue;
+            }
+
+            if let TokenKind::MacroParam { nth } = mcro_tok.kind {
+                if is_stringize {
+                    let stringized = stringize(tok.loc, args[nth].clone());
+                    expanded.push(stringized);
+                    is_stringize = false;
+                } else if is_combine {
+                    let mut last = expanded.pop().unwrap();
+                    for t in &args[nth] {
+                        *retrieve_ident_mut!(last) += retrieve_ident(t.clone())?.1.as_str();
+                    }
+                    expanded.push(last);
+                    is_combine = false;
+                } else {
+                    let mut sub_lexer =
+                        SubLexer::new_expr(self.path_arena.clone(), self.path()).temporary(true);
+                    sub_lexer.unget_all(args[nth].clone());
+                    self.sub_lexers.push_back(sub_lexer);
+                    loop {
+                        match self.do_get_token() {
+                            Ok(ok) => expanded.push(ok),
+                            Err(LexerError::EOF) => break,
+                            Err(e) => return Err(e),
+                        }
+                    }
+                }
+            } else {
+                if is_combine {
+                    let mut last = expanded.pop().unwrap();
+                    *retrieve_ident_mut!(last) += retrieve_ident(mcro_tok)?.1.as_str();
+                    expanded.push(last);
+                } else {
+                    expanded.push(mcro_tok.clone());
+                }
+            }
+        }
+
+        for t in &mut expanded {
+            t.hideset.insert(name.to_string());
+            t.loc = tok.loc;
+        }
+
+        self.unget_all(expanded);
 
         Ok(())
+    }
+
+    fn read_one_arg(&mut self) -> Result<(Vec<Token>, bool)> {
+        let mut nest = 0;
+        let mut arg = vec![];
+        loop {
+            let tok = self.do_read_token()?;
+            let val = retrieve_ident!(tok.clone());
+            match val.as_str() {
+                ")" if nest == 0 => return Ok((arg, true)),
+                "," if nest == 0 => return Ok((arg, false)),
+                "(" => nest += 1,
+                ")" => nest -= 1,
+                _ => {}
+            }
+            arg.push(tok);
+        }
     }
 
     // utils
@@ -549,6 +649,7 @@ impl SubLexer {
             source,
             buf: VecDeque::new(),
             loc: SourceLoc::new(path),
+            is_temporary: false,
         }
     }
 
@@ -559,11 +660,17 @@ impl SubLexer {
             source: "".to_string(),
             buf: VecDeque::new(),
             loc: SourceLoc::new(path),
+            is_temporary: false,
         }
     }
 
     pub fn file_path(&self) -> Ref<Arena<PathBuf>> {
         self.path_arena.borrow()
+    }
+
+    pub fn temporary(mut self, t: bool) -> Self {
+        self.is_temporary = t;
+        self
     }
 
     // reading char
@@ -613,15 +720,6 @@ impl SubLexer {
     }
 
     // reading token
-
-    // pub fn read_token(&mut self) -> Result<Token> {
-    //     let token = self.do_read_token();
-    //     token.and_then(|tok| match tok.kind {
-    //         TokenKind::Newline => self.read_token(),
-    //         TokenKind::Identifier(_) => Ok(convert_to_symbol(tok)),
-    //         _ => Ok(tok),
-    //     })
-    // }
 
     pub fn do_read_token(&mut self) -> Result<Token> {
         if let Some(tok) = self.buf.pop_back() {
@@ -990,6 +1088,29 @@ fn maybe_convert_to_keyword(token: Token) -> Token {
         _ => return token,
     };
     Token::new(keyw, token.loc)
+}
+
+fn stringize(loc: SourceLoc, ts: Vec<Token>) -> Token {
+    let string = ts
+        .into_iter()
+        .map(|t| {
+            format!(
+                "{}{}",
+                if t.leading_space { " " } else { "" },
+                match t.kind {
+                    TokenKind::String(s) => format!("\"{}\"", s),
+                    TokenKind::Int { n, .. } => format!("{}", n),
+                    TokenKind::Float(ref f) => format!("{}", *f),
+                    TokenKind::Identifier(ref i) => format!("{}", *i),
+                    TokenKind::Char(ref c) => format!("\'{}\'", *c),
+                    _ => "".to_string(),
+                }
+            )
+        })
+        .fold("".to_string(), |a, s| a + s.as_str())
+        .trim_start() // remove leading spaces
+        .to_string();
+    Token::new(TokenKind::String(string), loc)
 }
 
 impl LexerError {
