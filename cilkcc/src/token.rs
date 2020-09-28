@@ -23,7 +23,7 @@ pub enum TokenKind {
     Newline,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Keyword {
     Typedef,
     Extern,
@@ -62,7 +62,7 @@ pub enum Keyword {
     Return,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum Symbol {
     OpeningParen,
     ClosingParen,
@@ -134,5 +134,15 @@ impl Token {
     pub fn leading_space(mut self, x: bool) -> Self {
         self.leading_space = x;
         self
+    }
+}
+
+impl SourceLoc {
+    pub fn new(file: Id<PathBuf>) -> Self {
+        Self {
+            file,
+            line: 1,
+            pos: 0,
+        }
     }
 }
