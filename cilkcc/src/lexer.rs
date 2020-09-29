@@ -1,4 +1,7 @@
-use super::token::{Keyword, SourceLoc, Symbol, Token, TokenKind};
+use super::{
+    token,
+    token::{Keyword, SourceLoc, Symbol, Token},
+};
 use id_arena::{Arena, Id};
 use rustc_hash::FxHashMap;
 use std::cell::{Ref, RefCell};
@@ -27,10 +30,10 @@ pub struct SubLexer {
     is_temporary: bool,
 }
 
-pub type Result<T> = result::Result<T, LexerError>;
+pub type Result<T> = result::Result<T, Error>;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub enum LexerError {
+pub enum Error {
     Message(SourceLoc, String),
     EOF,
 }
@@ -44,7 +47,7 @@ pub enum Macro {
 macro_rules! retrieve_ident {
     ($e:expr) => {
         match &$e.kind {
-            &TokenKind::Identifier(ref ident) => ident.to_string(),
+            &token::Kind::Identifier(ref ident) => ident.to_string(),
             _ => "".to_string(),
         }
     };
@@ -53,7 +56,7 @@ macro_rules! retrieve_ident {
 macro_rules! retrieve_ident_mut {
     ($e:expr) => {
         match &mut $e.kind {
-            &mut TokenKind::Identifier(ref mut ident) => ident,
+            &mut token::Kind::Identifier(ref mut ident) => ident,
             _ => panic!(),
         }
     };
@@ -62,15 +65,15 @@ macro_rules! retrieve_ident_mut {
 macro_rules! retrieve_str {
     ($e:expr) => {
         match &$e.kind {
-            &TokenKind::String(ref s) => s.to_string(),
+            &token::Kind::String(ref s) => s.to_string(),
             _ => panic!(),
         }
     };
 }
 fn retrieve_ident(tok: Token) -> Result<(SourceLoc, String)> {
     match tok.kind {
-        TokenKind::Identifier(ident) => Ok((tok.loc, ident)),
-        _ => panic!(), //return Err(LexerError::msg(tok.loc, "expected identifier")),
+        token::Kind::Identifier(ident) => Ok((tok.loc, ident)),
+        _ => panic!(), //return Err(Error::msg(tok.loc, "expected identifier")),
     }
 }
 
@@ -108,15 +111,15 @@ impl Lexer {
 
     pub fn get_token(&mut self) -> Result<Token> {
         self.do_get_token().and_then(|tok| {
-            if matches!(tok.kind, TokenKind::String(_))
-                && matches!(self.peek_token()?.kind, TokenKind::String(_))
+            if matches!(tok.kind, token::Kind::String(_))
+                && matches!(self.peek_token()?.kind, token::Kind::String(_))
             {
                 let s1 = retrieve_str!(tok);
                 let s2 = retrieve_str!(self.get_token()?);
                 let mut new_tok = tok;
                 let mut concat_str = s1;
                 concat_str.push_str(s2.as_str());
-                new_tok.kind = TokenKind::String(concat_str);
+                new_tok.kind = token::Kind::String(concat_str);
                 Ok(new_tok)
             } else {
                 Ok(maybe_convert_to_keyword(tok))
@@ -134,7 +137,7 @@ impl Lexer {
 
     pub fn do_get_token(&mut self) -> Result<Token> {
         let tok = self.read_token().and_then(|tok| match &tok.kind {
-            &TokenKind::Symbol(Symbol::Hash) => {
+            &token::Kind::Symbol(Symbol::Hash) => {
                 self.read_cpp_directive()?;
                 self.do_get_token()
             }
@@ -153,15 +156,15 @@ impl Lexer {
 
     pub fn do_read_token(&mut self) -> Result<Token> {
         if self.sub_lexers.len() == 0 {
-            return Err(LexerError::EOF);
+            return Err(Error::EOF);
         }
 
         match self.sub_lexers.back_mut().unwrap().do_read_token() {
             Ok(token) => Ok(token),
-            Err(LexerError::EOF) => {
+            Err(Error::EOF) => {
                 let is_temporary = self.sub_lexers.pop_back().unwrap().is_temporary;
                 if is_temporary || self.sub_lexers.len() == 0 {
-                    return Err(LexerError::EOF);
+                    return Err(Error::EOF);
                 }
                 return self.do_read_token();
             }
@@ -172,8 +175,8 @@ impl Lexer {
     pub fn read_token(&mut self) -> Result<Token> {
         let token = self.do_read_token();
         token.and_then(|tok| match tok.kind {
-            TokenKind::Newline => self.read_token(),
-            TokenKind::Identifier(_) => Ok(convert_to_symbol(tok)),
+            token::Kind::Newline => self.read_token(),
+            token::Kind::Identifier(_) => Ok(convert_to_symbol(tok)),
             _ => Ok(tok),
         })
     }
@@ -181,7 +184,7 @@ impl Lexer {
     pub fn skip_symbol(&mut self, sym: Symbol) -> bool {
         if let Ok(tok) = self.get_token() {
             match tok.kind {
-                TokenKind::Symbol(s) if s == sym => return true,
+                token::Kind::Symbol(s) if s == sym => return true,
                 _ => self.unget(tok),
             }
         }
@@ -190,10 +193,7 @@ impl Lexer {
 
     pub fn expect_skip_symbol(&mut self, sym: Symbol) -> Result<()> {
         if !self.skip_symbol(sym) {
-            return Err(LexerError::Message(
-                self.loc(),
-                format!("expected '{:?}'", sym),
-            ));
+            return Err(Error::Message(self.loc(), format!("expected '{:?}'", sym)));
         }
         Ok(())
     }
@@ -201,8 +201,8 @@ impl Lexer {
     fn try_read_ident(&mut self) -> Result<(SourceLoc, String)> {
         let tok = self.do_read_token()?;
         match tok.kind {
-            TokenKind::Identifier(ident) => Ok((tok.loc, ident)),
-            _ => return Err(LexerError::msg(tok.loc, "expected identifier")),
+            token::Kind::Identifier(ident) => Ok((tok.loc, ident)),
+            _ => return Err(Error::msg(tok.loc, "expected identifier")),
         }
     }
 
@@ -226,7 +226,7 @@ impl Lexer {
     fn read_include(&mut self) -> Result<()> {
         let path = self.read_header_file_path()?;
         let abs_path = self.try_include(path.clone()).map_or(
-            Err(LexerError::Message(
+            Err(Error::Message(
                 self.sub_lexers.back().unwrap().loc,
                 format!("not found '{}'", path.as_path().display().to_string(),),
             )),
@@ -248,14 +248,11 @@ impl Lexer {
             self.next_char()?; // >
         } else {
             let tok = self.do_read_token()?;
-            if let TokenKind::String(s) = tok.kind {
+            if let token::Kind::String(s) = tok.kind {
                 println!("sorry, using \"double quote\" in #include is currently not supported.");
                 name = s;
             } else {
-                return Err(LexerError::Message(
-                    tok.loc,
-                    "expected '<' or '\"'".to_string(),
-                ));
+                return Err(Error::Message(tok.loc, "expected '<' or '\"'".to_string()));
             }
         }
         Ok(PathBuf::from(name))
@@ -306,7 +303,7 @@ impl Lexer {
             }
             if count > 0 {
                 if arg != "," {
-                    return Err(LexerError::msg(loc, "expected comma"));
+                    return Err(Error::msg(loc, "expected comma"));
                 }
                 arg = retrieve_ident!(self.do_read_token()?);
             }
@@ -318,14 +315,14 @@ impl Lexer {
 
         loop {
             let tok = self.do_read_token()?;
-            if tok.kind == TokenKind::Newline {
+            if tok.kind == token::Kind::Newline {
                 break;
             }
 
             let maybe_macro_name = retrieve_ident!(tok);
             if let Some(&nth) = params.get(maybe_macro_name.as_str()) {
                 let mut macro_param = tok;
-                macro_param.kind = TokenKind::MacroParam { nth };
+                macro_param.kind = token::Kind::MacroParam { nth };
                 body.push(macro_param);
             } else {
                 body.push(tok);
@@ -341,7 +338,7 @@ impl Lexer {
         let mut body = vec![];
         loop {
             let t = self.do_read_token()?;
-            if t.kind == TokenKind::Newline {
+            if t.kind == token::Kind::Newline {
                 break;
             }
             body.push(t);
@@ -419,7 +416,7 @@ impl Lexer {
             match val.as_str() {
                 "else" | "elif" | "endif" if nest == 0 => {
                     self.unget(tok);
-                    self.unget(Token::new(TokenKind::Identifier("#".to_string()), loc));
+                    self.unget(Token::new(token::Kind::Identifier("#".to_string()), loc));
                     return Ok(());
                 }
                 "if" | "ifdef" | "ifndef" => nest += 1,
@@ -437,7 +434,7 @@ impl Lexer {
         )
         .temporary(true);
         sub_lexer.unget(Token::new(
-            TokenKind::Symbol(Symbol::Semicolon),
+            token::Kind::Symbol(Symbol::Semicolon),
             SourceLoc::new(self.sub_lexers.back().unwrap().path),
         ));
         sub_lexer.unget_all(expr);
@@ -452,16 +449,16 @@ impl Lexer {
         loop {
             let tok = self.do_read_token()?;
             let tok = self.expand(tok)?;
-            if tok.kind == TokenKind::Newline {
+            if tok.kind == token::Kind::Newline {
                 break;
             }
             let tok = convert_to_symbol(tok);
             match tok.kind {
-                TokenKind::Identifier(ident) if ident == "defined" => {
+                token::Kind::Identifier(ident) if ident == "defined" => {
                     expr.push(self.read_defined_op()?)
                 }
-                TokenKind::Identifier(_) => expr.push(Token::new(
-                    TokenKind::Int { n: 0, bits: 32 },
+                token::Kind::Identifier(_) => expr.push(Token::new(
+                    token::Kind::Int { n: 0, bits: 32 },
                     SourceLoc::new(self.sub_lexers.back().unwrap().path),
                 )),
                 _ => expr.push(tok),
@@ -477,9 +474,9 @@ impl Lexer {
             self.expect_skip_symbol(Symbol::ClosingParen)?;
         }
         if self.macros.contains_key(retrieve_ident(tok)?.1.as_str()) {
-            Ok(Token::new(TokenKind::Int { n: 1, bits: 32 }, self.loc()))
+            Ok(Token::new(token::Kind::Int { n: 1, bits: 32 }, self.loc()))
         } else {
-            Ok(Token::new(TokenKind::Int { n: 0, bits: 32 }, self.loc()))
+            Ok(Token::new(token::Kind::Int { n: 0, bits: 32 }, self.loc()))
         }
     }
 
@@ -489,7 +486,7 @@ impl Lexer {
         match name.as_str() {
             "__LINE__" => {
                 return Ok(Token::new(
-                    TokenKind::Int {
+                    token::Kind::Int {
                         n: tok.loc.line as i64,
                         bits: 32,
                     },
@@ -498,7 +495,7 @@ impl Lexer {
             }
             "__FILE__" => {
                 return Ok(Token::new(
-                    TokenKind::String(
+                    token::Kind::String(
                         self.path_arena.borrow()[self.path()]
                             .as_path()
                             .display()
@@ -537,8 +534,8 @@ impl Lexer {
 
     fn expand_func_macro(&mut self, tok: Token, name: String, body: Vec<Token>) -> Result<()> {
         let paren = self.read_token()?;
-        if paren.kind != TokenKind::Symbol(Symbol::OpeningParen) {
-            return Err(LexerError::msg(paren.loc, "expected '('"));
+        if paren.kind != token::Kind::Symbol(Symbol::OpeningParen) {
+            return Err(Error::msg(paren.loc, "expected '('"));
         }
 
         let mut args = vec![];
@@ -565,7 +562,7 @@ impl Lexer {
                 continue;
             }
 
-            if let TokenKind::MacroParam { nth } = mcro_tok.kind {
+            if let token::Kind::MacroParam { nth } = mcro_tok.kind {
                 if is_stringize {
                     let stringized = stringize(tok.loc, args[nth].clone());
                     expanded.push(stringized);
@@ -585,7 +582,7 @@ impl Lexer {
                     loop {
                         match self.do_get_token() {
                             Ok(ok) => expanded.push(ok),
-                            Err(LexerError::EOF) => break,
+                            Err(Error::EOF) => break,
                             Err(e) => return Err(e),
                         }
                     }
@@ -677,32 +674,32 @@ impl SubLexer {
 
     pub fn get_char(&mut self) -> Result<char> {
         if self.loc.pos >= self.source.len() {
-            return Err(LexerError::EOF);
+            return Err(Error::EOF);
         }
         self.source[self.loc.pos..]
             .chars()
             .next()
-            .map_or(Err(LexerError::EOF), |c| Ok(c))
+            .map_or(Err(Error::EOF), |c| Ok(c))
     }
 
     pub fn get_char2(&mut self) -> Result<char> {
         if self.loc.pos + 1 >= self.source.len() {
-            return Err(LexerError::EOF);
+            return Err(Error::EOF);
         }
         self.source[self.loc.pos + 1..]
             .chars()
             .next()
-            .map_or(Err(LexerError::EOF), |c| Ok(c))
+            .map_or(Err(Error::EOF), |c| Ok(c))
     }
 
     pub fn next_char(&mut self) -> Result<char> {
         if self.loc.pos >= self.source.len() {
-            return Err(LexerError::EOF);
+            return Err(Error::EOF);
         }
         let c = self.source[self.loc.pos..]
             .chars()
             .next()
-            .map_or(Err(LexerError::EOF), |c| Ok(c));
+            .map_or(Err(Error::EOF), |c| Ok(c));
 
         if c == Ok('\n') {
             self.loc.line += 1;
@@ -781,7 +778,7 @@ impl SubLexer {
             break;
         }
 
-        Ok(Token::new(TokenKind::Identifier(ident), loc))
+        Ok(Token::new(token::Kind::Identifier(ident), loc))
     }
 
     pub fn read_number_literal(&mut self) -> Result<Token> {
@@ -806,7 +803,7 @@ impl SubLexer {
 
         if is_float {
             let num = num.parse().unwrap();
-            return Ok(Token::new(TokenKind::Float(num), loc));
+            return Ok(Token::new(token::Kind::Float(num), loc));
         }
 
         let n = if num.len() > 2 && num.starts_with("0x") {
@@ -819,7 +816,7 @@ impl SubLexer {
         let max_32bits = 0xffffffff;
         let bits = if 0 == (n & !max_32bits) { 32 } else { 64 };
 
-        Ok(Token::new(TokenKind::Int { n, bits }, loc))
+        Ok(Token::new(token::Kind::Int { n, bits }, loc))
     }
 
     fn parse_dec_number(&mut self, num_literal: &str) -> i64 {
@@ -885,7 +882,7 @@ impl SubLexer {
             _ => {}
         };
 
-        Ok(Token::new(TokenKind::Identifier(sym), loc))
+        Ok(Token::new(token::Kind::Identifier(sym), loc))
     }
 
     pub fn read_escaped_char(&mut self) -> Result<char> {
@@ -936,7 +933,7 @@ impl SubLexer {
 
     pub fn read_newline(&mut self) -> Result<Token> {
         assert!(self.next_char()? == '\n');
-        Ok(Token::new(TokenKind::Newline, self.loc))
+        Ok(Token::new(token::Kind::Newline, self.loc))
     }
 
     pub fn read_string_literal(&mut self) -> Result<Token> {
@@ -950,7 +947,7 @@ impl SubLexer {
                 c => s.push(c),
             }
         }
-        Ok(Token::new(TokenKind::String(s), loc))
+        Ok(Token::new(token::Kind::String(s), loc))
     }
 
     pub fn read_char_literal(&mut self) -> Result<Token> {
@@ -965,12 +962,9 @@ impl SubLexer {
             }
         };
         if self.next_char()? != '\'' {
-            return Err(LexerError::Message(
-                loc,
-                "missing terminating '\''".to_string(),
-            ));
+            return Err(Error::Message(loc, "missing terminating '\''".to_string()));
         }
-        Ok(Token::new(TokenKind::Char(c), loc))
+        Ok(Token::new(token::Kind::Char(c), loc))
     }
 
     // utils for token
@@ -986,58 +980,58 @@ impl SubLexer {
 
 fn convert_to_symbol(token: Token) -> Token {
     let ident = match token.kind {
-        TokenKind::Identifier(ref ident) => ident,
+        token::Kind::Identifier(ref ident) => ident,
         _ => panic!(),
     };
     let symbol = match ident.as_str() {
-        "sizeof" => TokenKind::Symbol(Symbol::Sizeof),
-        "++" => TokenKind::Symbol(Symbol::Inc),
-        "--" => TokenKind::Symbol(Symbol::Dec),
-        "(" => TokenKind::Symbol(Symbol::OpeningParen),
-        ")" => TokenKind::Symbol(Symbol::ClosingParen),
-        "[" => TokenKind::Symbol(Symbol::OpeningBoxBracket),
-        "]" => TokenKind::Symbol(Symbol::ClosingBoxBracket),
-        "{" => TokenKind::Symbol(Symbol::OpeningBrace),
-        "}" => TokenKind::Symbol(Symbol::ClosingBrace),
-        "." => TokenKind::Symbol(Symbol::Point),
-        "," => TokenKind::Symbol(Symbol::Comma),
-        ";" => TokenKind::Symbol(Symbol::Semicolon),
-        ":" => TokenKind::Symbol(Symbol::Colon),
-        "->" => TokenKind::Symbol(Symbol::Arrow),
-        "+" => TokenKind::Symbol(Symbol::Add),
-        "-" => TokenKind::Symbol(Symbol::Sub),
-        "!" => TokenKind::Symbol(Symbol::Not),
-        "~" => TokenKind::Symbol(Symbol::BitwiseNot),
-        "*" => TokenKind::Symbol(Symbol::Asterisk),
-        "&" => TokenKind::Symbol(Symbol::Ampersand),
-        "/" => TokenKind::Symbol(Symbol::Div),
-        "%" => TokenKind::Symbol(Symbol::Mod),
-        "<<" => TokenKind::Symbol(Symbol::Shl),
-        ">>" => TokenKind::Symbol(Symbol::Shr),
-        "<" => TokenKind::Symbol(Symbol::Lt),
-        "<=" => TokenKind::Symbol(Symbol::Le),
-        ">" => TokenKind::Symbol(Symbol::Gt),
-        ">=" => TokenKind::Symbol(Symbol::Ge),
-        "==" => TokenKind::Symbol(Symbol::Eq),
-        "!=" => TokenKind::Symbol(Symbol::Ne),
-        "^" => TokenKind::Symbol(Symbol::Xor),
-        "|" => TokenKind::Symbol(Symbol::Or),
-        "&&" => TokenKind::Symbol(Symbol::LAnd),
-        "||" => TokenKind::Symbol(Symbol::LOr),
-        "?" => TokenKind::Symbol(Symbol::Question),
-        "=" => TokenKind::Symbol(Symbol::Assign),
-        "+=" => TokenKind::Symbol(Symbol::AssignAdd),
-        "-=" => TokenKind::Symbol(Symbol::AssignSub),
-        "*=" => TokenKind::Symbol(Symbol::AssignMul),
-        "/=" => TokenKind::Symbol(Symbol::AssignDiv),
-        "%=" => TokenKind::Symbol(Symbol::AssignMod),
-        "<<=" => TokenKind::Symbol(Symbol::AssignShl),
-        ">>=" => TokenKind::Symbol(Symbol::AssignShr),
-        "&=" => TokenKind::Symbol(Symbol::AssignAnd),
-        "^=" => TokenKind::Symbol(Symbol::AssignXor),
-        "|=" => TokenKind::Symbol(Symbol::AssignOr),
-        "#" => TokenKind::Symbol(Symbol::Hash),
-        "..." => TokenKind::Symbol(Symbol::Vararg),
+        "sizeof" => token::Kind::Symbol(Symbol::Sizeof),
+        "++" => token::Kind::Symbol(Symbol::Inc),
+        "--" => token::Kind::Symbol(Symbol::Dec),
+        "(" => token::Kind::Symbol(Symbol::OpeningParen),
+        ")" => token::Kind::Symbol(Symbol::ClosingParen),
+        "[" => token::Kind::Symbol(Symbol::OpeningBoxBracket),
+        "]" => token::Kind::Symbol(Symbol::ClosingBoxBracket),
+        "{" => token::Kind::Symbol(Symbol::OpeningBrace),
+        "}" => token::Kind::Symbol(Symbol::ClosingBrace),
+        "." => token::Kind::Symbol(Symbol::Point),
+        "," => token::Kind::Symbol(Symbol::Comma),
+        ";" => token::Kind::Symbol(Symbol::Semicolon),
+        ":" => token::Kind::Symbol(Symbol::Colon),
+        "->" => token::Kind::Symbol(Symbol::Arrow),
+        "+" => token::Kind::Symbol(Symbol::Add),
+        "-" => token::Kind::Symbol(Symbol::Sub),
+        "!" => token::Kind::Symbol(Symbol::Not),
+        "~" => token::Kind::Symbol(Symbol::BitwiseNot),
+        "*" => token::Kind::Symbol(Symbol::Asterisk),
+        "&" => token::Kind::Symbol(Symbol::Ampersand),
+        "/" => token::Kind::Symbol(Symbol::Div),
+        "%" => token::Kind::Symbol(Symbol::Mod),
+        "<<" => token::Kind::Symbol(Symbol::Shl),
+        ">>" => token::Kind::Symbol(Symbol::Shr),
+        "<" => token::Kind::Symbol(Symbol::Lt),
+        "<=" => token::Kind::Symbol(Symbol::Le),
+        ">" => token::Kind::Symbol(Symbol::Gt),
+        ">=" => token::Kind::Symbol(Symbol::Ge),
+        "==" => token::Kind::Symbol(Symbol::Eq),
+        "!=" => token::Kind::Symbol(Symbol::Ne),
+        "^" => token::Kind::Symbol(Symbol::Xor),
+        "|" => token::Kind::Symbol(Symbol::Or),
+        "&&" => token::Kind::Symbol(Symbol::LAnd),
+        "||" => token::Kind::Symbol(Symbol::LOr),
+        "?" => token::Kind::Symbol(Symbol::Question),
+        "=" => token::Kind::Symbol(Symbol::Assign),
+        "+=" => token::Kind::Symbol(Symbol::AssignAdd),
+        "-=" => token::Kind::Symbol(Symbol::AssignSub),
+        "*=" => token::Kind::Symbol(Symbol::AssignMul),
+        "/=" => token::Kind::Symbol(Symbol::AssignDiv),
+        "%=" => token::Kind::Symbol(Symbol::AssignMod),
+        "<<=" => token::Kind::Symbol(Symbol::AssignShl),
+        ">>=" => token::Kind::Symbol(Symbol::AssignShr),
+        "&=" => token::Kind::Symbol(Symbol::AssignAnd),
+        "^=" => token::Kind::Symbol(Symbol::AssignXor),
+        "|=" => token::Kind::Symbol(Symbol::AssignOr),
+        "#" => token::Kind::Symbol(Symbol::Hash),
+        "..." => token::Kind::Symbol(Symbol::Vararg),
         _ => return token,
     };
     Token::new(symbol, token.loc)
@@ -1045,46 +1039,46 @@ fn convert_to_symbol(token: Token) -> Token {
 
 fn maybe_convert_to_keyword(token: Token) -> Token {
     let ident = match token.kind {
-        TokenKind::Identifier(ref ident) => ident,
+        token::Kind::Identifier(ref ident) => ident,
         _ => return token,
     };
     let keyw = match ident.as_str() {
-        "typedef" => TokenKind::Keyword(Keyword::Typedef),
-        "extern" => TokenKind::Keyword(Keyword::Extern),
-        "auto" => TokenKind::Keyword(Keyword::Auto),
-        "register" => TokenKind::Keyword(Keyword::Register),
-        "static" => TokenKind::Keyword(Keyword::Static),
-        "restrict" => TokenKind::Keyword(Keyword::Restrict),
-        "const" => TokenKind::Keyword(Keyword::Const),
-        "constexpr" => TokenKind::Keyword(Keyword::ConstExpr),
-        "volatile" => TokenKind::Keyword(Keyword::Volatile),
-        "void" => TokenKind::Keyword(Keyword::Void),
-        "signed" => TokenKind::Keyword(Keyword::Signed),
-        "unsigned" => TokenKind::Keyword(Keyword::Unsigned),
-        "char" => TokenKind::Keyword(Keyword::Char),
-        "int" => TokenKind::Keyword(Keyword::Int),
-        "bool" => TokenKind::Keyword(Keyword::Int),
-        "short" => TokenKind::Keyword(Keyword::Short),
-        "long" => TokenKind::Keyword(Keyword::Long),
-        "float" => TokenKind::Keyword(Keyword::Float),
-        "double" => TokenKind::Keyword(Keyword::Double),
-        "struct" => TokenKind::Keyword(Keyword::Struct),
-        "union" => TokenKind::Keyword(Keyword::Union),
-        "enum" => TokenKind::Keyword(Keyword::Enum),
-        "inline" => TokenKind::Keyword(Keyword::Inline),
-        "noreturn" => TokenKind::Keyword(Keyword::Noreturn),
-        "if" => TokenKind::Keyword(Keyword::If),
-        "else" => TokenKind::Keyword(Keyword::Else),
-        "for" => TokenKind::Keyword(Keyword::For),
-        "while" => TokenKind::Keyword(Keyword::While),
-        "do" => TokenKind::Keyword(Keyword::Do),
-        "switch" => TokenKind::Keyword(Keyword::Switch),
-        "case" => TokenKind::Keyword(Keyword::Case),
-        "default" => TokenKind::Keyword(Keyword::Default),
-        "goto" => TokenKind::Keyword(Keyword::Goto),
-        "break" => TokenKind::Keyword(Keyword::Break),
-        "continue" => TokenKind::Keyword(Keyword::Continue),
-        "return" => TokenKind::Keyword(Keyword::Return),
+        "typedef" => token::Kind::Keyword(Keyword::Typedef),
+        "extern" => token::Kind::Keyword(Keyword::Extern),
+        "auto" => token::Kind::Keyword(Keyword::Auto),
+        "register" => token::Kind::Keyword(Keyword::Register),
+        "static" => token::Kind::Keyword(Keyword::Static),
+        "restrict" => token::Kind::Keyword(Keyword::Restrict),
+        "const" => token::Kind::Keyword(Keyword::Const),
+        "constexpr" => token::Kind::Keyword(Keyword::ConstExpr),
+        "volatile" => token::Kind::Keyword(Keyword::Volatile),
+        "void" => token::Kind::Keyword(Keyword::Void),
+        "signed" => token::Kind::Keyword(Keyword::Signed),
+        "unsigned" => token::Kind::Keyword(Keyword::Unsigned),
+        "char" => token::Kind::Keyword(Keyword::Char),
+        "int" => token::Kind::Keyword(Keyword::Int),
+        "bool" => token::Kind::Keyword(Keyword::Int),
+        "short" => token::Kind::Keyword(Keyword::Short),
+        "long" => token::Kind::Keyword(Keyword::Long),
+        "float" => token::Kind::Keyword(Keyword::Float),
+        "double" => token::Kind::Keyword(Keyword::Double),
+        "struct" => token::Kind::Keyword(Keyword::Struct),
+        "union" => token::Kind::Keyword(Keyword::Union),
+        "enum" => token::Kind::Keyword(Keyword::Enum),
+        "inline" => token::Kind::Keyword(Keyword::Inline),
+        "noreturn" => token::Kind::Keyword(Keyword::Noreturn),
+        "if" => token::Kind::Keyword(Keyword::If),
+        "else" => token::Kind::Keyword(Keyword::Else),
+        "for" => token::Kind::Keyword(Keyword::For),
+        "while" => token::Kind::Keyword(Keyword::While),
+        "do" => token::Kind::Keyword(Keyword::Do),
+        "switch" => token::Kind::Keyword(Keyword::Switch),
+        "case" => token::Kind::Keyword(Keyword::Case),
+        "default" => token::Kind::Keyword(Keyword::Default),
+        "goto" => token::Kind::Keyword(Keyword::Goto),
+        "break" => token::Kind::Keyword(Keyword::Break),
+        "continue" => token::Kind::Keyword(Keyword::Continue),
+        "return" => token::Kind::Keyword(Keyword::Return),
         _ => return token,
     };
     Token::new(keyw, token.loc)
@@ -1098,11 +1092,11 @@ fn stringize(loc: SourceLoc, ts: Vec<Token>) -> Token {
                 "{}{}",
                 if t.leading_space { " " } else { "" },
                 match t.kind {
-                    TokenKind::String(s) => format!("\"{}\"", s),
-                    TokenKind::Int { n, .. } => format!("{}", n),
-                    TokenKind::Float(ref f) => format!("{}", *f),
-                    TokenKind::Identifier(ref i) => format!("{}", *i),
-                    TokenKind::Char(ref c) => format!("\'{}\'", *c),
+                    token::Kind::String(s) => format!("\"{}\"", s),
+                    token::Kind::Int { n, .. } => format!("{}", n),
+                    token::Kind::Float(ref f) => format!("{}", *f),
+                    token::Kind::Identifier(ref i) => format!("{}", *i),
+                    token::Kind::Char(ref c) => format!("\'{}\'", *c),
                     _ => "".to_string(),
                 }
             )
@@ -1110,10 +1104,10 @@ fn stringize(loc: SourceLoc, ts: Vec<Token>) -> Token {
         .fold("".to_string(), |a, s| a + s.as_str())
         .trim_start() // remove leading spaces
         .to_string();
-    Token::new(TokenKind::String(string), loc)
+    Token::new(token::Kind::String(string), loc)
 }
 
-impl LexerError {
+impl Error {
     pub fn msg(loc: SourceLoc, msg: &'static str) -> Self {
         Self::Message(loc, msg.to_string())
     }

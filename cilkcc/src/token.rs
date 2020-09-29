@@ -4,14 +4,14 @@ use std::path::PathBuf;
 
 #[derive(Debug, Clone)]
 pub struct Token {
-    pub kind: TokenKind,
+    pub kind: Kind,
     pub leading_space: bool,
     pub loc: SourceLoc,
     pub hideset: FxHashSet<String>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum TokenKind {
+pub enum Kind {
     MacroParam { nth: usize },
     Keyword(Keyword),
     Identifier(String),
@@ -122,7 +122,7 @@ pub struct SourceLoc {
 }
 
 impl Token {
-    pub fn new(kind: TokenKind, loc: SourceLoc) -> Self {
+    pub fn new(kind: Kind, loc: SourceLoc) -> Self {
         Self {
             kind,
             leading_space: false,
