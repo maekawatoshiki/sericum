@@ -1,5 +1,5 @@
 use super::{
-    token,
+    parser, token,
     token::{Keyword, SourceLoc, Symbol, Token},
 };
 use id_arena::{Arena, Id};
@@ -73,7 +73,7 @@ macro_rules! retrieve_str {
 fn retrieve_ident(tok: Token) -> Result<(SourceLoc, String)> {
     match tok.kind {
         token::Kind::Identifier(ident) => Ok((tok.loc, ident)),
-        _ => panic!(), //return Err(Error::msg(tok.loc, "expected identifier")),
+        _ => return Err(Error::msg(tok.loc, "expected identifier")),
     }
 }
 
@@ -181,18 +181,17 @@ impl Lexer {
         })
     }
 
-    pub fn skip_symbol(&mut self, sym: Symbol) -> bool {
-        if let Ok(tok) = self.get_token() {
-            match tok.kind {
-                token::Kind::Symbol(s) if s == sym => return true,
-                _ => self.unget(tok),
-            }
+    pub fn skip_symbol(&mut self, sym: Symbol) -> Result<bool> {
+        let tok = self.get_token()?;
+        match tok.kind {
+            token::Kind::Symbol(s) if s == sym => return Ok(true),
+            _ => self.unget(tok),
         }
-        false
+        Ok(false)
     }
 
     pub fn expect_skip_symbol(&mut self, sym: Symbol) -> Result<()> {
-        if !self.skip_symbol(sym) {
+        if !self.skip_symbol(sym)? {
             return Err(Error::Message(self.loc(), format!("expected '{:?}'", sym)));
         }
         Ok(())
@@ -219,6 +218,7 @@ impl Lexer {
             "ifndef" => self.read_ifndef(),
             "elif" => self.read_elif(),
             "else" => self.read_else(),
+            // "endif" => panic!(),
             _ => Ok(()),
         })
     }
@@ -241,7 +241,7 @@ impl Lexer {
 
     fn read_header_file_path(&mut self) -> Result<PathBuf> {
         let mut name = "".to_string();
-        if self.skip_symbol(Symbol::Lt) {
+        if self.skip_symbol(Symbol::Lt)? {
             while self.get_char()? != '>' {
                 name.push(self.next_char()?);
             }
@@ -411,7 +411,7 @@ impl Lexer {
             }
 
             let tok = self.do_read_token()?;
-            let val = retrieve_ident(tok.clone())?.1;
+            let val = retrieve_ident!(tok.clone());
 
             match val.as_str() {
                 "else" | "elif" | "endif" if nest == 0 => {
@@ -427,6 +427,7 @@ impl Lexer {
     }
 
     fn read_constexpr(&mut self) -> Result<bool> {
+        let loc = self.loc();
         let expr = self.read_intexpr_line()?;
         let mut sub_lexer = SubLexer::new_expr(
             self.path_arena.clone(),
@@ -439,9 +440,24 @@ impl Lexer {
         ));
         sub_lexer.unget_all(expr);
         self.sub_lexers.push_back(sub_lexer);
-        // let node = parser::Parser::new(self).run_as_expr().ok().unwrap();
-        todo!();
-        // Ok(false)
+        let node = match parser::Parser::new(self).parse_as_expr() {
+            Err(Error::EOF) => {
+                return Err(Error::msg(self.loc(), "reached end of expression"));
+            }
+            Err(Error::Message(loc, m)) => {
+                self.sub_lexers.pop_back();
+                return Err(Error::Message(loc, m));
+            }
+            Ok(node) => {
+                self.sub_lexers.pop_back();
+                node
+            }
+        };
+        if let Some(e) = node.eval() {
+            Ok(e != 0)
+        } else {
+            Err(Error::msg(loc, "expected constexpr"))
+        }
     }
 
     fn read_intexpr_line(&mut self) -> Result<Vec<Token>> {
@@ -464,7 +480,7 @@ impl Lexer {
                 _ => expr.push(tok),
             }
         }
-        Ok(vec![])
+        Ok(expr)
     }
 
     fn read_defined_op(&mut self) -> Result<Token> {
@@ -627,11 +643,11 @@ impl Lexer {
 
     // utils
 
-    fn loc(&self) -> SourceLoc {
+    pub fn loc(&self) -> SourceLoc {
         self.sub_lexers.back().unwrap().loc
     }
 
-    fn path(&self) -> Id<PathBuf> {
+    pub fn path(&self) -> Id<PathBuf> {
         self.sub_lexers.back().unwrap().path
     }
 }
@@ -979,10 +995,7 @@ impl SubLexer {
 }
 
 fn convert_to_symbol(token: Token) -> Token {
-    let ident = match token.kind {
-        token::Kind::Identifier(ref ident) => ident,
-        _ => panic!(),
-    };
+    let ident = retrieve_ident!(token);
     let symbol = match ident.as_str() {
         "sizeof" => token::Kind::Symbol(Symbol::Sizeof),
         "++" => token::Kind::Symbol(Symbol::Inc),

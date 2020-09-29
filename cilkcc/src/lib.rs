@@ -10,7 +10,11 @@ pub mod token;
 
 pub fn compile(path: PathBuf) {
     let mut lexer = lexer::Lexer::new(path);
-    while let Ok(tok) = lexer.get_token() {
-        println!("{:?}", tok);
+    loop {
+        match lexer.get_token() {
+            Ok(tok) => println!("{:?}", tok),
+            Err(lexer::Error::Message(loc, msg)) => println!("error: {:?}: {}", loc, msg),
+            Err(lexer::Error::EOF) => break,
+        }
     }
 }
