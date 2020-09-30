@@ -27,6 +27,7 @@ pub struct SubLexer {
     buf: VecDeque<Token>,
     source: String,
     loc: SourceLoc,
+    last_loc: SourceLoc,
     is_temporary: bool,
 }
 
@@ -670,6 +671,10 @@ impl Lexer {
         self.sub_lexers.back().unwrap().loc
     }
 
+    pub fn last_loc(&self) -> SourceLoc {
+        self.sub_lexers.back().unwrap().last_loc
+    }
+
     pub fn path(&self) -> Id<PathBuf> {
         self.sub_lexers.back().unwrap().path
     }
@@ -678,9 +683,19 @@ impl Lexer {
         &self.path_arena
     }
 
+    // TODO: REFINE CODE
     pub fn get_surrounding_line(&self, loc: SourceLoc) -> String {
-        let source = &self.sub_lexers.back().unwrap().source;
-        let peek_pos = loc.pos;
+        let source =
+            if self.sub_lexers.len() > 0 && self.sub_lexers.back().unwrap().path == loc.file {
+                self.sub_lexers.back().unwrap().source.clone()
+            } else {
+                let path = &self.path_arena.borrow()[loc.file];
+                fs::read_to_string(path).unwrap()
+            };
+        let mut peek_pos = loc.pos;
+        if peek_pos >= source.len() {
+            peek_pos = source.len() - 1
+        }
         let start_pos = {
             let mut p = peek_pos as i32;
             while p >= 0 && source[p as usize..].chars().next().unwrap() as char != '\n' {
@@ -716,6 +731,7 @@ impl SubLexer {
             source,
             buf: VecDeque::new(),
             loc: SourceLoc::new(path),
+            last_loc: SourceLoc::new(path),
             is_temporary: false,
         }
     }
@@ -727,6 +743,7 @@ impl SubLexer {
             source: "".to_string(),
             buf: VecDeque::new(),
             loc: SourceLoc::new(path),
+            last_loc: SourceLoc::new(path),
             is_temporary: false,
         }
     }
@@ -792,6 +809,8 @@ impl SubLexer {
         if let Some(tok) = self.buf.pop_back() {
             return Ok(tok);
         }
+
+        self.last_loc = self.loc;
 
         match self.get_char()? {
             'a'..='z' | 'A'..='Z' | '_' => self.read_identifier(),
