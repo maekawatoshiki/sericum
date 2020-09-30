@@ -38,6 +38,10 @@ pub enum Kind {
         then_: Box<AST>,
         else_: Box<AST>,
     },
+    While {
+        cond: Box<AST>,
+        body: Box<AST>,
+    },
     Return(Option<Box<AST>>),
 }
 

@@ -201,6 +201,7 @@ impl<'a> Parser<'a> {
         let tok = self.lexer.get_token()?;
         match tok.kind {
             token::Kind::Keyword(Keyword::If) => return self.read_if_stmt(),
+            token::Kind::Keyword(Keyword::While) => return self.read_while_stmt(),
             token::Kind::Keyword(Keyword::Return) => return self.read_return_stmt(),
             token::Kind::Symbol(Symbol::OpeningBrace) => return self.read_block(),
             _ => {}
@@ -230,6 +231,15 @@ impl<'a> Parser<'a> {
             Box::new(AST::new(ast::Kind::Block(vec![]), self.lexer.loc()))
         };
         Ok(AST::new(ast::Kind::If { cond, then_, else_ }, loc))
+    }
+
+    fn read_while_stmt(&mut self) -> Result<AST> {
+        let loc = self.lexer.loc();
+        expect_symbol_error!(self, OpeningParen, "expected '('");
+        let cond = Box::new(self.read_expr()?);
+        expect_symbol_error!(self, ClosingParen, "expected ')'");
+        let body = Box::new(self.read_stmt()?);
+        Ok(AST::new(ast::Kind::While { cond, body }, loc))
     }
 
     fn read_return_stmt(&mut self) -> Result<AST> {
@@ -312,11 +322,11 @@ impl<'a> Parser<'a> {
         false
     }
 
-    fn read_string_initializer(&mut self, ty: &mut Type, s: String) -> Result<AST> {
+    fn read_string_initializer(&mut self, _ty: &mut Type, _s: String) -> Result<AST> {
         todo!()
     }
 
-    fn read_initializer_list(&mut self, ty: &mut Type) -> Result<AST> {
+    fn read_initializer_list(&mut self, _ty: &mut Type) -> Result<AST> {
         todo!()
     }
 
@@ -996,7 +1006,6 @@ impl<'a> Parser<'a> {
     }
 
     fn read_primary(&mut self) -> Result<AST> {
-        let loc = self.lexer.loc();
         let tok = self.lexer.get_token()?;
 
         match tok.kind {
@@ -1013,7 +1022,7 @@ impl<'a> Parser<'a> {
                     };
                 }
                 Err(Error::Message(
-                    loc,
+                    tok.loc,
                     format!("variable not found '{}'", ident),
                 ))
             }
@@ -1026,15 +1035,18 @@ impl<'a> Parser<'a> {
                     Ok(expr)
                 }
                 _ => Err(Error::Message(
-                    loc,
-                    format!("expected '(', but got {:?}", tok.kind),
+                    tok.loc,
+                    format!("expected expression, but got {:?}", tok.kind),
                 )),
             },
-            _ => Err(Error::Message(loc, format!("unknown token {:?}", tok.kind))),
+            _ => Err(Error::Message(
+                tok.loc,
+                format!("unknown token {:?}", tok.kind),
+            )),
         }
     }
 
-    fn get_typedef(&self, name: &str) -> Option<Type> {
+    fn get_typedef(&self, _name: &str) -> Option<Type> {
         todo!()
     }
 

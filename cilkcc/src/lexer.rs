@@ -673,6 +673,37 @@ impl Lexer {
     pub fn path(&self) -> Id<PathBuf> {
         self.sub_lexers.back().unwrap().path
     }
+
+    pub fn path_arena(&self) -> &PathArena {
+        &self.path_arena
+    }
+
+    pub fn get_surrounding_line(&self, loc: SourceLoc) -> String {
+        let source = &self.sub_lexers.back().unwrap().source;
+        let peek_pos = loc.pos;
+        let start_pos = {
+            let mut p = peek_pos as i32;
+            while p >= 0 && source[p as usize..].chars().next().unwrap() as char != '\n' {
+                p -= 1;
+            }
+            p += 1; // '\n'
+            p as usize
+        };
+        let end_pos = {
+            let mut p = peek_pos as i32;
+            while p < source.len() as i32 && source[p as usize..].chars().next().unwrap() != '\n' {
+                p += 1;
+            }
+            p as usize
+        };
+        let surrounding_code = source[start_pos..end_pos].to_string();
+        let mut err_point = String::new();
+        for _ in 0..(peek_pos - start_pos) {
+            err_point.push(' ');
+        }
+        err_point.push('^');
+        surrounding_code + "\n" + err_point.as_str()
+    }
 }
 
 impl SubLexer {

@@ -11,7 +11,22 @@ pub mod types;
 
 pub fn compile(path: PathBuf) {
     let mut lexer = lexer::Lexer::new(path);
-    println!("{:?}", parser::Parser::new(&mut lexer).parse())
+    match parser::Parser::new(&mut lexer).parse() {
+        Ok(ok) => println!("{:?}", ok),
+        Err(lexer::Error::EOF) => panic!(),
+        Err(lexer::Error::Message(loc, msg)) => {
+            println!(
+                "{}:{}: {}",
+                lexer.path_arena().borrow()[loc.file]
+                    .as_path()
+                    .display()
+                    .to_string(),
+                loc.line,
+                msg
+            );
+            println!("{}", lexer.get_surrounding_line(loc));
+        }
+    }
     // loop {
     //     match lexer.get_token() {
     //         Ok(tok) => println!("{:?}", tok),
