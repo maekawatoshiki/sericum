@@ -12,6 +12,7 @@ pub struct Parser<'a> {
     pub lexer: &'a mut Lexer,
     env: Env<AST>,
     tags: Env<Type>,
+    compound_types: CompoundTypes,
 }
 
 pub struct Env<T: Clone>(pub VecDeque<FxHashMap<String, T>>);
@@ -31,6 +32,7 @@ impl<'a> Parser<'a> {
             lexer,
             env: Env::new(),
             tags: Env::new(),
+            compound_types: CompoundTypes::new(),
         }
     }
 
@@ -126,7 +128,67 @@ impl<'a> Parser<'a> {
         todo!()
     }
 
-    fn read_declarator(&mut self, ret_ty: Type) -> Result<(Type, String, Vec<String>)> {
+    fn read_declarator(&mut self, base: Type) -> Result<(Type, String, Vec<String>)> {
+        if self.lexer.skip_symbol(Symbol::OpeningParen)? {
+            let peek = self.lexer.peek_token()?;
+            if self.is_type(&peek) {
+                let (ty, params) = self.read_declarator_func(base)?;
+                return Ok((ty, "".to_string(), params));
+            }
+
+            let mut buf = vec![];
+            while !self.lexer.skip_symbol(Symbol::ClosingParen)? {
+                buf.push(self.lexer.get_token()?);
+            }
+            let (base, _) = self.read_declarator_tail(base)?;
+            self.lexer.unget_all(buf);
+            return self.read_declarator(base);
+        }
+
+        if self.lexer.skip_symbol(Symbol::Asterisk)? {
+            self.skip_type_qualifiers()?;
+            let ptr = self.compound_types.pointer(base);
+            return self.read_declarator(ptr);
+        }
+
+        let tok = self.lexer.get_token()?;
+
+        if let token::Kind::Identifier(ref name) = &tok.kind {
+            let (ty, params) = self.read_declarator_tail(base)?;
+            return Ok((ty, name.clone(), params));
+        }
+
+        self.lexer.unget(tok);
+        let (ty, params) = self.read_declarator_tail(base)?;
+        Ok((ty, "".to_string(), params))
+    }
+
+    fn read_declarator_func(&mut self, base: Type) -> Result<(Type, Vec<String>)> {
+        if self.lexer.peek_token()?.kind == token::Kind::Keyword(Keyword::Void)
+            && self.lexer.peek2_token()?.kind == token::Kind::Symbol(Symbol::ClosingParen)
+        {
+            self.lexer.expect_skip_keyword(Keyword::Void)?;
+            self.lexer.expect_skip_symbol(Symbol::ClosingParen)?;
+            return Ok((self.compound_types.func(base, vec![], false), vec![]));
+        }
+
+        if self.lexer.skip_symbol(Symbol::ClosingParen)? {
+            return Ok((self.compound_types.func(base, vec![], false), vec![]));
+        }
+
+        let (types, names, vararg) = self.read_declarator_params()?;
+        Ok((self.compound_types.func(base, types, vararg), names))
+    }
+
+    fn read_declarator_tail(&mut self, base: Type) -> Result<(Type, Vec<String>)> {
+        todo!()
+    }
+
+    fn read_declarator_params(&mut self) -> Result<(Vec<Type>, Vec<String>, bool)> {
+        todo!()
+    }
+
+    fn skip_type_qualifiers(&mut self) -> Result<()> {
         todo!()
     }
 

@@ -129,10 +129,17 @@ impl Lexer {
 
     pub fn peek_token(&mut self) -> Result<Token> {
         self.get_token().and_then(|tok| {
-            let tok = maybe_convert_to_keyword(tok);
             self.unget(tok.clone());
             Ok(tok)
         })
+    }
+
+    pub fn peek2_token(&mut self) -> Result<Token> {
+        let p1 = self.get_token()?;
+        let p2 = self.get_token()?;
+        self.unget(p2.clone());
+        self.unget(p1);
+        Ok(p2)
     }
 
     pub fn do_get_token(&mut self) -> Result<Token> {
@@ -190,9 +197,25 @@ impl Lexer {
         Ok(false)
     }
 
+    pub fn skip_keyword(&mut self, keyw: Keyword) -> Result<bool> {
+        let tok = self.get_token()?;
+        match tok.kind {
+            token::Kind::Keyword(k) if k == keyw => return Ok(true),
+            _ => self.unget(tok),
+        }
+        Ok(false)
+    }
+
     pub fn expect_skip_symbol(&mut self, sym: Symbol) -> Result<()> {
         if !self.skip_symbol(sym)? {
             return Err(Error::Message(self.loc(), format!("expected '{:?}'", sym)));
+        }
+        Ok(())
+    }
+
+    pub fn expect_skip_keyword(&mut self, keyw: Keyword) -> Result<()> {
+        if !self.skip_keyword(keyw)? {
+            return Err(Error::Message(self.loc(), format!("expected '{:?}'", keyw)));
         }
         Ok(())
     }

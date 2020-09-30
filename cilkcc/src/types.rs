@@ -28,10 +28,10 @@ pub enum Type {
     Double,
     Pointer(CompoundTypeId),
     // Array(Box<Type>, i32),               // ary elem type, size
-    // Func(Box<Type>, Vec<Type>, bool),    // return type, param types, vararg
-    // Struct(RectypeName, Vec<AST>),       // name, fields
-    // Union(RectypeName, Vec<AST>, usize), // name, fields, means size of nth field is size of the union
-    // Enum,                                // as same as Int
+    Func(CompoundTypeId), // return type, param types, vararg
+                          // Struct(RectypeName, Vec<AST>),       // name, fields
+                          // Union(RectypeName, Vec<AST>, usize), // name, fields, means size of nth field is size of the union
+                          // Enum,                                // as same as Int
 }
 
 pub enum CompoundType {
@@ -61,6 +61,44 @@ pub enum CompoundType {
 pub struct CompoundTypes(Arena<CompoundType>);
 
 pub type CompoundTypeId = Id<CompoundType>;
+
+impl CompoundTypes {
+    pub fn new() -> Self {
+        CompoundTypes(Arena::new())
+    }
+
+    pub fn pointer(&mut self, inner: Type) -> Type {
+        Type::Pointer(
+            match self.0.iter().find_map(|(id, t)| match t {
+                CompoundType::Pointer { inner: inner2 } if &inner == inner2 => Some(id),
+                _ => None,
+            }) {
+                Some(id) => id,
+                None => self.0.alloc(CompoundType::Pointer { inner }),
+            },
+        )
+    }
+
+    pub fn func(&mut self, ret: Type, params: Vec<Type>, vararg: bool) -> Type {
+        Type::Func(
+            match self.0.iter().find_map(|(id, t)| match t {
+                CompoundType::Func {
+                    ret: r,
+                    params: p,
+                    vararg: v,
+                } if r == &ret && p == &params && v == &vararg => Some(id),
+                _ => None,
+            }) {
+                Some(id) => id,
+                None => self.0.alloc(CompoundType::Func {
+                    ret,
+                    params,
+                    vararg,
+                }),
+            },
+        )
+    }
+}
 
 impl Index<CompoundTypeId> for CompoundTypes {
     type Output = CompoundType;
