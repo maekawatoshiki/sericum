@@ -290,6 +290,33 @@ impl<'a> Parser<'a> {
     }
 
     fn read_decl_init(&mut self, ty: &mut Type) -> Result<AST> {
+        if self.lexer.peek_token()?.kind == token::Kind::Symbol(Symbol::OpeningBrace) {
+            return self.read_initializer_list(ty);
+        } else if self.is_string(ty) {
+            let tok = self.lexer.get_token()?;
+            if let token::Kind::String(s) = tok.kind {
+                return self.read_string_initializer(ty, s);
+            }
+            self.lexer.unget(tok)
+        }
+        self.read_assign()
+    }
+
+    fn is_string(&self, ty: &Type) -> bool {
+        if let &Type::Array(id) = ty {
+            return matches!(
+                self.compound_types[id].as_array().0,
+                Type::Char(Sign::Signed)
+            );
+        }
+        false
+    }
+
+    fn read_string_initializer(&mut self, ty: &mut Type, s: String) -> Result<AST> {
+        todo!()
+    }
+
+    fn read_initializer_list(&mut self, ty: &mut Type) -> Result<AST> {
         todo!()
     }
 
