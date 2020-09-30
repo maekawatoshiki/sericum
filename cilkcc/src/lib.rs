@@ -11,11 +11,12 @@ pub mod types;
 
 pub fn compile(path: PathBuf) {
     let mut lexer = lexer::Lexer::new(path);
-    loop {
-        match lexer.get_token() {
-            Ok(tok) => println!("{:?}", tok),
-            Err(lexer::Error::Message(loc, msg)) => println!("error: {:?}: {}", loc, msg),
-            Err(lexer::Error::EOF) => break,
-        }
-    }
+    println!("{:?}", parser::Parser::new(&mut lexer).parse())
+    // loop {
+    //     match lexer.get_token() {
+    //         Ok(tok) => println!("{:?}", tok),
+    //         Err(lexer::Error::Message(loc, msg)) => println!("error: {:?}: {}", loc, msg),
+    //         Err(lexer::Error::EOF) => break,
+    //     }
+    // }
 }

@@ -1,5 +1,5 @@
 use super::token::SourceLoc;
-use super::types::Type;
+use super::types::{StorageClass, Type};
 
 #[derive(Debug, Clone)]
 pub struct AST {
@@ -9,16 +9,31 @@ pub struct AST {
 
 #[derive(Debug, Clone)]
 pub enum Kind {
-    Statements(Vec<AST>),
-    Int { n: i64, bits: u8 },
+    Block(Vec<AST>),
+    FuncDef {
+        ty: Type,
+        param_names: Vec<String>,
+        name: String,
+        body: Box<AST>,
+    },
+    Int {
+        n: i64,
+        bits: u8,
+    },
     Float(f64),
     Char(char),
     String(String),
     Typedef(Type, String),
     UnaryOp(UnaryOp, Box<AST>),
     BinaryOp(BinaryOp, Box<AST>, Box<AST>),
-    Assign { dst: Box<AST>, src: Box<AST> },
+    Assign {
+        dst: Box<AST>,
+        src: Box<AST>,
+    },
     Load(Box<AST>),
+    Variable(Type, String),
+    VariableDecl(Type, String, StorageClass, Option<Box<AST>>),
+    Return(Option<Box<AST>>),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

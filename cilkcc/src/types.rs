@@ -27,7 +27,7 @@ pub enum Type {
     Float,
     Double,
     Pointer(CompoundTypeId),
-    // Array(Box<Type>, i32),               // ary elem type, size
+    Array(CompoundTypeId),
     Func(CompoundTypeId), // return type, param types, vararg
                           // Struct(RectypeName, Vec<AST>),       // name, fields
                           // Union(RectypeName, Vec<AST>, usize), // name, fields, means size of nth field is size of the union
@@ -79,6 +79,18 @@ impl CompoundTypes {
         )
     }
 
+    pub fn array(&mut self, inner: Type, len: i32) -> Type {
+        Type::Pointer(
+            match self.0.iter().find_map(|(id, t)| match t {
+                CompoundType::Array { inner: i, len: l } if i == &inner && l == &len => Some(id),
+                _ => None,
+            }) {
+                Some(id) => id,
+                None => self.0.alloc(CompoundType::Array { inner, len }),
+            },
+        )
+    }
+
     pub fn func(&mut self, ret: Type, params: Vec<Type>, vararg: bool) -> Type {
         Type::Func(
             match self.0.iter().find_map(|(id, t)| match t {
@@ -97,6 +109,15 @@ impl CompoundTypes {
                 }),
             },
         )
+    }
+}
+
+impl CompoundType {
+    pub fn as_array(&self) -> (Type, i32) {
+        match self {
+            Self::Array { inner, len } => (*inner, *len),
+            _ => panic!(),
+        }
     }
 }
 

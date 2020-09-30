@@ -26,6 +26,17 @@ pub struct Qualifiers {
     pub noreturn: bool,
 }
 
+macro_rules! expect_symbol_error {
+    ($self:expr, $sym:ident, $msg:expr) => {{
+        match $self.lexer.skip_symbol(Symbol::$sym) {
+            Ok(true) => {}
+            Ok(false) => return Err(Error::msg($self.lexer.loc(), $msg)),
+            Err(Error::EOF) => return Err(Error::msg($self.lexer.loc(), $msg)),
+            Err(e) => return Err(e),
+        }
+    }};
+}
+
 impl<'a> Parser<'a> {
     pub fn new(lexer: &'a mut Lexer) -> Parser<'a> {
         Self {
@@ -54,9 +65,9 @@ impl<'a> Parser<'a> {
         if self.is_func_def()? {
             nodes.push(self.read_func_def()?)
         } else {
-            todo!()
+            self.read_decl(&mut nodes)?
         }
-        Ok(AST::new(ast::Kind::Statements(nodes), loc))
+        Ok(AST::new(ast::Kind::Block(nodes), loc))
     }
 
     fn is_func_def(&mut self) -> Result<bool> {
@@ -122,9 +133,143 @@ impl<'a> Parser<'a> {
         self.env.push();
         self.tags.push();
 
+        let loc = self.lexer.loc();
         let (ret_ty, _, _) = self.read_type_spec()?;
         let (func_ty, name, param_names) = self.read_declarator(ret_ty)?;
 
+        self.env.add_global(
+            name.clone(),
+            AST::new(ast::Kind::Variable(func_ty, name.clone()), loc),
+        );
+        self.env.add(
+            "__func__".to_string(),
+            AST::new(ast::Kind::String(name.clone()), loc),
+        );
+
+        expect_symbol_error!(self, OpeningBrace, "expected '('");
+        let body = Box::new(self.read_func_body()?);
+
+        self.env.pop();
+        self.tags.pop();
+
+        Ok(AST::new(
+            ast::Kind::FuncDef {
+                ty: func_ty,
+                name,
+                param_names,
+                body,
+            },
+            loc,
+        ))
+    }
+
+    fn read_func_body(&mut self) -> Result<AST> {
+        self.read_block()
+    }
+
+    fn read_block(&mut self) -> Result<AST> {
+        let mut stmts = vec![];
+        let loc = self.lexer.loc();
+        loop {
+            let loc = self.lexer.loc();
+            if self
+                .lexer
+                .skip_symbol(Symbol::ClosingBrace)
+                .or_else(|e| match e {
+                    Error::EOF => Err(Error::msg(loc, "expected '}'")),
+                    e => Err(e),
+                })?
+            {
+                break;
+            }
+            let peek = self.lexer.peek_token()?;
+            if self.is_type(&peek) {
+                self.read_decl(&mut stmts)?;
+            } else {
+                stmts.push(self.read_stmt()?);
+            }
+        }
+        Ok(AST::new(ast::Kind::Block(stmts), loc))
+    }
+
+    fn read_stmt(&mut self) -> Result<AST> {
+        let tok = self.lexer.get_token()?;
+        match tok.kind {
+            token::Kind::Keyword(Keyword::Return) => return self.read_return_stmt(),
+            token::Kind::Symbol(Symbol::OpeningBrace) => return self.read_block(),
+            _ => {}
+        }
+        if tok.kind.is_identifier()
+            && self.lexer.peek_token()?.kind == token::Kind::Symbol(Symbol::Colon)
+        {
+            todo!();
+            // return self.read_label();
+        }
+
+        self.lexer.unget(tok);
+        let expr = self.read_opt_expr();
+        expect_symbol_error!(self, Semicolon, "expected ';'");
+        expr
+    }
+
+    fn read_return_stmt(&mut self) -> Result<AST> {
+        let loc = self.lexer.loc();
+        if self.lexer.skip_symbol(Symbol::Semicolon)? {
+            Ok(AST::new(ast::Kind::Return(None), loc))
+        } else {
+            let val = Some(Box::new(self.read_expr()?));
+            expect_symbol_error!(self, Semicolon, "expected ';'");
+            Ok(AST::new(ast::Kind::Return(val), loc))
+        }
+    }
+
+    fn read_decl(&mut self, stmts: &mut Vec<AST>) -> Result<()> {
+        let (base, sclass, qual) = self.read_type_spec()?;
+        let is_typedef = sclass == StorageClass::Typedef;
+
+        if self.lexer.skip_symbol(Symbol::Semicolon)? {
+            return Ok(());
+        }
+
+        loop {
+            let (mut ty, name, _) = self.read_declarator(base)?;
+
+            if (qual.constexpr || qual.const_) && self.lexer.skip_symbol(Symbol::Assign)? {
+                let init = self.read_decl_init(&mut ty)?;
+                self.env.add(name.clone(), init);
+            } else {
+                if is_typedef {
+                    let typedef = AST::new(ast::Kind::Typedef(ty, name.clone()), self.lexer.loc());
+                    self.env.add(name, typedef);
+                    return Ok(());
+                }
+                let init = if self.lexer.skip_symbol(Symbol::Assign)? {
+                    Some(Box::new(self.read_decl_init(&mut ty)?))
+                } else {
+                    None
+                };
+                self.env.add(
+                    name.clone(),
+                    AST::new(ast::Kind::Variable(ty, name.clone()), self.lexer.loc()),
+                );
+                stmts.push(AST::new(
+                    ast::Kind::VariableDecl(ty, name, sclass, init),
+                    self.lexer.loc(),
+                ))
+            }
+
+            if self.lexer.skip_symbol(Symbol::Semicolon)? {
+                return Ok(());
+            }
+
+            let loc = self.lexer.loc();
+            if !self.lexer.skip_symbol(Symbol::Comma)? {
+                return Err(Error::msg(loc, "expected ','"));
+            }
+        }
+    }
+
+    fn read_decl_init(&mut self, ty: &mut Type) -> Result<AST> {
         todo!()
     }
 
@@ -181,15 +326,91 @@ impl<'a> Parser<'a> {
     }
 
     fn read_declarator_tail(&mut self, base: Type) -> Result<(Type, Vec<String>)> {
-        todo!()
+        if self.lexer.skip_symbol(Symbol::OpeningBoxBracket)? {
+            return Ok((self.read_declarator_array(base)?, vec![]));
+        }
+
+        if self.lexer.skip_symbol(Symbol::OpeningParen)? {
+            return self.read_declarator_func(base);
+        }
+
+        Ok((base, vec![]))
+    }
+
+    fn read_declarator_array(&mut self, base: Type) -> Result<Type> {
+        let len: i32 = if self.lexer.skip_symbol(Symbol::ClosingBoxBracket)? {
+            -1
+        } else {
+            let loc = self.lexer.loc();
+            let len = match self.read_expr()?.eval() {
+                Some(len) => len as i32,
+                None => return Err(Error::msg(loc, "array size must be constant")),
+            };
+            expect_symbol_error!(self, ClosingBoxBracket, "expected ']'");
+            len
+        };
+        let inner = self.read_declarator_tail(base)?.0;
+        Ok(self.compound_types.array(inner, len))
     }
 
     fn read_declarator_params(&mut self) -> Result<(Vec<Type>, Vec<String>, bool)> {
-        todo!()
+        let mut types = vec![];
+        let mut names = vec![];
+        loop {
+            if self.lexer.skip_symbol(Symbol::Vararg)? {
+                if types.len() == 0 {
+                    return Err(Error::msg(
+                        self.lexer.loc(),
+                        "at least one parameter is required before '...'",
+                    ));
+                }
+                expect_symbol_error!(self, ClosingParen, "expected ')'");
+                return Ok((types, names, true));
+            }
+
+            let loc = self.lexer.loc();
+            let (ty, name) = self.read_func_param()?;
+
+            // if reading a parameter of a function to be defined
+            if self.env.is_local() {
+                self.env.add(
+                    name.clone(),
+                    AST::new(ast::Kind::Variable(ty, name.clone()), loc),
+                )
+            }
+
+            types.push(ty);
+            names.push(name);
+
+            if self.lexer.skip_symbol(Symbol::ClosingParen)? {
+                return Ok((types, names, false));
+            }
+
+            if !self.lexer.skip_symbol(Symbol::Comma)? {
+                return Err(Error::msg(self.lexer.loc(), "expected ','"));
+            }
+        }
+    }
+
+    fn read_func_param(&mut self) -> Result<(Type, String)> {
+        let base = self.read_type_spec()?.0;
+        let (ty, name, _) = self.read_declarator(base)?;
+        match ty {
+            Type::Array(x) => {
+                let inner = self.compound_types[x].as_array().0;
+                Ok((self.compound_types.pointer(inner), name))
+            }
+            Type::Func(_) => Ok((self.compound_types.pointer(ty), name)),
+            _ => Ok((ty, name)),
+        }
     }
 
     fn skip_type_qualifiers(&mut self) -> Result<()> {
-        todo!()
+        while self.lexer.skip_keyword(Keyword::Const)?
+            || self.lexer.skip_keyword(Keyword::Volatile)?
+            || self.lexer.skip_keyword(Keyword::Restrict)?
+        {}
+        Ok(())
     }
 
     fn read_type_spec(&mut self) -> Result<(Type, StorageClass, Qualifiers)> {
@@ -312,6 +533,14 @@ impl<'a> Parser<'a> {
 
     fn read_expr(&mut self) -> Result<AST> {
         self.read_comma()
+    }
+
+    fn read_opt_expr(&mut self) -> Result<AST> {
+        if self.lexer.peek_token()?.kind == token::Kind::Symbol(Symbol::Semicolon) {
+            Ok(AST::new(ast::Kind::Block(vec![]), self.lexer.loc()))
+        } else {
+            self.read_expr()
+        }
     }
 
     fn read_comma(&mut self) -> Result<AST> {
