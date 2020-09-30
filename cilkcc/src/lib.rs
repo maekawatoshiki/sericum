@@ -7,6 +7,7 @@ pub mod ast;
 pub mod lexer;
 pub mod parser;
 pub mod token;
+pub mod types;
 
 pub fn compile(path: PathBuf) {
     let mut lexer = lexer::Lexer::new(path);

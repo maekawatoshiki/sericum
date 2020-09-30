@@ -137,6 +137,16 @@ impl Token {
     }
 }
 
+impl Kind {
+    pub fn is_identifier(&self) -> bool {
+        matches!(self, Kind::Identifier(_))
+    }
+
+    pub fn is_keyword(&self) -> bool {
+        matches!(self, Kind::Keyword(_))
+    }
+}
+
 impl SourceLoc {
     pub fn new(file: Id<PathBuf>) -> Self {
         Self {

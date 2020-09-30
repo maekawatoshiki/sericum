@@ -1,4 +1,5 @@
 use super::token::SourceLoc;
+use super::types::Type;
 
 #[derive(Debug, Clone)]
 pub struct AST {
@@ -8,10 +9,12 @@ pub struct AST {
 
 #[derive(Debug, Clone)]
 pub enum Kind {
+    Statements(Vec<AST>),
     Int { n: i64, bits: u8 },
     Float(f64),
     Char(char),
     String(String),
+    Typedef(Type, String),
     UnaryOp(UnaryOp, Box<AST>),
     BinaryOp(BinaryOp, Box<AST>, Box<AST>),
     Assign { dst: Box<AST>, src: Box<AST> },
@@ -89,10 +92,7 @@ impl AST {
             Kind::BinaryOp(BinaryOp::Ge, ref l, ref r) => (l.eval()? >= r.eval()?) as i64,
             Kind::BinaryOp(BinaryOp::Shl, ref l, ref r) => l.eval()? << r.eval()?,
             Kind::BinaryOp(BinaryOp::Shr, ref l, ref r) => l.eval()? >> r.eval()?,
-            Kind::BinaryOp(BinaryOp::Comma, ref l, ref r) => {
-                l.eval()?;
-                r.eval()?
-            }
+            Kind::BinaryOp(BinaryOp::Comma, ref _l, ref r) => r.eval()?,
             _ => return None,
         })
     }
