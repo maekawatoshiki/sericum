@@ -48,11 +48,16 @@ impl<'a> Parser<'a> {
     }
 
     pub fn parse(&mut self) -> Result<Vec<AST>> {
-        let mut node = vec![];
-        while let Ok(n) = self.read_toplevel() {
-            node.push(n);
+        let mut nodes = vec![];
+        loop {
+            let node = self.read_toplevel();
+            match node {
+                Ok(ok) => nodes.push(ok),
+                Err(Error::EOF) => break,
+                Err(e) => return Err(e),
+            }
         }
-        Ok(node)
+        Ok(nodes)
     }
 
     pub fn parse_as_expr(&mut self) -> Result<AST> {
@@ -195,6 +200,7 @@ impl<'a> Parser<'a> {
     fn read_stmt(&mut self) -> Result<AST> {
         let tok = self.lexer.get_token()?;
         match tok.kind {
+            token::Kind::Keyword(Keyword::If) => return self.read_if_stmt(),
             token::Kind::Keyword(Keyword::Return) => return self.read_return_stmt(),
             token::Kind::Symbol(Symbol::OpeningBrace) => return self.read_block(),
             _ => {}
@@ -210,6 +216,20 @@ impl<'a> Parser<'a> {
         let expr = self.read_opt_expr();
         expect_symbol_error!(self, Semicolon, "expected ';'");
         expr
+    }
+
+    fn read_if_stmt(&mut self) -> Result<AST> {
+        let loc = self.lexer.loc();
+        expect_symbol_error!(self, OpeningParen, "expected '('");
+        let cond = Box::new(self.read_expr()?);
+        expect_symbol_error!(self, ClosingParen, "expected ')'");
+        let then_ = Box::new(self.read_stmt()?);
+        let else_ = if self.lexer.skip_keyword(Keyword::Else)? {
+            Box::new(self.read_stmt()?)
+        } else {
+            Box::new(AST::new(ast::Kind::Block(vec![]), self.lexer.loc()))
+        };
+        Ok(AST::new(ast::Kind::If { cond, then_, else_ }, loc))
     }
 
     fn read_return_stmt(&mut self) -> Result<AST> {
@@ -955,7 +975,21 @@ impl<'a> Parser<'a> {
         match tok.kind {
             token::Kind::Int { n, bits } => Ok(AST::new(ast::Kind::Int { n, bits }, tok.loc)),
             token::Kind::Float(f) => Ok(AST::new(ast::Kind::Float(f), tok.loc)),
-            token::Kind::Identifier(_ident) => todo!(),
+            token::Kind::Identifier(ident) => {
+                if let Some(v) = self.env.get(ident.as_str()) {
+                    return match v.kind {
+                        ast::Kind::Variable(_, _) => Ok(AST::new(
+                            ast::Kind::Load(Box::new(v.clone())),
+                            self.lexer.loc(),
+                        )),
+                        _ => Ok(v.clone()),
+                    };
+                }
+                Err(Error::Message(
+                    loc,
+                    format!("variable not found '{}'", ident),
+                ))
+            }
             token::Kind::String(s) => Ok(AST::new(ast::Kind::String(s), tok.loc)),
             token::Kind::Char(c) => Ok(AST::new(ast::Kind::Char(c), tok.loc)),
             token::Kind::Symbol(s) => match s {
