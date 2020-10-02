@@ -13,8 +13,9 @@ pub mod types;
 
 pub fn compile(path: PathBuf) {
     let mut lexer = lexer::Lexer::new(path);
-    match parser::Parser::new(&mut lexer).parse() {
-        Ok(ok) => println!("{:?}", ok),
+    let mut parser = parser::Parser::new(&mut lexer);
+    let nodes = match parser.parse() {
+        Ok(ok) => ok,
         Err(lexer::Error::EOF) => panic!(),
         Err(lexer::Error::Message(loc, msg)) => {
             println!(
@@ -27,13 +28,13 @@ pub fn compile(path: PathBuf) {
                 msg
             );
             println!("{}", lexer.get_surrounding_line(loc));
+            panic!();
         }
+    };
+    println!("{:?}", nodes);
+    let mut codegen = codegen::Codegenerator::new(&mut parser.compound_types);
+    for node in nodes {
+        codegen.generate(&node);
     }
-    // loop {
-    //     match lexer.get_token() {
-    //         Ok(tok) => println!("{:?}", tok),
-    //         Err(lexer::Error::Message(loc, msg)) => println!("error: {:?}: {}", loc, msg),
-    //         Err(lexer::Error::EOF) => break,
-    //     }
-    // }
+    println!("{:?}", codegen.module);
 }

@@ -12,7 +12,7 @@ pub struct Parser<'a> {
     pub lexer: &'a mut Lexer,
     env: Env<AST>,
     tags: Env<Type>,
-    compound_types: CompoundTypes,
+    pub compound_types: CompoundTypes,
 }
 
 pub struct Env<T: Clone>(pub VecDeque<FxHashMap<String, T>>);

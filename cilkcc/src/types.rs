@@ -113,10 +113,68 @@ impl CompoundTypes {
 }
 
 impl CompoundType {
+    pub fn as_pointer(&self) -> Type {
+        match self {
+            Self::Pointer { inner } => *inner,
+            _ => panic!(),
+        }
+    }
+
     pub fn as_array(&self) -> (Type, i32) {
         match self {
             Self::Array { inner, len } => (*inner, *len),
             _ => panic!(),
+        }
+    }
+
+    pub fn as_func(&self) -> (Type, &Vec<Type>, bool) {
+        match self {
+            Self::Func {
+                ret,
+                params,
+                vararg,
+            } => (*ret, params, *vararg),
+            _ => panic!(),
+        }
+    }
+}
+
+use cilk::types;
+
+pub trait TypeConversion<T> {
+    fn conv(&self, compound_types: &CompoundTypes, types: &types::Types) -> cilk::types::Type;
+}
+
+impl TypeConversion<types::Type> for Type {
+    fn conv(&self, compound_types: &CompoundTypes, types: &types::Types) -> cilk::types::Type {
+        match self {
+            Type::Void => types::Type::Void,
+            Type::Char(_) => types::Type::i8,
+            Type::Short(_) => panic!(),
+            Type::Int(_) => types::Type::i32,
+            Type::Long(_) => types::Type::i64,
+            Type::LLong(_) => types::Type::i64,
+            Type::Float => panic!(),
+            Type::Double => types::Type::f64,
+            Type::Pointer(id) => {
+                let inner = compound_types[*id].as_pointer();
+                let inner = inner.conv(compound_types, types);
+                types.new_pointer_ty(inner)
+            }
+            Type::Array(id) => {
+                let (inner, len) = compound_types[*id].as_array();
+                let inner = inner.conv(compound_types, types);
+                types.new_array_ty(inner, len as usize)
+            }
+            Type::Func(id) => {
+                let (ret, params, _vararg) = compound_types[*id].as_func();
+                let ret = ret.conv(compound_types, types);
+                let params = params
+                    .into_iter()
+                    .map(|p| p.conv(compound_types, types))
+                    .collect();
+                types.new_function_ty(ret, params)
+            }
         }
     }
 }
@@ -132,5 +190,25 @@ impl Index<CompoundTypeId> for CompoundTypes {
 impl IndexMut<CompoundTypeId> for CompoundTypes {
     fn index_mut(&mut self, id: CompoundTypeId) -> &mut Self::Output {
         &mut self.0[id]
+    }
+}
+
+impl Index<Type> for CompoundTypes {
+    type Output = CompoundType;
+
+    fn index(&self, ty: Type) -> &Self::Output {
+        match ty {
+            Type::Pointer(id) | Type::Array(id) | Type::Func(id) => &self.0[id],
+            _ => panic!(),
+        }
+    }
+}
+
+impl IndexMut<Type> for CompoundTypes {
+    fn index_mut(&mut self, ty: Type) -> &mut Self::Output {
+        match ty {
+            Type::Pointer(id) | Type::Array(id) | Type::Func(id) => &mut self.0[id],
+            _ => panic!(),
+        }
     }
 }
