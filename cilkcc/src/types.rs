@@ -1,3 +1,4 @@
+use cilk::types;
 use id_arena::{Arena, Id};
 use std::ops::{Index, IndexMut};
 
@@ -138,8 +139,6 @@ impl CompoundType {
         }
     }
 }
-
-use cilk::types;
 
 pub trait TypeConversion<T> {
     fn conv(&self, compound_types: &CompoundTypes, types: &types::Types) -> cilk::types::Type;
