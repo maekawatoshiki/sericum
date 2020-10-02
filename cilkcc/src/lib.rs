@@ -1,9 +1,11 @@
+extern crate cilk;
 extern crate id_arena;
 extern crate rustc_hash;
 
 use std::path::PathBuf;
 
 pub mod ast;
+pub mod codegen;
 pub mod lexer;
 pub mod parser;
 pub mod token;
