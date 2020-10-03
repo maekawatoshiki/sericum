@@ -2,12 +2,11 @@ use super::value::Value;
 use id_arena::*;
 use rustc_hash::FxHashMap;
 use std::fmt;
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::Ref, cell::RefCell, rc::Rc};
 
 #[derive(Clone)]
 pub struct Types {
     pub base: Rc<RefCell<TypesBase>>,
-    // pub non_primitive_types: Arena<NonPrimitiveType>,
 }
 
 #[derive(Clone)]
@@ -126,12 +125,14 @@ impl Types {
         Type::Struct(id)
     }
 
-    // pub fn as_function_ty(&self, ty: Type) -> Option<&FunctionType> {
-    //     match ty {
-    //         Type::Function(id) => Some(self.non_primitive_types[id].as_function()),
-    //         _ => None,
-    //     }
-    // }
+    pub fn non_primitive_ty(&self, ty: Type) -> Option<Ref<NonPrimitiveType>> {
+        match ty {
+            Type::Pointer(id) | Type::Function(id) | Type::Array(id) | Type::Struct(id) => {
+                Some(Ref::map(self.base.borrow(), |x| &x.non_primitive_types[id]))
+            }
+            _ => None,
+        }
+    }
 
     pub fn get_element_ty(&self, ty: Type, index: Option<&Value>) -> Option<Type> {
         match ty {
