@@ -74,7 +74,7 @@ impl<'a> Codegenerator<'a> {
     fn generate_func_def(
         &mut self,
         ty: &Type,
-        _param_names: &Vec<String>,
+        param_names: &Vec<String>,
         name: &String,
         body: &AST,
     ) -> Result<Value> {
@@ -87,9 +87,9 @@ impl<'a> Codegenerator<'a> {
             .as_function_ty(func_ty_)
             .unwrap()
             .clone();
-        let func_id = self
-            .module
-            .create_function(name.as_str(), func_ty.ret_ty, func_ty.params_ty);
+        let func_id =
+            self.module
+                .create_function(name.as_str(), func_ty.ret_ty, func_ty.params_ty.clone());
         let val = Value::Function({
             value::FunctionValue {
                 func_id,
@@ -105,6 +105,20 @@ impl<'a> Codegenerator<'a> {
             &mut self.variables,
             func_id,
         );
+        for (i, (name, &cilk_ty)) in param_names.iter().zip(func_ty.params_ty.iter()).enumerate() {
+            let ty = gen.compound_types[*ty].as_func().1[i];
+            let val = gen
+                .builder
+                .func
+                .module
+                .function_ref(func_id)
+                .get_param_value(i)
+                .unwrap();
+            let var = gen.builder.build_alloca(cilk_ty);
+            gen.builder.build_store(val, var);
+            gen.variables
+                .add_local_var(name.clone(), Variable::new(ty, cilk_ty, var));
+        }
         gen.generate(body);
         self.variables.pop_env();
         Ok(val)
@@ -141,6 +155,7 @@ impl<'a> FunctionCodeGenerator<'a> {
             ast::Kind::Assign { dst, src } => self.generate_assign(dst, src),
             ast::Kind::Load(val) => self.generate_load(val),
             ast::Kind::BinaryOp(op, lhs, rhs) => self.generate_binary_op(*op, lhs, rhs),
+            ast::Kind::FuncCall(f, args) => self.generate_func_call(f, args),
             ast::Kind::Return(val) => self.generate_return(val.as_ref().map(|v| &**v)),
             _ => panic!(),
         }
@@ -230,6 +245,27 @@ impl<'a> FunctionCodeGenerator<'a> {
         let rhs = self.generate(rhs)?;
         match op {
             ast::BinaryOp::Eq => Some(self.builder.build_icmp(ICmpKind::Eq, lhs, rhs)),
+            ast::BinaryOp::Le => Some(self.builder.build_icmp(ICmpKind::Le, lhs, rhs)),
+            ast::BinaryOp::Add => Some(self.builder.build_add(lhs, rhs)),
+            ast::BinaryOp::Sub => Some(self.builder.build_sub(lhs, rhs)),
+            _ => unimplemented!(),
+        }
+    }
+
+    fn generate_func_call(&mut self, f: &AST, args: &Vec<AST>) -> Option<Value> {
+        let f = retrieve_from_load(f);
+        let mut args_ = vec![];
+        for arg in args {
+            args_.push(self.generate(arg).unwrap());
+        }
+        match &f.kind {
+            ast::Kind::Variable(_, name) => {
+                let var = self
+                    .variables
+                    .find_var(name.as_str())
+                    .expect("var not found");
+                Some(self.builder.build_call(var.val, args_))
+            }
             _ => unimplemented!(),
         }
     }

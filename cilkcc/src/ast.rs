@@ -33,6 +33,7 @@ pub enum Kind {
     Load(Box<AST>),
     Variable(Type, String),
     VariableDecl(Type, String, StorageClass, Option<Box<AST>>),
+    FuncCall(Box<AST>, Vec<AST>),
     If {
         cond: Box<AST>,
         then_: Box<AST>,

@@ -681,7 +681,7 @@ impl<'a> Parser<'a> {
 
     fn read_logical_or(&mut self) -> Result<AST> {
         let mut lhs = self.read_logical_and()?;
-        while lexer!(self, skip_symbol(Symbol::Or)) {
+        while lexer!(self, skip_symbol(Symbol::LOr)) {
             let rhs = self.read_logical_and()?;
             lhs = AST::new(
                 ast::Kind::BinaryOp(ast::BinaryOp::LogicalOr, Box::new(lhs), Box::new(rhs)),
@@ -693,7 +693,7 @@ impl<'a> Parser<'a> {
 
     fn read_logical_and(&mut self) -> Result<AST> {
         let mut lhs = self.read_or()?;
-        while lexer!(self, skip_symbol(Symbol::Ampersand)) {
+        while lexer!(self, skip_symbol(Symbol::LAnd)) {
             let rhs = self.read_or()?;
             lhs = AST::new(
                 ast::Kind::BinaryOp(ast::BinaryOp::LogicalAnd, Box::new(lhs), Box::new(rhs)),
@@ -1002,8 +1002,19 @@ impl<'a> Parser<'a> {
         Ok(ast)
     }
 
-    fn read_func_call(&mut self, _: AST) -> Result<AST> {
-        todo!()
+    fn read_func_call(&mut self, f: AST) -> Result<AST> {
+        let loc = f.loc;
+        let mut args = vec![];
+        if !self.lexer.skip_symbol(Symbol::ClosingParen)? {
+            loop {
+                args.push(self.read_assign()?);
+                if self.lexer.skip_symbol(Symbol::ClosingParen)? {
+                    break;
+                }
+                self.lexer.expect_skip_symbol(Symbol::Comma)?;
+            }
+        }
+        Ok(AST::new(ast::Kind::FuncCall(Box::new(f), args), loc))
     }
 
     fn read_field(&mut self, _: AST) -> Result<AST> {
