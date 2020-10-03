@@ -72,7 +72,7 @@ use cilk::ir::{
 
 fn main() {
     let mut module = Module::new("cilk");
-    let func_id = module.create_function("main", Type::Int32, vec![]);
+    let func_id = module.create_function("main", Type::i32, vec![]);
     let mut builder = Builder::new(FunctionIdWithModule::new(&mut module, func_id));
     let entry = builder.append_basic_block();
     builder.set_insert_point(entry);
@@ -118,7 +118,7 @@ use cilk::codegen::arch::exec::jit::JITExecutor;
 
 fn main() {
     let mut module = Module::new("cilk");
-    let func_id = module.create_function("main", Type::Int32, vec![]);
+    let func_id = module.create_function("main", Type::i32, vec![]);
     let mut builder = Builder::new(FunctionIdWithModule::new(&mut module, func_id));
     let entry = builder.append_basic_block();
     builder.set_insert_point(entry);
@@ -162,7 +162,7 @@ create_functionは関数(Function)そのものでなく識別ID(FunctionId)を�
 IDはCopyが実装してあるので，取り回しが楽です．
 
 ```rs
-let func_id = module.create_function("main", Type::Int32, vec![]);
+let func_id = module.create_function("main", Type::i32, vec![]);
 ```
 
 ### ビルダーを作る
