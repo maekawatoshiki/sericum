@@ -42,7 +42,7 @@ pub fn compile(path: PathBuf) {
 
     let mut codegen = codegen::Codegenerator::new(&mut parser.compound_types);
     for node in nodes {
-        codegen.generate(&node);
+        codegen.generate(&node).unwrap();
     }
     println!("{:?}", codegen.module);
 
