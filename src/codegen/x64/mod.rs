@@ -23,12 +23,8 @@ impl TypeSize for Type {
             Type::i32 => 4,
             Type::i64 => 8,
             Type::f64 => 8,
-            Type::Array(id) => tys.base.borrow().non_primitive_types[*id]
-                .as_array()
-                .size_in_byte(tys),
-            Type::Struct(id) => tys.base.borrow().non_primitive_types[*id]
-                .as_struct()
-                .size_in_byte(tys),
+            Type::Array(id) => tys.compound_ty(*id).as_array().size_in_byte(tys),
+            Type::Struct(id) => tys.compound_ty(*id).as_struct().size_in_byte(tys),
             Type::Pointer(_) => 8,
             Type::Function(_) => unimplemented!(),
             Type::Void => 0,
@@ -46,12 +42,8 @@ impl TypeSize for Type {
             Type::i32 => 4,
             Type::i64 => 8,
             Type::f64 => 8,
-            Type::Array(id) => tys.base.borrow().non_primitive_types[*id]
-                .as_array()
-                .align_in_byte(tys),
-            Type::Struct(id) => tys.base.borrow().non_primitive_types[*id]
-                .as_struct()
-                .align_in_byte(tys),
+            Type::Array(id) => tys.compound_ty(*id).as_array().align_in_byte(tys),
+            Type::Struct(id) => tys.compound_ty(*id).as_struct().align_in_byte(tys),
             Type::Pointer(_) => 8,
             Type::Function(_) => unimplemented!(),
             Type::Void => 0,

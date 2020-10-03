@@ -92,37 +92,48 @@ impl Function {
     }
 
     pub fn get_return_type(&self) -> Type {
-        let base = self.types.base.borrow();
-        base.as_function_ty(self.ty).unwrap().ret_ty
+        self.types.compound_ty(self.ty).as_function().ret_ty
     }
 
     pub fn get_param_value(&self, idx: usize) -> Option<Value> {
-        let base = self.types.base.borrow();
-        let params_ty = &base.as_function_ty(self.ty).unwrap().params_ty;
-        params_ty.get(idx).map_or(None, |&ty| {
-            Some(Value::Argument(ArgumentValue {
-                func_id: self.id.unwrap(),
-                index: idx,
-                ty,
-            }))
-        })
+        self.types
+            .compound_ty(self.ty)
+            .as_function()
+            .params_ty
+            .get(idx)
+            .map_or(None, |&ty| {
+                Some(Value::Argument(ArgumentValue {
+                    func_id: self.id.unwrap(),
+                    index: idx,
+                    ty,
+                }))
+            })
     }
 
     pub fn get_param_type(&self, idx: usize) -> Option<Type> {
-        let base = self.types.base.borrow();
-        let params_ty = &base.as_function_ty(self.ty).unwrap().params_ty;
-        params_ty.get(idx).map_or(None, |&ty| Some(ty))
+        self.types
+            .compound_ty(self.ty)
+            .as_function()
+            .params_ty
+            .get(idx)
+            .map_or(None, |&ty| Some(ty))
     }
 
     pub fn get_param_attr(&self, idx: usize) -> Option<ParamAttribute> {
-        let base = self.types.base.borrow();
-        let params_attr = &base.as_function_ty(self.ty).unwrap().params_attr;
-        params_attr.get(&idx).map_or(None, |&a| Some(a))
+        self.types
+            .compound_ty(self.ty)
+            .as_function()
+            .params_attr
+            .get(&idx)
+            .map_or(None, |&a| Some(a))
     }
 
     pub fn get_params_len(&self) -> usize {
-        let base = self.types.base.borrow();
-        base.as_function_ty(self.ty).unwrap().params_ty.len()
+        self.types
+            .compound_ty(self.ty)
+            .as_function()
+            .params_ty
+            .len()
     }
 
     pub fn find_inst_pos(&self, inst_id: InstructionId) -> Option<(BasicBlockId, usize)> {

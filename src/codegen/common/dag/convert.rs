@@ -539,7 +539,10 @@ impl<'a> ConvertToDAGNode<'a> {
         for idx in indices {
             let size = match ty {
                 Type::Struct(id) => {
-                    let off = *self.module.types.base.borrow().non_primitive_types[id]
+                    let off = *self
+                        .module
+                        .types
+                        .compound_ty(id)
                         .as_struct()
                         .get_elem_offset(idx.as_imm().as_int32() as usize)
                         .unwrap();

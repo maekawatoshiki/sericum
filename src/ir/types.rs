@@ -1,6 +1,7 @@
 use super::value::Value;
 use id_arena::*;
 use rustc_hash::FxHashMap;
+use std::convert::From;
 use std::fmt;
 use std::{cell::Ref, cell::RefCell, rc::Rc};
 
@@ -11,13 +12,13 @@ pub struct Types {
 
 #[derive(Clone)]
 pub struct TypesBase {
-    pub non_primitive_types: Arena<NonPrimitiveType>,
+    pub compound_types: Arena<CompoundType>,
 }
 
-pub type NonPrimitiveTypeId = Id<NonPrimitiveType>;
+pub type CompoundTypeId = Id<CompoundType>;
 
 #[derive(Clone, Eq, PartialEq)]
-pub enum NonPrimitiveType {
+pub enum CompoundType {
     Pointer(Type),
     Array(ArrayType),
     Function(FunctionType),
@@ -33,10 +34,10 @@ pub enum Type {
     i32,
     i64,
     f64,
-    Pointer(NonPrimitiveTypeId),
-    Array(NonPrimitiveTypeId),
-    Function(NonPrimitiveTypeId),
-    Struct(NonPrimitiveTypeId),
+    Pointer(CompoundTypeId),
+    Array(CompoundTypeId),
+    Function(CompoundTypeId),
+    Struct(CompoundTypeId),
 }
 
 pub trait TypeSize {
@@ -75,27 +76,27 @@ impl Types {
     pub fn new() -> Self {
         Self {
             base: Rc::new(RefCell::new(TypesBase::new())),
-            // non_primitive_types: Arena::new(),
+            // compound_types: Arena::new(),
         }
     }
 
-    fn new_non_primitive_ty(&self, t: NonPrimitiveType) -> NonPrimitiveTypeId {
-        let non_primitive_types = &mut self.base.borrow_mut().non_primitive_types;
-        for (id, t_) in &*non_primitive_types {
+    fn new_compound_ty(&self, t: CompoundType) -> CompoundTypeId {
+        let compound_types = &mut self.base.borrow_mut().compound_types;
+        for (id, t_) in &*compound_types {
             if &t == t_ {
                 return id;
             }
         }
-        non_primitive_types.alloc(t)
+        compound_types.alloc(t)
     }
 
     pub fn new_pointer_ty(&self, elem_ty: Type) -> Type {
-        let id = self.new_non_primitive_ty(NonPrimitiveType::Pointer(elem_ty));
+        let id = self.new_compound_ty(CompoundType::Pointer(elem_ty));
         Type::Pointer(id)
     }
 
     pub fn new_array_ty(&self, elem_ty: Type, len: usize) -> Type {
-        let id = self.new_non_primitive_ty(NonPrimitiveType::Array(ArrayType::new(elem_ty, len)));
+        let id = self.new_compound_ty(CompoundType::Array(ArrayType::new(elem_ty, len)));
         Type::Array(id)
     }
 
@@ -111,7 +112,7 @@ impl Types {
                 _ => {}
             }
         }
-        let id = self.new_non_primitive_ty(NonPrimitiveType::Function(FunctionType::new(
+        let id = self.new_compound_ty(CompoundType::Function(FunctionType::new(
             ret_ty,
             params_ty,
             params_attr,
@@ -120,172 +121,20 @@ impl Types {
     }
 
     pub fn new_struct_ty(&self, fields_ty: Vec<Type>) -> Type {
-        let id =
-            self.new_non_primitive_ty(NonPrimitiveType::Struct(StructType::new(self, fields_ty)));
+        let id = self.new_compound_ty(CompoundType::Struct(StructType::new(self, fields_ty)));
         Type::Struct(id)
     }
 
-    pub fn non_primitive_ty(&self, ty: Type) -> Option<Ref<NonPrimitiveType>> {
-        match ty {
-            Type::Pointer(id) | Type::Function(id) | Type::Array(id) | Type::Struct(id) => {
-                Some(Ref::map(self.base.borrow(), |x| &x.non_primitive_types[id]))
-            }
-            _ => None,
-        }
+    pub fn compound_ty<T: Into<CompoundTypeId>>(&self, id: T) -> Ref<CompoundType> {
+        Ref::map(self.base.borrow(), |x| &x.compound_types[id.into()])
     }
 
     pub fn get_element_ty(&self, ty: Type, index: Option<&Value>) -> Option<Type> {
         match ty {
-            Type::Pointer(id) => Some(*self.base.borrow().non_primitive_types[id].as_pointer()),
-            Type::Array(id) => Some(
-                self.base.borrow().non_primitive_types[id]
-                    .as_array()
-                    .elem_ty,
-            ),
+            Type::Pointer(id) => Some(*self.base.borrow().compound_types[id].as_pointer()),
+            Type::Array(id) => Some(self.base.borrow().compound_types[id].as_array().elem_ty),
             Type::Struct(id) => Some(
-                self.base.borrow().non_primitive_types[id]
-                    .as_struct()
-                    .fields_ty[index.unwrap().as_imm().as_int32() as usize],
-            ),
-            Type::Void
-            | Type::i1
-            | Type::i8
-            | Type::i32
-            | Type::i64
-            | Type::f64
-            | Type::Function(_) => Some(ty),
-        }
-    }
-
-    pub fn get_element_ty_with_indices(&self, ty: Type, indices: &[Value]) -> Option<Type> {
-        if indices.len() == 0 {
-            return Some(ty);
-        }
-
-        match ty {
-            Type::Void
-            | Type::i1
-            | Type::i8
-            | Type::i32
-            | Type::i64
-            | Type::f64
-            | Type::Function(_) => None,
-            Type::Pointer(id) => match indices.len() {
-                1 => Some(*self.base.borrow().non_primitive_types[id].as_pointer()),
-                _ => {
-                    let elem_ty = *self.base.borrow().non_primitive_types[id].as_pointer();
-                    self.get_element_ty_with_indices(elem_ty, &indices[1..])
-                }
-            },
-            Type::Array(id) => match indices.len() {
-                1 => Some(
-                    self.base.borrow().non_primitive_types[id]
-                        .as_array()
-                        .elem_ty,
-                ),
-                _ => {
-                    let elem_ty = self.base.borrow().non_primitive_types[id]
-                        .as_array()
-                        .elem_ty;
-                    self.get_element_ty_with_indices(elem_ty, &indices[1..])
-                }
-            },
-            Type::Struct(id) => match indices.len() {
-                1 => Some(
-                    self.base.borrow().non_primitive_types[id]
-                        .as_struct()
-                        .fields_ty[indices[0].as_imm().as_int32() as usize],
-                ),
-                _ => self.get_element_ty_with_indices(
-                    self.base.borrow().non_primitive_types[id]
-                        .as_struct()
-                        .fields_ty[indices[0].as_imm().as_int32() as usize],
-                    &indices[1..],
-                ),
-            },
-        }
-    }
-
-    pub fn to_string(&self, ty: Type) -> String {
-        self.base.borrow().to_string(ty)
-    }
-
-    // pub fn get_pointer_ty(&self) -> Type {
-    //     Type::Pointer(Box::new(self.clone()))
-    // }
-}
-
-impl TypesBase {
-    pub fn new() -> Self {
-        Self {
-            non_primitive_types: Arena::new(),
-        }
-    }
-
-    fn new_non_primitive_ty(&mut self, t: NonPrimitiveType) -> NonPrimitiveTypeId {
-        for (id, t_) in &self.non_primitive_types {
-            if &t == t_ {
-                return id;
-            }
-        }
-        self.non_primitive_types.alloc(t)
-    }
-
-    pub fn new_pointer_ty(&mut self, elem_ty: Type) -> Type {
-        let id = self.new_non_primitive_ty(NonPrimitiveType::Pointer(elem_ty));
-        Type::Pointer(id)
-    }
-
-    pub fn new_array_ty(&mut self, elem_ty: Type, len: usize) -> Type {
-        let id = self.new_non_primitive_ty(NonPrimitiveType::Array(ArrayType::new(elem_ty, len)));
-        Type::Array(id)
-    }
-
-    pub fn new_function_ty(&mut self, ret_ty: Type, mut params_ty: Vec<Type>) -> Type {
-        let mut params_attr = FxHashMap::default();
-        for (i, ty) in params_ty.iter_mut().enumerate() {
-            match ty {
-                Type::Struct(_) => {
-                    let ptr = self.new_pointer_ty(*ty);
-                    *ty = ptr;
-                    params_attr.insert(i, ParamAttribute { byval: true });
-                }
-                _ => {}
-            }
-        }
-        let id = self.new_non_primitive_ty(NonPrimitiveType::Function(FunctionType::new(
-            ret_ty,
-            params_ty,
-            params_attr,
-        )));
-        Type::Function(id)
-    }
-
-    // pub fn new_struct_ty(&mut self, fields_ty: Vec<Type>) -> Type {
-    //     let id = self.new_non_primitive_ty(NonPrimitiveType::Struct(StructType::new(fields_ty)));
-    //     Type::Struct(id)
-    // }
-
-    pub fn as_function_ty(&self, ty: Type) -> Option<&FunctionType> {
-        match ty {
-            Type::Function(id) => Some(self.non_primitive_types[id].as_function()),
-            _ => None,
-        }
-    }
-
-    pub fn as_struct_ty(&self, ty: Type) -> Option<&StructType> {
-        match ty {
-            Type::Struct(id) => Some(self.non_primitive_types[id].as_struct()),
-            _ => None,
-        }
-    }
-
-    pub fn get_element_ty(&self, ty: Type, index: Option<&Value>) -> Option<Type> {
-        match ty {
-            Type::Pointer(id) => Some(*self.non_primitive_types[id].as_pointer()),
-            Type::Array(id) => Some(self.non_primitive_types[id].as_array().elem_ty),
-            Type::Struct(id) => Some(
-                self.non_primitive_types[id].as_struct().fields_ty
+                self.base.borrow().compound_types[id].as_struct().fields_ty
                     [index.unwrap().as_imm().as_int32() as usize],
             ),
             Type::Void
@@ -312,26 +161,159 @@ impl TypesBase {
             | Type::f64
             | Type::Function(_) => None,
             Type::Pointer(id) => match indices.len() {
-                1 => Some(*self.non_primitive_types[id].as_pointer()),
+                1 => Some(*self.base.borrow().compound_types[id].as_pointer()),
                 _ => {
-                    let elem_ty = self.non_primitive_types[id].as_pointer();
-                    self.get_element_ty_with_indices(*elem_ty, &indices[1..])
+                    let elem_ty = *self.base.borrow().compound_types[id].as_pointer();
+                    self.get_element_ty_with_indices(elem_ty, &indices[1..])
                 }
             },
             Type::Array(id) => match indices.len() {
-                1 => Some(self.non_primitive_types[id].as_array().elem_ty),
+                1 => Some(self.base.borrow().compound_types[id].as_array().elem_ty),
                 _ => {
-                    let elem_ty = self.non_primitive_types[id].as_array().elem_ty;
+                    let elem_ty = self.base.borrow().compound_types[id].as_array().elem_ty;
                     self.get_element_ty_with_indices(elem_ty, &indices[1..])
                 }
             },
             Type::Struct(id) => match indices.len() {
                 1 => Some(
-                    self.non_primitive_types[id].as_struct().fields_ty
+                    self.base.borrow().compound_types[id].as_struct().fields_ty
                         [indices[0].as_imm().as_int32() as usize],
                 ),
                 _ => self.get_element_ty_with_indices(
-                    self.non_primitive_types[id].as_struct().fields_ty
+                    self.base.borrow().compound_types[id].as_struct().fields_ty
+                        [indices[0].as_imm().as_int32() as usize],
+                    &indices[1..],
+                ),
+            },
+        }
+    }
+
+    pub fn to_string(&self, ty: Type) -> String {
+        self.base.borrow().to_string(ty)
+    }
+
+    // pub fn get_pointer_ty(&self) -> Type {
+    //     Type::Pointer(Box::new(self.clone()))
+    // }
+}
+
+impl TypesBase {
+    pub fn new() -> Self {
+        Self {
+            compound_types: Arena::new(),
+        }
+    }
+
+    fn new_compound_ty(&mut self, t: CompoundType) -> CompoundTypeId {
+        for (id, t_) in &self.compound_types {
+            if &t == t_ {
+                return id;
+            }
+        }
+        self.compound_types.alloc(t)
+    }
+
+    pub fn new_pointer_ty(&mut self, elem_ty: Type) -> Type {
+        let id = self.new_compound_ty(CompoundType::Pointer(elem_ty));
+        Type::Pointer(id)
+    }
+
+    pub fn new_array_ty(&mut self, elem_ty: Type, len: usize) -> Type {
+        let id = self.new_compound_ty(CompoundType::Array(ArrayType::new(elem_ty, len)));
+        Type::Array(id)
+    }
+
+    pub fn new_function_ty(&mut self, ret_ty: Type, mut params_ty: Vec<Type>) -> Type {
+        let mut params_attr = FxHashMap::default();
+        for (i, ty) in params_ty.iter_mut().enumerate() {
+            match ty {
+                Type::Struct(_) => {
+                    let ptr = self.new_pointer_ty(*ty);
+                    *ty = ptr;
+                    params_attr.insert(i, ParamAttribute { byval: true });
+                }
+                _ => {}
+            }
+        }
+        let id = self.new_compound_ty(CompoundType::Function(FunctionType::new(
+            ret_ty,
+            params_ty,
+            params_attr,
+        )));
+        Type::Function(id)
+    }
+
+    // pub fn new_struct_ty(&mut self, fields_ty: Vec<Type>) -> Type {
+    //     let id = self.new_compound_ty(CompoundType::Struct(StructType::new(fields_ty)));
+    //     Type::Struct(id)
+    // }
+
+    pub fn as_function_ty(&self, ty: Type) -> Option<&FunctionType> {
+        match ty {
+            Type::Function(id) => Some(self.compound_types[id].as_function()),
+            _ => None,
+        }
+    }
+
+    pub fn as_struct_ty(&self, ty: Type) -> Option<&StructType> {
+        match ty {
+            Type::Struct(id) => Some(self.compound_types[id].as_struct()),
+            _ => None,
+        }
+    }
+
+    pub fn get_element_ty(&self, ty: Type, index: Option<&Value>) -> Option<Type> {
+        match ty {
+            Type::Pointer(id) => Some(*self.compound_types[id].as_pointer()),
+            Type::Array(id) => Some(self.compound_types[id].as_array().elem_ty),
+            Type::Struct(id) => Some(
+                self.compound_types[id].as_struct().fields_ty
+                    [index.unwrap().as_imm().as_int32() as usize],
+            ),
+            Type::Void
+            | Type::i1
+            | Type::i8
+            | Type::i32
+            | Type::i64
+            | Type::f64
+            | Type::Function(_) => Some(ty),
+        }
+    }
+
+    pub fn get_element_ty_with_indices(&self, ty: Type, indices: &[Value]) -> Option<Type> {
+        if indices.len() == 0 {
+            return Some(ty);
+        }
+
+        match ty {
+            Type::Void
+            | Type::i1
+            | Type::i8
+            | Type::i32
+            | Type::i64
+            | Type::f64
+            | Type::Function(_) => None,
+            Type::Pointer(id) => match indices.len() {
+                1 => Some(*self.compound_types[id].as_pointer()),
+                _ => {
+                    let elem_ty = self.compound_types[id].as_pointer();
+                    self.get_element_ty_with_indices(*elem_ty, &indices[1..])
+                }
+            },
+            Type::Array(id) => match indices.len() {
+                1 => Some(self.compound_types[id].as_array().elem_ty),
+                _ => {
+                    let elem_ty = self.compound_types[id].as_array().elem_ty;
+                    self.get_element_ty_with_indices(elem_ty, &indices[1..])
+                }
+            },
+            Type::Struct(id) => match indices.len() {
+                1 => Some(
+                    self.compound_types[id].as_struct().fields_ty
+                        [indices[0].as_imm().as_int32() as usize],
+                ),
+                _ => self.get_element_ty_with_indices(
+                    self.compound_types[id].as_struct().fields_ty
                         [indices[0].as_imm().as_int32() as usize],
                     &indices[1..],
                 ),
@@ -348,19 +330,19 @@ impl TypesBase {
             Type::i64 => "i64".to_string(),
             Type::f64 => "f64".to_string(),
             Type::Pointer(id) => {
-                let elem_ty = self.non_primitive_types[id].as_pointer();
+                let elem_ty = self.compound_types[id].as_pointer();
                 format!("{}*", self.to_string(*elem_ty))
             }
             Type::Array(id) => {
-                let arr = self.non_primitive_types[id].as_array();
+                let arr = self.compound_types[id].as_array();
                 arr.to_string(self)
             }
             Type::Function(id) => {
-                let f = self.non_primitive_types[id].as_function();
+                let f = self.compound_types[id].as_function();
                 f.to_string(self)
             }
             Type::Struct(id) => {
-                let s = self.non_primitive_types[id].as_struct();
+                let s = self.compound_types[id].as_struct();
                 s.to_string(self)
             }
         }
@@ -508,31 +490,40 @@ impl StructType {
     }
 }
 
-impl NonPrimitiveType {
+impl CompoundType {
     pub fn as_pointer(&self) -> &Type {
         match self {
-            NonPrimitiveType::Pointer(p) => p,
+            CompoundType::Pointer(p) => p,
             _ => panic!(),
         }
     }
 
     pub fn as_array(&self) -> &ArrayType {
         match self {
-            NonPrimitiveType::Array(a) => a,
+            CompoundType::Array(a) => a,
             _ => panic!(),
         }
     }
 
     pub fn as_function(&self) -> &FunctionType {
         match self {
-            NonPrimitiveType::Function(f) => f,
+            CompoundType::Function(f) => f,
             _ => panic!(),
         }
     }
 
     pub fn as_struct(&self) -> &StructType {
         match self {
-            NonPrimitiveType::Struct(s) => s,
+            CompoundType::Struct(s) => s,
+            _ => panic!(),
+        }
+    }
+}
+
+impl From<Type> for CompoundTypeId {
+    fn from(x: Type) -> CompoundTypeId {
+        match x {
+            Type::Pointer(id) | Type::Array(id) | Type::Function(id) | Type::Struct(id) => id,
             _ => panic!(),
         }
     }
