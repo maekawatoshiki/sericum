@@ -5,7 +5,7 @@ use super::{
     types::{CompoundTypes, StorageClass, Type, TypeConversion},
 };
 use cilk::ir::{
-    builder::{Builder, FunctionIdWithModule},
+    builder::{Builder, FuncRef, FunctionEntity, FunctionIdWithModule},
     module::Module,
     opcode::ICmpKind,
     types, value,
@@ -129,13 +129,7 @@ impl<'a> FunctionCodeGenerator<'a> {
         for (i, name) in param_names.iter().enumerate() {
             let cilk_ty = cilk_func_ty.params_ty[i];
             let ty = gen.compound_types[*ty].as_func().1[i];
-            let val = gen
-                .builder
-                .func
-                .module
-                .function_ref(func_id)
-                .get_param_value(i)
-                .unwrap();
+            let val = gen.builder.func.func_ref().get_param_value(i).unwrap();
             let var = gen.builder.build_alloca(cilk_ty);
             gen.builder.build_store(val, var);
             gen.variables
@@ -211,7 +205,10 @@ impl<'a> FunctionCodeGenerator<'a> {
         _val: Option<&AST>,
     ) -> Option<Value> {
         let cilk_ty = ty.conv(self.compound_types, &self.builder.func.module.types);
-        let alloca = self.builder.build_alloca(cilk_ty);
+        let mut builder = Builder::new(FunctionEntity(self.builder.func.func_ref_mut()));
+        let entry = builder.func.func_ref().get_entry_block().unwrap();
+        builder.set_insert_point(entry);
+        let alloca = builder.build_alloca(cilk_ty);
         self.variables
             .add_local_var(name.clone(), Variable::new(ty, cilk_ty, alloca));
         None

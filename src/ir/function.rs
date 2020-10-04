@@ -58,6 +58,10 @@ impl Function {
         })
     }
 
+    pub fn get_entry_block(&self) -> Option<BasicBlockId> {
+        self.basic_blocks.order.get(0).map(|bb| *bb)
+    }
+
     pub fn append_basic_block(&mut self) -> BasicBlockId {
         let id = self.basic_blocks.arena.alloc(BasicBlock::new());
         self.basic_blocks.order.push(id);
