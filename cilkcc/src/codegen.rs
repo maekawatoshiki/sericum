@@ -6,7 +6,6 @@ use super::{
 };
 use cilk::ir::{
     builder::{Builder, FunctionIdWithModule},
-    function::FunctionId,
     module::Module,
     opcode::ICmpKind,
     types, value,
@@ -78,34 +77,57 @@ impl<'a> Codegenerator<'a> {
         name: &String,
         body: &AST,
     ) -> Result<Value> {
-        let func_ty_ = ty.conv(self.compound_types, &self.module.types);
-        let func_ty = self
-            .module
-            .types
-            .base
-            .borrow()
-            .as_function_ty(func_ty_)
-            .unwrap()
-            .clone();
-        let func_id =
-            self.module
-                .create_function(name.as_str(), func_ty.ret_ty, func_ty.params_ty.clone());
-        let val = Value::Function({
-            value::FunctionValue {
-                func_id,
-                ty: func_ty_,
-            }
-        });
-        self.variables
-            .add_local_var(name.clone(), Variable::new(*ty, func_ty_, val));
-        self.variables.push_env();
-        let mut gen = FunctionCodeGenerator::new(
+        let val = FunctionCodeGenerator::new(
             &mut self.module,
             self.compound_types,
             &mut self.variables,
-            func_id,
+            ty,
+            param_names,
+            name,
+            body,
         );
-        for (i, (name, &cilk_ty)) in param_names.iter().zip(func_ty.params_ty.iter()).enumerate() {
+        Ok(val)
+    }
+}
+
+impl<'a> FunctionCodeGenerator<'a> {
+    pub fn new(
+        module: &'a mut Module,
+        compound_types: &'a mut CompoundTypes,
+        variables: &'a mut Variables,
+        ty: &Type,
+        param_names: &Vec<String>,
+        name: &String,
+        body: &AST,
+    ) -> Value {
+        let func_ty = ty.conv(compound_types, &module.types);
+        let cilk_func_ty = module.types.compound_ty(func_ty).as_function().clone();
+        let func_id = module.create_function(
+            name.as_str(),
+            cilk_func_ty.ret_ty,
+            cilk_func_ty.params_ty.clone(),
+        );
+        let val = Value::Function(value::FunctionValue {
+            func_id,
+            ty: func_ty,
+        });
+
+        variables.add_local_var(name.clone(), Variable::new(*ty, func_ty, val));
+        variables.push_env();
+
+        let mut gen = Self {
+            builder: {
+                let mut builder = Builder::new(FunctionIdWithModule::new(module, func_id));
+                let entry = builder.append_basic_block();
+                builder.set_insert_point(entry);
+                builder
+            },
+            compound_types,
+            variables,
+        };
+
+        for (i, name) in param_names.iter().enumerate() {
+            let cilk_ty = cilk_func_ty.params_ty[i];
             let ty = gen.compound_types[*ty].as_func().1[i];
             let val = gen
                 .builder
@@ -119,29 +141,12 @@ impl<'a> Codegenerator<'a> {
             gen.variables
                 .add_local_var(name.clone(), Variable::new(ty, cilk_ty, var));
         }
-        gen.generate(body);
-        self.variables.pop_env();
-        Ok(val)
-    }
-}
 
-impl<'a> FunctionCodeGenerator<'a> {
-    pub fn new(
-        module: &'a mut Module,
-        compound_types: &'a mut CompoundTypes,
-        variables: &'a mut Variables,
-        func: FunctionId,
-    ) -> Self {
-        Self {
-            builder: {
-                let mut builder = Builder::new(FunctionIdWithModule::new(module, func));
-                let entry = builder.append_basic_block();
-                builder.set_insert_point(entry);
-                builder
-            },
-            compound_types,
-            variables,
-        }
+        gen.generate(body);
+
+        gen.variables.pop_env();
+
+        val
     }
 
     pub fn generate(&mut self, body: &AST) -> Option<Value> {
