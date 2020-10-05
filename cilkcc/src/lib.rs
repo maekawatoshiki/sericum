@@ -40,7 +40,7 @@ pub fn compile(path: PathBuf) {
         }
     };
 
-    println!("{:#?}", nodes);
+    // println!("{:#?}", nodes);
 
     let mut codegen = codegen::Codegenerator::new(&mut parser.compound_types);
     for node in nodes {
@@ -109,8 +109,11 @@ fn assemble_and_run(c_parent: &str, s_target: &str) {
     let execution = process::Command::new(output_name.as_str())
         .status()
         .unwrap();
-    println!("Exit code: {:?}", execution.code());
-    assert!(execution.success());
+    if let Some(code) = execution.code() {
+        println!("Exit code: {:?}", code);
+    } else {
+        assert!(execution.success());
+    }
 
     fs::remove_file(output_name).unwrap();
     fs::remove_file(parent_name).unwrap();

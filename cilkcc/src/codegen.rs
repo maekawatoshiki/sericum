@@ -154,6 +154,9 @@ impl<'a> FunctionCodeGenerator<'a> {
             ast::Kind::Assign { dst, src } => self.generate_assign(dst, src),
             ast::Kind::Load(val) => self.generate_load(val),
             ast::Kind::BinaryOp(op, lhs, rhs) => self.generate_binary_op(*op, lhs, rhs),
+            ast::Kind::TernaryOp(cond, then_, else_) => {
+                self.generate_ternary_op(cond, then_, else_)
+            }
             ast::Kind::FuncCall(f, args) => self.generate_func_call(f, args),
             ast::Kind::Return(val) => self.generate_return(val.as_ref().map(|v| &**v)),
             _ => panic!(),
@@ -283,6 +286,42 @@ impl<'a> FunctionCodeGenerator<'a> {
             ast::BinaryOp::Sub => Ok(self.builder.build_sub(lhs, rhs)),
             _ => unimplemented!(),
         }
+    }
+
+    fn generate_ternary_op(&mut self, cond: &AST, then_: &AST, else_: &AST) -> Result<Value> {
+        let cond = self.generate(cond)?;
+
+        let then_block = self.builder.append_basic_block();
+        let else_block = self.builder.append_basic_block();
+        let merge_block = self.builder.append_basic_block();
+
+        self.builder.build_cond_br(cond, then_block, else_block);
+
+        self.builder.set_insert_point(then_block);
+
+        let then_ = self.generate(then_)?;
+
+        if !self.builder.is_last_inst_terminator() {
+            self.builder.build_br(merge_block);
+        }
+
+        self.builder.set_insert_point(else_block);
+
+        let else_ = self.generate(else_)?;
+
+        if !self.builder.is_last_inst_terminator() {
+            self.builder.build_br(merge_block);
+        }
+
+        self.builder.set_insert_point(merge_block);
+
+        if matches!(then_, Value::None) || matches!(else_, Value::None) {
+            return Ok(Value::None);
+        }
+
+        Ok(self
+            .builder
+            .build_phi(vec![(then_, then_block), (else_, else_block)]))
     }
 
     fn generate_func_call(&mut self, f: &AST, args: &Vec<AST>) -> Result<Value> {
