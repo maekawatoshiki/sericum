@@ -4,14 +4,19 @@ use id_arena::*;
 use rustc_hash::FxHashSet;
 use std::cell::{Ref, RefCell, RefMut};
 
+/// BasicBlockId that indicates a BasicBlock uniquely is given by [id_arena::Arena](https://docs.rs/id-arena).
 pub type BasicBlockId = Id<BasicBlock>;
 
+/// An allocator of BasicBlock and a sequence of BasicBlock.
+/// See also [Builder](../builder/struct.Builder.html) to know how it's used.
 #[derive(Debug, Clone)]
 pub struct BasicBlocks {
     pub arena: Arena<BasicBlock>,
     pub order: Vec<BasicBlockId>,
 }
 
+/// The representation of BasicBlock.
+/// A BasicBlock has a set of Predecessors, Successors and a sequence of [Value](../value/enum.Value.html).
 #[derive(Clone, Debug)]
 pub struct BasicBlock {
     /// Information for liveness analysis
@@ -28,14 +33,30 @@ pub struct BasicBlock {
     pub iseq: RefCell<Vec<Value>>,
 }
 
+/// The information of Liveness Analysis.
+/// See also [liveness analysis](../liveness/struct.IRLivenessAnalyzer.html#method.analyze) to know how it's used.
 #[derive(Clone, Debug)]
 pub struct LivenessInfo {
+    /// The set of variables that are used in an instruction.
     pub def: FxHashSet<InstructionId>,
+    /// The set of "in" information that is living at before an instruction executing.
     pub live_in: FxHashSet<InstructionId>,
+    /// The set of "out" information that is living at after executed an instruction.
     pub live_out: FxHashSet<InstructionId>,
 }
 
 impl BasicBlocks {
+    /// Creates an empty BasicBlocks.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cilk::ir::basic_block::BasicBlocks;
+    /// let bbs = BasicBlocks::new();
+    ///
+    /// assert!(bbs.arena.len() == 0);
+    /// assert!(bbs.order.is_empty());
+    /// ```
     pub fn new() -> Self {
         Self {
             arena: Arena::new(),
@@ -43,6 +64,7 @@ impl BasicBlocks {
         }
     }
 
+    /// Let src-basicblock to absorb into dst basicblock.
     pub fn merge(&mut self, dst: &BasicBlockId, src: &BasicBlockId) {
         let src_block = ::std::mem::replace(&mut self.arena[*src], BasicBlock::new());
         let BasicBlock {
@@ -70,6 +92,18 @@ impl BasicBlocks {
 }
 
 impl BasicBlock {
+    /// Creates an empty BasicBlock
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cilk::ir::basic_block::BasicBlock;
+    ///
+    /// let bb = BasicBlock::new();
+    /// assert!(bb.iseq.borrow().is_empty());
+    /// assert!(bb.pred.is_empty());
+    /// assert!(bb.succ.is_empty());
+    /// ```
     pub fn new() -> Self {
         Self {
             iseq: RefCell::new(Vec::new()),
@@ -79,14 +113,17 @@ impl BasicBlock {
         }
     }
 
+    /// Get a reference to basicblock's instructions.
     pub fn iseq_ref<'b>(&'b self) -> Ref<Vec<Value>> {
         self.iseq.borrow()
     }
 
+    /// Get a mutable reference to basicblock's instructions.
     pub fn iseq_ref_mut(&self) -> RefMut<Vec<Value>> {
         self.iseq.borrow_mut()
     }
 
+    /// Try to find a position of given instruction in the vector of instructions that receiver has.
     pub fn find_inst_pos(&self, id2find: InstructionId) -> Option<usize> {
         self.iseq_ref()
             .iter()
@@ -134,6 +171,18 @@ impl DumpToString for BasicBlock {
 }
 
 impl LivenessInfo {
+    /// Creates an empty LivenessInfo
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use cilk::ir::basic_block::LivenessInfo;
+    ///
+    /// let info = LivenessInfo::new();
+    /// assert!(info.def.is_empty());
+    /// assert!(info.live_in.is_empty());
+    /// assert!(info.live_out.is_empty());
+    /// ```
     pub fn new() -> Self {
         Self {
             def: FxHashSet::default(),
@@ -142,7 +191,7 @@ impl LivenessInfo {
         }
     }
 
-    // merge src into self
+    /// Merge src into self
     pub fn merge(&mut self, src: LivenessInfo) {
         self.def = &self.def | &src.def;
         self.live_in = &self.live_in | &src.live_in;
