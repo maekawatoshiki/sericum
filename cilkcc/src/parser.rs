@@ -1039,8 +1039,14 @@ impl<'a> Parser<'a> {
         todo!()
     }
 
-    fn read_index(&mut self, _: AST) -> Result<AST> {
-        todo!()
+    fn read_index(&mut self, base: AST) -> Result<AST> {
+        let loc = base.loc;
+        let idx = self.read_expr()?;
+        self.lexer.expect_skip_symbol(Symbol::ClosingBoxBracket)?;
+        Ok(AST::new(
+            ast::Kind::BinaryOp(ast::BinaryOp::Add, Box::new(base), Box::new(idx)),
+            loc,
+        ))
     }
 
     fn read_primary(&mut self) -> Result<AST> {
@@ -1084,8 +1090,28 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn get_typedef(&self, _name: &str) -> Option<Type> {
-        todo!()
+    fn get_typedef(&self, name: &str) -> Option<Type> {
+        match self.env.get(name) {
+            Some(ast) => match ast.kind {
+                ast::Kind::Typedef(ref from, ref _to) => {
+                    let ty = match from {
+                        &Type::Union(_) => todo!(),
+                        &Type::Struct(id) => {
+                            let (name, fields) = self.compound_types[id].as_struct();
+                            if fields.len() == 0 {
+                                self.tags.get(name.as_str()).unwrap().clone()
+                            } else {
+                                *from
+                            }
+                        }
+                        _ => *from,
+                    };
+                    return Some(ty);
+                }
+                _ => None,
+            },
+            None => None,
+        }
     }
 
     fn is_type(&self, tok: &token::Token) -> bool {

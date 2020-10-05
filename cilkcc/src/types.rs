@@ -30,9 +30,11 @@ pub enum Type {
     Pointer(CompoundTypeId),
     Array(CompoundTypeId),
     Func(CompoundTypeId), // return type, param types, vararg
-                          // Struct(RectypeName, Vec<AST>),       // name, fields
-                          // Union(RectypeName, Vec<AST>, usize), // name, fields, means size of nth field is size of the union
-                          // Enum,                                // as same as Int
+    Struct(CompoundTypeId),
+    Union(CompoundTypeId),
+    // Struct(RectypeName, Vec<AST>),       // name, fields
+    // Union(RectypeName, Vec<AST>, usize), // name, fields, means size of nth field is size of the union
+    // Enum,                                // as same as Int
 }
 
 pub enum CompoundType {
@@ -81,7 +83,7 @@ impl CompoundTypes {
     }
 
     pub fn array(&mut self, inner: Type, len: i32) -> Type {
-        Type::Pointer(
+        Type::Array(
             match self.0.iter().find_map(|(id, t)| match t {
                 CompoundType::Array { inner: i, len: l } if i == &inner && l == &len => Some(id),
                 _ => None,
@@ -138,6 +140,13 @@ impl CompoundType {
             _ => panic!(),
         }
     }
+
+    pub fn as_struct(&self) -> (&String, &Vec<Type>) {
+        match self {
+            Self::Struct { name, fields } => (name, fields),
+            _ => panic!(),
+        }
+    }
 }
 
 pub trait TypeConversion<T> {
@@ -174,6 +183,15 @@ impl TypeConversion<types::Type> for Type {
                     .collect();
                 types.new_function_ty(ret, params)
             }
+            Type::Struct(id) => {
+                let (_name, fields) = compound_types[*id].as_struct();
+                let fields = fields
+                    .iter()
+                    .map(|t| t.conv(compound_types, types))
+                    .collect();
+                types.new_struct_ty(fields)
+            }
+            Type::Union(_id) => panic!(),
         }
     }
 }

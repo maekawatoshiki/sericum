@@ -151,6 +151,11 @@ impl<'a> FunctionCodeGenerator<'a> {
             ast::Kind::VariableDecl(ty, name, sclass, val) => {
                 self.generate_var_decl(*ty, name, *sclass, val.as_ref().map(|v| &**v))
             }
+            ast::Kind::Variable(_, name) => self
+                .variables
+                .find_var(name.as_str())
+                .ok_or_else(|| Error::Message(body.loc, "variable not found".to_string()))
+                .map(|ok| ok.val),
             ast::Kind::Assign { dst, src } => self.generate_assign(dst, src),
             ast::Kind::Load(val) => self.generate_load(val),
             ast::Kind::BinaryOp(op, lhs, rhs) => self.generate_binary_op(*op, lhs, rhs),
@@ -249,30 +254,22 @@ impl<'a> FunctionCodeGenerator<'a> {
     }
 
     fn generate_assign(&mut self, dst: &AST, src: &AST) -> Result<Value> {
-        let dst = retrieve_from_load(dst);
-        let src = self.generate(src).unwrap();
-        match &dst.kind {
-            ast::Kind::Variable(_, name) => {
-                let dst = self
-                    .variables
-                    .find_var(name.as_str())
-                    .ok_or_else(|| Error::Message(dst.loc, "variable not found".to_string()))?;
-                Ok(self.builder.build_store(src, dst.val))
-            }
-            _ => unimplemented!(),
-        }
+        let dst = self.generate(retrieve_from_load(dst))?;
+        let src = self.generate(src)?;
+        self.builder.build_store(src, dst);
+        Ok(self.builder.build_load(dst))
     }
 
     fn generate_load(&mut self, val: &AST) -> Result<Value> {
-        match &val.kind {
-            ast::Kind::Variable(_, name) => {
-                let var = self
-                    .variables
-                    .find_var(name.as_str())
-                    .ok_or_else(|| Error::Message(val.loc, "variable not found".to_string()))?;
-                Ok(self.builder.build_load(var.val))
+        let val = self.generate(val)?;
+        if let types::Type::Pointer(id) = val.get_type() {
+            let inner = *self.builder.func.module.types.compound_ty(id).as_pointer();
+            match inner {
+                types::Type::Array(_) => Ok(val),
+                _ => Ok(self.builder.build_load(val)),
             }
-            _ => unimplemented!(),
+        } else {
+            panic!()
         }
     }
 
@@ -282,8 +279,45 @@ impl<'a> FunctionCodeGenerator<'a> {
         match op {
             ast::BinaryOp::Eq => Ok(self.builder.build_icmp(ICmpKind::Eq, lhs, rhs)),
             ast::BinaryOp::Le => Ok(self.builder.build_icmp(ICmpKind::Le, lhs, rhs)),
-            ast::BinaryOp::Add => Ok(self.builder.build_add(lhs, rhs)),
+            ast::BinaryOp::Add => {
+                if let types::Type::Pointer(_) = lhs.get_type() {
+                    return self.generate_ptr_binary_op(op, lhs, rhs);
+                }
+                // TODO: ???
+                if let types::Type::Pointer(_) = rhs.get_type() {
+                    return self.generate_ptr_binary_op(op, rhs, lhs);
+                }
+
+                Ok(self.builder.build_add(lhs, rhs))
+            }
             ast::BinaryOp::Sub => Ok(self.builder.build_sub(lhs, rhs)),
+            _ => unimplemented!(),
+        }
+    }
+
+    fn generate_ptr_binary_op(
+        &mut self,
+        op: ast::BinaryOp,
+        lhs: Value,
+        rhs: Value,
+    ) -> Result<Value> {
+        let is_elem_array = match lhs.get_type() {
+            types::Type::Pointer(id) => matches!(
+                self.builder.func.module.types.compound_ty(id).as_pointer(),
+                types::Type::Array(_)
+            ),
+            _ => panic!(),
+        };
+        match op {
+            ast::BinaryOp::Add => {
+                if is_elem_array {
+                    Ok(self
+                        .builder
+                        .build_gep(lhs, vec![Value::new_imm_int32(0), rhs]))
+                } else {
+                    Ok(self.builder.build_gep(lhs, vec![rhs]))
+                }
+            }
             _ => unimplemented!(),
         }
     }
