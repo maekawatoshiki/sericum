@@ -17,6 +17,8 @@ pub mod parser;
 pub mod token;
 pub mod types;
 
+// TODO: Refine code
+
 pub fn compile(path: PathBuf) {
     let mut lexer = lexer::Lexer::new(path);
     let mut parser = parser::Parser::new(&mut lexer);
@@ -42,7 +44,19 @@ pub fn compile(path: PathBuf) {
 
     let mut codegen = codegen::Codegenerator::new(&mut parser.compound_types);
     for node in nodes {
-        codegen.generate(&node).unwrap();
+        if let Err(codegen::Error::Message(loc, msg)) = codegen.generate(&node) {
+            println!(
+                "{}:{}: {}",
+                parser.lexer.path_arena().borrow()[loc.file]
+                    .as_path()
+                    .display()
+                    .to_string(),
+                loc.line,
+                msg
+            );
+            println!("{}", parser.lexer.get_surrounding_line(loc));
+            panic!();
+        }
     }
     println!("{:?}", codegen.module);
 

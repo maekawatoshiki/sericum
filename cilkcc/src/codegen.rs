@@ -253,7 +253,7 @@ impl<'a> FunctionCodeGenerator<'a> {
                 let dst = self
                     .variables
                     .find_var(name.as_str())
-                    .expect("var not found");
+                    .ok_or_else(|| Error::Message(dst.loc, "variable not found".to_string()))?;
                 Ok(self.builder.build_store(src, dst.val))
             }
             _ => unimplemented!(),
@@ -266,7 +266,7 @@ impl<'a> FunctionCodeGenerator<'a> {
                 let var = self
                     .variables
                     .find_var(name.as_str())
-                    .expect("var not found");
+                    .ok_or_else(|| Error::Message(val.loc, "variable not found".to_string()))?;
                 Ok(self.builder.build_load(var.val))
             }
             _ => unimplemented!(),
@@ -296,7 +296,7 @@ impl<'a> FunctionCodeGenerator<'a> {
                 let var = self
                     .variables
                     .find_var(name.as_str())
-                    .expect("var not found");
+                    .ok_or_else(|| Error::Message(f.loc, "variable not found".to_string()))?;
                 Ok(self.builder.build_call(var.val, args_))
             }
             _ => unimplemented!(),
