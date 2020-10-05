@@ -44,13 +44,13 @@ pub fn compile(path: PathBuf) {
     for node in nodes {
         codegen.generate(&node).unwrap();
     }
-    // println!("{:?}", codegen.module);
+    println!("{:?}", codegen.module);
 
     let machine_module =
         cilk::codegen::x64::standard_conversion_into_machine_module(&mut codegen.module);
     let mut printer = cilk::codegen::x64::asm::print::MachineAsmPrinter::new();
     printer.run_on_module(&machine_module);
-    // println!("{}", printer.output);
+    println!("{}", printer.output);
 
     assemble_and_run("int main(int argc, char **argv);", &printer.output);
 }

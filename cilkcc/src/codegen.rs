@@ -146,6 +146,7 @@ impl<'a> FunctionCodeGenerator<'a> {
         match &body.kind {
             ast::Kind::Block(stmts) => self.generate_block(&stmts),
             ast::Kind::If { cond, then_, else_ } => self.generate_if(cond, then_, else_),
+            ast::Kind::While { cond, body } => self.generate_while(cond, body),
             ast::Kind::Int { n, bits: 32 } => Ok(Value::new_imm_int32(*n as i32)),
             ast::Kind::VariableDecl(ty, name, sclass, val) => {
                 self.generate_var_decl(*ty, name, *sclass, val.as_ref().map(|v| &**v))
@@ -196,6 +197,30 @@ impl<'a> FunctionCodeGenerator<'a> {
         Ok(Value::None)
     }
 
+    fn generate_while(&mut self, cond: &AST, body: &AST) -> Result<Value> {
+        let header_block = self.builder.append_basic_block();
+        let body_block = self.builder.append_basic_block();
+        let post_block = self.builder.append_basic_block();
+
+        self.builder.build_br(header_block);
+        self.builder.set_insert_point(header_block);
+
+        let cond = self.generate(cond)?;
+        self.builder.build_cond_br(cond, body_block, post_block);
+
+        self.builder.set_insert_point(body_block);
+
+        self.generate(body)?;
+
+        if !self.builder.is_last_inst_terminator() {
+            self.builder.build_br(header_block);
+        }
+
+        self.builder.set_insert_point(post_block);
+
+        Ok(Value::None)
+    }
+
     fn generate_var_decl(
         &mut self,
         ty: Type,
@@ -206,10 +231,17 @@ impl<'a> FunctionCodeGenerator<'a> {
         let cilk_ty = ty.conv(self.compound_types, &self.builder.func.module.types);
         let mut builder = Builder::new(FunctionEntity(self.builder.func.func_ref_mut()));
         let entry = builder.func.func_ref().get_entry_block().unwrap();
-        builder.set_insert_point(entry);
+        builder.set_insert_point_at(0, entry);
         let alloca = builder.build_alloca(cilk_ty);
         self.variables
             .add_local_var(name.clone(), Variable::new(ty, cilk_ty, alloca));
+
+        // Adjust the insert point of global builder
+        let (pt, bb) = self.builder.insert_point();
+        if bb == Some(entry) {
+            self.builder.set_insert_point_at(pt + 1, entry);
+        }
+
         Ok(Value::None)
     }
 

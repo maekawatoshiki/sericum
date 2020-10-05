@@ -54,6 +54,14 @@ impl<F: FuncRef> Builder<F> {
         }
     }
 
+    pub fn block(&self) -> Option<BasicBlockId> {
+        self.cur_bb
+    }
+
+    pub fn insert_point(&self) -> (usize, Option<BasicBlockId>) {
+        (self.insert_point, self.block())
+    }
+
     pub fn get_param(&self, idx: usize) -> Option<Value> {
         self.func.func_ref().get_param_value(idx)
     }
