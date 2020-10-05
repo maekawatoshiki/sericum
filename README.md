@@ -7,13 +7,12 @@ Toy Compiler Infrastructure influenced by LLVM written in Rust.
 
 Do not expect too much stuff!
 
-
 # To Do
 
-- Implement optimizations for IR
-- Refine code 
-- Write documents in detail
-- Write tests (because I recently removed most of them)
+- [ ] Verify IR
+- [ ] More optimizations for IR
+- [ ] Support returning struct as value
+- [ ] Write documents
 
 # Build
 
@@ -126,3 +125,7 @@ let fibo = cilk_ir!(m; define [i32] f [(i32)] {
         ret (%r3);
 });
 ```
+
+# Make your own language using cilk as backend
+
+``./minilang`` and ``./cilkcc`` may help you.
