@@ -77,7 +77,7 @@ impl<'a> Codegenerator<'a> {
         name: &String,
         body: &AST,
     ) -> Result<Value> {
-        let val = FunctionCodeGenerator::new(
+        FunctionCodeGenerator::new(
             &mut self.module,
             self.compound_types,
             &mut self.variables,
@@ -85,8 +85,7 @@ impl<'a> Codegenerator<'a> {
             param_names,
             name,
             body,
-        );
-        Ok(val)
+        )
     }
 }
 
@@ -99,7 +98,7 @@ impl<'a> FunctionCodeGenerator<'a> {
         param_names: &Vec<String>,
         name: &String,
         body: &AST,
-    ) -> Value {
+    ) -> Result<Value> {
         let func_ty = ty.conv(compound_types, &module.types);
         let cilk_func_ty = module.types.compound_ty(func_ty).as_function().clone();
         let func_id = module.create_function(
@@ -136,18 +135,18 @@ impl<'a> FunctionCodeGenerator<'a> {
                 .add_local_var(name.clone(), Variable::new(ty, cilk_ty, var));
         }
 
-        gen.generate(body);
+        gen.generate(body)?;
 
         gen.variables.pop_env();
 
-        val
+        Ok(val)
     }
 
-    pub fn generate(&mut self, body: &AST) -> Option<Value> {
+    pub fn generate(&mut self, body: &AST) -> Result<Value> {
         match &body.kind {
             ast::Kind::Block(stmts) => self.generate_block(&stmts),
             ast::Kind::If { cond, then_, else_ } => self.generate_if(cond, then_, else_),
-            ast::Kind::Int { n, bits: 32 } => Some(Value::new_imm_int32(*n as i32)),
+            ast::Kind::Int { n, bits: 32 } => Ok(Value::new_imm_int32(*n as i32)),
             ast::Kind::VariableDecl(ty, name, sclass, val) => {
                 self.generate_var_decl(*ty, name, *sclass, val.as_ref().map(|v| &**v))
             }
@@ -160,14 +159,14 @@ impl<'a> FunctionCodeGenerator<'a> {
         }
     }
 
-    fn generate_block(&mut self, stmts: &Vec<AST>) -> Option<Value> {
+    fn generate_block(&mut self, stmts: &Vec<AST>) -> Result<Value> {
         for stmt in stmts {
-            self.generate(stmt);
+            self.generate(stmt)?;
         }
-        None
+        Ok(Value::None)
     }
 
-    fn generate_if(&mut self, cond: &AST, then_: &AST, else_: &AST) -> Option<Value> {
+    fn generate_if(&mut self, cond: &AST, then_: &AST, else_: &AST) -> Result<Value> {
         let cond = self.generate(cond)?;
 
         let then_block = self.builder.append_basic_block();
@@ -178,7 +177,7 @@ impl<'a> FunctionCodeGenerator<'a> {
 
         self.builder.set_insert_point(then_block);
 
-        self.generate(then_);
+        self.generate(then_)?;
 
         if !self.builder.is_last_inst_terminator() {
             self.builder.build_br(merge_block);
@@ -186,7 +185,7 @@ impl<'a> FunctionCodeGenerator<'a> {
 
         self.builder.set_insert_point(else_block);
 
-        self.generate(else_);
+        self.generate(else_)?;
 
         if !self.builder.is_last_inst_terminator() {
             self.builder.build_br(merge_block);
@@ -194,7 +193,7 @@ impl<'a> FunctionCodeGenerator<'a> {
 
         self.builder.set_insert_point(merge_block);
 
-        None
+        Ok(Value::None)
     }
 
     fn generate_var_decl(
@@ -203,7 +202,7 @@ impl<'a> FunctionCodeGenerator<'a> {
         name: &String,
         _sclass: StorageClass,
         _val: Option<&AST>,
-    ) -> Option<Value> {
+    ) -> Result<Value> {
         let cilk_ty = ty.conv(self.compound_types, &self.builder.func.module.types);
         let mut builder = Builder::new(FunctionEntity(self.builder.func.func_ref_mut()));
         let entry = builder.func.func_ref().get_entry_block().unwrap();
@@ -211,10 +210,10 @@ impl<'a> FunctionCodeGenerator<'a> {
         let alloca = builder.build_alloca(cilk_ty);
         self.variables
             .add_local_var(name.clone(), Variable::new(ty, cilk_ty, alloca));
-        None
+        Ok(Value::None)
     }
 
-    fn generate_assign(&mut self, dst: &AST, src: &AST) -> Option<Value> {
+    fn generate_assign(&mut self, dst: &AST, src: &AST) -> Result<Value> {
         let dst = retrieve_from_load(dst);
         let src = self.generate(src).unwrap();
         match &dst.kind {
@@ -223,38 +222,38 @@ impl<'a> FunctionCodeGenerator<'a> {
                     .variables
                     .find_var(name.as_str())
                     .expect("var not found");
-                Some(self.builder.build_store(src, dst.val))
+                Ok(self.builder.build_store(src, dst.val))
             }
             _ => unimplemented!(),
         }
     }
 
-    fn generate_load(&mut self, val: &AST) -> Option<Value> {
+    fn generate_load(&mut self, val: &AST) -> Result<Value> {
         match &val.kind {
             ast::Kind::Variable(_, name) => {
                 let var = self
                     .variables
                     .find_var(name.as_str())
                     .expect("var not found");
-                Some(self.builder.build_load(var.val))
+                Ok(self.builder.build_load(var.val))
             }
             _ => unimplemented!(),
         }
     }
 
-    fn generate_binary_op(&mut self, op: ast::BinaryOp, lhs: &AST, rhs: &AST) -> Option<Value> {
+    fn generate_binary_op(&mut self, op: ast::BinaryOp, lhs: &AST, rhs: &AST) -> Result<Value> {
         let lhs = self.generate(lhs)?;
         let rhs = self.generate(rhs)?;
         match op {
-            ast::BinaryOp::Eq => Some(self.builder.build_icmp(ICmpKind::Eq, lhs, rhs)),
-            ast::BinaryOp::Le => Some(self.builder.build_icmp(ICmpKind::Le, lhs, rhs)),
-            ast::BinaryOp::Add => Some(self.builder.build_add(lhs, rhs)),
-            ast::BinaryOp::Sub => Some(self.builder.build_sub(lhs, rhs)),
+            ast::BinaryOp::Eq => Ok(self.builder.build_icmp(ICmpKind::Eq, lhs, rhs)),
+            ast::BinaryOp::Le => Ok(self.builder.build_icmp(ICmpKind::Le, lhs, rhs)),
+            ast::BinaryOp::Add => Ok(self.builder.build_add(lhs, rhs)),
+            ast::BinaryOp::Sub => Ok(self.builder.build_sub(lhs, rhs)),
             _ => unimplemented!(),
         }
     }
 
-    fn generate_func_call(&mut self, f: &AST, args: &Vec<AST>) -> Option<Value> {
+    fn generate_func_call(&mut self, f: &AST, args: &Vec<AST>) -> Result<Value> {
         let f = retrieve_from_load(f);
         let mut args_ = vec![];
         for arg in args {
@@ -266,19 +265,19 @@ impl<'a> FunctionCodeGenerator<'a> {
                     .variables
                     .find_var(name.as_str())
                     .expect("var not found");
-                Some(self.builder.build_call(var.val, args_))
+                Ok(self.builder.build_call(var.val, args_))
             }
             _ => unimplemented!(),
         }
     }
 
-    fn generate_return(&mut self, val: Option<&AST>) -> Option<Value> {
+    fn generate_return(&mut self, val: Option<&AST>) -> Result<Value> {
         let val = if let Some(val) = val {
             self.generate(val)
         } else {
-            Some(Value::None)
+            Ok(Value::None)
         };
-        Some(self.builder.build_ret(val.unwrap()))
+        Ok(self.builder.build_ret(val?))
     }
 }
 
