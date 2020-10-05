@@ -40,7 +40,7 @@ pub fn compile(path: PathBuf) {
         }
     };
 
-    // println!("{:?}", nodes);
+    println!("{:#?}", nodes);
 
     let mut codegen = codegen::Codegenerator::new(&mut parser.compound_types);
     for node in nodes {

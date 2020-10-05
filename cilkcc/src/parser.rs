@@ -624,7 +624,7 @@ impl<'a> Parser<'a> {
     fn read_assign(&mut self) -> Result<AST> {
         let mut lhs = self.read_logical_or()?;
         if lexer!(self, skip_symbol(Symbol::Question)) {
-            todo!("ternary operator");
+            return self.read_ternary(lhs);
         }
 
         macro_rules! asgn {
@@ -677,6 +677,24 @@ impl<'a> Parser<'a> {
         }
 
         Ok(lhs)
+    }
+
+    fn read_ternary(&mut self, cond: AST) -> Result<AST> {
+        let then_ = self.read_expr()?;
+        let loc = then_.loc;
+        self.lexer.expect_skip_symbol(Symbol::Colon)?;
+        let else_ = self.read_expr()?;
+        // let then_ty = try!(self.get_expr_returning_ty(&then_expr));
+        // let else_ty = try!(self.get_expr_returning_ty(&else_expr));
+        // if then_ty.is_arith_ty() && else_ty.is_arith_ty() {
+        //     let ty = self.usual_binary_ty_cov(then_ty, else_ty);
+        //     then_expr = self.cast_ast(&then_expr, &ty);
+        //     else_expr = self.cast_ast(&else_expr, &ty);
+        // }
+        Ok(AST::new(
+            ast::Kind::TernaryOp(Box::new(cond), Box::new(then_), Box::new(else_)),
+            loc,
+        ))
     }
 
     fn read_logical_or(&mut self) -> Result<AST> {

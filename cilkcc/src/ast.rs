@@ -26,6 +26,7 @@ pub enum Kind {
     Typedef(Type, String),
     UnaryOp(UnaryOp, Box<AST>),
     BinaryOp(BinaryOp, Box<AST>, Box<AST>),
+    TernaryOp(Box<AST>, Box<AST>, Box<AST>),
     Assign {
         dst: Box<AST>,
         src: Box<AST>,
@@ -118,6 +119,13 @@ impl AST {
             Kind::BinaryOp(BinaryOp::Shl, ref l, ref r) => l.eval()? << r.eval()?,
             Kind::BinaryOp(BinaryOp::Shr, ref l, ref r) => l.eval()? >> r.eval()?,
             Kind::BinaryOp(BinaryOp::Comma, ref _l, ref r) => r.eval()?,
+            Kind::TernaryOp(ref c, ref l, ref r) => {
+                if c.eval()? != 0 {
+                    l.eval()?
+                } else {
+                    r.eval()?
+                }
+            }
             _ => return None,
         })
     }
