@@ -245,7 +245,8 @@ impl<'a> FunctionCodeGenerator<'a> {
             .add_local_var(name.clone(), Variable::new(ty, cilk_ty, alloca));
 
         // Adjust the insert point of global builder
-        let (pt, bb) = self.builder.insert_point();
+        let bb = self.builder.block();
+        let pt = self.builder.insert_point();
         if bb == Some(entry) {
             self.builder.set_insert_point_at(pt + 1, entry);
         }
