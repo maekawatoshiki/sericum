@@ -58,7 +58,7 @@ impl<'a> CodegenPrepareOnFunction<'a> {
             let user_parent = self.func.inst_table[user_id].parent;
             let gep = &mut self.func.inst_table[gep_id];
             gep.parent = user_parent;
-            let mut builder = BuilderWithFunction::new(self.func);
+            let mut builder = IRBuilderWithFunction::new(self.func);
             builder.set_insert_point_before_inst(user_id);
             builder.insert(gep_val);
         }

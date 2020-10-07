@@ -1,5 +1,5 @@
 use crate::ir::{
-    builder::{BuilderWithFunction, IRBuilder},
+    builder::{IRBuilder, IRBuilderWithFunction},
     function::Function,
     module::Module,
     opcode::Opcode,
@@ -62,7 +62,7 @@ impl<'a> MergeReturnsOnFunction<'a> {
             return;
         }
 
-        let mut builder = BuilderWithFunction::new(self.func);
+        let mut builder = IRBuilderWithFunction::new(self.func);
         let mut pairs = vec![];
         let ret_bb = builder.append_basic_block();
 

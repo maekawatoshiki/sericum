@@ -1,19 +1,19 @@
 use super::{basic_block::*, function::*, module::Module, opcode::*, types::*, value::*};
 
-pub struct BuilderWithFunction<'a> {
+pub struct IRBuilderWithFunction<'a> {
     func: &'a mut Function,
     block: Option<BasicBlockId>,
     insert_point: usize,
 }
 
-pub struct BuilderWithModuleAndFuncId<'a> {
+pub struct IRBuilderWithModuleAndFuncId<'a> {
     module: &'a mut Module,
     func_id: FunctionId,
     block: Option<BasicBlockId>,
     insert_point: usize,
 }
 
-impl<'a> BuilderWithFunction<'a> {
+impl<'a> IRBuilderWithFunction<'a> {
     pub fn new(func: &'a mut Function) -> Self {
         Self {
             func,
@@ -23,7 +23,7 @@ impl<'a> BuilderWithFunction<'a> {
     }
 }
 
-impl<'a> BuilderWithModuleAndFuncId<'a> {
+impl<'a> IRBuilderWithModuleAndFuncId<'a> {
     pub fn new(module: &'a mut Module, func_id: FunctionId) -> Self {
         Self {
             module,
@@ -34,7 +34,7 @@ impl<'a> BuilderWithModuleAndFuncId<'a> {
     }
 }
 
-impl<'a> IRBuilder for BuilderWithFunction<'a> {
+impl<'a> IRBuilder for IRBuilderWithFunction<'a> {
     fn module(&self) -> Option<&Module> {
         None
     }
@@ -68,7 +68,7 @@ impl<'a> IRBuilder for BuilderWithFunction<'a> {
     }
 }
 
-impl<'a> IRBuilder for BuilderWithModuleAndFuncId<'a> {
+impl<'a> IRBuilder for IRBuilderWithModuleAndFuncId<'a> {
     fn module(&self) -> Option<&Module> {
         Some(self.module)
     }

@@ -5,7 +5,7 @@ use crate::{
     },
     ir::{
         basic_block::{BasicBlock, BasicBlockId},
-        builder::{BuilderWithFunction, IRBuilder},
+        builder::{IRBuilder, IRBuilderWithFunction},
         function::Function,
         module::Module,
         opcode::{Instruction, Opcode, Operand},
@@ -123,7 +123,7 @@ impl<'a> LoopInvariantCodeMotionOnFunction<'a> {
             .pred
             .extend(preds_not_in_loop);
 
-        let mut builder = BuilderWithFunction::new(self.func);
+        let mut builder = IRBuilderWithFunction::new(self.func);
         builder.set_insert_point(pre_header);
         builder.build_br(loop_.header);
 
@@ -179,7 +179,7 @@ impl<'a> LoopInvariantCodeMotionOnFunction<'a> {
                     }
                     // worklist.push_back(inst_id);
 
-                    let mut builder = BuilderWithFunction::new(self.func);
+                    let mut builder = IRBuilderWithFunction::new(self.func);
                     builder.set_insert_point_before_terminator(pre_header);
                     builder.insert(val);
                 }
