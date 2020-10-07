@@ -403,9 +403,113 @@ impl<F: FuncRef> Builder<F> {
     }
 }
 
+pub struct BuilderWithFunction<'a> {
+    func: &'a mut Function,
+    block: Option<BasicBlockId>,
+    insert_point: usize,
+}
+
+pub struct BuilderWithModuleAndFuncId<'a> {
+    module: &'a mut Module,
+    func_id: FunctionId,
+    block: Option<BasicBlockId>,
+    insert_point: usize,
+}
+
+impl<'a> BuilderWithFunction<'a> {
+    pub fn new(func: &'a mut Function) -> Self {
+        Self {
+            func,
+            block: None,
+            insert_point: 0,
+        }
+    }
+}
+
+impl<'a> BuilderWithModuleAndFuncId<'a> {
+    pub fn new(module: &'a mut Module, func_id: FunctionId) -> Self {
+        Self {
+            module,
+            func_id,
+            block: None,
+            insert_point: 0,
+        }
+    }
+}
+
+impl<'a> IRBuilder for BuilderWithFunction<'a> {
+    fn module(&self) -> Option<&Module> {
+        None
+    }
+
+    fn module_mut(&mut self) -> Option<&mut Module> {
+        None
+    }
+
+    fn func_ref(&self) -> &Function {
+        self.func
+    }
+
+    fn func_ref_mut(&mut self) -> &mut Function {
+        self.func
+    }
+
+    fn insert_point(&self) -> usize {
+        self.insert_point
+    }
+
+    fn insert_point_mut(&mut self) -> &mut usize {
+        &mut self.insert_point
+    }
+
+    fn block(&self) -> Option<BasicBlockId> {
+        self.block
+    }
+
+    fn block_mut(&mut self) -> &mut Option<BasicBlockId> {
+        &mut self.block
+    }
+}
+
+impl<'a> IRBuilder for BuilderWithModuleAndFuncId<'a> {
+    fn module(&self) -> Option<&Module> {
+        Some(self.module)
+    }
+
+    fn module_mut(&mut self) -> Option<&mut Module> {
+        Some(&mut self.module)
+    }
+
+    fn func_ref(&self) -> &Function {
+        self.module.function_ref(self.func_id)
+    }
+
+    fn func_ref_mut(&mut self) -> &mut Function {
+        self.module.function_ref_mut(self.func_id)
+    }
+
+    fn insert_point(&self) -> usize {
+        self.insert_point
+    }
+
+    fn insert_point_mut(&mut self) -> &mut usize {
+        &mut self.insert_point
+    }
+
+    fn block(&self) -> Option<BasicBlockId> {
+        self.block
+    }
+
+    fn block_mut(&mut self) -> &mut Option<BasicBlockId> {
+        &mut self.block
+    }
+}
+
 pub trait IRBuilder {
-    fn func_ref_mut(&mut self) -> &mut Function;
+    fn module(&self) -> Option<&Module>;
+    fn module_mut(&mut self) -> Option<&mut Module>;
     fn func_ref(&self) -> &Function;
+    fn func_ref_mut(&mut self) -> &mut Function;
     fn insert_point(&self) -> usize;
     fn insert_point_mut(&mut self) -> &mut usize;
     fn block(&self) -> Option<BasicBlockId>;

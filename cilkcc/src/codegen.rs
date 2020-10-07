@@ -5,7 +5,7 @@ use super::{
     types::{CompoundTypes, StorageClass, Type, TypeConversion},
 };
 use cilk::ir::{
-    builder::{Builder, FuncRef, FunctionEntity, FunctionIdWithModule},
+    builder::{BuilderWithFunction, BuilderWithModuleAndFuncId, IRBuilder},
     module::Module,
     opcode::ICmpKind,
     types, value,
@@ -21,7 +21,7 @@ pub struct Codegenerator<'a> {
 }
 
 pub struct FunctionCodeGenerator<'a> {
-    builder: Builder<FunctionIdWithModule<'a>>,
+    builder: BuilderWithModuleAndFuncId<'a>,
     compound_types: &'a mut CompoundTypes,
     variables: &'a mut Variables,
 }
@@ -116,7 +116,7 @@ impl<'a> FunctionCodeGenerator<'a> {
 
         let mut gen = Self {
             builder: {
-                let mut builder = Builder::new(FunctionIdWithModule::new(module, func_id));
+                let mut builder = BuilderWithModuleAndFuncId::new(module, func_id);
                 let entry = builder.append_basic_block();
                 builder.set_insert_point(entry);
                 builder
@@ -128,7 +128,7 @@ impl<'a> FunctionCodeGenerator<'a> {
         for (i, name) in param_names.iter().enumerate() {
             let cilk_ty = cilk_func_ty.params_ty[i];
             let ty = gen.compound_types[*ty].as_func().1[i];
-            let val = gen.builder.func.func_ref().get_param_value(i).unwrap();
+            let val = gen.builder.func_ref().get_param_value(i).unwrap();
             let var = gen.builder.build_alloca(cilk_ty);
             gen.builder.build_store(val, var);
             gen.variables
@@ -236,9 +236,9 @@ impl<'a> FunctionCodeGenerator<'a> {
         _sclass: StorageClass,
         _val: Option<&AST>,
     ) -> Result<Value> {
-        let cilk_ty = ty.conv(self.compound_types, &self.builder.func.module.types);
-        let mut builder = Builder::new(FunctionEntity(self.builder.func.func_ref_mut()));
-        let entry = builder.func.func_ref().get_entry_block().unwrap();
+        let cilk_ty = ty.conv(self.compound_types, &self.builder.module().unwrap().types);
+        let mut builder = BuilderWithFunction::new(self.builder.func_ref_mut());
+        let entry = builder.func_ref().get_entry_block().unwrap();
         builder.set_insert_point_at(0, entry);
         let alloca = builder.build_alloca(cilk_ty);
         self.variables
@@ -264,7 +264,13 @@ impl<'a> FunctionCodeGenerator<'a> {
     fn generate_load(&mut self, val: &AST) -> Result<Value> {
         let val = self.generate(val)?;
         if let types::Type::Pointer(id) = val.get_type() {
-            let inner = *self.builder.func.module.types.compound_ty(id).as_pointer();
+            let inner = *self
+                .builder
+                .module()
+                .unwrap()
+                .types
+                .compound_ty(id)
+                .as_pointer();
             match inner {
                 types::Type::Array(_) => Ok(val),
                 _ => Ok(self.builder.build_load(val)),
@@ -304,7 +310,12 @@ impl<'a> FunctionCodeGenerator<'a> {
     ) -> Result<Value> {
         let is_elem_array = match lhs.get_type() {
             types::Type::Pointer(id) => matches!(
-                self.builder.func.module.types.compound_ty(id).as_pointer(),
+                self.builder
+                    .module()
+                    .unwrap()
+                    .types
+                    .compound_ty(id)
+                    .as_pointer(),
                 types::Type::Array(_)
             ),
             _ => panic!(),
