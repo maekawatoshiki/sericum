@@ -2,7 +2,7 @@ use crate::{
     analysis::dom_tree::{DominatorTree, DominatorTreeConstructor},
     ir::{
         basic_block::{BasicBlock, BasicBlockId},
-        builder::{Builder, FuncRef, FunctionEntity},
+        builder::{BuilderWithFunction, IRBuilder},
         function::Function,
         module::Module,
         opcode::{Instruction, Opcode, Operand},
@@ -112,7 +112,7 @@ impl<'a> SimplifyLoopOnFunction<'a> {
             dest_.pred.remove(&edge);
         }
 
-        let mut builder = Builder::new(FunctionEntity(self.func));
+        let mut builder = BuilderWithFunction::new(self.func);
         builder.set_insert_point(merge);
         builder.build_br(back_edges.dest);
 
@@ -152,12 +152,12 @@ impl<'a> SimplifyLoopOnFunction<'a> {
             }
         }
 
-        let mut builder = Builder::new(FunctionEntity(self.func));
+        let mut builder = BuilderWithFunction::new(self.func);
         builder.set_insert_point_at(0, merge);
 
         for (phi, incomings) in new_phi_incomings {
             let new_phi = builder.build_phi(incomings);
-            let phi = &mut builder.func.func_ref_mut().inst_table[phi];
+            let phi = &mut builder.func_ref_mut().inst_table[phi];
             phi.operands.push(Operand::Value(new_phi));
             phi.operands.push(Operand::BasicBlock(merge));
         }

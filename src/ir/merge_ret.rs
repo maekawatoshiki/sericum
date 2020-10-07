@@ -1,5 +1,5 @@
 use crate::ir::{
-    builder::{Builder, FuncRef, FunctionEntity},
+    builder::{BuilderWithFunction, IRBuilder},
     function::Function,
     module::Module,
     opcode::Opcode,
@@ -62,17 +62,17 @@ impl<'a> MergeReturnsOnFunction<'a> {
             return;
         }
 
-        let mut builder = Builder::new(FunctionEntity(self.func));
+        let mut builder = BuilderWithFunction::new(self.func);
         let mut pairs = vec![];
         let ret_bb = builder.append_basic_block();
 
         for ret_id in returns {
-            let ret = &builder.func.0.inst_table[ret_id];
+            let ret = &builder.func_ref().inst_table[ret_id];
             let parent = ret.parent;
             if !ret_void {
                 pairs.push((*ret.operands[0].as_value(), parent));
             }
-            builder.func.func_ref_mut().remove_inst(ret_id);
+            builder.func_ref_mut().remove_inst(ret_id);
             builder.set_insert_point(parent);
             builder.build_br(ret_bb);
         }
