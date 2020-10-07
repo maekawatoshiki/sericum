@@ -1018,7 +1018,6 @@ mod aarch64 {
         codegen::aarch64::{
             asm::print::MachineAsmPrinter, standard_conversion_into_machine_module,
         },
-        ir::builder::FuncRef,
         ir::{builder, types, value},
         module::Module,
         *, // for macro

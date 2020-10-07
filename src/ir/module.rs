@@ -54,7 +54,7 @@ impl Module {
     /// ```
     /// use cilk::{module::Module, types::Type};
     /// let mut m = Module::new("owner");
-    /// let _f_id = m1.create_function("f", Type::Void, vec![]);
+    /// let _f_id = m.create_function("f", Type::Void, vec![]);
     /// ```
     pub fn create_function(
         &mut self,

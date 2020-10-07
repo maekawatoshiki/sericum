@@ -2,7 +2,7 @@
 mod x86_64 {
     use cilk::{
         codegen::x64::exec,
-        // exec::{interpreter::interp, jit::x64::compiler},
+        ir::builder::IRBuilder,
         ir::{builder, opcode, types, value},
         *,
     };
@@ -178,15 +178,15 @@ mod x86_64 {
 
         let f_id = m.create_function("compiled_brainfuxk_code", types::Type::Void, vec![]);
 
-        let mut builder = builder::Builder::new(builder::FunctionIdWithModule::new(&mut m, f_id));
+        let mut builder = builder::BuilderWithModuleAndFuncId::new(&mut m, f_id);
         let entry = builder.append_basic_block();
         builder.set_insert_point(entry);
 
         // tape and index
         let tape_len = 30000;
         let ary_ty = builder
-            .func
-            .module
+            .module()
+            .unwrap()
             .types
             .new_array_ty(types::Type::i32, tape_len);
         let tape = builder.build_alloca(ary_ty);
@@ -239,7 +239,7 @@ mod x86_64 {
                     builder.build_call(
                         value::Value::new_func(value::FunctionValue {
                             func_id: cilk_printch_i32,
-                            ty: builder.func.module.function_ref(cilk_printch_i32).ty,
+                            ty: builder.module().unwrap().function_ref(cilk_printch_i32).ty,
                         }),
                         vec![cur_val],
                     );
@@ -293,7 +293,7 @@ mod x86_64 {
         ir::cse::CommonSubexprElimination::new().run_on_module(&mut m);
         ir::licm::LoopInvariantCodeMotion::new().run_on_module(&mut m);
 
-        // println!("IR: {}", m.dump(f_id));
+        // println!("{:?}", m);
 
         // use cilk::codegen::x64::asm::print::MachineAsmPrinter;
         // use cilk::codegen::x64::standard_conversion_into_machine_module;
@@ -632,6 +632,7 @@ mod aarch64 {
     use cilk::{
         // codegen::riscv64::exec,
         // exec::{interpreter::interp, jit::riscv64::compiler},
+        ir::builder::IRBuilder,
         ir::{builder, opcode, types, value},
         *,
     };
@@ -807,15 +808,15 @@ mod aarch64 {
 
         let f_id = m.create_function("main", types::Type::Void, vec![]);
 
-        let mut builder = builder::Builder::new(builder::FunctionIdWithModule::new(&mut m, f_id));
+        let mut builder = builder::BuilderWithModuleAndFuncId::new(&mut m, f_id);
         let entry = builder.append_basic_block();
         builder.set_insert_point(entry);
 
         // tape and index
         let tape_len = 2048;
         let ary_ty = builder
-            .func
-            .module
+            .module()
+            .unwrap()
             .types
             .new_array_ty(types::Type::i32, tape_len);
         let tape = builder.build_alloca(ary_ty);
@@ -868,7 +869,7 @@ mod aarch64 {
                     builder.build_call(
                         value::Value::new_func(value::FunctionValue {
                             func_id: cilk_printch_i32,
-                            ty: builder.func.module.function_ref(cilk_printch_i32).ty,
+                            ty: builder.module().unwrap().function_ref(cilk_printch_i32).ty,
                         }),
                         vec![cur_val],
                     );
