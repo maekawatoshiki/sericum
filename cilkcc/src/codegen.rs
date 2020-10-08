@@ -5,7 +5,7 @@ use super::{
     types::{CompoundTypes, StorageClass, Type, TypeConversion},
 };
 use cilk::ir::{
-    builder::{BuilderWithFunction, BuilderWithModuleAndFuncId, IRBuilder},
+    builder::{IRBuilder, IRBuilderWithFunction, IRBuilderWithModuleAndFuncId},
     module::Module,
     opcode::ICmpKind,
     types, value,
@@ -21,7 +21,7 @@ pub struct Codegenerator<'a> {
 }
 
 pub struct FunctionCodeGenerator<'a> {
-    builder: BuilderWithModuleAndFuncId<'a>,
+    builder: IRBuilderWithModuleAndFuncId<'a>,
     compound_types: &'a mut CompoundTypes,
     variables: &'a mut Variables,
 }
@@ -116,7 +116,7 @@ impl<'a> FunctionCodeGenerator<'a> {
 
         let mut gen = Self {
             builder: {
-                let mut builder = BuilderWithModuleAndFuncId::new(module, func_id);
+                let mut builder = IRBuilderWithModuleAndFuncId::new(module, func_id);
                 let entry = builder.append_basic_block();
                 builder.set_insert_point(entry);
                 builder
@@ -237,7 +237,7 @@ impl<'a> FunctionCodeGenerator<'a> {
         _val: Option<&AST>,
     ) -> Result<Value> {
         let cilk_ty = ty.conv(self.compound_types, &self.builder.module().unwrap().types);
-        let mut builder = BuilderWithFunction::new(self.builder.func_ref_mut());
+        let mut builder = IRBuilderWithFunction::new(self.builder.func_ref_mut());
         let entry = builder.func_ref().get_entry_block().unwrap();
         builder.set_insert_point_at(0, entry);
         let alloca = builder.build_alloca(cilk_ty);

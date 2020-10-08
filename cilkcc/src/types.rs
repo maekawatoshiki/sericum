@@ -52,11 +52,11 @@ pub enum CompoundType {
     },
     Struct {
         name: String,
-        fields: Vec<Type>,
+        fields: Vec<(Type, String)>,
     },
     Union {
         name: String,
-        fields: Vec<Type>,
+        fields: Vec<(Type, String)>,
     },
     Enum, // == i32
 }
@@ -113,6 +113,34 @@ impl CompoundTypes {
             },
         )
     }
+
+    pub fn struct_(&mut self, name: String, fields: Vec<(Type, String)>) -> Type {
+        Type::Struct(
+            match self.0.iter().find_map(|(id, t)| match t {
+                CompoundType::Struct { name: n, fields: f } if n == &name && f == &fields => {
+                    Some(id)
+                }
+                _ => None,
+            }) {
+                Some(id) => id,
+                None => self.0.alloc(CompoundType::Struct { name, fields }),
+            },
+        )
+    }
+
+    pub fn union(&mut self, name: String, fields: Vec<(Type, String)>) -> Type {
+        Type::Union(
+            match self.0.iter().find_map(|(id, t)| match t {
+                CompoundType::Union { name: n, fields: f } if n == &name && f == &fields => {
+                    Some(id)
+                }
+                _ => None,
+            }) {
+                Some(id) => id,
+                None => self.0.alloc(CompoundType::Union { name, fields }),
+            },
+        )
+    }
 }
 
 impl CompoundType {
@@ -141,9 +169,23 @@ impl CompoundType {
         }
     }
 
-    pub fn as_struct(&self) -> (&String, &Vec<Type>) {
+    pub fn as_struct(&self) -> (&String, &Vec<(Type, String)>) {
         match self {
             Self::Struct { name, fields } => (name, fields),
+            _ => panic!(),
+        }
+    }
+
+    pub fn as_struct_mut(&mut self) -> (&mut String, &mut Vec<(Type, String)>) {
+        match self {
+            Self::Struct { name, fields } => (name, fields),
+            _ => panic!(),
+        }
+    }
+
+    pub fn as_union(&self) -> (&String, &Vec<(Type, String)>) {
+        match self {
+            Self::Union { name, fields } => (name, fields),
             _ => panic!(),
         }
     }
@@ -187,7 +229,7 @@ impl TypeConversion<types::Type> for Type {
                 let (_name, fields) = compound_types[*id].as_struct();
                 let fields = fields
                     .iter()
-                    .map(|t| t.conv(compound_types, types))
+                    .map(|t| t.0.conv(compound_types, types))
                     .collect();
                 types.new_struct_ty(fields)
             }
@@ -215,7 +257,11 @@ impl Index<Type> for CompoundTypes {
 
     fn index(&self, ty: Type) -> &Self::Output {
         match ty {
-            Type::Pointer(id) | Type::Array(id) | Type::Func(id) => &self.0[id],
+            Type::Pointer(id)
+            | Type::Array(id)
+            | Type::Func(id)
+            | Type::Struct(id)
+            | Type::Union(id) => &self.0[id],
             _ => panic!(),
         }
     }
@@ -224,7 +270,11 @@ impl Index<Type> for CompoundTypes {
 impl IndexMut<Type> for CompoundTypes {
     fn index_mut(&mut self, ty: Type) -> &mut Self::Output {
         match ty {
-            Type::Pointer(id) | Type::Array(id) | Type::Func(id) => &mut self.0[id],
+            Type::Pointer(id)
+            | Type::Array(id)
+            | Type::Func(id)
+            | Type::Struct(id)
+            | Type::Union(id) => &mut self.0[id],
             _ => panic!(),
         }
     }

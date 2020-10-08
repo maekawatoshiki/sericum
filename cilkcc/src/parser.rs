@@ -1,12 +1,14 @@
 use super::lexer::{Error, Lexer, Result};
-use super::types::{CompoundTypes, Sign, StorageClass, Type};
+use super::types::{CompoundType, CompoundTypes, Sign, StorageClass, Type};
 use super::{ast, ast::AST};
 use super::{
     token,
     token::{Keyword, Symbol},
 };
 use rustc_hash::FxHashMap;
+use std::collections::hash_map;
 use std::collections::VecDeque;
+use {rand, rand::Rng};
 
 pub struct Parser<'a> {
     pub lexer: &'a mut Lexer,
@@ -586,15 +588,96 @@ impl<'a> Parser<'a> {
     }
 
     fn read_struct_def(&mut self) -> Result<Type> {
-        todo!()
+        self.read_rectype_def(true)
     }
 
     fn read_union_def(&mut self) -> Result<Type> {
-        todo!()
+        self.read_rectype_def(false)
     }
 
     fn read_enum_def(&mut self) -> Result<Type> {
         todo!()
+    }
+
+    fn read_rectype_def(&mut self, is_struct: bool) -> Result<Type> {
+        let tag = self.read_rectype_tag()?.unwrap_or_else(|| unique_string(8));
+        let fields = self.read_rectype_fields()?;
+        let cur_tags = self.tags.back_mut().unwrap();
+        if fields.is_empty() {
+            Ok(match cur_tags.entry(tag) {
+                hash_map::Entry::Occupied(o) => *o.get(),
+                hash_map::Entry::Vacant(v) => {
+                    let new_rectype = if is_struct {
+                        self.compound_types.struct_(v.key().to_string(), vec![])
+                    } else {
+                        self.compound_types.union(v.key().to_string(), vec![])
+                    };
+                    *v.insert(new_rectype)
+                }
+            })
+        } else {
+            Ok(match cur_tags.entry(tag) {
+                hash_map::Entry::Occupied(o) => {
+                    match &mut self.compound_types[*o.get()] {
+                        CompoundType::Struct { fields: f, .. }
+                        | CompoundType::Union { fields: f, .. } => {
+                            *f = fields;
+                        }
+                        _ => panic!(),
+                    };
+                    *o.get()
+                }
+                hash_map::Entry::Vacant(v) => {
+                    let new_rectype = if is_struct {
+                        self.compound_types.struct_(v.key().to_string(), fields)
+                    } else {
+                        self.compound_types.union(v.key().to_string(), fields)
+                    };
+                    *v.insert(new_rectype)
+                }
+            })
+        }
+    }
+
+    fn read_rectype_tag(&mut self) -> Result<Option<String>> {
+        if let token::Kind::Identifier(name) = lexer!(self, peek_token()).kind {
+            lexer!(self, get_token());
+            return Ok(Some(name));
+        }
+        Ok(None)
+    }
+
+    fn read_rectype_fields(&mut self) -> Result<Vec<(Type, String)>> {
+        if !lexer!(self, skip_symbol(Symbol::OpeningBrace)) {
+            return Ok(vec![]);
+        }
+
+        let mut decls = vec![];
+        loop {
+            let peek = lexer!(self, peek_token());
+            if !self.is_type(&peek) {
+                break;
+            }
+            let (base, _, _) = self.read_type_spec()?;
+            loop {
+                let (ty, name, _) = self.read_declarator(base)?;
+                if lexer!(self, skip_symbol(Symbol::Colon)) {
+                    // TODO: ignore bitwidth for now
+                    self.read_expr()?;
+                }
+                decls.push((ty, name));
+                if lexer!(self, skip_symbol(Symbol::Comma)) {
+                    continue;
+                } else {
+                    lexer!(self, expect_skip_symbol(Symbol::Semicolon));
+                }
+                break;
+            }
+        }
+
+        lexer!(self, expect_skip_symbol(Symbol::ClosingBrace));
+
+        Ok(decls)
     }
 
     fn read_expr(&mut self) -> Result<AST> {
@@ -682,7 +765,7 @@ impl<'a> Parser<'a> {
     fn read_ternary(&mut self, cond: AST) -> Result<AST> {
         let then_ = self.read_expr()?;
         let loc = then_.loc;
-        self.lexer.expect_skip_symbol(Symbol::Colon)?;
+        lexer!(self, expect_skip_symbol(Symbol::Colon));
         let else_ = self.read_expr()?;
         // let then_ty = try!(self.get_expr_returning_ty(&then_expr));
         // let else_ty = try!(self.get_expr_returning_ty(&else_expr));
@@ -963,14 +1046,29 @@ impl<'a> Parser<'a> {
             }
             token::Kind::Symbol(Symbol::Sizeof) => {
                 // TODO: must fix this sloppy implementation
-                // return self.read_sizeof();
-                todo!()
+                return self.read_sizeof();
             }
             _ => {}
         }
 
         self.lexer.unget(tok);
         self.read_postfix()
+    }
+
+    fn read_sizeof(&mut self) -> Result<AST> {
+        let tok = lexer!(self, get_token());
+        let peek = lexer!(self, peek_token());
+        if matches!(tok.kind, token::Kind::Symbol(Symbol::OpeningParen)) && self.is_type(&peek) {
+            let (basety, _, _) = self.read_type_spec()?;
+            let (_ty, _, _) = self.read_declarator(basety)?;
+            lexer!(self, expect_skip_symbol(Symbol::ClosingParen));
+            // TODO: calc type size
+            return Ok(AST::new(ast::Kind::Int { n: 1, bits: 32 }, tok.loc));
+        }
+        self.lexer.unget(tok);
+        let _expr = self.read_unary()?;
+        // TODO: calc type size
+        Ok(AST::new(ast::Kind::Int { n: 1, bits: 32 }, peek.loc))
     }
 
     fn read_postfix(&mut self) -> Result<AST> {
@@ -1203,4 +1301,14 @@ impl Qualifiers {
             noreturn: false,
         }
     }
+}
+
+fn unique_string(len: usize) -> String {
+    const CHARSET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ\
+                            abcdefghijklmnopqrstuvwxyz\
+                            0123456789";
+    let mut rng = rand::thread_rng();
+    (0..len)
+        .map(|_| CHARSET[rng.gen_range(0, CHARSET.len())] as char)
+        .collect()
 }
