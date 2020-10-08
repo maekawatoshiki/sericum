@@ -1,4 +1,5 @@
 use super::lexer::{Error, Lexer, Result};
+use super::retrieve_ident;
 use super::types::{CompoundType, CompoundTypes, Sign, StorageClass, Type};
 use super::{ast, ast::AST};
 use super::{
@@ -969,7 +970,20 @@ impl<'a> Parser<'a> {
     }
 
     fn read_cast(&mut self) -> Result<AST> {
-        // todo!()
+        let tok = lexer!(self, get_token());
+        let peek = lexer!(self, peek_token());
+        if tok.kind == token::Kind::Symbol(Symbol::OpeningParen) && self.is_type(&peek) {
+            let basety = self.read_type_spec()?.0;
+            let ty = self.read_declarator(basety)?.0;
+            lexer!(self, expect_skip_symbol(Symbol::ClosingParen));
+            return Ok(AST::new(
+                ast::Kind::TypeCast(Box::new(self.read_cast()?), ty),
+                tok.loc,
+            ));
+        } else {
+            self.lexer.unget(tok);
+        }
+
         self.read_unary()
     }
 
@@ -1133,8 +1147,16 @@ impl<'a> Parser<'a> {
         Ok(AST::new(ast::Kind::FuncCall(Box::new(f), args), loc))
     }
 
-    fn read_field(&mut self, _: AST) -> Result<AST> {
-        todo!()
+    fn read_field(&mut self, base: AST) -> Result<AST> {
+        let field = lexer!(self, get_token());
+        if !matches!(field.kind, token::Kind::Identifier(_)) {
+            return Err(Error::msg(field.loc, "expected field name"));
+        }
+        let name = retrieve_ident!(field);
+        Ok(AST::new(
+            ast::Kind::FieldRef(Box::new(base), name),
+            field.loc,
+        ))
     }
 
     fn read_index(&mut self, base: AST) -> Result<AST> {

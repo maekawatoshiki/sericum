@@ -1,4 +1,5 @@
-#include <sample.h>
+#include <cilkcc.h>
+#include <stdio.h>
 #define master(x, y) main(int x, char ** y)
 #define A 10
 #define B 20

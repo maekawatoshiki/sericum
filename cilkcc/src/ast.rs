@@ -32,6 +32,8 @@ pub enum Kind {
         src: Box<AST>,
     },
     Load(Box<AST>),
+    TypeCast(Box<AST>, Type),
+    FieldRef(Box<AST>, String),
     Variable(Type, String),
     VariableDecl(Type, String, StorageClass, Option<Box<AST>>),
     FuncCall(Box<AST>, Vec<AST>),

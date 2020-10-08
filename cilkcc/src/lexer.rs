@@ -45,6 +45,7 @@ pub enum Macro {
     FuncLike(Vec<Token>),
 }
 
+#[macro_export]
 macro_rules! retrieve_ident {
     ($e:expr) => {
         match &$e.kind {
