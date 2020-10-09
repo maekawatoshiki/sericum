@@ -1,8 +1,9 @@
-struct A {
-  int x, y;
-};
-
 int main() {
-  struct A a;
-  return 0;
+  typedef struct {
+    int a;
+  } A;
+  A a;
+  a.a = 1;
+  a.a += a.a;
+  return a.a;
 }

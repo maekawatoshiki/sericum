@@ -144,6 +144,13 @@ impl CompoundTypes {
 }
 
 impl CompoundType {
+    pub fn inner_ty(&self) -> Type {
+        match self {
+            Self::Pointer { inner } | Self::Array { inner, .. } => *inner,
+            _ => panic!(),
+        }
+    }
+
     pub fn as_pointer(&self) -> Type {
         match self {
             Self::Pointer { inner } => *inner,

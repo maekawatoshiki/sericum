@@ -2,7 +2,7 @@ use super::{
     ast,
     ast::AST,
     token::SourceLoc,
-    types::{CompoundTypes, StorageClass, Type, TypeConversion},
+    types::{CompoundTypes, Sign, StorageClass, Type, TypeConversion},
 };
 use cilk::ir::{
     builder::{IRBuilder, IRBuilderWithFunction, IRBuilderWithModuleAndFuncId},
@@ -142,20 +142,26 @@ impl<'a> FunctionCodeGenerator<'a> {
         Ok(val)
     }
 
-    pub fn generate(&mut self, body: &AST) -> Result<Value> {
+    pub fn generate(&mut self, body: &AST) -> Result<(Value, Type)> {
         match &body.kind {
             ast::Kind::Block(stmts) => self.generate_block(&stmts),
             ast::Kind::If { cond, then_, else_ } => self.generate_if(cond, then_, else_),
             ast::Kind::While { cond, body } => self.generate_while(cond, body),
-            ast::Kind::Int { n, bits: 32 } => Ok(Value::new_imm_int32(*n as i32)),
+            ast::Kind::Int { n, bits: 32 } => {
+                Ok((Value::new_imm_int32(*n as i32), Type::Int(Sign::Signed)))
+            }
+            ast::Kind::FieldRef(val, name) => self.generate_field_ref(val, name),
             ast::Kind::VariableDecl(ty, name, sclass, val) => {
                 self.generate_var_decl(*ty, name, *sclass, val.as_ref().map(|v| &**v))
             }
-            ast::Kind::Variable(_, name) => self
-                .variables
-                .find_var(name.as_str())
-                .ok_or_else(|| Error::Message(body.loc, "variable not found".to_string()))
-                .map(|ok| ok.val),
+            ast::Kind::Variable(_, name) => {
+                // let ty=self.compound_types.pointer(
+                let &Variable { val, ty, .. } = self
+                    .variables
+                    .find_var(name.as_str())
+                    .ok_or_else(|| Error::Message(body.loc, "variable not found".to_string()))?;
+                Ok((val, self.compound_types.pointer(ty)))
+            }
             ast::Kind::Assign { dst, src } => self.generate_assign(dst, src),
             ast::Kind::Load(val) => self.generate_load(val),
             ast::Kind::BinaryOp(op, lhs, rhs) => self.generate_binary_op(*op, lhs, rhs),
@@ -168,15 +174,15 @@ impl<'a> FunctionCodeGenerator<'a> {
         }
     }
 
-    fn generate_block(&mut self, stmts: &Vec<AST>) -> Result<Value> {
+    fn generate_block(&mut self, stmts: &Vec<AST>) -> Result<(Value, Type)> {
         for stmt in stmts {
             self.generate(stmt)?;
         }
-        Ok(Value::None)
+        Ok((Value::None, Type::Void))
     }
 
-    fn generate_if(&mut self, cond: &AST, then_: &AST, else_: &AST) -> Result<Value> {
-        let cond = self.generate(cond)?;
+    fn generate_if(&mut self, cond: &AST, then_: &AST, else_: &AST) -> Result<(Value, Type)> {
+        let cond = self.generate(cond)?.0;
 
         let then_block = self.builder.append_basic_block();
         let else_block = self.builder.append_basic_block();
@@ -202,10 +208,10 @@ impl<'a> FunctionCodeGenerator<'a> {
 
         self.builder.set_insert_point(merge_block);
 
-        Ok(Value::None)
+        Ok((Value::None, Type::Void))
     }
 
-    fn generate_while(&mut self, cond: &AST, body: &AST) -> Result<Value> {
+    fn generate_while(&mut self, cond: &AST, body: &AST) -> Result<(Value, Type)> {
         let header_block = self.builder.append_basic_block();
         let body_block = self.builder.append_basic_block();
         let post_block = self.builder.append_basic_block();
@@ -213,7 +219,7 @@ impl<'a> FunctionCodeGenerator<'a> {
         self.builder.build_br(header_block);
         self.builder.set_insert_point(header_block);
 
-        let cond = self.generate(cond)?;
+        let cond = self.generate(cond)?.0;
         self.builder.build_cond_br(cond, body_block, post_block);
 
         self.builder.set_insert_point(body_block);
@@ -226,7 +232,29 @@ impl<'a> FunctionCodeGenerator<'a> {
 
         self.builder.set_insert_point(post_block);
 
-        Ok(Value::None)
+        Ok((Value::None, Type::Void))
+    }
+
+    fn generate_field_ref(&mut self, val: &AST, name: &String) -> Result<(Value, Type)> {
+        let (val, ty) = self.generate(retrieve_from_load(val))?;
+        let ty = self.compound_types[ty].inner_ty();
+        let (field_idx, &field_ty) = self.compound_types[ty]
+            .as_struct()
+            .1
+            .iter()
+            .enumerate()
+            .find_map(|(i, (t, n))| if n == name { Some((i, t)) } else { None })
+            .unwrap();
+        Ok((
+            self.builder.build_gep(
+                val,
+                vec![
+                    Value::new_imm_int32(0),
+                    Value::new_imm_int32(field_idx as i32),
+                ],
+            ),
+            self.compound_types.pointer(field_ty),
+        ))
     }
 
     fn generate_var_decl(
@@ -235,7 +263,7 @@ impl<'a> FunctionCodeGenerator<'a> {
         name: &String,
         _sclass: StorageClass,
         _val: Option<&AST>,
-    ) -> Result<Value> {
+    ) -> Result<(Value, Type)> {
         let cilk_ty = ty.conv(self.compound_types, &self.builder.module().unwrap().types);
         let mut builder = IRBuilderWithFunction::new(self.builder.func_ref_mut());
         let entry = builder.func_ref().get_entry_block().unwrap();
@@ -251,18 +279,18 @@ impl<'a> FunctionCodeGenerator<'a> {
             self.builder.set_insert_point_at(pt + 1, entry);
         }
 
-        Ok(Value::None)
+        Ok((Value::None, Type::Void))
     }
 
-    fn generate_assign(&mut self, dst: &AST, src: &AST) -> Result<Value> {
-        let dst = self.generate(retrieve_from_load(dst))?;
-        let src = self.generate(src)?;
+    fn generate_assign(&mut self, dst: &AST, src: &AST) -> Result<(Value, Type)> {
+        let (dst, _) = self.generate(retrieve_from_load(dst))?;
+        let (src, ty) = self.generate(src)?;
         self.builder.build_store(src, dst);
-        Ok(self.builder.build_load(dst))
+        Ok((self.builder.build_load(dst), ty))
     }
 
-    fn generate_load(&mut self, val: &AST) -> Result<Value> {
-        let val = self.generate(val)?;
+    fn generate_load(&mut self, val: &AST) -> Result<(Value, Type)> {
+        let (val, ty) = self.generate(val)?;
         if let types::Type::Pointer(id) = val.get_type() {
             let inner = *self
                 .builder
@@ -272,42 +300,57 @@ impl<'a> FunctionCodeGenerator<'a> {
                 .compound_ty(id)
                 .as_pointer();
             match inner {
-                types::Type::Array(_) => Ok(val),
-                _ => Ok(self.builder.build_load(val)),
+                types::Type::Array(_) => Ok((val, self.compound_types.pointer(ty))),
+                _ => Ok((
+                    self.builder.build_load(val),
+                    self.compound_types[ty].inner_ty(),
+                )),
             }
         } else {
             panic!()
         }
     }
 
-    fn generate_binary_op(&mut self, op: ast::BinaryOp, lhs: &AST, rhs: &AST) -> Result<Value> {
-        let lhs = self.generate(lhs)?;
-        let rhs = self.generate(rhs)?;
+    fn generate_binary_op(
+        &mut self,
+        op: ast::BinaryOp,
+        lhs: &AST,
+        rhs: &AST,
+    ) -> Result<(Value, Type)> {
+        let (lhs, lty) = self.generate(lhs)?;
+        let (rhs, rty) = self.generate(rhs)?;
         match op {
-            ast::BinaryOp::Eq => Ok(self.builder.build_icmp(ICmpKind::Eq, lhs, rhs)),
-            ast::BinaryOp::Le => Ok(self.builder.build_icmp(ICmpKind::Le, lhs, rhs)),
+            ast::BinaryOp::Eq => Ok((
+                self.builder.build_icmp(ICmpKind::Eq, lhs, rhs),
+                Type::Int(Sign::Signed),
+            )),
+            ast::BinaryOp::Le => Ok((
+                self.builder.build_icmp(ICmpKind::Le, lhs, rhs),
+                Type::Int(Sign::Signed),
+            )),
             ast::BinaryOp::Add => {
                 if let types::Type::Pointer(_) = lhs.get_type() {
-                    return self.generate_ptr_binary_op(op, lhs, rhs);
+                    return self.generate_ptr_binary_op(lty, op, lhs, rhs);
                 }
                 // TODO: ???
                 if let types::Type::Pointer(_) = rhs.get_type() {
-                    return self.generate_ptr_binary_op(op, rhs, lhs);
+                    return self.generate_ptr_binary_op(rty, op, rhs, lhs);
                 }
 
-                Ok(self.builder.build_add(lhs, rhs))
+                Ok((self.builder.build_add(lhs, rhs), lty))
             }
-            ast::BinaryOp::Sub => Ok(self.builder.build_sub(lhs, rhs)),
+            ast::BinaryOp::Sub => Ok((self.builder.build_sub(lhs, rhs), lty)),
             _ => unimplemented!(),
         }
     }
 
     fn generate_ptr_binary_op(
         &mut self,
+        ty: Type,
         op: ast::BinaryOp,
         lhs: Value,
         rhs: Value,
-    ) -> Result<Value> {
+    ) -> Result<(Value, Type)> {
         let is_elem_array = match lhs.get_type() {
             types::Type::Pointer(id) => matches!(
                 self.builder
@@ -323,19 +366,27 @@ impl<'a> FunctionCodeGenerator<'a> {
         match op {
             ast::BinaryOp::Add => {
                 if is_elem_array {
-                    Ok(self
-                        .builder
-                        .build_gep(lhs, vec![Value::new_imm_int32(0), rhs]))
+                    let ty = self.compound_types[ty].inner_ty();
+                    Ok((
+                        self.builder
+                            .build_gep(lhs, vec![Value::new_imm_int32(0), rhs]),
+                        ty,
+                    ))
                 } else {
-                    Ok(self.builder.build_gep(lhs, vec![rhs]))
+                    Ok((self.builder.build_gep(lhs, vec![rhs]), ty))
                 }
             }
             _ => unimplemented!(),
         }
     }
 
-    fn generate_ternary_op(&mut self, cond: &AST, then_: &AST, else_: &AST) -> Result<Value> {
-        let cond = self.generate(cond)?;
+    fn generate_ternary_op(
+        &mut self,
+        cond: &AST,
+        then_: &AST,
+        else_: &AST,
+    ) -> Result<(Value, Type)> {
+        let (cond, _) = self.generate(cond)?;
 
         let then_block = self.builder.append_basic_block();
         let else_block = self.builder.append_basic_block();
@@ -345,7 +396,7 @@ impl<'a> FunctionCodeGenerator<'a> {
 
         self.builder.set_insert_point(then_block);
 
-        let then_ = self.generate(then_)?;
+        let (then_, ty) = self.generate(then_)?;
 
         if !self.builder.is_last_inst_terminator() {
             self.builder.build_br(merge_block);
@@ -353,7 +404,7 @@ impl<'a> FunctionCodeGenerator<'a> {
 
         self.builder.set_insert_point(else_block);
 
-        let else_ = self.generate(else_)?;
+        let (else_, _) = self.generate(else_)?;
 
         if !self.builder.is_last_inst_terminator() {
             self.builder.build_br(merge_block);
@@ -362,19 +413,21 @@ impl<'a> FunctionCodeGenerator<'a> {
         self.builder.set_insert_point(merge_block);
 
         if matches!(then_, Value::None) || matches!(else_, Value::None) {
-            return Ok(Value::None);
+            return Ok((Value::None, Type::Void));
         }
 
-        Ok(self
-            .builder
-            .build_phi(vec![(then_, then_block), (else_, else_block)]))
+        Ok((
+            self.builder
+                .build_phi(vec![(then_, then_block), (else_, else_block)]),
+            ty,
+        ))
     }
 
-    fn generate_func_call(&mut self, f: &AST, args: &Vec<AST>) -> Result<Value> {
+    fn generate_func_call(&mut self, f: &AST, args: &Vec<AST>) -> Result<(Value, Type)> {
         let f = retrieve_from_load(f);
         let mut args_ = vec![];
         for arg in args {
-            args_.push(self.generate(arg).unwrap());
+            args_.push(self.generate(arg).unwrap().0);
         }
         match &f.kind {
             ast::Kind::Variable(_, name) => {
@@ -382,19 +435,20 @@ impl<'a> FunctionCodeGenerator<'a> {
                     .variables
                     .find_var(name.as_str())
                     .ok_or_else(|| Error::Message(f.loc, "variable not found".to_string()))?;
-                Ok(self.builder.build_call(var.val, args_))
+                let ret = self.compound_types[var.ty].as_func().0;
+                Ok((self.builder.build_call(var.val, args_), ret))
             }
             _ => unimplemented!(),
         }
     }
 
-    fn generate_return(&mut self, val: Option<&AST>) -> Result<Value> {
+    fn generate_return(&mut self, val: Option<&AST>) -> Result<(Value, Type)> {
         let val = if let Some(val) = val {
-            self.generate(val)
+            self.generate(val)?.0
         } else {
-            Ok(Value::None)
+            Value::None
         };
-        Ok(self.builder.build_ret(val?))
+        Ok((self.builder.build_ret(val), Type::Void))
     }
 }
 
