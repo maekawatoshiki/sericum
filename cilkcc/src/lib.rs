@@ -60,6 +60,10 @@ pub fn compile(path: PathBuf) {
     }
     println!("{:?}", codegen.module);
 
+    // cilk::ir::mem2reg::Mem2Reg::new().run_on_module(&mut codegen.module);
+    // cilk::ir::cse::CommonSubexprElimination::new().run_on_module(&mut codegen.module);
+    // cilk::ir::licm::LoopInvariantCodeMotion::new().run_on_module(&mut codegen.module);
+
     let machine_module =
         cilk::codegen::x64::standard_conversion_into_machine_module(&mut codegen.module);
     let mut printer = cilk::codegen::x64::asm::print::MachineAsmPrinter::new();

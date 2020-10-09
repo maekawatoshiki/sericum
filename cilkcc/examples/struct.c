@@ -1,9 +1,13 @@
 int main() {
   typedef struct {
-    int a;
+    int x, y, z;
   } A;
-  A a;
-  a.a = 1;
-  a.a += a.a;
-  return a.a;
+  A a[1];
+  A c[2][2];
+  a[0].y=1;
+  A b;
+  b.x=3;
+  c[1][1].z=4;
+  c[0][1].y=1;
+  return b.x+a[0].y+c[1][1].z+c[0][1].y;
 }

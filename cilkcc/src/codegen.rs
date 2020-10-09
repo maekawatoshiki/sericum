@@ -2,7 +2,7 @@ use super::{
     ast,
     ast::AST,
     token::SourceLoc,
-    types::{CompoundTypes, Sign, StorageClass, Type, TypeConversion},
+    types::{CompoundType, CompoundTypes, Sign, StorageClass, Type, TypeConversion},
 };
 use cilk::ir::{
     builder::{IRBuilder, IRBuilderWithFunction, IRBuilderWithModuleAndFuncId},
@@ -300,7 +300,10 @@ impl<'a> FunctionCodeGenerator<'a> {
                 .compound_ty(id)
                 .as_pointer();
             match inner {
-                types::Type::Array(_) => Ok((val, self.compound_types.pointer(ty))),
+                types::Type::Array(_) => Ok((val, {
+                    let inner = self.compound_types[ty].inner_ty();
+                    self.compound_types.pointer(inner)
+                })),
                 _ => Ok((
                     self.builder.build_load(val),
                     self.compound_types[ty].inner_ty(),
@@ -346,27 +349,21 @@ impl<'a> FunctionCodeGenerator<'a> {
 
     fn generate_ptr_binary_op(
         &mut self,
-        ty: Type,
+        mut ty: Type,
         op: ast::BinaryOp,
         lhs: Value,
         rhs: Value,
     ) -> Result<(Value, Type)> {
-        let is_elem_array = match lhs.get_type() {
-            types::Type::Pointer(id) => matches!(
-                self.builder
-                    .module()
-                    .unwrap()
-                    .types
-                    .compound_ty(id)
-                    .as_pointer(),
-                types::Type::Array(_)
-            ),
-            _ => panic!(),
+        let inner = self.compound_types[ty].as_pointer();
+        let is_array = if let CompoundType::Array { inner, .. } = self.compound_types[inner] {
+            ty = self.compound_types.pointer(inner);
+            true
+        } else {
+            false
         };
         match op {
             ast::BinaryOp::Add => {
-                if is_elem_array {
-                    let ty = self.compound_types[ty].inner_ty();
+                if is_array {
                     Ok((
                         self.builder
                             .build_gep(lhs, vec![Value::new_imm_int32(0), rhs]),
