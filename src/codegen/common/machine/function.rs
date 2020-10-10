@@ -147,6 +147,10 @@ impl MachineFunction {
         }
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.get_basic_blocks().order.len() == 0
+    }
+
     pub fn alloc_inst(&mut self, inst: MachineInst) -> MachineInstId {
         self.body.inst_arena.alloc(&mut self.regs_info, inst)
     }

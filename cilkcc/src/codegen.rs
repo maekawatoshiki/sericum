@@ -60,7 +60,10 @@ impl<'a> Codegenerator<'a> {
                 name,
                 body,
             } => self.generate_func_def(&ty, &param_names, &name, &body),
-            _ => unimplemented!(),
+            ast::Kind::VariableDecl(ty, name, sclass, val) => {
+                self.generate_var_decl(*ty, name, *sclass, val.as_ref().map(|v| &**v))
+            }
+            e => unimplemented!("{:?}", e),
         }
     }
 
@@ -87,6 +90,64 @@ impl<'a> Codegenerator<'a> {
             name,
             body,
         )
+    }
+
+    fn generate_var_decl(
+        &mut self,
+        ty: Type,
+        name: &String,
+        _sclass: StorageClass,
+        _val: Option<&AST>,
+    ) -> Result<Value> {
+        match ty {
+            Type::Func(_) => {
+                let cilk_ty = ty.conv(self.compound_types, &self.module.types);
+                let cilk_func_ty = self.module.types.compound_ty(cilk_ty).as_function().clone();
+                let func_id = self.module.create_function(
+                    name.as_str(),
+                    cilk_func_ty.ret_ty,
+                    cilk_func_ty.params_ty.clone(),
+                );
+                let val = Value::Function(value::FunctionValue {
+                    func_id,
+                    ty: cilk_ty,
+                });
+                self.variables
+                    .add_global_var(name.clone(), Variable::new(ty, cilk_ty, val));
+            }
+            _ => todo!(),
+        }
+        // let (saved_bb, saved_pt) = (self.builder.block(), self.builder.insert_point());
+        // let entry = self.builder.func_ref().get_entry_block().unwrap();
+        // let pt = self.builder.func_ref().basic_blocks.arena[entry]
+        //     .iseq_ref()
+        //     .iter()
+        //     .enumerate()
+        //     .find_map(|(i, inst)| {
+        //         if self.builder.func_ref().inst_table[inst.as_instruction().id].opcode
+        //             == Opcode::Alloca
+        //         {
+        //             None
+        //         } else {
+        //             Some(i)
+        //         }
+        //     })
+        //     .unwrap_or(0);
+        // self.builder.set_insert_point_at(pt, entry);
+        // let alloca = self.builder.build_alloca(cilk_ty);
+        // if let Some(val) = val {
+        //     let val = self.generate(val)?.0;
+        //     self.builder.build_store(val, alloca);
+        // }
+        // self.variables
+        //     .add_local_var(name.clone(), Variable::new(ty, cilk_ty, alloca));
+        //
+        // // Adjust the insert point of global builder
+        // *self.builder.block_mut() = saved_bb;
+        // *self.builder.insert_point_mut() = saved_pt;
+        // self.builder.set_insert_point_at_end_of_current_block();
+        //
+        Ok(Value::None)
     }
 }
 
@@ -527,6 +588,10 @@ impl Variables {
 
     pub fn pop_env(&mut self) {
         self.0.pop();
+    }
+
+    fn add_global_var(&mut self, name: String, var: Variable) {
+        self.0[0].insert(name, var);
     }
 
     fn add_local_var(&mut self, name: String, var: Variable) {

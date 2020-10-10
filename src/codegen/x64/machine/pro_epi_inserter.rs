@@ -46,7 +46,7 @@ impl PrologueEpilogueInserter {
     }
 
     pub fn run_on_function(&mut self, tys: &Types, cur_func: &mut MachineFunction) {
-        if cur_func.is_internal {
+        if cur_func.is_internal || cur_func.is_empty() {
             return;
         }
 

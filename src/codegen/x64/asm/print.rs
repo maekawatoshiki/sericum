@@ -42,7 +42,7 @@ impl MachineAsmPrinter {
     }
 
     fn run_on_function(&mut self, f: &MachineFunction) {
-        if f.is_internal {
+        if f.is_internal || f.is_empty() {
             return;
         }
 
