@@ -120,6 +120,15 @@ pub trait IRBuilder {
         self.func_ref_mut().append_basic_block()
     }
 
+    fn set_insert_point_at_end_of_current_block(&mut self) {
+        let len = self
+            .func_ref()
+            .basic_block_ref(self.block().unwrap())
+            .iseq_ref()
+            .len();
+        *self.insert_point_mut() = len;
+    }
+
     fn set_insert_point(&mut self, id: BasicBlockId) {
         *self.block_mut() = Some(id);
         let iseq_len = self.func_ref_mut().basic_block_ref(id).iseq_ref().len();

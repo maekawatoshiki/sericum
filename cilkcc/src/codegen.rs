@@ -5,9 +5,10 @@ use super::{
     types::{CompoundType, CompoundTypes, Sign, StorageClass, Type, TypeConversion},
 };
 use cilk::ir::{
-    builder::{IRBuilder, IRBuilderWithFunction, IRBuilderWithModuleAndFuncId},
+    builder::{IRBuilder, IRBuilderWithModuleAndFuncId},
     module::Module,
     opcode::ICmpKind,
+    opcode::Opcode,
     types, value,
     value::Value,
 };
@@ -310,24 +311,36 @@ impl<'a> FunctionCodeGenerator<'a> {
         _sclass: StorageClass,
         val: Option<&AST>,
     ) -> Result<(Value, Type)> {
+        let (saved_bb, saved_pt) = (self.builder.block(), self.builder.insert_point());
         let cilk_ty = ty.conv(self.compound_types, &self.builder.module().unwrap().types);
-        let val = val.map(|val| self.generate(val));
-        let mut builder = IRBuilderWithFunction::new(self.builder.func_ref_mut());
-        let entry = builder.func_ref().get_entry_block().unwrap();
-        builder.set_insert_point_at(0, entry);
-        let alloca = builder.build_alloca(cilk_ty);
+        let entry = self.builder.func_ref().get_entry_block().unwrap();
+        let pt = self.builder.func_ref().basic_blocks.arena[entry]
+            .iseq_ref()
+            .iter()
+            .enumerate()
+            .find_map(|(i, inst)| {
+                if self.builder.func_ref().inst_table[inst.as_instruction().id].opcode
+                    == Opcode::Alloca
+                {
+                    None
+                } else {
+                    Some(i)
+                }
+            })
+            .unwrap_or(0);
+        self.builder.set_insert_point_at(pt, entry);
+        let alloca = self.builder.build_alloca(cilk_ty);
         if let Some(val) = val {
-            builder.build_store(val?.0, alloca);
-        };
+            let val = self.generate(val)?.0;
+            self.builder.build_store(val, alloca);
+        }
         self.variables
             .add_local_var(name.clone(), Variable::new(ty, cilk_ty, alloca));
 
         // Adjust the insert point of global builder
-        let bb = builder.block();
-        let pt = builder.insert_point();
-        if bb == Some(entry) {
-            self.builder.set_insert_point_at(pt, entry);
-        }
+        *self.builder.block_mut() = saved_bb;
+        *self.builder.insert_point_mut() = saved_pt;
+        self.builder.set_insert_point_at_end_of_current_block();
 
         Ok((Value::None, Type::Void))
     }
