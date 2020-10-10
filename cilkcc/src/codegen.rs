@@ -147,6 +147,12 @@ impl<'a> FunctionCodeGenerator<'a> {
             ast::Kind::Block(stmts) => self.generate_block(&stmts),
             ast::Kind::If { cond, then_, else_ } => self.generate_if(cond, then_, else_),
             ast::Kind::While { cond, body } => self.generate_while(cond, body),
+            ast::Kind::For {
+                init,
+                cond,
+                step,
+                body,
+            } => self.generate_for(init, cond.as_ref().map(|v| &**v), step, body),
             ast::Kind::Int { n, bits: 32 } => {
                 Ok((Value::new_imm_int32(*n as i32), Type::Int(Sign::Signed)))
             }
@@ -227,6 +233,47 @@ impl<'a> FunctionCodeGenerator<'a> {
 
         if !self.builder.is_last_inst_terminator() {
             self.builder.build_br(header_block);
+        }
+
+        self.builder.set_insert_point(post_block);
+
+        Ok((Value::None, Type::Void))
+    }
+
+    fn generate_for(
+        &mut self,
+        init: &AST,
+        cond: Option<&AST>,
+        step: &AST,
+        body: &AST,
+    ) -> Result<(Value, Type)> {
+        let pre_block = self.builder.append_basic_block();
+        let loop_block = self.builder.append_basic_block();
+        let step_block = self.builder.append_basic_block();
+        let post_block = self.builder.append_basic_block();
+
+        self.generate(init)?;
+
+        self.builder.build_br(pre_block);
+        self.builder.set_insert_point(pre_block);
+
+        if let Some(cond) = cond {
+            let cond = self.generate(cond)?.0;
+            self.builder.build_cond_br(cond, loop_block, post_block);
+        } else {
+            self.builder.build_br(loop_block);
+        }
+
+        self.builder.set_insert_point(loop_block);
+
+        self.generate(body)?;
+
+        self.builder.build_br(step_block);
+        self.builder.set_insert_point(step_block);
+
+        self.generate(step)?;
+        if !self.builder.is_last_inst_terminator() {
+            self.builder.build_br(pre_block);
         }
 
         self.builder.set_insert_point(post_block);
@@ -328,6 +375,10 @@ impl<'a> FunctionCodeGenerator<'a> {
             )),
             ast::BinaryOp::Le => Ok((
                 self.builder.build_icmp(ICmpKind::Le, lhs, rhs),
+                Type::Int(Sign::Signed),
+            )),
+            ast::BinaryOp::Lt => Ok((
+                self.builder.build_icmp(ICmpKind::Lt, lhs, rhs),
                 Type::Int(Sign::Signed),
             )),
             ast::BinaryOp::Add => {

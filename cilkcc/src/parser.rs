@@ -258,7 +258,11 @@ impl<'a> Parser<'a> {
     fn read_for_stmt(&mut self) -> Result<AST> {
         lexer!(self, expect_skip_symbol(Symbol::OpeningParen));
         let init = Box::new(self.read_opt_decl_or_stmt()?);
-        let cond = Box::new(self.read_opt_expr()?);
+        let cond = self.read_opt_expr()?;
+        let cond = match cond.kind {
+            ast::Kind::Block(_) => None,
+            _ => Some(Box::new(cond)),
+        };
         lexer!(self, expect_skip_symbol(Symbol::Semicolon));
         let step = if lexer!(self, peek_token()).kind == token::Kind::Symbol(Symbol::ClosingParen) {
             Box::new(AST::new(ast::Kind::Block(vec![]), self.lexer.loc()))

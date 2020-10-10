@@ -78,6 +78,9 @@ impl BranchFolding {
                     blocks_to_merge.push(id);
                 }
             }
+            if f.body.basic_blocks.order.len() <= 1 {
+                break;
+            }
             if blocks_to_merge.len() == 0 {
                 break;
             }

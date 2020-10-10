@@ -58,7 +58,7 @@ impl<'a> MergeReturnsOnFunction<'a> {
             }
         }
 
-        if returns.len() == 1 && return_at_last_block {
+        if returns.len() == 0 || (returns.len() == 1 && return_at_last_block) {
             return;
         }
 
