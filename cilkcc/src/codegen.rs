@@ -308,21 +308,25 @@ impl<'a> FunctionCodeGenerator<'a> {
         ty: Type,
         name: &String,
         _sclass: StorageClass,
-        _val: Option<&AST>,
+        val: Option<&AST>,
     ) -> Result<(Value, Type)> {
         let cilk_ty = ty.conv(self.compound_types, &self.builder.module().unwrap().types);
+        let val = val.map(|val| self.generate(val));
         let mut builder = IRBuilderWithFunction::new(self.builder.func_ref_mut());
         let entry = builder.func_ref().get_entry_block().unwrap();
         builder.set_insert_point_at(0, entry);
         let alloca = builder.build_alloca(cilk_ty);
+        if let Some(val) = val {
+            builder.build_store(val?.0, alloca);
+        };
         self.variables
             .add_local_var(name.clone(), Variable::new(ty, cilk_ty, alloca));
 
         // Adjust the insert point of global builder
-        let bb = self.builder.block();
-        let pt = self.builder.insert_point();
+        let bb = builder.block();
+        let pt = builder.insert_point();
         if bb == Some(entry) {
-            self.builder.set_insert_point_at(pt + 1, entry);
+            self.builder.set_insert_point_at(pt, entry);
         }
 
         Ok((Value::None, Type::Void))
