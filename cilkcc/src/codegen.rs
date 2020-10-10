@@ -155,7 +155,6 @@ impl<'a> FunctionCodeGenerator<'a> {
                 self.generate_var_decl(*ty, name, *sclass, val.as_ref().map(|v| &**v))
             }
             ast::Kind::Variable(_, name) => {
-                // let ty=self.compound_types.pointer(
                 let &Variable { val, ty, .. } = self
                     .variables
                     .find_var(name.as_str())

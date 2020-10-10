@@ -46,6 +46,12 @@ pub enum Kind {
         cond: Box<AST>,
         body: Box<AST>,
     },
+    For {
+        init: Box<AST>,
+        cond: Box<AST>,
+        step: Box<AST>,
+        body: Box<AST>,
+    },
     Return(Option<Box<AST>>),
 }
 

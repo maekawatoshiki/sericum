@@ -214,6 +214,7 @@ impl<'a> Parser<'a> {
         match tok.kind {
             token::Kind::Keyword(Keyword::If) => return self.read_if_stmt(),
             token::Kind::Keyword(Keyword::While) => return self.read_while_stmt(),
+            token::Kind::Keyword(Keyword::For) => return self.read_for_stmt(),
             token::Kind::Keyword(Keyword::Return) => return self.read_return_stmt(),
             token::Kind::Symbol(Symbol::OpeningBrace) => return self.read_block(),
             _ => {}
@@ -254,6 +255,29 @@ impl<'a> Parser<'a> {
         Ok(AST::new(ast::Kind::While { cond, body }, loc))
     }
 
+    fn read_for_stmt(&mut self) -> Result<AST> {
+        lexer!(self, expect_skip_symbol(Symbol::OpeningParen));
+        let init = Box::new(self.read_opt_decl_or_stmt()?);
+        let cond = Box::new(self.read_opt_expr()?);
+        lexer!(self, expect_skip_symbol(Symbol::Semicolon));
+        let step = if lexer!(self, peek_token()).kind == token::Kind::Symbol(Symbol::ClosingParen) {
+            Box::new(AST::new(ast::Kind::Block(vec![]), self.lexer.loc()))
+        } else {
+            Box::new(self.read_opt_expr()?)
+        };
+        lexer!(self, expect_skip_symbol(Symbol::ClosingParen));
+        let body = Box::new(self.read_stmt()?);
+        Ok(AST::new(
+            ast::Kind::For {
+                init,
+                cond,
+                step,
+                body,
+            },
+            self.lexer.loc(),
+        ))
+    }
+
     fn read_return_stmt(&mut self) -> Result<AST> {
         let loc = self.lexer.loc();
         if lexer!(self, skip_symbol(Symbol::Semicolon)) {
@@ -262,6 +286,21 @@ impl<'a> Parser<'a> {
             let val = Some(Box::new(self.read_expr()?));
             expect_symbol_error!(self, Semicolon, "expected ';'");
             Ok(AST::new(ast::Kind::Return(val), loc))
+        }
+    }
+
+    fn read_opt_decl_or_stmt(&mut self) -> Result<AST> {
+        if lexer!(self, skip_symbol(Symbol::Semicolon)) {
+            return Ok(AST::new(ast::Kind::Block(vec![]), self.lexer.loc()));
+        }
+
+        let peek = lexer!(self, peek_token());
+        if self.is_type(&peek) {
+            let mut stmts = vec![];
+            self.read_decl(&mut stmts)?;
+            return Ok(AST::new(ast::Kind::Block(stmts), peek.loc));
+        } else {
+            self.read_stmt()
         }
     }
 
