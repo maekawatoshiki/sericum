@@ -38,7 +38,7 @@ impl Mem2Reg {
 
     pub fn run_on_module(&mut self, module: &mut Module) {
         for (_, func) in &mut module.functions {
-            if func.is_internal {
+            if func.is_internal || func.is_empty() {
                 continue;
             }
 

@@ -58,6 +58,10 @@ impl Function {
         })
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.basic_blocks.order.len() == 0
+    }
+
     pub fn get_entry_block(&self) -> Option<BasicBlockId> {
         self.basic_blocks.order.get(0).map(|bb| *bb)
     }

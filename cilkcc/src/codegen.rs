@@ -237,7 +237,7 @@ impl<'a> FunctionCodeGenerator<'a> {
             }
             ast::Kind::FuncCall(f, args) => self.generate_func_call(f, args),
             ast::Kind::Return(val) => self.generate_return(val.as_ref().map(|v| &**v)),
-            _ => panic!(),
+            e => todo!("{:?}", e),
         }
     }
 

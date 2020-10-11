@@ -32,7 +32,7 @@ impl LoopInvariantCodeMotion {
         SimplifyLoop::new().run_on_module(module);
 
         for (_, func) in &mut module.functions {
-            if func.is_internal {
+            if func.is_internal || func.is_empty() {
                 continue;
             }
             LoopInvariantCodeMotionOnFunction::new(func).run();

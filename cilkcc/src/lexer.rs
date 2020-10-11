@@ -249,8 +249,8 @@ impl Lexer {
     }
 
     fn read_include(&mut self) -> Result<()> {
-        let path = self.read_header_file_path()?;
-        let abs_path = self.try_include(path.clone()).map_or(
+        let (path, is_dquote) = self.read_header_file_path()?;
+        let abs_path = self.try_include(path.clone(), is_dquote).map_or(
             Err(Error::Message(
                 self.sub_lexers.back().unwrap().loc,
                 format!("not found '{}'", path.as_path().display().to_string(),),
@@ -264,8 +264,9 @@ impl Lexer {
         Ok(())
     }
 
-    fn read_header_file_path(&mut self) -> Result<PathBuf> {
+    fn read_header_file_path(&mut self) -> Result<(PathBuf, bool)> {
         let mut name = "".to_string();
+        let mut is_dquote = false;
         if self.skip_symbol(Symbol::Lt)? {
             while self.get_char()? != '>' {
                 name.push(self.next_char()?);
@@ -274,17 +275,17 @@ impl Lexer {
         } else {
             let tok = self.do_read_token()?;
             if let token::Kind::String(s) = tok.kind {
-                println!("sorry, using \"double quote\" in #include is currently not supported.");
                 name = s;
+                is_dquote = true;
             } else {
                 return Err(Error::Message(tok.loc, "expected '<' or '\"'".to_string()));
             }
         }
-        Ok(PathBuf::from(name))
+        Ok((PathBuf::from(name), is_dquote))
     }
 
-    fn try_include(&mut self, path: PathBuf) -> Option<PathBuf> {
-        let header_paths = vec![
+    fn try_include(&mut self, path: PathBuf, is_dquote: bool) -> Option<PathBuf> {
+        let mut header_paths: Vec<PathBuf> = vec![
             "./include/",
             "/include/",
             "/usr/include/",
@@ -293,18 +294,25 @@ impl Lexer {
             "./include/", // todo
             "./examples", // todo
             "",
-        ];
-        header_paths
-            .iter()
-            .map(|p| PathBuf::from(p))
-            .find_map(|mut header_path| {
-                header_path.push(path.clone());
-                if Path::new(&header_path).exists() {
-                    Some(header_path)
-                } else {
-                    None
-                }
-            })
+        ]
+        .into_iter()
+        .map(|p| PathBuf::from(p))
+        .collect();
+        if is_dquote {
+            let parent = self.path_arena.borrow()[self.path()]
+                .parent()
+                .unwrap()
+                .to_path_buf();
+            header_paths.insert(0, parent);
+        }
+        header_paths.into_iter().find_map(|mut header_path| {
+            header_path.push(path.clone());
+            if Path::new(&header_path).exists() {
+                Some(header_path)
+            } else {
+                None
+            }
+        })
     }
 
     fn read_define(&mut self) -> Result<()> {
