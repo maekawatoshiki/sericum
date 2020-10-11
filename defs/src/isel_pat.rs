@@ -39,6 +39,7 @@ struct InstPattern {
 struct OperandPattern {
     name: String,
     ty: Option<TS>,
+    if_: Option<TS>,
     parent: TS,
     body: Pattern,
 }
@@ -92,6 +93,7 @@ impl Parse for InstPattern {
         let group = input.parse::<Group>()?;
         let inst: InstBase = syn::parse2(group.stream())?;
         let ty = parse_type(input)?;
+        // let if_ = parse_if(input)?;
         let parent = parse_parent(input)?;
         let body = parse_pattern(input)?;
         Ok(InstPattern {
@@ -109,10 +111,12 @@ impl Parse for OperandPattern {
         let name = input.parse::<Ident>()?.to_string();
         let ty = parse_type(input)?;
         let parent = parse_parent(input)?;
+        let if_ = parse_if(input)?;
         let body = parse_pattern(input)?;
         Ok(OperandPattern {
             name,
             ty,
+            if_,
             parent,
             body,
         })
@@ -222,6 +226,15 @@ fn parse_type(input: ParseStream) -> Result<Option<TS>, Error> {
     }))
 }
 
+fn parse_if(input: ParseStream) -> Result<Option<TS>, Error> {
+    if !input.peek(Token![if]) {
+        return Ok(None);
+    }
+    assert!(input.parse::<Token![if]>().is_ok());
+    let group = input.parse::<Group>()?;
+    return Ok(Some(group.stream()));
+}
+
 fn parse_parent(input: ParseStream) -> Result<TS, Error> {
     Ok(match input.parse::<Ident>() {
         Ok(parent) => quote! { #parent },
@@ -299,24 +312,24 @@ impl PatternMatchConstructible for OperandPattern {
     fn construct(&self) -> TS {
         let body = self.body.construct();
         let parent = &self.parent;
-        match self.name.as_str() {
+        let cond = match self.name.as_str() {
             "imm8" => {
-                quote! { if #parent.is_constant() && matches!(#parent.ty, Type::i8) { #body } }
+                quote! { #parent.is_constant() && matches!(#parent.ty, Type::i8) }
             }
             "imm32" => {
-                quote! { if #parent.is_constant() && matches!(#parent.ty, Type::i32) { #body } }
+                quote! { #parent.is_constant() && matches!(#parent.ty, Type::i32) }
             }
             "imm_f64" => {
-                quote! { if #parent.is_constant() && matches!(#parent.ty, Type::f64) {  #body } }
+                quote! { #parent.is_constant() && matches!(#parent.ty, Type::f64) }
             }
             _ if self.name.as_str().starts_with("imm") => {
                 let bit = self.name.as_str()["imm".len()..].parse::<u32>().unwrap();
-                quote! { if #parent.is_constant()
+                quote! { #parent.is_constant()
                 && #parent.ty.is_integer()
-                && #parent.as_constant().bits_within(#bit).unwrap() { #body } }
+                && #parent.as_constant().bits_within(#bit).unwrap() }
             }
             // TODO
-            "mem" => quote! { if #parent.is_frame_index() {  #body } },
+            "mem" => quote! { #parent.is_frame_index() },
             "mem32" | "mem64" => {
                 let bits = match self.name.as_str() {
                     "mem32" => 32usize,
@@ -324,9 +337,7 @@ impl PatternMatchConstructible for OperandPattern {
                     _ => unimplemented!(),
                 };
                 quote! {
-                    if #parent.is_frame_index() && #parent.ty.size_in_bits(tys) == #bits {
-                          #body
-                    }
+                    #parent.is_frame_index() && #parent.ty.size_in_bits(tys) == #bits
                 }
             }
             "f64mem" => {
@@ -335,34 +346,34 @@ impl PatternMatchConstructible for OperandPattern {
                     _ => unimplemented!(),
                 };
                 quote! {
-                    if #parent.is_frame_index() && matches!(#parent.ty, #ty) {
-                          #body
-                    }
+                    #parent.is_frame_index() && matches!(#parent.ty, #ty)
                 }
             }
             "addr" => {
                 quote! {
-                    if #parent.is_address() {
-                        #body
-                    }
+                    #parent.is_address()
                 }
             }
 
             reg_class => {
                 let reg_class = str2ident(reg_class);
                 if let Some(ty) = &self.ty {
-                    quote! { if #parent.is_maybe_register()
+                    quote! { #parent.is_maybe_register()
                         && matches!(ty2rc(&#parent.ty), Some(RegisterClassKind::#reg_class))
-                        && matches!(#parent.ty, #ty) {
-                                #body
-                    } }
+                        && matches!(#parent.ty, #ty)
+                    }
                 } else {
-                    quote! { if #parent.is_maybe_register()
-                        && matches!(ty2rc(&#parent.ty), Some(RegisterClassKind::#reg_class)) {
-                                #body
-                    }}
+                    quote! { #parent.is_maybe_register()
+                        && matches!(ty2rc(&#parent.ty), Some(RegisterClassKind::#reg_class))
+                    }
                 }
             }
+        };
+
+        if let Some(if_) = &self.if_ {
+            quote! { if #cond && (#if_) { #body } }
+        } else {
+            quote! { if #cond { #body } }
         }
     }
 }

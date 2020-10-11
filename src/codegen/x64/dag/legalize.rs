@@ -134,7 +134,11 @@ impl Legalize {
                 (ir.FIAddr fi) x {
                     imm32 y => (mi.MOVrm32 [BaseFiOff %rbp, fi, y])
                     (ir.Mul z, u) y {
-                        imm32 u => (mi.MOVrm32 [BaseFiAlignOff %rbp, fi, u, z]) } }
+                        imm32 u if ({
+                            let i = u.kind.as_operand().as_constant().as_i32() as usize;
+                            i.is_power_of_two() && i <= 8
+                        }) => (mi.MOVrm32 [BaseFiAlignOff %rbp, fi, u, z])
+                        imm32 u => (mi.MOVrm32 [BaseFiAlignOff %rbp, fi, $1, (mi.IMULrr64i32 z, u)]) } }
                 (ir.GlobalAddr g) x {
                     imm32 y => (mi.MOVrm32 [AddressOff g, y])
                     (ir.Mul z, u) y {
@@ -229,7 +233,11 @@ impl Legalize {
                                         } }
                                     }
                                 }
-                                imm32 src => (mi.MOVmi32 [BaseFiAlignOff %rbp, fi, m2, m1], src)
+                                imm32 src if ({
+                                    let i = m2.kind.as_operand().as_constant().as_i32() as usize;
+                                    i.is_power_of_two() && i <= 8
+                                }) => (mi.MOVmi32 [BaseFiAlignOff %rbp, fi, m2, m1], src)
+                                imm32 src => (mi.MOVmi32 [BaseFiAlignOff %rbp, fi, $1, (mi.IMULrr64i32 m1, m2)], src)
                                 GR32  src => (mi.MOVmr32 [BaseFiAlignOff %rbp, fi, m2, m1], src)
                             }
                         } } }
