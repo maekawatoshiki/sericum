@@ -105,17 +105,34 @@ impl Legalize {
                                         let w = self.run_on_node(tys, regs_info, heap, w);
                                         let w = heap.alloc(DAGNode::new(NodeKind::IR(IRNodeKind::RegClass), vec![w], Type::i64));
                                         let rbp = heap.alloc_phys_reg(regs_info, GR64::RBP);
-                                        let off = e.kind.as_operand().as_constant().as_i32()
-                                            * u.kind.as_operand().as_constant().as_i32();
+                                        let i = u.kind.as_operand().as_constant().as_i32();
+                                        let off = e.kind.as_operand().as_constant().as_i32() * i;
                                         let off = heap.alloc(DAGNode::new(
                                             NodeKind::Operand(OperandNodeKind::Constant(ConstantKind::Int32(off))),
                                             vec![],
                                             Type::i32
                                         ));
-                                        let m = heap.alloc(DAGNode::new_mem(
-                                            MemNodeKind::BaseFiAlignOffOff,
-                                            vec![rbp, fi, u, w, off],
-                                        ));
+                                        let m = if (i as usize).is_power_of_two() && i <= 8 {
+                                            heap.alloc(DAGNode::new_mem(
+                                                MemNodeKind::BaseFiAlignOffOff,
+                                                vec![rbp, fi, u, w, off],
+                                            ))
+                                        } else {
+                                            let one = heap.alloc(DAGNode::new(
+                                                NodeKind::Operand(OperandNodeKind::Constant(ConstantKind::Int32(1))),
+                                                vec![],
+                                                Type::i32
+                                            ));
+                                            let off2 = heap.alloc(DAGNode::new(
+                                                NodeKind::MI(MINodeKind::IMULrr64i32),
+                                                vec![w, u],
+                                                Type::i64
+                                            ));
+                                            heap.alloc(DAGNode::new_mem(
+                                                MemNodeKind::BaseFiAlignOffOff,
+                                                vec![rbp, fi, one, off2, off],
+                                            ))
+                                        };
                                         heap.alloc(DAGNode::new(
                                             NodeKind::MI(MINodeKind::MOVrm32),
                                             vec![m],
@@ -210,17 +227,34 @@ impl Legalize {
                                             let w = self.run_on_node(tys, regs_info, heap, w);
                                             let w = heap.alloc(DAGNode::new(NodeKind::IR(IRNodeKind::RegClass), vec![w], Type::i64));
                                             let rbp = heap.alloc_phys_reg(regs_info, GR64::RBP);
-                                            let off = e.kind.as_operand().as_constant().as_i32()
-                                                * m2.kind.as_operand().as_constant().as_i32();
+                                            let i = m2.kind.as_operand().as_constant().as_i32();
+                                            let off = e.kind.as_operand().as_constant().as_i32() * i;
                                             let off = heap.alloc(DAGNode::new(
                                                 NodeKind::Operand(OperandNodeKind::Constant(ConstantKind::Int32(off))),
                                                 vec![],
                                                 Type::i32
                                             ));
-                                            let m = heap.alloc(DAGNode::new_mem(
-                                                MemNodeKind::BaseFiAlignOffOff,
-                                                vec![rbp, fi, m2, w, off],
-                                            ));
+                                            let m = if (i as usize).is_power_of_two() && i <= 8 {
+                                                heap.alloc(DAGNode::new_mem(
+                                                    MemNodeKind::BaseFiAlignOffOff,
+                                                    vec![rbp, fi, m2, w, off],
+                                                ))
+                                            } else {
+                                                let one = heap.alloc(DAGNode::new(
+                                                    NodeKind::Operand(OperandNodeKind::Constant(ConstantKind::Int32(1))),
+                                                    vec![],
+                                                    Type::i32
+                                                ));
+                                                let off2 = heap.alloc(DAGNode::new(
+                                                    NodeKind::MI(MINodeKind::IMULrr64i32),
+                                                    vec![w, m2],
+                                                    Type::i64
+                                                ));
+                                                heap.alloc(DAGNode::new_mem(
+                                                    MemNodeKind::BaseFiAlignOffOff,
+                                                    vec![rbp, fi, one, off2, off],
+                                                ))
+                                            };
                                             heap.alloc(DAGNode::new(
                                                 if src.is_constant() {
                                                     NodeKind::MI(MINodeKind::MOVmi32)
