@@ -391,10 +391,6 @@ impl<'a> FunctionCodeGenerator<'a> {
             .unwrap_or(0);
         self.builder.set_insert_point_at(pt, entry);
         let alloca = self.builder.build_alloca(cilk_ty);
-        if let Some(val) = val {
-            let val = self.generate(val)?.0;
-            self.builder.build_store(val, alloca);
-        }
         self.variables
             .add_local_var(name.clone(), Variable::new(ty, cilk_ty, alloca));
 
@@ -402,6 +398,11 @@ impl<'a> FunctionCodeGenerator<'a> {
         *self.builder.block_mut() = saved_bb;
         *self.builder.insert_point_mut() = saved_pt;
         self.builder.set_insert_point_at_end_of_current_block();
+
+        if let Some(val) = val {
+            let val = self.generate(val)?.0;
+            self.builder.build_store(val, alloca);
+        }
 
         Ok((Value::None, Type::Void))
     }
@@ -446,6 +447,39 @@ impl<'a> FunctionCodeGenerator<'a> {
     ) -> Result<(Value, Type)> {
         let (lhs, lty) = self.generate(lhs)?;
         let (rhs, rty) = self.generate(rhs)?;
+
+        if let Type::Pointer(_) = lty {
+            return self.generate_ptr_binary_op(lty, op, lhs, rhs);
+        }
+
+        if let Type::Pointer(_) = rty {
+            return self.generate_ptr_binary_op(rty, op, lhs, rhs);
+        }
+
+        let conv_ty = if lty.priority() < rty.priority() {
+            rty
+        } else {
+            lty
+        };
+
+        if matches!(conv_ty, Type::Float | Type::Double) {
+            todo!()
+        }
+
+        if conv_ty.is_int() {
+            return self.generate_int_binary_op(conv_ty, op, lhs, rhs);
+        }
+
+        panic!()
+    }
+
+    fn generate_int_binary_op(
+        &mut self,
+        ty: Type,
+        op: ast::BinaryOp,
+        lhs: Value,
+        rhs: Value,
+    ) -> Result<(Value, Type)> {
         match op {
             ast::BinaryOp::Eq => Ok((
                 self.builder.build_icmp(ICmpKind::Eq, lhs, rhs),
@@ -459,21 +493,11 @@ impl<'a> FunctionCodeGenerator<'a> {
                 self.builder.build_icmp(ICmpKind::Lt, lhs, rhs),
                 Type::Int(Sign::Signed),
             )),
-            ast::BinaryOp::Add => {
-                if let types::Type::Pointer(_) = lhs.get_type() {
-                    return self.generate_ptr_binary_op(lty, op, lhs, rhs);
-                }
-                // TODO: ???
-                if let types::Type::Pointer(_) = rhs.get_type() {
-                    return self.generate_ptr_binary_op(rty, op, rhs, lhs);
-                }
-
-                Ok((self.builder.build_add(lhs, rhs), lty))
-            }
-            ast::BinaryOp::Sub => Ok((self.builder.build_sub(lhs, rhs), lty)),
-            ast::BinaryOp::Mul => Ok((self.builder.build_mul(lhs, rhs), lty)),
-            ast::BinaryOp::Div => Ok((self.builder.build_div(lhs, rhs), lty)),
-            ast::BinaryOp::Rem => Ok((self.builder.build_rem(lhs, rhs), lty)),
+            ast::BinaryOp::Add => Ok((self.builder.build_add(lhs, rhs), ty)),
+            ast::BinaryOp::Sub => Ok((self.builder.build_sub(lhs, rhs), ty)),
+            ast::BinaryOp::Mul => Ok((self.builder.build_mul(lhs, rhs), ty)),
+            ast::BinaryOp::Div => Ok((self.builder.build_div(lhs, rhs), ty)),
+            ast::BinaryOp::Rem => Ok((self.builder.build_rem(lhs, rhs), ty)),
             _ => unimplemented!(),
         }
     }
@@ -493,17 +517,12 @@ impl<'a> FunctionCodeGenerator<'a> {
             false
         };
         match op {
-            ast::BinaryOp::Add => {
-                if is_array {
-                    Ok((
-                        self.builder
-                            .build_gep(lhs, vec![Value::new_imm_int32(0), rhs]),
-                        ty,
-                    ))
-                } else {
-                    Ok((self.builder.build_gep(lhs, vec![rhs]), ty))
-                }
-            }
+            ast::BinaryOp::Add if is_array => Ok((
+                self.builder
+                    .build_gep(lhs, vec![Value::new_imm_int32(0), rhs]),
+                ty,
+            )),
+            ast::BinaryOp::Add => Ok((self.builder.build_gep(lhs, vec![rhs]), ty)),
             _ => unimplemented!(),
         }
     }

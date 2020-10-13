@@ -65,6 +65,35 @@ pub struct CompoundTypes(Arena<CompoundType>);
 
 pub type CompoundTypeId = Id<CompoundType>;
 
+impl Type {
+    pub fn priority(&self) -> usize {
+        match self {
+            &Type::Void => 0,
+            &Type::Char(_) => 1,
+            &Type::Short(_) => 2,
+            &Type::Int(_) => 3,
+            &Type::Long(_) => 4,
+            &Type::LLong(_) => 5,
+            &Type::Float => 6,
+            &Type::Double => 7,
+            &Type::Array(_) => 8,
+            // &Type::Enum => 8,
+            &Type::Pointer(_) => 10,
+            &Type::Struct(_) | &Type::Union(_) => 11,
+            &Type::Func(_) => 12,
+        }
+    }
+
+    pub fn is_int(&self) -> bool {
+        matches!(self, 
+            Type::Char(_)  |
+            Type::Short(_) |
+            Type::Int(_)   |
+            Type::Long(_)  |
+            Type::LLong(_))
+    }
+}
+
 impl CompoundTypes {
     pub fn new() -> Self {
         CompoundTypes(Arena::new())
