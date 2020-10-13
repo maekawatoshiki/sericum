@@ -471,6 +471,9 @@ impl<'a> FunctionCodeGenerator<'a> {
                 Ok((self.builder.build_add(lhs, rhs), lty))
             }
             ast::BinaryOp::Sub => Ok((self.builder.build_sub(lhs, rhs), lty)),
+            ast::BinaryOp::Mul => Ok((self.builder.build_mul(lhs, rhs), lty)),
+            ast::BinaryOp::Div => Ok((self.builder.build_div(lhs, rhs), lty)),
+            ast::BinaryOp::Rem => Ok((self.builder.build_rem(lhs, rhs), lty)),
             _ => unimplemented!(),
         }
     }
