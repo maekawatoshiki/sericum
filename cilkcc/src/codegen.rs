@@ -231,6 +231,7 @@ impl<'a> FunctionCodeGenerator<'a> {
             }
             ast::Kind::Assign { dst, src } => self.generate_assign(dst, src),
             ast::Kind::Load(val) => self.generate_load(val),
+            ast::Kind::UnaryOp(op, expr) => self.generate_unary_op(*op, expr),
             ast::Kind::BinaryOp(op, lhs, rhs) => self.generate_binary_op(*op, lhs, rhs),
             ast::Kind::TernaryOp(cond, then_, else_) => {
                 self.generate_ternary_op(cond, then_, else_)
@@ -436,6 +437,14 @@ impl<'a> FunctionCodeGenerator<'a> {
             }
         } else {
             panic!()
+        }
+    }
+
+    fn generate_unary_op(&mut self, op: ast::UnaryOp, expr: &AST) -> Result<(Value, Type)> {
+        match op {
+            ast::UnaryOp::Addr => self.generate(retrieve_from_load(expr)),
+            ast::UnaryOp::Deref => self.generate_load(expr),
+            _ => todo!(),
         }
     }
 
