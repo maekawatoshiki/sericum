@@ -2,8 +2,12 @@
 
 A small C compiler powered by cilk
 
+# Todo
+
+[ ] Add tests 
+
 # Run
 
 ```
-cargo run --release examples/simple.c
+cargo run --release examples/fibo.c
 ```
