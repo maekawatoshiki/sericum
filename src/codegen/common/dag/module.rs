@@ -1,5 +1,5 @@
 use crate::codegen::common::dag::function::*;
-use crate::ir::{global_val::GlobalVariables, types::Types};
+use crate::ir::{constant_pool::ConstantPool, global_val::GlobalVariables, types::Types};
 use id_arena::*;
 use std::fmt;
 
@@ -8,6 +8,7 @@ pub struct DAGModule {
     pub functions: Arena<DAGFunction>,
     pub types: Types,
     pub global_vars: GlobalVariables,
+    pub const_pool: ConstantPool,
 }
 
 impl DAGModule {

@@ -9,19 +9,6 @@ mod x86_64 {
     };
 
     #[test]
-    fn test_string() {
-        let mut m = module::Module::new("cilk");
-
-        let str_ty = m.types.new_array_ty(types::Type::i8, 6);
-        m.const_pool.add(ir::constant_pool::Constant {
-            ty: str_ty,
-            kind: ir::constant_pool::ConstantKind::String("hello".to_string()),
-        });
-
-        println!("{:?}", m);
-    }
-
-    #[test]
     fn test0_mem2reg() {
         let mut m = module::Module::new("cilk");
 

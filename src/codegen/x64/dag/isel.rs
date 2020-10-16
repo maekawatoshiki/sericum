@@ -192,6 +192,7 @@ impl MISelector {
             }
             (ir.FIAddr a) { mem a => (mi.LEAr64m [BaseFi %rbp, a]) }
             // (ir.GlobalAddr a) => (mi.Copy a)  TODO
+            (ir.ConstAddr a) => (mi.MOVrm64 [Address a])
             (ir.Br dst) => (mi.JMP dst)
             (ir.CopyFromReg a) => (mi.Copy a)
         );

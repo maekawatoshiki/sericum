@@ -75,6 +75,7 @@ impl<'a> ConvertToDAGModule<'a> {
             functions,
             types: self.module.types.clone(),
             global_vars: self.module.global_vars.clone(),
+            const_pool: self.module.const_pool.clone(),
         }
     }
 }
@@ -525,6 +526,18 @@ impl<'a> ConvertToDAGNode<'a> {
                 self.alloc_node(DAGNode::new(
                     NodeKind::IR(IRNodeKind::GlobalAddr),
                     vec![g],
+                    *ty,
+                ))
+            }
+            Value::Constant(ConstantValue { id, ty }) => {
+                let c = self.alloc_node(DAGNode::new(
+                    NodeKind::Operand(OperandNodeKind::Address(AddressKind::Const(*id))),
+                    vec![],
+                    *ty,
+                ));
+                self.alloc_node(DAGNode::new(
+                    NodeKind::IR(IRNodeKind::ConstAddr),
+                    vec![c],
                     *ty,
                 ))
             }

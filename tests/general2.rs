@@ -66,8 +66,43 @@ mod x86_64 {
         let mut printer = MachineAsmPrinter::new();
         // println!("{:?}", machine_module);
         printer.run_on_module(&machine_module);
-        // println!("{}", printer.output);
+        println!("{}", printer.output);
         assemble_and_run(c_parent, &printer.output);
+    }
+
+    #[test]
+    fn test_string() {
+        let mut m = module::Module::new("cilk");
+
+        let str_ty = m.types.new_array_ty(types::Type::i8, 6);
+        let id = m.const_pool.add(ir::constant_pool::Constant {
+            ty: str_ty,
+            kind: ir::constant_pool::ConstantKind::String("hello".to_string()),
+        });
+        let c = value::Value::Constant(value::ConstantValue {
+            id,
+            ty: m.types.new_pointer_ty(str_ty),
+        });
+
+        let func = cilk_ir!(m; define [ptr i8] test [] {
+        entry:
+            a = gep (%c), [(i32 0), (i32 0)];
+            ret (%a);
+        });
+
+        println!("{:?}", m);
+
+        compile_and_run(
+            "
+        #include <assert.h>
+        #include <string.h>
+        extern char *test();
+        int main() {
+            assert(strcmp(test(), \"hello\") == 0);
+        }
+            ",
+            &mut m,
+        );
     }
 
     #[test]

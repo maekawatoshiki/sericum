@@ -36,6 +36,23 @@ impl MachineAsmPrinter {
             self.id_to_global_name.insert(id, g.name.clone());
         }
 
+        for (id, c) in &m.const_pool.arena {
+            // let size = g.ty.size_in_byte(&m.types);
+            // let align = g.ty.align_in_byte(&m.types);
+            use crate::ir::constant_pool;
+            self.output.push_str(
+                format!(
+                    ".L_const_{}:\n  .string \"{}\"\n",
+                    id.index(),
+                    match &c.kind {
+                        constant_pool::ConstantKind::String(s) => s.as_str(),
+                    }
+                )
+                .as_str(),
+            );
+            // self.id_to_global_name.insert(id, g.name.clone());
+        }
+
         for (_, func) in &m.functions {
             self.run_on_function(&func)
         }
@@ -158,6 +175,9 @@ impl MachineAsmPrinter {
                     format!("{} ptr [{}+{}]", word, self.global_var_name(id), off).as_str(),
                 )
             }
+            MachineOperand::Mem(MachineMemOperand::Address(AddressKind::Constant(id))) => self
+                .output
+                .push_str(format!("offset .L_const_{}", id.index()).as_str()),
             MachineOperand::Mem(MachineMemOperand::AddressAlignOff(
                 AddressKind::Global(id),
                 align,

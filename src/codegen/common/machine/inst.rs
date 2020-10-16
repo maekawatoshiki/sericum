@@ -8,7 +8,7 @@ use crate::codegen::arch::machine::{
     },
 };
 use crate::codegen::common::machine::{basic_block::*, const_data::DataId};
-use crate::ir::{global_val::GlobalVariableId, types::*};
+use crate::ir::{constant_pool::ConstantId, global_val::GlobalVariableId, types::*};
 use id_arena::*;
 use rustc_hash::FxHashMap;
 use std::{fmt, fmt::Debug};
@@ -51,6 +51,7 @@ pub struct RegisterOperand {
 pub enum AddressKind {
     FunctionName(String),
     Global(GlobalVariableId),
+    Constant(ConstantId),
     Label(DataId),
 }
 
@@ -732,6 +733,7 @@ impl fmt::Debug for AddressKind {
             AddressKind::FunctionName(name) => write!(f, "addr<fn:{}>", name),
             AddressKind::Label(id) => write!(f, "label<{}>", id),
             AddressKind::Global(id) => write!(f, "global<{:?}>", id),
+            AddressKind::Constant(id) => write!(f, "const<{:?}>", id),
         }
     }
 }

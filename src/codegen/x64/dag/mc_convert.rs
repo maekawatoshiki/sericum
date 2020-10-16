@@ -273,6 +273,7 @@ impl<'a> ScheduleByBlock<'a> {
 
     pub fn convert_ret(&mut self, node: &DAGNode) -> MachineInstId {
         let val = self.normal_operand(node.operand[0]);
+        println!("{:?}", val);
 
         if let Some(ty) = val.get_type(&self.cur_func.regs_info) {
             let ret_reg = ty2rc(&ty).unwrap().return_value_register();
@@ -552,6 +553,9 @@ impl<'a> ScheduleByBlock<'a> {
                 ConstantKind::Int32(i) => MachineOperand::Constant(MachineConstant::Int32(i)),
                 ConstantKind::Int64(i) => MachineOperand::Constant(MachineConstant::Int64(i)),
                 ConstantKind::F64(f) => MachineOperand::Constant(MachineConstant::F64(f)),
+                ConstantKind::Other(c) => {
+                    MachineOperand::Mem(MachineMemOperand::Address(inst::AddressKind::Constant(c)))
+                }
             },
             NodeKind::Operand(OperandNodeKind::FrameIndex(ref kind)) => {
                 MachineOperand::FrameIndex(kind.clone())
@@ -629,6 +633,7 @@ impl<'a> ScheduleByBlock<'a> {
                     node::AddressKind::FunctionName(name) => {
                         inst::AddressKind::FunctionName(name.clone())
                     }
+                    node::AddressKind::Const(id) => inst::AddressKind::Constant(*id),
                 })),
             },
             NodeKind::None => MachineOperand::None,

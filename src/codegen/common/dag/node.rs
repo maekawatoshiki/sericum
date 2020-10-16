@@ -6,7 +6,7 @@ use crate::codegen::{
     },
     common::dag::basic_block::*,
 };
-use crate::ir::{global_val::GlobalVariableId, opcode::*, types::*};
+use crate::ir::{constant_pool, global_val::GlobalVariableId, opcode::*, types::*};
 use crate::util::allocator::*;
 use id_arena::*;
 use rustc_hash::FxHashMap;
@@ -77,6 +77,7 @@ pub enum IRNodeKind {
 
     FIAddr,
     GlobalAddr,
+    ConstAddr,
 
     CopyToReg,
     CopyFromReg,
@@ -94,6 +95,7 @@ pub enum ConstantKind {
     Int32(i32),
     Int64(i64),
     F64(f64),
+    Other(constant_pool::ConstantId),
 }
 
 #[derive(Debug, Clone, PartialEq, Copy)]
@@ -116,6 +118,7 @@ pub enum CondKind {
 pub enum AddressKind {
     FunctionName(String),
     Global(GlobalVariableId),
+    Const(constant_pool::ConstantId),
 }
 
 impl Into<CondKind> for ICmpKind {
@@ -172,6 +175,7 @@ impl ConstantKind {
             ConstantKind::Int32(i) => ConstantKind::Int32(-i),
             ConstantKind::Int64(i) => ConstantKind::Int64(-i),
             ConstantKind::F64(f) => ConstantKind::F64(-f),
+            ConstantKind::Other(_) => panic!(),
         }
     }
 
@@ -189,6 +193,7 @@ impl ConstantKind {
             ConstantKind::Int32(x) => Some((x << (32 - n)) >> (32 - n) == *x),
             ConstantKind::Int64(x) => Some((x << (64 - n)) >> (64 - n) == *x),
             ConstantKind::F64(_) => None,
+            ConstantKind::Other(_) => None,
         }
     }
 
@@ -198,6 +203,7 @@ impl ConstantKind {
             ConstantKind::Int32(_) => Type::i32,
             ConstantKind::Int64(_) => Type::i64,
             ConstantKind::F64(_) => Type::f64,
+            ConstantKind::Other(_) => panic!(),
         }
     }
 

@@ -39,7 +39,7 @@ impl fmt::Debug for ConstantPool {
         for (id, c) in &self.arena {
             writeln!(
                 f,
-                "@c.{} = constant {} {:?}",
+                "@const.{} = constant {} {:?}",
                 id.index(),
                 self.types.to_string(c.ty),
                 c.kind

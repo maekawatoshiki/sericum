@@ -1,5 +1,6 @@
 use super::{
-    function::*, global_val::GlobalVariableId, module::*, opcode::*, types::*, DumpToString,
+    constant_pool::ConstantId, function::*, global_val::GlobalVariableId, module::*, opcode::*,
+    types::*, DumpToString,
 };
 use std::hash;
 
@@ -32,6 +33,7 @@ pub enum Value {
     Instruction(InstructionValue),
     Function(FunctionValue),
     Global(GlobalValue),
+    Constant(ConstantValue),
     None,
 }
 
@@ -58,6 +60,12 @@ pub struct FunctionValue {
 #[derive(Debug, Clone, Copy, PartialEq, Hash, Eq)]
 pub struct GlobalValue {
     pub id: GlobalVariableId,
+    pub ty: Type,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Hash, Eq)]
+pub struct ConstantValue {
+    pub id: ConstantId,
     pub ty: Type,
 }
 
@@ -106,6 +114,7 @@ impl Value {
             Value::Function(FunctionValue { ty, .. }) => *ty,
             Value::Global(GlobalValue { ty, .. }) => *ty,
             Value::Immediate(ref im) => *im.get_type(),
+            Value::Constant(ConstantValue { ty, .. }) => *ty,
             Value::None => Type::Void,
         }
     }
@@ -175,6 +184,9 @@ impl Value {
             Value::Global(GlobalValue { id, ty }) => {
                 let g = &parent.global_vars.arena[*id];
                 format!("{} @{}", parent.types.to_string(*ty), g.name)
+            }
+            Value::Constant(ConstantValue { id, ty }) => {
+                format!("{} @const.{}", parent.types.to_string(*ty), id.index())
             }
             Value::None => "".to_string(),
         }

@@ -31,7 +31,13 @@ pub fn convert_module(module: DAGModule) -> MachineModule {
         let id = functions.alloc(convert_function(&module.types, func));
         functions[id].id = Some(id);
     }
-    MachineModule::new(module.name, functions, module.types, module.global_vars)
+    MachineModule::new(
+        module.name,
+        functions,
+        module.types,
+        module.global_vars,
+        module.const_pool,
+    )
 }
 
 pub fn convert_function(types: &Types, dag_func: DAGFunction) -> MachineFunction {

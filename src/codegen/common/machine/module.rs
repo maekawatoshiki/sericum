@@ -1,5 +1,5 @@
 use crate::codegen::common::machine::function::*;
-use crate::ir::{global_val::GlobalVariables, types::*};
+use crate::ir::{constant_pool::ConstantPool, global_val::GlobalVariables, types::*};
 use id_arena::*;
 use std::fmt;
 
@@ -8,6 +8,7 @@ pub struct MachineModule {
     pub functions: Arena<MachineFunction>,
     pub types: Types,
     pub global_vars: GlobalVariables,
+    pub const_pool: ConstantPool,
 }
 
 impl MachineModule {
@@ -16,12 +17,14 @@ impl MachineModule {
         functions: Arena<MachineFunction>,
         types: Types,
         global_vars: GlobalVariables,
+        const_pool: ConstantPool,
     ) -> Self {
         Self {
             name,
             functions,
             types,
             global_vars,
+            const_pool,
         }
     }
 
