@@ -1,4 +1,4 @@
-use super::{function::*, global_val::*, types::*, DumpToString};
+use super::{constant_pool::*, function::*, global_val::*, types::*, DumpToString};
 use id_arena::*;
 use std::fmt;
 
@@ -14,6 +14,9 @@ pub struct Module {
 
     /// Global varaibles attached to this module
     pub global_vars: GlobalVariables,
+
+    /// Constant values attached to this module
+    pub const_pool: ConstantPool,
 
     /// Type definitions in this module
     pub types: Types,
@@ -37,6 +40,7 @@ impl Module {
             name: name.to_string(),
             functions: Arena::new(),
             global_vars: GlobalVariables::new(types.clone()),
+            const_pool: ConstantPool::new(types.clone()),
             types,
         }
     }
@@ -125,6 +129,7 @@ impl fmt::Debug for Module {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         writeln!(f, "Module (name: {})", self.name)?;
         writeln!(f, "{:?}", self.global_vars)?;
+        writeln!(f, "{:?}", self.const_pool)?;
         for (_, func) in &self.functions {
             writeln!(f, "{}", self.dump(func))?;
         }

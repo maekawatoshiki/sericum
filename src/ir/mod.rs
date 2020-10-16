@@ -2,6 +2,7 @@ pub mod basic_block;
 pub mod builder;
 pub mod codegen_prepare;
 pub mod const_folding;
+pub mod constant_pool;
 pub mod cse;
 pub mod function;
 pub mod global_val;
