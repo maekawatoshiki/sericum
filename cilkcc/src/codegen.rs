@@ -218,6 +218,7 @@ impl<'a> FunctionCodeGenerator<'a> {
             ast::Kind::Int { n, bits: 32 } => {
                 Ok((Value::new_imm_int32(*n as i32), Type::Int(Sign::Signed)))
             }
+            ast::Kind::String(s) => self.generate_string(s),
             ast::Kind::FieldRef(val, name) => self.generate_field_ref(val, name),
             ast::Kind::VariableDecl(ty, name, sclass, val) => {
                 self.generate_var_decl(*ty, name, *sclass, val.as_ref().map(|v| &**v))
@@ -342,6 +343,14 @@ impl<'a> FunctionCodeGenerator<'a> {
         self.builder.set_insert_point(post_block);
 
         Ok((Value::None, Type::Void))
+    }
+
+    fn generate_string(&mut self, s: &String) -> Result<(Value, Type)> {
+        let s = self.builder.module_mut().unwrap().create_string(s.clone());
+        let gep = self
+            .builder
+            .build_gep(s, vec![Value::new_imm_int32(0), Value::new_imm_int32(0)]);
+        Ok((gep, self.compound_types.pointer(Type::Char(Sign::Signed))))
     }
 
     fn generate_field_ref(&mut self, val: &AST, name: &String) -> Result<(Value, Type)> {
@@ -519,12 +528,13 @@ impl<'a> FunctionCodeGenerator<'a> {
         rhs: Value,
     ) -> Result<(Value, Type)> {
         let inner = self.compound_types[ty].as_pointer();
-        let is_array = if let CompoundType::Array { inner, .. } = self.compound_types[inner] {
-            ty = self.compound_types.pointer(inner);
-            true
-        } else {
-            false
-        };
+        let is_array = inner.is_compound()
+            && if let CompoundType::Array { inner, .. } = self.compound_types[inner] {
+                ty = self.compound_types.pointer(inner);
+                true
+            } else {
+                false
+            };
         match op {
             ast::BinaryOp::Add if is_array => Ok((
                 self.builder

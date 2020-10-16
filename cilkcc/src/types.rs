@@ -85,12 +85,11 @@ impl Type {
     }
 
     pub fn is_int(&self) -> bool {
-        matches!(self, 
-            Type::Char(_)  |
-            Type::Short(_) |
-            Type::Int(_)   |
-            Type::Long(_)  |
-            Type::LLong(_))
+        matches!(self, Type::Char(_) | Type::Short(_) | Type::Int(_) | Type::Long(_) | Type::LLong(_))
+    }
+
+    pub fn is_compound(&self) -> bool {
+        matches!(self, Type::Pointer(_) | Type::Array(_) | Type::Func(_) | Type::Struct(_) | Type::Union(_))
     }
 }
 

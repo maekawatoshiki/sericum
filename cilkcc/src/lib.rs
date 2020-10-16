@@ -70,7 +70,7 @@ pub fn compile(path: PathBuf) {
     printer.run_on_module(&machine_module);
     println!("{}", printer.output);
 
-    assemble_and_run("int main(int argc, char **argv);", &printer.output);
+    assemble_and_run(&printer.output);
 }
 
 fn unique_file_name(extension: &str) -> String {
@@ -88,24 +88,16 @@ fn unique_file_name(extension: &str) -> String {
     format!("/tmp/{}.{}", name, extension)
 }
 
-fn assemble_and_run(c_parent: &str, s_target: &str) {
-    let parent_name = unique_file_name("c");
+fn assemble_and_run(s_target: &str) {
     let target_name = unique_file_name("s");
     {
-        let mut parent = BufWriter::new(fs::File::create(parent_name.as_str()).unwrap());
         let mut target = BufWriter::new(fs::File::create(target_name.as_str()).unwrap());
-        parent.write_all(c_parent.as_bytes()).unwrap();
         target.write_all(s_target.as_bytes()).unwrap();
     }
 
     let output_name = unique_file_name("out");
-    let compilation = process::Command::new("gcc")
-        .args(&[
-            parent_name.as_str(),
-            target_name.as_str(),
-            "-o",
-            output_name.as_str(),
-        ])
+    let compilation = process::Command::new("clang")
+        .args(&[target_name.as_str(), "-o", output_name.as_str()])
         .status()
         .unwrap();
     assert!(compilation.success());
@@ -120,6 +112,5 @@ fn assemble_and_run(c_parent: &str, s_target: &str) {
     }
 
     fs::remove_file(output_name).unwrap();
-    fs::remove_file(parent_name).unwrap();
     fs::remove_file(target_name).unwrap();
 }

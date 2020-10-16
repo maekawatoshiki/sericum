@@ -1,4 +1,4 @@
-use super::{constant_pool::*, function::*, global_val::*, types::*, DumpToString};
+use super::{constant_pool::*, function::*, global_val::*, types::*, value, DumpToString};
 use id_arena::*;
 use std::fmt;
 
@@ -118,6 +118,18 @@ impl Module {
         self.functions
             .iter()
             .find_map(|(id, f)| if f.name == name { Some(id) } else { None })
+    }
+
+    pub fn create_string(&mut self, s: String) -> value::Value {
+        let i8_arr = self.types.new_array_ty(Type::i8, s.len() + 1);
+        let id = self.const_pool.add(Constant {
+            kind: ConstantKind::String(s),
+            ty: i8_arr,
+        });
+        value::Value::Constant(value::ConstantValue {
+            id,
+            ty: self.types.new_pointer_ty(i8_arr),
+        })
     }
 
     pub fn dump<T: DumpToString>(&self, obj: T) -> String {
