@@ -112,41 +112,13 @@ impl<'a> Codegenerator<'a> {
                     func_id,
                     ty: cilk_ty,
                 });
+                let p_cilk_ty = self.module.types.new_pointer_ty(cilk_ty);
+                let p_ty = self.compound_types.pointer(ty);
                 self.variables
-                    .add_global_var(name.clone(), Variable::new(ty, cilk_ty, val));
+                    .add_global_var(name.clone(), Variable::new(p_ty, p_cilk_ty, val));
             }
             _ => todo!(),
         }
-        // let (saved_bb, saved_pt) = (self.builder.block(), self.builder.insert_point());
-        // let entry = self.builder.func_ref().get_entry_block().unwrap();
-        // let pt = self.builder.func_ref().basic_blocks.arena[entry]
-        //     .iseq_ref()
-        //     .iter()
-        //     .enumerate()
-        //     .find_map(|(i, inst)| {
-        //         if self.builder.func_ref().inst_table[inst.as_instruction().id].opcode
-        //             == Opcode::Alloca
-        //         {
-        //             None
-        //         } else {
-        //             Some(i)
-        //         }
-        //     })
-        //     .unwrap_or(0);
-        // self.builder.set_insert_point_at(pt, entry);
-        // let alloca = self.builder.build_alloca(cilk_ty);
-        // if let Some(val) = val {
-        //     let val = self.generate(val)?.0;
-        //     self.builder.build_store(val, alloca);
-        // }
-        // self.variables
-        //     .add_local_var(name.clone(), Variable::new(ty, cilk_ty, alloca));
-        //
-        // // Adjust the insert point of global builder
-        // *self.builder.block_mut() = saved_bb;
-        // *self.builder.insert_point_mut() = saved_pt;
-        // self.builder.set_insert_point_at_end_of_current_block();
-        //
         Ok(Value::None)
     }
 }
@@ -173,7 +145,9 @@ impl<'a> FunctionCodeGenerator<'a> {
             ty: func_ty,
         });
 
-        variables.add_local_var(name.clone(), Variable::new(*ty, func_ty, val));
+        let p_cilk_ty = module.types.new_pointer_ty(func_ty);
+        let p_ty = compound_types.pointer(*ty);
+        variables.add_local_var(name.clone(), Variable::new(p_ty, p_cilk_ty, val));
         variables.push_env();
 
         let mut gen = Self {
@@ -193,8 +167,10 @@ impl<'a> FunctionCodeGenerator<'a> {
             let val = gen.builder.func_ref().get_param_value(i).unwrap();
             let var = gen.builder.build_alloca(cilk_ty);
             gen.builder.build_store(val, var);
+            let p_cilk_ty = gen.builder.module().unwrap().types.new_pointer_ty(cilk_ty);
+            let p_ty = gen.compound_types.pointer(ty);
             gen.variables
-                .add_local_var(name.clone(), Variable::new(ty, cilk_ty, var));
+                .add_local_var(name.clone(), Variable::new(p_ty, p_cilk_ty, var));
         }
 
         gen.generate(body)?;
@@ -228,7 +204,7 @@ impl<'a> FunctionCodeGenerator<'a> {
                     .variables
                     .find_var(name.as_str())
                     .ok_or_else(|| Error::Message(body.loc, "variable not found".to_string()))?;
-                Ok((val, self.compound_types.pointer(ty)))
+                Ok((val, ty))
             }
             ast::Kind::Assign { dst, src } => self.generate_assign(dst, src),
             ast::Kind::Load(val) => self.generate_load(val),
@@ -401,8 +377,10 @@ impl<'a> FunctionCodeGenerator<'a> {
             .unwrap_or(0);
         self.builder.set_insert_point_at(pt, entry);
         let alloca = self.builder.build_alloca(cilk_ty);
+        let p_cilk_ty = self.builder.module().unwrap().types.new_pointer_ty(cilk_ty);
+        let p_ty = self.compound_types.pointer(ty);
         self.variables
-            .add_local_var(name.clone(), Variable::new(ty, cilk_ty, alloca));
+            .add_local_var(name.clone(), Variable::new(p_ty, p_cilk_ty, alloca));
 
         // Adjust the insert point of global builder
         *self.builder.block_mut() = saved_bb;
@@ -426,19 +404,20 @@ impl<'a> FunctionCodeGenerator<'a> {
 
     fn generate_load(&mut self, val: &AST) -> Result<(Value, Type)> {
         let (val, ty) = self.generate(val)?;
-        if let types::Type::Pointer(id) = val.get_type() {
-            let inner = *self
-                .builder
-                .module()
-                .unwrap()
-                .types
-                .compound_ty(id)
-                .as_pointer();
-            match inner {
-                types::Type::Array(_) => Ok((val, {
-                    let inner = self.compound_types[ty].inner_ty();
-                    self.compound_types.pointer(inner)
-                })),
+        if let Type::Pointer(id) = ty {
+            let inner = self.compound_types[id].as_pointer();
+            if !inner.is_compound() {
+                return Ok((
+                    self.builder.build_load(val),
+                    self.compound_types[ty].inner_ty(),
+                ));
+            }
+            match self.compound_types[inner] {
+                CompoundType::Array { inner, .. } => Ok((
+                    self.builder
+                        .build_gep(val, vec![Value::new_imm_int32(0), Value::new_imm_int32(0)]),
+                    self.compound_types.pointer(inner),
+                )),
                 _ => Ok((
                     self.builder.build_load(val),
                     self.compound_types[ty].inner_ty(),
@@ -488,7 +467,7 @@ impl<'a> FunctionCodeGenerator<'a> {
             return self.generate_int_binary_op(conv_ty, op, lhs, rhs);
         }
 
-        panic!()
+        panic!("{:?}", conv_ty)
     }
 
     fn generate_int_binary_op(
@@ -522,27 +501,14 @@ impl<'a> FunctionCodeGenerator<'a> {
 
     fn generate_ptr_binary_op(
         &mut self,
-        mut ty: Type,
+        ty: Type,
         op: ast::BinaryOp,
         lhs: Value,
         rhs: Value,
     ) -> Result<(Value, Type)> {
-        let inner = self.compound_types[ty].as_pointer();
-        let is_array = inner.is_compound()
-            && if let CompoundType::Array { inner, .. } = self.compound_types[inner] {
-                ty = self.compound_types.pointer(inner);
-                true
-            } else {
-                false
-            };
         match op {
-            ast::BinaryOp::Add if is_array => Ok((
-                self.builder
-                    .build_gep(lhs, vec![Value::new_imm_int32(0), rhs]),
-                ty,
-            )),
             ast::BinaryOp::Add => Ok((self.builder.build_gep(lhs, vec![rhs]), ty)),
-            _ => unimplemented!(),
+            e => unimplemented!("{:?}", e),
         }
     }
 
@@ -601,7 +567,8 @@ impl<'a> FunctionCodeGenerator<'a> {
                     .variables
                     .find_var(name.as_str())
                     .ok_or_else(|| Error::Message(f.loc, "variable not found".to_string()))?;
-                let ret = self.compound_types[var.ty].as_func().0;
+                let i = self.compound_types[var.ty].as_pointer();
+                let ret = self.compound_types[i].as_func().0;
                 Ok((self.builder.build_call(var.val, args_), ret))
             }
             _ => unimplemented!(),

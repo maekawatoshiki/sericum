@@ -37,6 +37,7 @@ pub enum Type {
     // Enum,                                // as same as Int
 }
 
+#[derive(Debug)]
 pub enum CompoundType {
     Pointer {
         inner: Type,
