@@ -490,6 +490,14 @@ impl<'a> FunctionCodeGenerator<'a> {
                 self.builder.build_icmp(ICmpKind::Lt, lhs, rhs),
                 Type::Int(Sign::Signed),
             )),
+            ast::BinaryOp::Gt => Ok((
+                self.builder.build_icmp(ICmpKind::Gt, lhs, rhs),
+                Type::Int(Sign::Signed),
+            )),
+            ast::BinaryOp::Ge => Ok((
+                self.builder.build_icmp(ICmpKind::Ge, lhs, rhs),
+                Type::Int(Sign::Signed),
+            )),
             ast::BinaryOp::Add => Ok((self.builder.build_add(lhs, rhs), ty)),
             ast::BinaryOp::Sub => Ok((self.builder.build_sub(lhs, rhs), ty)),
             ast::BinaryOp::Mul => Ok((self.builder.build_mul(lhs, rhs), ty)),

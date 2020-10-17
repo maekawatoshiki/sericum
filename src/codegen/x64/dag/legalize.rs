@@ -161,6 +161,7 @@ impl Legalize {
                     (ir.Mul z, u) y {
                         imm32 u => (mi.MOVrm32 [AddressAlignOff g, u, z]) } }
                 GR64 x {
+                    imm32 y => (mi.MOVrm32 [BaseOff x, y])
                     (ir.Mul z, u) y {
                         imm32 u => (mi.MOVrm32 [BaseAlignOff x, u, (ir.RegClass z):i64]) } }
             }
