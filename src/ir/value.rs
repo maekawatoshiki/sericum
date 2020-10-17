@@ -107,6 +107,18 @@ impl Value {
         Self::Function(f)
     }
 
+    pub fn null(ty: Type) -> Self {
+        match ty {
+            Type::Void => Value::None,
+            Type::i1 => Value::Immediate(ImmediateValue::Int8(0)),
+            Type::i8 => Value::Immediate(ImmediateValue::Int8(0)),
+            Type::i32 => Value::Immediate(ImmediateValue::Int32(0)),
+            Type::i64 => Value::Immediate(ImmediateValue::Int64(0)),
+            Type::f64 => Value::Immediate(ImmediateValue::F64(0.0)),
+            _ => todo!(),
+        }
+    }
+
     pub fn get_type(&self) -> Type {
         match self {
             Value::Argument(ArgumentValue { ty, .. }) => *ty,

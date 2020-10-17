@@ -348,6 +348,10 @@ impl<'a> Mem2RegOnFunction<'a> {
 
                         *incoming_val = *val;
                     } else {
+                        if !incoming.contains_key(alloca_id) {
+                            let ty = *self.cur_func.inst_table[*alloca_id].operands[0].as_type();
+                            incoming.insert(*alloca_id, Operand::Value(Value::null(ty)));
+                        }
                         let incoming_val = incoming.get_mut(alloca_id).unwrap();
                         let ty = self
                             .cur_func
