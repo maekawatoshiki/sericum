@@ -44,8 +44,11 @@ pub enum Error {
 
 impl<'a> Codegenerator<'a> {
     pub fn new(compound_types: &'a mut CompoundTypes) -> Self {
+        let mut module = Module::new("cilk");
+        let ptr_i64 = module.types.new_pointer_ty(types::Type::i64);
+        module.create_function("memcpy", ptr_i64, vec![ptr_i64, ptr_i64, types::Type::i32]);
         Self {
-            module: Module::new("cilkcc"),
+            module,
             variables: Variables::new(),
             compound_types,
         }
@@ -195,6 +198,7 @@ impl<'a> FunctionCodeGenerator<'a> {
                 Ok((Value::new_imm_int32(*n as i32), Type::Int(Sign::Signed)))
             }
             ast::Kind::String(s) => self.generate_string(s),
+            ast::Kind::ConstArray(ty, elems) => self.generate_const_array(ty, elems),
             ast::Kind::FieldRef(val, name) => self.generate_field_ref(val, name),
             ast::Kind::VariableDecl(ty, name, sclass, val) => {
                 self.generate_var_decl(*ty, name, *sclass, val.as_ref().map(|v| &**v))
@@ -329,6 +333,26 @@ impl<'a> FunctionCodeGenerator<'a> {
         Ok((gep, self.compound_types.pointer(Type::Char(Sign::Signed))))
     }
 
+    fn generate_const_array(&mut self, ty: &Type, elems: &Vec<AST>) -> Result<(Value, Type)> {
+        let mut elems_ = vec![];
+        for e in elems {
+            elems_.push(ConstantKind::Immediate(*self.generate(e)?.0.as_imm()));
+        }
+        use cilk::ir::constant_pool::{Constant, ConstantKind};
+        let cilk_ty = ty.conv(self.compound_types, &self.builder.module().unwrap().types);
+        let id = self.builder.module_mut().unwrap().const_pool.add(Constant {
+            ty: cilk_ty,
+            kind: ConstantKind::Array(elems_),
+        });
+        Ok((
+            Value::Constant(value::ConstantValue {
+                id,
+                ty: self.builder.module().unwrap().types.new_pointer_ty(cilk_ty),
+            }),
+            *ty,
+        ))
+    }
+
     fn generate_field_ref(&mut self, val: &AST, name: &String) -> Result<(Value, Type)> {
         let (val, ty) = self.generate(retrieve_from_load(val))?;
         let ty = self.compound_types[ty].inner_ty();
@@ -388,8 +412,37 @@ impl<'a> FunctionCodeGenerator<'a> {
         self.builder.set_insert_point_at_end_of_current_block();
 
         if let Some(val) = val {
-            let val = self.generate(val)?.0;
-            self.builder.build_store(val, alloca);
+            if let ast::Kind::ConstArray(_, _) = val.kind {
+                let (val, ty) = self.generate(val)?;
+                let ty = ty.conv(&self.compound_types, &self.builder.module().unwrap().types);
+                let gep = self
+                    .builder
+                    .build_gep(val, vec![Value::new_imm_int32(0), Value::new_imm_int32(0)]);
+                let func_id = self
+                    .builder
+                    .module()
+                    .unwrap()
+                    .find_function("memcpy")
+                    .unwrap();
+                let memcpy = Value::Function(value::FunctionValue {
+                    func_id,
+                    ty: self.builder.module().unwrap().functions[func_id].ty,
+                });
+                use cilk::ir::types::TypeSize;
+                self.builder.build_call(
+                    memcpy,
+                    vec![
+                        alloca,
+                        gep,
+                        Value::new_imm_int32(
+                            ty.size_in_byte(&self.builder.module().unwrap().types) as i32,
+                        ),
+                    ],
+                );
+            } else {
+                let val = self.generate(val)?.0;
+                self.builder.build_store(val, alloca);
+            }
         }
 
         Ok((Value::None, Type::Void))

@@ -6,7 +6,7 @@ use crate::codegen::common::machine::{
     function::{InstIter, MachineFunction},
     module::MachineModule,
 };
-use crate::ir::{global_val::GlobalVariableId, types::TypeSize};
+use crate::ir::{global_val::GlobalVariableId, types::TypeSize, value::ImmediateValue};
 use rustc_hash::FxHashMap;
 
 pub struct MachineAsmPrinter {
@@ -37,20 +37,28 @@ impl MachineAsmPrinter {
         }
 
         for (id, c) in &m.const_pool.arena {
-            // let size = g.ty.size_in_byte(&m.types);
-            // let align = g.ty.align_in_byte(&m.types);
             use crate::ir::constant_pool;
-            self.output.push_str(
-                format!(
-                    ".L_const_{}:\n  .string \"{}\"\n",
-                    id.index(),
-                    match &c.kind {
-                        constant_pool::ConstantKind::String(s) => s.as_str(),
+            match &c.kind {
+                constant_pool::ConstantKind::Array(e) => {
+                    self.output
+                        .push_str(format!(".L_const_{}:\n", id.index()).as_str());
+                    for e in e {
+                        match e {
+                            constant_pool::ConstantKind::Immediate(ImmediateValue::Int32(i)) => {
+                                self.output.push_str(format!("  .long {}\n", i).as_str())
+                            }
+                            _ => todo!(),
+                        }
                     }
-                )
-                .as_str(),
-            );
-            // self.id_to_global_name.insert(id, g.name.clone());
+                }
+                constant_pool::ConstantKind::String(s) => {
+                    self.output.push_str(
+                        format!(".L_const_{}:\n  .string \"{}\"\n", id.index(), s.as_str())
+                            .as_str(),
+                    );
+                }
+                constant_pool::ConstantKind::Immediate(_) => {}
+            }
         }
 
         for (_, func) in &m.functions {

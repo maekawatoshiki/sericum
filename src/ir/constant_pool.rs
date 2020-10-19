@@ -1,4 +1,5 @@
 use super::types::{Type, Types};
+use super::value::ImmediateValue;
 use id_arena::{Arena, Id};
 use std::fmt;
 
@@ -19,6 +20,8 @@ pub struct Constant {
 #[derive(Clone)]
 pub enum ConstantKind {
     String(String),
+    Array(Vec<ConstantKind>),
+    Immediate(ImmediateValue),
 }
 
 impl ConstantPool {
@@ -53,6 +56,14 @@ impl fmt::Debug for ConstantKind {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::String(s) => write!(f, "\"{}\"", s),
+            Self::Array(es) => {
+                write!(f, "{{")?;
+                for e in es {
+                    write!(f, "{:?},", e)?
+                }
+                Ok(())
+            }
+            Self::Immediate(i) => write!(f, "{:?}", i),
         }
     }
 }

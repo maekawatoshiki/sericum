@@ -381,8 +381,62 @@ impl<'a> Parser<'a> {
         todo!()
     }
 
-    fn read_initializer_list(&mut self, _ty: &mut Type) -> Result<AST> {
-        todo!()
+    fn read_array_initializer(&mut self, ty: &mut Type) -> Result<AST> {
+        let has_brace = lexer!(self, skip_symbol(Symbol::OpeningBrace));
+        let (inner, len) = if let CompoundType::Array { inner, len } = self.compound_types[*ty] {
+            (inner, len)
+        } else {
+            panic!()
+        };
+        let is_flexible = len < 0;
+        let mut elems = vec![];
+        let mut elem_ty = inner;
+        let loc = lexer!(self, peek_token()).loc;
+        loop {
+            let tok = lexer!(self, get_token());
+            if let token::Kind::Symbol(Symbol::ClosingBrace) = tok.kind {
+                if !has_brace {
+                    self.lexer.unget(tok)
+                }
+                break;
+            }
+            self.lexer.unget(tok);
+            let elem = self.read_initializer_elem(&mut elem_ty)?;
+            elems.push(elem);
+            lexer!(self, skip_symbol(Symbol::Comma));
+        }
+        if is_flexible {
+            let len = &mut self.compound_types[*ty].as_array().1;
+            *len = elems.len() as i32;
+        }
+        Ok(AST::new(ast::Kind::ConstArray(*ty, elems), loc))
+    }
+
+    fn read_initializer_elem(&mut self, ty: &mut Type) -> Result<AST> {
+        if matches!(ty, Type::Array(_) | Type::Struct(_) | Type::Union(_)) {
+            self.read_initializer_list(ty)
+        } else if lexer!(self, peek_token()).kind == token::Kind::Symbol(Symbol::OpeningBrace) {
+            let elem = self.read_initializer_elem(ty);
+            lexer!(self, expect_skip_symbol(Symbol::ClosingBrace));
+            elem
+        } else {
+            self.read_assign()
+        }
+    }
+
+    fn read_initializer_list(&mut self, ty: &mut Type) -> Result<AST> {
+        if self.is_string(ty) {
+            let tok = lexer!(self, get_token());
+            if let token::Kind::String(s) = tok.kind {
+                return self.read_string_initializer(ty, s);
+            }
+            self.lexer.unget(tok)
+        }
+        match ty {
+            Type::Array(_) => self.read_array_initializer(ty),
+            Type::Struct(_) | Type::Union(_) => todo!(),
+            _ => self.read_assign(),
+        }
     }
 
     fn read_declarator(&mut self, base: Type) -> Result<(Type, String, Vec<String>)> {

@@ -23,6 +23,7 @@ pub enum Kind {
     Float(f64),
     Char(char),
     String(String),
+    ConstArray(Type, Vec<AST>),
     Typedef(Type, String),
     UnaryOp(UnaryOp, Box<AST>),
     BinaryOp(BinaryOp, Box<AST>, Box<AST>),
