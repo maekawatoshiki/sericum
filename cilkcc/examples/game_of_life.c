@@ -70,7 +70,7 @@ int game()
 }
  
 int main() {
-  srand(13);
+  // srand(13);
 	game();
   return 0;
 }

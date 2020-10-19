@@ -4,6 +4,7 @@ pub mod codegen_prepare;
 pub mod const_folding;
 pub mod constant_pool;
 pub mod cse;
+pub mod dce;
 pub mod function;
 pub mod global_val;
 pub mod inst_combine;
