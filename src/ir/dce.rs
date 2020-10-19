@@ -1,14 +1,9 @@
-use crate::analysis::dom_tree::{DominatorTree, DominatorTreeConstructor};
 use crate::ir::{
-    basic_block::{BasicBlock, BasicBlockId},
     function::Function,
     module::Module,
     opcode::{Instruction, InstructionId, Opcode, Operand},
     value::{InstructionValue, Value},
 };
-// use crate::traits::basic_block::*;
-use id_arena::Arena;
-use rustc_hash::{FxHashMap, FxHashSet};
 
 pub struct DeadCodeElimination {}
 
