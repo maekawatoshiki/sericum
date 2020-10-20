@@ -6,7 +6,9 @@ use crate::codegen::common::machine::{
     function::{InstIter, MachineFunction},
     module::MachineModule,
 };
-use crate::ir::{global_val::GlobalVariableId, types::TypeSize, value::ImmediateValue};
+use crate::ir::{
+    constant_pool, global_val::GlobalVariableId, types::TypeSize, value::ImmediateValue,
+};
 use rustc_hash::FxHashMap;
 
 pub struct MachineAsmPrinter {
@@ -36,26 +38,34 @@ impl MachineAsmPrinter {
             self.id_to_global_name.insert(id, g.name.clone());
         }
 
-        for (id, c) in &m.const_pool.arena {
-            use crate::ir::constant_pool;
-            match &c.kind {
-                constant_pool::ConstantKind::Array(e) => {
-                    self.output
-                        .push_str(format!(".L_const_{}:\n", id.index()).as_str());
-                    for e in e {
-                        match e {
-                            constant_pool::ConstantKind::Immediate(ImmediateValue::Int32(i)) => {
-                                self.output.push_str(format!("  .long {}\n", i).as_str())
-                            }
-                            _ => todo!(),
-                        }
+        fn f(output: &mut String, kind: &constant_pool::ConstantKind) {
+            match kind {
+                constant_pool::ConstantKind::Array(elems) => {
+                    for e in elems {
+                        f(output, e)
                     }
                 }
                 constant_pool::ConstantKind::String(s) => {
-                    self.output.push_str(
-                        format!(".L_const_{}:\n  .string \"{}\"\n", id.index(), s.as_str())
-                            .as_str(),
-                    );
+                    output.push_str(format!("  .string \"{}\"\n", s).as_str())
+                }
+                constant_pool::ConstantKind::Immediate(ImmediateValue::Int32(i)) => {
+                    output.push_str(format!("  .long {}\n", i).as_str())
+                }
+                _ => todo!(),
+            }
+        }
+
+        for (id, c) in &m.const_pool.arena {
+            match &c.kind {
+                constant_pool::ConstantKind::Array(_e) => {
+                    self.output
+                        .push_str(format!(".L_const_{}:\n", id.index()).as_str());
+                    f(&mut self.output, &c.kind)
+                }
+                constant_pool::ConstantKind::String(_s) => {
+                    self.output
+                        .push_str(format!(".L_const_{}:\n", id.index()).as_str());
+                    f(&mut self.output, &c.kind)
                 }
                 constant_pool::ConstantKind::Immediate(_) => {}
             }

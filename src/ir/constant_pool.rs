@@ -61,7 +61,7 @@ impl fmt::Debug for ConstantKind {
                 for e in es {
                     write!(f, "{:?},", e)?
                 }
-                Ok(())
+                write!(f, "}}")
             }
             Self::Immediate(i) => write!(f, "{:?}", i),
         }

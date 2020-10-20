@@ -334,11 +334,35 @@ impl<'a> FunctionCodeGenerator<'a> {
     }
 
     fn generate_const_array(&mut self, ty: &Type, elems: &Vec<AST>) -> Result<(Value, Type)> {
-        let mut elems_ = vec![];
-        for e in elems {
-            elems_.push(ConstantKind::Immediate(*self.generate(e)?.0.as_imm()));
-        }
+        // TODO: Refactoring
         use cilk::ir::constant_pool::{Constant, ConstantKind};
+
+        fn f(compound_types: &mut CompoundTypes, elem: &AST) -> ConstantKind {
+            match &elem.kind {
+                ast::Kind::ConstArray(ty, elems) => {
+                    let (inner, len) = compound_types[*ty].as_array();
+                    let mut elems_ = vec![];
+                    for elem in elems {
+                        elems_.push(f(compound_types, elem))
+                    }
+                    while elems_.len() < len as usize {
+                        assert!(inner == Type::Int(Sign::Signed));
+                        elems_.push(ConstantKind::Immediate(value::ImmediateValue::Int32(0)))
+                    }
+                    ConstantKind::Array(elems_)
+                }
+                ast::Kind::Int { n, bits: 32 } => {
+                    ConstantKind::Immediate(value::ImmediateValue::Int32(*n as i32))
+                }
+                _ => todo!(),
+            }
+        }
+
+        let mut elems_ = vec![];
+        for elem in elems {
+            elems_.push(f(&mut self.compound_types, elem));
+        }
+
         let cilk_ty = ty.conv(self.compound_types, &self.builder.module().unwrap().types);
         let id = self.builder.module_mut().unwrap().const_pool.add(Constant {
             ty: cilk_ty,
