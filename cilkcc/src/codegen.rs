@@ -201,6 +201,10 @@ impl<'a> FunctionCodeGenerator<'a> {
                 Ok((Value::new_imm_int32(*n as i32), Type::Int(Sign::Signed)))
             }
             ast::Kind::String(s) => self.generate_string(s),
+            ast::Kind::Char(c) => Ok((
+                Value::new_imm_int32(*c as u8 as i32),
+                Type::Int(Sign::Signed),
+            )),
             ast::Kind::ConstArray(ty, elems) => self.generate_const_array(ty, elems),
             ast::Kind::FieldRef(val, name) => self.generate_field_ref(val, name),
             ast::Kind::VariableDecl(ty, name, sclass, val) => {
@@ -585,6 +589,10 @@ impl<'a> FunctionCodeGenerator<'a> {
         match op {
             ast::BinaryOp::Eq => Ok((
                 self.builder.build_icmp(ICmpKind::Eq, lhs, rhs),
+                Type::Int(Sign::Signed),
+            )),
+            ast::BinaryOp::Ne => Ok((
+                self.builder.build_icmp(ICmpKind::Ne, lhs, rhs),
                 Type::Int(Sign::Signed),
             )),
             ast::BinaryOp::Le => Ok((

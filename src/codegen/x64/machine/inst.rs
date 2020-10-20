@@ -75,6 +75,7 @@ impl MachineOpcode {
     pub fn flip_conditional_jmp(&self) -> Option<Self> {
         match self {
             MachineOpcode::JE => Some(Self::JNE),
+            MachineOpcode::JNE => Some(Self::JE),
             MachineOpcode::JL => Some(Self::JGE),
             MachineOpcode::JLE => Some(Self::JG),
             MachineOpcode::JG => Some(Self::JLE),
@@ -97,6 +98,7 @@ impl MachineInst {
         match self.opcode {
             MachineOpcode::JMP
             | MachineOpcode::JE
+            | MachineOpcode::JNE
             | MachineOpcode::JL
             | MachineOpcode::JLE
             | MachineOpcode::JG

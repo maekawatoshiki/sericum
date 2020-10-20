@@ -212,6 +212,7 @@ impl BranchFolding {
                 }
 
                 if inst.opcode.is_conditional_jmp() {
+                    println!("{:?}", inst);
                     let dst = inst.get_jmp_dst().unwrap();
                     // If we jump to the next block conditionally, flip the jump condition.
                     if i + 1 < order.len() && dst == order[i + 1] {

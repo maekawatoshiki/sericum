@@ -942,7 +942,7 @@ impl<'a> Parser<'a> {
         let mut lhs = self.read_relation()?;
         loop {
             if lexer!(self, skip_symbol(Symbol::Eq)) {
-                let rhs = self.read_primary()?;
+                let rhs = self.read_relation()?;
                 lhs = AST::new(
                     ast::Kind::BinaryOp(ast::BinaryOp::Eq, Box::new(lhs), Box::new(rhs)),
                     self.lexer.loc(),
