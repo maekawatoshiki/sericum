@@ -132,6 +132,12 @@ impl Module {
         })
     }
 
+    pub fn create_constant(&mut self, c: Constant) -> value::Value {
+        let ty = self.types.new_pointer_ty(c.ty);
+        let id = self.const_pool.add(c);
+        value::Value::Constant(value::ConstantValue { ty, id })
+    }
+
     pub fn dump<T: DumpToString>(&self, obj: T) -> String {
         obj.dump(self)
     }

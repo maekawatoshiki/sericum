@@ -20,8 +20,14 @@ pub struct Constant {
 #[derive(Clone)]
 pub enum ConstantKind {
     String(String),
-    Array(Vec<ConstantKind>),
+    Array(Vec<ConstantArrayElement>),
+}
+
+#[derive(Clone)]
+pub enum ConstantArrayElement {
+    String(ConstantId),
     Immediate(ImmediateValue),
+    Array(Vec<ConstantArrayElement>),
 }
 
 impl ConstantPool {
@@ -56,6 +62,21 @@ impl fmt::Debug for ConstantKind {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::String(s) => write!(f, "\"{}\"", s),
+            Self::Array(es) => {
+                write!(f, "{{")?;
+                for e in es {
+                    write!(f, "{:?},", e)?
+                }
+                write!(f, "}}")
+            }
+        }
+    }
+}
+
+impl fmt::Debug for ConstantArrayElement {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Self::String(id) => write!(f, "@const.{}", id.index()),
             Self::Array(es) => {
                 write!(f, "{{")?;
                 for e in es {

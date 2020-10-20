@@ -6,6 +6,7 @@ use super::{
 };
 use cilk::ir::{
     builder::{IRBuilder, IRBuilderWithModuleAndFuncId},
+    constant_pool::{Constant, ConstantArrayElement, ConstantKind},
     module::Module,
     opcode::ICmpKind,
     opcode::Opcode,
@@ -45,8 +46,10 @@ pub enum Error {
 impl<'a> Codegenerator<'a> {
     pub fn new(compound_types: &'a mut CompoundTypes) -> Self {
         let mut module = Module::new("cilk");
-        let ptr_i64 = module.types.new_pointer_ty(types::Type::i64);
-        module.create_function("memcpy", ptr_i64, vec![ptr_i64, ptr_i64, types::Type::i32]);
+        {
+            let ptr_i64 = module.types.new_pointer_ty(types::Type::i64);
+            module.create_function("memcpy", ptr_i64, vec![ptr_i64, ptr_i64, types::Type::i32]);
+        }
         Self {
             module,
             variables: Variables::new(),
@@ -333,48 +336,73 @@ impl<'a> FunctionCodeGenerator<'a> {
         Ok((gep, self.compound_types.pointer(Type::Char(Sign::Signed))))
     }
 
-    fn generate_const_array(&mut self, ty: &Type, elems: &Vec<AST>) -> Result<(Value, Type)> {
+    fn generate_const_array(
+        &mut self,
+        array_ty: &Type,
+        elements: &Vec<AST>,
+    ) -> Result<(Value, Type)> {
         // TODO: Refactoring
-        use cilk::ir::constant_pool::{Constant, ConstantKind};
 
-        fn f(compound_types: &mut CompoundTypes, elem: &AST) -> ConstantKind {
-            match &elem.kind {
-                ast::Kind::ConstArray(ty, elems) => {
-                    let (inner, len) = compound_types[*ty].as_array();
-                    let mut elems_ = vec![];
-                    for elem in elems {
-                        elems_.push(f(compound_types, elem))
+        fn conv(
+            compound_types: &mut CompoundTypes,
+            module: &mut Module,
+            element: &AST,
+        ) -> ConstantArrayElement {
+            match &element.kind {
+                ast::Kind::ConstArray(array_ty, elements) => {
+                    let (inner, len) = compound_types[*array_ty].as_array();
+                    let mut new_elements = vec![];
+                    for element in elements {
+                        new_elements.push(conv(compound_types, module, element))
                     }
-                    while elems_.len() < len as usize {
+                    while new_elements.len() < len as usize {
                         assert!(inner == Type::Int(Sign::Signed));
-                        elems_.push(ConstantKind::Immediate(value::ImmediateValue::Int32(0)))
+                        new_elements.push(ConstantArrayElement::Immediate(
+                            value::ImmediateValue::Int32(0),
+                        ))
                     }
-                    ConstantKind::Array(elems_)
+                    ConstantArrayElement::Array(new_elements)
                 }
                 ast::Kind::Int { n, bits: 32 } => {
-                    ConstantKind::Immediate(value::ImmediateValue::Int32(*n as i32))
+                    ConstantArrayElement::Immediate(value::ImmediateValue::Int32(*n as i32))
+                }
+                ast::Kind::String(s) => {
+                    let i8_arr = module.types.new_array_ty(types::Type::i8, s.len() + 1);
+                    let id = module.const_pool.add(Constant {
+                        kind: ConstantKind::String(s.to_string()),
+                        ty: i8_arr,
+                    });
+                    ConstantArrayElement::String(id)
                 }
                 _ => todo!(),
             }
         }
 
-        let mut elems_ = vec![];
-        for elem in elems {
-            elems_.push(f(&mut self.compound_types, elem));
+        let (inner, len) = self.compound_types[*array_ty].as_array();
+        let mut new_elements = vec![];
+        for element in elements {
+            new_elements.push(conv(
+                &mut self.compound_types,
+                &mut self.builder.module_mut().unwrap(),
+                element,
+            ));
+        }
+        while new_elements.len() < len as usize {
+            assert!(inner == Type::Int(Sign::Signed)); // TODO
+            new_elements.push(ConstantArrayElement::Immediate(
+                value::ImmediateValue::Int32(0),
+            ))
         }
 
-        let cilk_ty = ty.conv(self.compound_types, &self.builder.module().unwrap().types);
-        let id = self.builder.module_mut().unwrap().const_pool.add(Constant {
-            ty: cilk_ty,
-            kind: ConstantKind::Array(elems_),
-        });
-        Ok((
-            Value::Constant(value::ConstantValue {
-                id,
-                ty: self.builder.module().unwrap().types.new_pointer_ty(cilk_ty),
-            }),
-            *ty,
-        ))
+        let kind = ConstantKind::Array(new_elements);
+        let cilk_ty = array_ty.conv(self.compound_types, &self.builder.module().unwrap().types);
+        let val = self
+            .builder
+            .module_mut()
+            .unwrap()
+            .create_constant(Constant { ty: cilk_ty, kind });
+
+        Ok((val, *array_ty))
     }
 
     fn generate_field_ref(&mut self, val: &AST, name: &String) -> Result<(Value, Type)> {

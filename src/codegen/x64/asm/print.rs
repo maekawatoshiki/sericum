@@ -38,17 +38,17 @@ impl MachineAsmPrinter {
             self.id_to_global_name.insert(id, g.name.clone());
         }
 
-        fn f(output: &mut String, kind: &constant_pool::ConstantKind) {
+        fn f(output: &mut String, kind: &constant_pool::ConstantArrayElement) {
             match kind {
-                constant_pool::ConstantKind::Array(elems) => {
+                constant_pool::ConstantArrayElement::Array(elems) => {
                     for e in elems {
                         f(output, e)
                     }
                 }
-                constant_pool::ConstantKind::String(s) => {
-                    output.push_str(format!("  .string \"{}\"\n", s).as_str())
+                constant_pool::ConstantArrayElement::String(id) => {
+                    output.push_str(format!("  .quad .L_const_{}\n", id.index()).as_str())
                 }
-                constant_pool::ConstantKind::Immediate(ImmediateValue::Int32(i)) => {
+                constant_pool::ConstantArrayElement::Immediate(ImmediateValue::Int32(i)) => {
                     output.push_str(format!("  .long {}\n", i).as_str())
                 }
                 _ => todo!(),
@@ -57,17 +57,19 @@ impl MachineAsmPrinter {
 
         for (id, c) in &m.const_pool.arena {
             match &c.kind {
-                constant_pool::ConstantKind::Array(_e) => {
+                constant_pool::ConstantKind::Array(elems) => {
                     self.output
                         .push_str(format!(".L_const_{}:\n", id.index()).as_str());
-                    f(&mut self.output, &c.kind)
+                    for elem in elems {
+                        f(&mut self.output, elem);
+                    }
                 }
-                constant_pool::ConstantKind::String(_s) => {
+                constant_pool::ConstantKind::String(s) => {
                     self.output
                         .push_str(format!(".L_const_{}:\n", id.index()).as_str());
-                    f(&mut self.output, &c.kind)
+                    self.output
+                        .push_str(format!("  .string \"{}\"\n", s).as_str())
                 }
-                constant_pool::ConstantKind::Immediate(_) => {}
             }
         }
 
