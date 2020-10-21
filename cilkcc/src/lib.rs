@@ -107,6 +107,7 @@ fn assemble_and_run(s_target: &str) {
         .unwrap();
     if let Some(code) = execution.code() {
         println!("Exit code: {:?}", code);
+        assert!(code == 0);
     } else {
         assert!(execution.success());
     }

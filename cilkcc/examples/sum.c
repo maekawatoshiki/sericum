@@ -1,3 +1,5 @@
+#include "assert.h"
+
 int main() {
   int i, sum;
   i = 0; sum = 0;
@@ -5,5 +7,6 @@ int main() {
     sum += i;
     i += 1;
   }
-  return sum;
+  assert(sum == 55);
+  return 0;
 }

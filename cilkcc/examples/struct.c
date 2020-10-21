@@ -1,3 +1,5 @@
+#include "assert.h"
+
 int main() {
   typedef struct {
     int x, y, z;
@@ -9,5 +11,6 @@ int main() {
   b.x=3;
   c[1][1].z=4;
   c[0][1].y=1;
-  return b.x+a[0].y+c[1][1].z+c[0][1].y;
+  assert(b.x+a[0].y+c[1][1].z+c[0][1].y == 9);
+  return 0;
 }
