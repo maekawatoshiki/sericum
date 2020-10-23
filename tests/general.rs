@@ -2,7 +2,7 @@
 mod x86_64 {
     use cilk::{
         codegen::x64::exec,
-        ir::builder::IRBuilder,
+        ir::prelude::*,
         // exec::{interpreter::interp, jit::x64::compiler},
         ir::{builder, opcode, types, value},
         *,

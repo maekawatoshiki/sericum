@@ -5,13 +5,11 @@ use super::{
     types::{CompoundType, CompoundTypes, Sign, StorageClass, Type, TypeConversion},
 };
 use cilk::ir::{
-    builder::{IRBuilder, IRBuilderWithModuleAndFuncId},
+    builder::IRBuilderWithModuleAndFuncId,
     constant_pool::{Constant, ConstantArrayElement, ConstantKind},
-    module::Module,
     opcode::ICmpKind,
-    opcode::Opcode,
+    prelude::*,
     types, value,
-    value::Value,
 };
 use rustc_hash::FxHashMap;
 use std::result;
