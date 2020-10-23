@@ -4,10 +4,14 @@ A small C compiler powered by cilk
 
 # Todo
 
-[ ] Add tests 
+- [x] Add tests 
+- [ ] Implement remaining C features
 
 # Run
 
 ```
-cargo run --release examples/fibo.c
+# test
+cargo test
+# run 
+cargo run --release your.code.c
 ```
