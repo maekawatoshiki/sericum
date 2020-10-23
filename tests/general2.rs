@@ -3,9 +3,7 @@ mod x86_64 {
     use cilk::{
         cilk_ir,
         codegen::x64::{asm::print::MachineAsmPrinter, standard_conversion_into_machine_module},
-        ir::{builder, global_val, types, value},
-        module::Module,
-        *, // for macro
+        ir::prelude::*,
     };
     use std::{
         fs,
@@ -72,7 +70,7 @@ mod x86_64 {
 
     #[test]
     fn test_string() {
-        let mut m = module::Module::new("cilk");
+        let mut m = Module::new("cilk");
         let s = m.create_string("hello".to_string());
 
         let _func = cilk_ir!(m; define [ptr i8] test [] {

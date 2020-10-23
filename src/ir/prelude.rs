@@ -1,4 +1,4 @@
 pub use super::{
-    builder::IRBuilder, function, function::Function, module::Module, opcode::Opcode, types::Type,
-    value::Value,
+    builder, builder::IRBuilder, function, function::Function, global_val, module::Module, opcode,
+    opcode::Opcode, types, types::Type, value, value::Value,
 };

@@ -1,25 +1,16 @@
 #[cfg(feature = "x86_64")]
 mod x86_64 {
-    use cilk::{
-        codegen::x64::exec,
-        ir::prelude::*,
-        // exec::{interpreter::interp, jit::x64::compiler},
-        ir::{builder, opcode, types, value},
-        *,
-    };
+    use cilk::{cilk_ir, codegen::x64::exec, ir, ir::prelude::*};
 
     #[test]
     fn test0_mem2reg() {
-        let mut m = module::Module::new("cilk");
+        let mut m = Module::new("cilk");
 
         let func = cilk_ir!(m; define [i32] func [] {
         entry:
             i = alloca i32;
             store (i32 3), (%i);
             li = load (%i);
-            // tmp = add (%li), (i32 2);
-            // store (%tmp), (%i);
-            // li = load (%i);
             ret (%li);
         });
 
@@ -34,7 +25,7 @@ mod x86_64 {
 
     #[test]
     fn test1_mem2reg() {
-        let mut m = module::Module::new("cilk");
+        let mut m = Module::new("cilk");
 
         let func = cilk_ir!(m; define [i32] func [] {
         entry:
@@ -64,7 +55,7 @@ mod x86_64 {
 
     #[test]
     fn test2_mem2reg() {
-        let mut m = module::Module::new("cilk");
+        let mut m = Module::new("cilk");
 
         let func = cilk_ir!(m; define [i32] func [] {
         entry:
@@ -91,7 +82,7 @@ mod x86_64 {
 
     #[test]
     fn test3_mem2reg() {
-        let mut m = module::Module::new("cilk");
+        let mut m = Module::new("cilk");
 
         let func = cilk_ir!(m; define [i32] func [(i32)] {
         entry:
@@ -124,7 +115,7 @@ mod x86_64 {
 
     #[test]
     fn test4_mem2reg() {
-        let mut m = module::Module::new("cilk");
+        let mut m = Module::new("cilk");
 
         let func = cilk_ir!(m; define [i32] func [(i32)] {
         entry:
@@ -168,7 +159,7 @@ mod x86_64 {
 
     #[test]
     fn pointer() {
-        let mut m = module::Module::new("cilk");
+        let mut m = Module::new("cilk");
 
         let ptr_i32_ty = m.types.new_pointer_ty(types::Type::i32);
         let cilk_memset_i32 = m.create_function(
@@ -198,7 +189,7 @@ mod x86_64 {
 
     #[test]
     fn pointer2() {
-        let mut m = module::Module::new("cilk");
+        let mut m = Module::new("cilk");
 
         cilk_ir!(m; define [i32] main [] {
         entry:
@@ -220,7 +211,7 @@ mod x86_64 {
 
     #[test]
     fn pointer3() {
-        let mut m = module::Module::new("cilk");
+        let mut m = Module::new("cilk");
 
         cilk_ir!(m; define [void] func [(ptr i32)] {
         entry:
@@ -247,7 +238,7 @@ mod x86_64 {
 
     #[test]
     fn phi() {
-        let mut m = module::Module::new("cilk");
+        let mut m = Module::new("cilk");
 
         let _ = cilk_ir!(m; define [i32] func [(i32)] {
             entry:
@@ -277,7 +268,7 @@ mod x86_64 {
 
     #[test]
     fn arr_2d() {
-        let mut m = module::Module::new("cilk");
+        let mut m = Module::new("cilk");
 
         // Internal function must be defined before you use it
 
@@ -341,7 +332,7 @@ mod x86_64 {
 
     #[test]
     fn jit_executor1() {
-        let mut m = module::Module::new("cilk");
+        let mut m = Module::new("cilk");
 
         // Internal function must be defined before you use it
         let cilk_println_i32 = m.create_function(
@@ -421,7 +412,7 @@ mod x86_64 {
 
     #[test]
     fn jit_executor2() {
-        let mut m = module::Module::new("cilk");
+        let mut m = Module::new("cilk");
 
         // Internal function must be defined before you use it
         let cilk_println_i32 = m.create_function(
@@ -481,7 +472,7 @@ mod x86_64 {
     fn fibo() {
         use cilk::codegen::x64::standard_conversion_into_machine_module;
 
-        let mut m = module::Module::new("cilk");
+        let mut m = Module::new("cilk");
 
         let _fibo = cilk_ir!(m; define [i32] fibo [(i32)] {
             entry:
@@ -557,7 +548,7 @@ main:
 
     #[test]
     fn spill() {
-        let mut m = module::Module::new("cilk");
+        let mut m = Module::new("cilk");
 
         let _ = cilk_ir!(m; define [i32] func [(i32)] {
             entry:
@@ -606,7 +597,7 @@ main:
 
     #[test]
     fn struct1() {
-        let mut m = module::Module::new("cilk");
+        let mut m = Module::new("cilk");
 
         let f = m.create_function("f", types::Type::i32, vec![]);
 
@@ -644,7 +635,7 @@ main:
 
     #[test]
     fn struct2() {
-        let mut m = module::Module::new("cilk");
+        let mut m = Module::new("cilk");
 
         let struct_ty = m
             .types
@@ -688,7 +679,7 @@ main:
 
     #[test]
     fn many_arguments() {
-        let mut m = module::Module::new("cilk");
+        let mut m = Module::new("cilk");
 
         let _ = cilk_ir!(m; define [i32] func [
                 (i32), (i32), (i32), (i32), (i32), (i32), (i32), (i32), (i32) ] {
@@ -721,7 +712,7 @@ main:
 
     #[test]
     fn fact() {
-        let mut m = module::Module::new("cilk");
+        let mut m = Module::new("cilk");
 
         /*
          * int fact(int x) {
@@ -751,7 +742,7 @@ main:
 
     #[test]
     fn float2() {
-        let mut m = module::Module::new("cilk");
+        let mut m = Module::new("cilk");
 
         let _ = cilk_ir!(m; define [f64] func [] {
             entry:
@@ -769,7 +760,7 @@ main:
 
     #[test]
     fn float3() {
-        let mut m = module::Module::new("cilk");
+        let mut m = Module::new("cilk");
 
         let _ = cilk_ir!(m; define [f64] func [] {
             entry:
@@ -791,7 +782,7 @@ main:
 
     #[test]
     fn float4() {
-        let mut m = module::Module::new("cilk");
+        let mut m = Module::new("cilk");
 
         let _ = cilk_ir!(m; define [f64] func [] {
             entry:
@@ -813,7 +804,7 @@ main:
 
     #[test]
     fn float5() {
-        let mut m = module::Module::new("cilk");
+        let mut m = Module::new("cilk");
 
         let _ = cilk_ir!(m; define [i32] func [] {
             entry:
@@ -836,7 +827,7 @@ main:
 
     #[test]
     fn pass_arr() {
-        let mut m = module::Module::new("cilk");
+        let mut m = Module::new("cilk");
 
         cilk_ir!(m; define [i32] func [(ptr [16; i32])] {
         entry:
@@ -857,7 +848,7 @@ main:
 
     #[test]
     fn branch_folding() {
-        let mut m = module::Module::new("cilk");
+        let mut m = Module::new("cilk");
 
         cilk_ir!(m; define [i32] func [(i32)] {
         entry:
@@ -895,7 +886,7 @@ main:
 
     #[test]
     fn cse0() {
-        let mut m = module::Module::new("cilk");
+        let mut m = Module::new("cilk");
 
         cilk_ir!(m; define [i32] func [] {
         entry:
@@ -921,7 +912,7 @@ main:
 
     #[test]
     fn cse1() {
-        let mut m = module::Module::new("cilk");
+        let mut m = Module::new("cilk");
 
         cilk_ir!(m; define [i32] func [(i32)] {
         entry:
@@ -966,7 +957,7 @@ main:
 
     #[test]
     fn pass_struct() {
-        let mut m = module::Module::new("cilk");
+        let mut m = Module::new("cilk");
 
         let struct_ty = m
             .types
@@ -1010,7 +1001,7 @@ main:
 
     #[test]
     fn pass_struct1() {
-        let mut m = module::Module::new("cilk");
+        let mut m = Module::new("cilk");
 
         let struct_ty = m.types.new_struct_ty(vec![
             types::Type::i32,
@@ -1064,7 +1055,7 @@ main:
 
     #[test]
     fn pass_struct2() {
-        let mut m = module::Module::new("cilk");
+        let mut m = Module::new("cilk");
 
         let struct_ty = m
             .types
@@ -1103,7 +1094,7 @@ main:
 
     #[test]
     fn pass_struct3() {
-        let mut m = module::Module::new("cilk");
+        let mut m = Module::new("cilk");
 
         let struct_ty = m
             .types

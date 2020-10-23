@@ -1,11 +1,6 @@
 #[cfg(feature = "x86_64")]
 mod x86_64 {
-    use cilk::{
-        codegen::x64::exec,
-        ir::builder::IRBuilder,
-        ir::{builder, opcode, types, value},
-        *,
-    };
+    use cilk::{cilk_ir, codegen::x64::exec, ir, ir::prelude::*};
 
     #[test]
     // #[ignore]
@@ -160,7 +155,7 @@ mod x86_64 {
     +[-[->>>>>>>>>+<<<<<<<<<]>>>>>>>>>]>>>>>->>>>>>>>>>>>>>>>>>>>>>>>>>>-<<<<<<[<<<<
     <<<<<]]>>>]";
 
-        let mut m = module::Module::new("brainfuxk");
+        let mut m = Module::new("brainfuxk");
 
         // Internal function must be defined before you use it
         let cilk_printch_i32 = m.create_function(

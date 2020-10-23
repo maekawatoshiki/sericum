@@ -258,6 +258,7 @@ impl<'a> ScheduleByBlock<'a> {
                 ConstantKind::Int32(i) => MachineOperand::Constant(MachineConstant::Int32(i)),
                 ConstantKind::Int64(i) => MachineOperand::Constant(MachineConstant::Int64(i)),
                 ConstantKind::F64(f) => MachineOperand::Constant(MachineConstant::F64(f)),
+                ConstantKind::Other(c) => todo!(),
             },
             NodeKind::Operand(OperandNodeKind::FrameIndex(ref kind)) => {
                 MachineOperand::FrameIndex(kind.clone())
