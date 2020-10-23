@@ -62,7 +62,7 @@ fn main() {
 
     println!("{:?}", codegen.module);
 
-    let mut jit = cilk::codegen::x64::exec::jit::JITExecutor::new(&mut codegen.module);
+    let mut jit = cilk::codegen::x64::exec::jit::JITExecutor::new(codegen.module);
     let func = jit.find_function_by_name("main").unwrap();
     println!("Result: {:?}", jit.run(func, vec![]));
 }
@@ -362,13 +362,13 @@ fn ray_tracing() {
 
     println!("{:?}", codegen.module);
 
-    // let mut jit = cilk::codegen::x64::exec::jit::JITExecutor::new(&mut codegen.module);
+    // let mut jit = cilk::codegen::x64::exec::jit::JITExecutor::new(codegen.module);
     // let func = jit.find_function_by_name("main").unwrap();
     // println!("Result: {:?}", jit.run(func, vec![]));
 
     use cilk::codegen::x64::asm::print::MachineAsmPrinter;
     use cilk::codegen::x64::standard_conversion_into_machine_module;
-    let machine_module = standard_conversion_into_machine_module(&mut codegen.module);
+    let machine_module = standard_conversion_into_machine_module(codegen.module);
     let mut printer = MachineAsmPrinter::new();
     // println!("{:?}", machine_module);
     printer.run_on_module(&machine_module);
@@ -423,7 +423,7 @@ fn eratosthenes_sieve() {
 
     use cilk::codegen::x64::asm::print::MachineAsmPrinter;
     use cilk::codegen::x64::standard_conversion_into_machine_module;
-    let machine_module = standard_conversion_into_machine_module(&mut codegen.module);
+    let machine_module = standard_conversion_into_machine_module(codegen.module);
     let mut printer = MachineAsmPrinter::new();
     // println!("{:?}", machine_module);
     printer.run_on_module(&machine_module);
@@ -482,13 +482,13 @@ fn loop_licm() {
 
     println!("{:?}", codegen.module);
 
-    // let mut jit = cilk::codegen::x64::exec::jit::JITExecutor::new(&mut codegen.module);
+    // let mut jit = cilk::codegen::x64::exec::jit::JITExecutor::new(codegen.module);
     // let func = jit.find_function_by_name("main").unwrap();
     // println!("Result: {:?}", jit.run(func, vec![]));
 
     use cilk::codegen::x64::asm::print::MachineAsmPrinter;
     use cilk::codegen::x64::standard_conversion_into_machine_module;
-    let machine_module = standard_conversion_into_machine_module(&mut codegen.module);
+    let machine_module = standard_conversion_into_machine_module(codegen.module);
     let mut printer = MachineAsmPrinter::new();
     println!("{:?}", machine_module);
     printer.run_on_module(&machine_module);
@@ -537,7 +537,7 @@ fn pass_struct() {
 
     use cilk::codegen::x64::asm::print::MachineAsmPrinter;
     use cilk::codegen::x64::standard_conversion_into_machine_module;
-    let machine_module = standard_conversion_into_machine_module(&mut codegen.module);
+    let machine_module = standard_conversion_into_machine_module(codegen.module);
     let mut printer = MachineAsmPrinter::new();
     printer.run_on_module(&machine_module);
     println!("{}", printer.output);
@@ -586,7 +586,7 @@ fn rand_mandelbrot() {
 
     use cilk::codegen::x64::asm::print::MachineAsmPrinter;
     use cilk::codegen::x64::standard_conversion_into_machine_module;
-    let machine_module = standard_conversion_into_machine_module(&mut codegen.module);
+    let machine_module = standard_conversion_into_machine_module(codegen.module);
     let mut printer = MachineAsmPrinter::new();
     printer.run_on_module(&machine_module);
     println!("{}", printer.output);
@@ -656,7 +656,7 @@ fn bubble_sort() {
 
     use cilk::codegen::x64::asm::print::MachineAsmPrinter;
     use cilk::codegen::x64::standard_conversion_into_machine_module;
-    let machine_module = standard_conversion_into_machine_module(&mut codegen.module);
+    let machine_module = standard_conversion_into_machine_module(codegen.module);
     let mut printer = MachineAsmPrinter::new();
     printer.run_on_module(&machine_module);
     assemble_and_run(
@@ -721,7 +721,7 @@ fn quick_sort() {
 
     use cilk::codegen::x64::asm::print::MachineAsmPrinter;
     use cilk::codegen::x64::standard_conversion_into_machine_module;
-    let machine_module = standard_conversion_into_machine_module(&mut codegen.module);
+    let machine_module = standard_conversion_into_machine_module(codegen.module);
     // println!("{:?}", machine_module);
     let mut printer = MachineAsmPrinter::new();
     printer.run_on_module(&machine_module);
@@ -797,7 +797,7 @@ fn pi() {
     cilk::ir::cse::CommonSubexprElimination::new().run_on_module(&mut codegen.module);
     cilk::ir::mem2reg::Mem2Reg::new().run_on_module(&mut codegen.module);
 
-    let mut jit = cilk::codegen::x64::exec::jit::JITExecutor::new(&mut codegen.module);
+    let mut jit = cilk::codegen::x64::exec::jit::JITExecutor::new(codegen.module);
     let func = jit.find_function_by_name("main").unwrap();
     let output: [i32; 600] = [0; 600];
     jit.run(
@@ -874,7 +874,7 @@ fn pi2() {
     cilk::ir::cse::CommonSubexprElimination::new().run_on_module(&mut codegen.module);
     cilk::ir::mem2reg::Mem2Reg::new().run_on_module(&mut codegen.module);
 
-    let mut jit = cilk::codegen::x64::exec::jit::JITExecutor::new(&mut codegen.module);
+    let mut jit = cilk::codegen::x64::exec::jit::JITExecutor::new(codegen.module);
     let func = jit.find_function_by_name("main").unwrap();
     let output: [i32; 3750] = [0; 3750];
     jit.run(

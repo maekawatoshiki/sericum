@@ -61,7 +61,7 @@ mod x86_64 {
         fs::remove_file(target_name).unwrap();
     }
 
-    fn compile_and_run(c_parent: &str, module: &mut Module) {
+    fn compile_and_run(c_parent: &str, module: Module) {
         let machine_module = standard_conversion_into_machine_module(module);
         let mut printer = MachineAsmPrinter::new();
         // println!("{:?}", machine_module);
@@ -92,7 +92,7 @@ mod x86_64 {
             assert(strcmp(test(), \"hello\") == 0);
         }
             ",
-            &mut m,
+            m,
         );
     }
 
@@ -114,7 +114,7 @@ mod x86_64 {
         assert(test() == 1);
     }
             ",
-            &mut m,
+            m,
         );
     }
 
@@ -150,7 +150,7 @@ mod x86_64 {
                 assert(test(i) == test_ref(i)); 
             return 0;
         }",
-            &mut m,
+            m,
         );
     }
 
@@ -183,7 +183,7 @@ mod x86_64 {
             "#include <assert.h>
         extern int test();
         int main() { assert(test() == 123); }",
-            &mut m,
+            m,
         );
     }
 
@@ -215,7 +215,7 @@ mod x86_64 {
             "#include <assert.h>
         extern int test();
         int main() { assert(test() == 123); }",
-            &mut m,
+            m,
         );
     }
 
@@ -237,7 +237,7 @@ mod x86_64 {
             for (int i = -128; i <= 127; i++) assert(test(i) == test_ref(i));
             return 0;
         }",
-            &mut m,
+            m,
         );
     }
 
@@ -257,7 +257,7 @@ mod x86_64 {
             assert(test(\"hello\", 1) == 'e');
             return 0;
         }",
-            &mut m,
+            m,
         );
     }
 
@@ -289,7 +289,7 @@ mod x86_64 {
             assert(mystrlen(\"hello\") == 5);
             return 0;
         }",
-            &mut m,
+            m,
         );
     }
 
@@ -338,7 +338,7 @@ mod x86_64 {
             }
             return 0;
         }",
-            &mut m,
+            m,
         );
     }
 
@@ -371,7 +371,7 @@ mod x86_64 {
             for (x = -128, i = 0; i < 256; i++, x++) 
                 assert(test(x) == test_ref(x));
         }",
-            &mut m,
+            m,
         );
     }
 }
@@ -469,7 +469,7 @@ mod riscv64 {
         assert(test() == 42);
     }
             ",
-            &mut m,
+            m,
         );
     }
 
@@ -491,7 +491,7 @@ mod riscv64 {
         assert(test() == 42);
     }
             ",
-            &mut m,
+            m,
         );
     }
 
@@ -535,7 +535,7 @@ mod riscv64 {
         assert(big2() == -2147483648);
     }
             ",
-            &mut m,
+            m,
         );
     }
 
@@ -568,7 +568,7 @@ mod riscv64 {
         assert(small() == -1389698115);
     }
             ",
-            &mut m,
+            m,
         );
     }
 
@@ -614,7 +614,7 @@ mod riscv64 {
         assert(test_rem() == 3);
     }
             ",
-            &mut m,
+            m,
         );
     }
 
@@ -637,7 +637,7 @@ mod riscv64 {
         assert(test() == 2);
     }
             ",
-            &mut m,
+            m,
         );
     }
 
@@ -662,7 +662,7 @@ mod riscv64 {
         assert(test(3) == 2);
     }
             ",
-            &mut m,
+            m,
         );
     }
 
@@ -687,7 +687,7 @@ mod riscv64 {
         assert(test() == 3);
     }
             ",
-            &mut m,
+            m,
         );
     }
 
@@ -717,7 +717,7 @@ mod riscv64 {
         assert(test() == 3);
     }
             ",
-            &mut m,
+            m,
         );
     }
 
@@ -740,7 +740,7 @@ mod riscv64 {
         assert(test() == 3);
     }
             ",
-            &mut m,
+            m,
         );
     }
 
@@ -763,7 +763,7 @@ mod riscv64 {
         assert(test(1) == 3);
     }
             ",
-            &mut m,
+            m,
         );
     }
 
@@ -860,7 +860,7 @@ mod riscv64 {
         }
     }
             ",
-            &mut m,
+            m,
         );
     }
 
@@ -887,7 +887,7 @@ mod riscv64 {
         assert(fact(5) == 120);
     }
             ",
-            &mut m,
+            m,
         );
     }
 
@@ -941,7 +941,7 @@ mod riscv64 {
             if (prime(i)) assert(i == *(q++));
     }
             ",
-            &mut m,
+            m,
         );
     }
 
@@ -970,7 +970,7 @@ mod riscv64 {
         assert(fibo(10) == 55);
     }
             ",
-            &mut m,
+            m,
         );
     }
 
@@ -999,7 +999,7 @@ mod riscv64 {
             "#include <assert.h>
         extern int test();
         int main() { assert(test() == 123); }",
-            &mut m,
+            m,
         );
     }
 
@@ -1032,7 +1032,7 @@ mod riscv64 {
             "#include <assert.h>
         extern int test();
         int main() { assert(test() == 123); }",
-            &mut m,
+            m,
         );
     }
 }
@@ -1408,33 +1408,33 @@ mod aarch64 {
     int main() {
         int c[8][8] = {0};
         int a[8][8] = {
-        {3, 3, 2, 9, 0, 8, 2, 6}, 
-        {6, 9, 1, 1, 3, 5, 8, 3}, 
-        {0, 6, 9, 2, 7, 7, 2, 8}, 
-        {0, 3, 9, 2, 4, 9, 1, 7}, 
-        {0, 4, 5, 0, 4, 0, 2, 4}, 
-        {3, 1, 0, 6, 6, 1, 9, 7}, 
-        {5, 1, 0, 4, 4, 5, 9, 0}, 
+        {3, 3, 2, 9, 0, 8, 2, 6},
+        {6, 9, 1, 1, 3, 5, 8, 3},
+        {0, 6, 9, 2, 7, 7, 2, 8},
+        {0, 3, 9, 2, 4, 9, 1, 7},
+        {0, 4, 5, 0, 4, 0, 2, 4},
+        {3, 1, 0, 6, 6, 1, 9, 7},
+        {5, 1, 0, 4, 4, 5, 9, 0},
         {7, 6, 3, 4, 4, 0, 9, 0}};
 
         int b[8][8] = {
-        {6, 2, 2, 3, 0, 9, 9, 5}, 
-        {5, 9, 7, 9, 7, 4, 6, 9}, 
-        {6, 4, 3, 5, 7, 6, 9, 4}, 
-        {2, 5, 3, 8, 1, 0, 0, 7}, 
-        {5, 6, 3, 1, 7, 2, 6, 8}, 
-        {2, 1, 0, 0, 8, 1, 1, 4}, 
-        {7, 4, 7, 5, 8, 1, 8, 7}, 
+        {6, 2, 2, 3, 0, 9, 9, 5},
+        {5, 9, 7, 9, 7, 4, 6, 9},
+        {6, 4, 3, 5, 7, 6, 9, 4},
+        {2, 5, 3, 8, 1, 0, 0, 7},
+        {5, 6, 3, 1, 7, 2, 6, 8},
+        {2, 1, 0, 0, 8, 1, 1, 4},
+        {7, 4, 7, 5, 8, 1, 8, 7},
         {1, 7, 3, 9, 5, 0, 0, 3}};
 
         int d[8][8] = {
-        { 99,  144,   92,  182,  154,   61,   87,  177}, 
-        {173,  178,  155,  182,  211,  115,  204,  231}, 
-        {159,  213,  134,  204,  268,  101,  182,  226}, 
-        {125,  159,   94,  160,  229,   84,  140,  173}, 
-        { 88,  116,   81,  111,  127,   56,  109,  114}, 
-        {137,  167,  133,  180,  170,   53,  142,  202}, 
-        {136,  104,  104,  105,  151,   71,  152,  177}, 
+        { 99,  144,   92,  182,  154,   61,   87,  177},
+        {173,  178,  155,  182,  211,  115,  204,  231},
+        {159,  213,  134,  204,  268,  101,  182,  226},
+        {125,  159,   94,  160,  229,   84,  140,  173},
+        { 88,  116,   81,  111,  127,   56,  109,  114},
+        {137,  167,  133,  180,  170,   53,  142,  202},
+        {136,  104,  104,  105,  151,   71,  152,  177},
         {181,  160,  152,  171,  167,  122,  222,  224}};
 
         matrix_mul(&c, a, b);

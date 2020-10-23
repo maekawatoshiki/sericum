@@ -65,7 +65,7 @@ pub fn compile(path: PathBuf) {
     // cilk::ir::licm::LoopInvariantCodeMotion::new().run_on_module(&mut codegen.module);
 
     let machine_module =
-        cilk::codegen::x64::standard_conversion_into_machine_module(&mut codegen.module);
+        cilk::codegen::x64::standard_conversion_into_machine_module(codegen.module);
     let mut printer = cilk::codegen::x64::asm::print::MachineAsmPrinter::new();
     printer.run_on_module(&machine_module);
     println!("{}", printer.output);

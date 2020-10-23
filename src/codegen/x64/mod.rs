@@ -87,14 +87,14 @@ impl TypeSize for StructType {
     }
 }
 
-pub fn standard_conversion_into_machine_module(module: &mut Module) -> MachineModule {
-    ir::dce::DeadCodeElimination::new().run_on_module(module);
-    ir::merge_ret::MergeReturns::new().run_on_module(module);
-    ir::const_folding::ConstantFolding::new().run_on_module(module);
-    ir::inst_combine::InstructionCombine::new().run_on_module(module);
-    ir::codegen_prepare::CodegenPrepare::new().run_on_module(module);
+pub fn standard_conversion_into_machine_module(mut module: Module) -> MachineModule {
+    ir::dce::DeadCodeElimination::new().run_on_module(&mut module);
+    ir::merge_ret::MergeReturns::new().run_on_module(&mut module);
+    ir::const_folding::ConstantFolding::new().run_on_module(&mut module);
+    ir::inst_combine::InstructionCombine::new().run_on_module(&mut module);
+    ir::codegen_prepare::CodegenPrepare::new().run_on_module(&mut module);
 
-    let mut dag_module = convert::ConvertToDAGModule::new(module).run();
+    let mut dag_module = convert::convert_to_dag_module(module);
 
     let mut pass_mgr = ModulePassManager::new();
     // TODO: This is so nonsense

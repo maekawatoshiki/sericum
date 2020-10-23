@@ -303,7 +303,7 @@ mod x86_64 {
         // printer.run_on_module(&machine_module);
         // println!("{}", printer.output);
 
-        let mut jit = exec::jit::JITExecutor::new(&mut m);
+        let mut jit = exec::jit::JITExecutor::new(m);
         let func = jit
             .find_function_by_name("compiled_brainfuxk_code")
             .unwrap();

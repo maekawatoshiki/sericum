@@ -43,6 +43,38 @@ pub struct ConvertToDAGNode<'a> {
     pub last_chained_node: Option<Raw<DAGNode>>,
 }
 
+pub fn convert_to_dag_module(module: Module) -> DAGModule {
+    IRLivenessAnalyzer::new(&module).analyze();
+
+    let mut functions: Arena<DAGFunction> = Arena::new();
+
+    for (_, func) in &module.functions {
+        functions.alloc(
+            ConvertToDAGFunction {
+                module: &module,
+                func,
+                bb_arena: Arena::new(),
+                bb_order: vec![],
+                bb_map: FxHashMap::default(),
+                node_heap: DAGHeap::new(),
+                inst_to_node: FxHashMap::default(),
+                regs_info: RegistersInfo::new(),
+                arg_regs: FxHashMap::default(),
+                local_mgr: LocalVariables::new(),
+            }
+            .run(),
+        );
+    }
+
+    DAGModule {
+        name: module.name,
+        functions,
+        types: module.types,
+        global_vars: module.global_vars,
+        const_pool: module.const_pool,
+    }
+}
+
 impl<'a> ConvertToDAGModule<'a> {
     pub fn new(module: &'a Module) -> Self {
         IRLivenessAnalyzer::new(&module).analyze();

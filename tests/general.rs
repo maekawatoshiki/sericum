@@ -27,7 +27,7 @@ mod x86_64 {
 
         ir::mem2reg::Mem2Reg::new().run_on_module(&mut m);
 
-        let mut jit = exec::jit::JITExecutor::new(&mut m);
+        let mut jit = exec::jit::JITExecutor::new(m);
         let func = jit.find_function_by_name("func").unwrap();
         assert_eq!(jit.run(func, vec![]), exec::jit::GenericValue::Int32(3));
     }
@@ -57,7 +57,7 @@ mod x86_64 {
 
         ir::mem2reg::Mem2Reg::new().run_on_module(&mut m);
 
-        let mut jit = exec::jit::JITExecutor::new(&mut m);
+        let mut jit = exec::jit::JITExecutor::new(m);
         let func = jit.find_function_by_name("func").unwrap();
         assert_eq!(jit.run(func, vec![]), exec::jit::GenericValue::Int32(8));
     }
@@ -84,7 +84,7 @@ mod x86_64 {
 
         ir::mem2reg::Mem2Reg::new().run_on_module(&mut m);
 
-        let mut jit = exec::jit::JITExecutor::new(&mut m);
+        let mut jit = exec::jit::JITExecutor::new(m);
         let func = jit.find_function_by_name("func").unwrap();
         assert_eq!(jit.run(func, vec![]), exec::jit::GenericValue::Int32(3));
     }
@@ -114,7 +114,7 @@ mod x86_64 {
 
         ir::mem2reg::Mem2Reg::new().run_on_module(&mut m);
 
-        let mut jit = exec::jit::JITExecutor::new(&mut m);
+        let mut jit = exec::jit::JITExecutor::new(m);
         let func = jit.find_function_by_name("func").unwrap();
         assert_eq!(
             jit.run(func, vec![exec::jit::GenericValue::Int32(10)]),
@@ -154,7 +154,7 @@ mod x86_64 {
 
         ir::mem2reg::Mem2Reg::new().run_on_module(&mut m);
 
-        let mut jit = exec::jit::JITExecutor::new(&mut m);
+        let mut jit = exec::jit::JITExecutor::new(m);
         let func = jit.find_function_by_name("func").unwrap();
         assert_eq!(
             jit.run(func, vec![exec::jit::GenericValue::Int32(2)]),
@@ -191,7 +191,7 @@ mod x86_64 {
 
         println!("{}", m.dump(func));
 
-        let mut jit = exec::jit::JITExecutor::new(&mut m);
+        let mut jit = exec::jit::JITExecutor::new(m);
         let func = jit.find_function_by_name("func").unwrap();
         assert_eq!(jit.run(func, vec![]), exec::jit::GenericValue::Int32(0));
     }
@@ -213,7 +213,7 @@ mod x86_64 {
 
         println!("{:?}", m);
 
-        let mut jit = exec::jit::JITExecutor::new(&mut m);
+        let mut jit = exec::jit::JITExecutor::new(m);
         let func = jit.find_function_by_name("main").unwrap();
         assert_eq!(jit.run(func, vec![]), exec::jit::GenericValue::Int32(123));
     }
@@ -240,7 +240,7 @@ mod x86_64 {
 
         println!("{:?}", m);
 
-        let mut jit = exec::jit::JITExecutor::new(&mut m);
+        let mut jit = exec::jit::JITExecutor::new(m);
         let func = jit.find_function_by_name("main").unwrap();
         assert_eq!(jit.run(func, vec![]), exec::jit::GenericValue::Int32(123));
     }
@@ -267,7 +267,7 @@ mod x86_64 {
                 ret (%p);
         });
 
-        let mut jit = exec::jit::JITExecutor::new(&mut m);
+        let mut jit = exec::jit::JITExecutor::new(m);
         let func = jit.find_function_by_name("func").unwrap();
         let ret = jit.run(func, vec![exec::jit::GenericValue::Int32(7)]);
         assert_eq!(ret, exec::jit::GenericValue::Int32(13));
@@ -332,7 +332,7 @@ mod x86_64 {
         //     ret (%r);
         });
 
-        let mut jit = exec::jit::JITExecutor::new(&mut m);
+        let mut jit = exec::jit::JITExecutor::new(m);
         let func = jit.find_function_by_name("func").unwrap();
         let ret = jit.run(func, vec![]);
         println!("return: {:?}", ret);
@@ -411,7 +411,7 @@ mod x86_64 {
                 ret (void);
         });
 
-        let mut jit = exec::jit::JITExecutor::new(&mut m);
+        let mut jit = exec::jit::JITExecutor::new(m);
         let main = jit.find_function_by_name("main").unwrap();
         println!(
             "main: return: {:?}",
@@ -469,7 +469,7 @@ mod x86_64 {
                 ret (void);
         });
 
-        let mut jit = exec::jit::JITExecutor::new(&mut m);
+        let mut jit = exec::jit::JITExecutor::new(m);
         let main = jit.find_function_by_name("main").unwrap();
         println!(
             "main: return: {:?}",
@@ -504,7 +504,7 @@ mod x86_64 {
                 ret (%r);
         });
 
-        let machine_module = standard_conversion_into_machine_module(&mut m);
+        let machine_module = standard_conversion_into_machine_module(m);
         // println!("{:?}", machine_module);
         use cilk::codegen::x64::asm::print::MachineAsmPrinter;
         let mut printer = MachineAsmPrinter::new();
@@ -597,7 +597,7 @@ main:
                 ret (%y11);
         });
 
-        let mut jit = exec::jit::JITExecutor::new(&mut m);
+        let mut jit = exec::jit::JITExecutor::new(m);
         let func = jit.find_function_by_name("func").unwrap();
         let res = jit.run(func, vec![exec::jit::GenericValue::Int32(1)]);
         println!("return: {:?}", res);
@@ -636,7 +636,7 @@ main:
 
         println!("{}", m.dump(f));
 
-        let mut jit = exec::jit::JITExecutor::new(&mut m);
+        let mut jit = exec::jit::JITExecutor::new(m);
         let func = jit.find_function_by_name("f").unwrap();
         let res = jit.run(func, vec![]);
         assert_eq!(res, exec::jit::GenericValue::Int32(3));
@@ -680,7 +680,7 @@ main:
             ret (%r);
         });
 
-        let mut jit = exec::jit::JITExecutor::new(&mut m);
+        let mut jit = exec::jit::JITExecutor::new(m);
         let func = jit.find_function_by_name("main").unwrap();
         let res = jit.run(func, vec![]);
         assert_eq!(res, exec::jit::GenericValue::Int32(123));
@@ -712,7 +712,7 @@ main:
 
         println!("{:?}", m);
 
-        let mut jit = exec::jit::JITExecutor::new(&mut m);
+        let mut jit = exec::jit::JITExecutor::new(m);
         let func = jit.find_function_by_name("main").unwrap();
         let res = jit.run(func, vec![]);
         println!("{:?}", res);
@@ -742,7 +742,7 @@ main:
                 ret (%z);
         });
 
-        let mut jit = exec::jit::JITExecutor::new(&mut m);
+        let mut jit = exec::jit::JITExecutor::new(m);
         let func = jit.find_function_by_name("fact").unwrap();
         let res = jit.run(func, vec![exec::jit::GenericValue::Int32(10)]);
         println!("{:?}", res);
@@ -761,7 +761,7 @@ main:
                 ret (%la);
         });
 
-        let mut jit = exec::jit::JITExecutor::new(&mut m);
+        let mut jit = exec::jit::JITExecutor::new(m);
         let func = jit.find_function_by_name("func").unwrap();
         let res = jit.run(func, vec![]);
         assert_eq!(res, exec::jit::GenericValue::F64(1.23));
@@ -783,7 +783,7 @@ main:
                 ret (%e);
         });
 
-        let mut jit = exec::jit::JITExecutor::new(&mut m);
+        let mut jit = exec::jit::JITExecutor::new(m);
         let func = jit.find_function_by_name("func").unwrap();
         let res = jit.run(func, vec![]);
         assert_eq!(res, exec::jit::GenericValue::F64(5.57));
@@ -805,7 +805,7 @@ main:
                 ret (%e);
         });
 
-        let mut jit = exec::jit::JITExecutor::new(&mut m);
+        let mut jit = exec::jit::JITExecutor::new(m);
         let func = jit.find_function_by_name("func").unwrap();
         let res = jit.run(func, vec![]);
         assert_eq!(res, exec::jit::GenericValue::F64(2.4));
@@ -828,7 +828,7 @@ main:
                 ret (i32 2);
         });
 
-        let mut jit = exec::jit::JITExecutor::new(&mut m);
+        let mut jit = exec::jit::JITExecutor::new(m);
         let func = jit.find_function_by_name("func").unwrap();
         let res = jit.run(func, vec![]);
         assert_eq!(res, exec::jit::GenericValue::Int32(2));
@@ -845,7 +845,7 @@ main:
             ret (i32 0);
         });
 
-        let mut jit = exec::jit::JITExecutor::new(&mut m);
+        let mut jit = exec::jit::JITExecutor::new(m);
         let func = jit.find_function_by_name("func").unwrap();
         let arr: [u32; 8] = [0, 0, 0, 0, 0, 0, 0, 0];
         jit.run(
@@ -885,7 +885,7 @@ main:
         ir::cse::CommonSubexprElimination::new().run_on_module(&mut m);
         println!("{:?}", m);
 
-        let mut jit = exec::jit::JITExecutor::new(&mut m);
+        let mut jit = exec::jit::JITExecutor::new(m);
         let func = jit.find_function_by_name("func").unwrap();
         assert_eq!(
             jit.run(func, vec![exec::jit::GenericValue::Int32(1)]),
@@ -914,7 +914,7 @@ main:
         ir::cse::CommonSubexprElimination::new().run_on_module(&mut m);
         println!("{:?}", m);
 
-        let mut jit = exec::jit::JITExecutor::new(&mut m);
+        let mut jit = exec::jit::JITExecutor::new(m);
         let func = jit.find_function_by_name("func").unwrap();
         assert_eq!(jit.run(func, vec![]), exec::jit::GenericValue::Int32(15));
     }
@@ -952,7 +952,7 @@ main:
         ir::cse::CommonSubexprElimination::new().run_on_module(&mut m);
         println!("{:?}", m);
 
-        let mut jit = exec::jit::JITExecutor::new(&mut m);
+        let mut jit = exec::jit::JITExecutor::new(m);
         let func = jit.find_function_by_name("func").unwrap();
         assert_eq!(
             jit.run(func, vec![exec::jit::GenericValue::Int32(1)]),
@@ -1003,7 +1003,7 @@ main:
 
         println!("{:?}", m);
 
-        let mut jit = exec::jit::JITExecutor::new(&mut m);
+        let mut jit = exec::jit::JITExecutor::new(m);
         let func = jit.find_function_by_name("main").unwrap();
         assert_eq!(jit.run(func, vec![]), exec::jit::GenericValue::Int32(22));
     }
@@ -1057,7 +1057,7 @@ main:
 
         println!("{:?}", m);
 
-        let mut jit = exec::jit::JITExecutor::new(&mut m);
+        let mut jit = exec::jit::JITExecutor::new(m);
         let func = jit.find_function_by_name("main").unwrap();
         assert_eq!(jit.run(func, vec![]), exec::jit::GenericValue::Int32(38));
     }
@@ -1096,7 +1096,7 @@ main:
 
         println!("{:?}", m);
 
-        let mut jit = exec::jit::JITExecutor::new(&mut m);
+        let mut jit = exec::jit::JITExecutor::new(m);
         let func = jit.find_function_by_name("main").unwrap();
         assert_eq!(jit.run(func, vec![]), exec::jit::GenericValue::F64(12.3));
     }
@@ -1144,7 +1144,7 @@ main:
 
         // println!("{:?}", m);
 
-        let mut jit = exec::jit::JITExecutor::new(&mut m);
+        let mut jit = exec::jit::JITExecutor::new(m);
         let func = jit.find_function_by_name("main").unwrap();
         assert_eq!(jit.run(func, vec![]), exec::jit::GenericValue::F64(24.6));
     }

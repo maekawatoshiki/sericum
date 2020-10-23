@@ -33,7 +33,7 @@ mod x86_64 {
         format!("/tmp/{}.{}", name, extension)
     }
 
-    fn compile(parent_in_c: &str, module: &mut Module) {
+    fn compile(parent_in_c: &str, module: Module) {
         let parent_name = unique_file_name("c");
         {
             let mut parent = BufWriter::new(fs::File::create(parent_name.as_str()).unwrap());
@@ -82,7 +82,7 @@ mod x86_64 {
                    ret (%x);
         });
 
-        let machine_module = standard_conversion_into_machine_module(&mut m);
+        let machine_module = standard_conversion_into_machine_module(m);
         // println!("{:?}", machine_module);
 
         let mut exec = Executor::new(machine_module);
@@ -105,7 +105,7 @@ mod x86_64 {
                 ret (%x);
         });
 
-        let machine_module = standard_conversion_into_machine_module(&mut m);
+        let machine_module = standard_conversion_into_machine_module(m);
 
         let mut exec = Executor::new(machine_module);
         exec.compile();
@@ -124,7 +124,7 @@ mod x86_64 {
             "#include <assert.h>
                  extern int test(); 
                  int main() { assert(test() == 42); return 0; }",
-            &mut m,
+            m,
         );
     }
 
@@ -142,7 +142,7 @@ mod x86_64 {
             "#include <assert.h>
                  extern int test(); 
                  int main() { assert(test() == 42); return 0; }",
-            &mut m,
+            m,
         );
     }
 
@@ -167,7 +167,7 @@ mod x86_64 {
                 assert(test(1) == 1);
                 return 0;
              }",
-            &mut m,
+            m,
         )
     }
 
@@ -190,7 +190,7 @@ mod x86_64 {
                 assert(caller(10) == 12);
                 return 0;
              }",
-            &mut m,
+            m,
         )
     }
 
@@ -223,7 +223,7 @@ mod x86_64 {
                      assert(div(6) == 2);
                      return 0; 
                  }",
-            &mut m,
+            m,
         );
     }
 }
