@@ -27,7 +27,7 @@ impl<'a> CodegenPrepareOnFunction<'a> {
         let mut geps_to_be_sunk = vec![];
 
         for (_, block) in &self.func.basic_blocks.arena {
-            for inst_id in block.iseq.borrow().iter().map(|i| i.as_instruction().id) {
+            for &inst_id in &*block.iseq.borrow() {
                 let inst = &self.func.inst_table[inst_id];
                 if inst.opcode == Opcode::GetElementPtr && self.able_to_be_sunk(inst) {
                     geps_to_be_sunk.push(inst_id);

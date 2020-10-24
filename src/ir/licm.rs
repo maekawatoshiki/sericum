@@ -90,7 +90,6 @@ impl<'a> LoopInvariantCodeMotionOnFunction<'a> {
         header_preds.retain(|p| !preds_not_in_loop.contains(p)); // retain preds in loop
         header_preds.insert(pre_header);
         for &id in header_bb.iseq_ref().iter().rev() {
-            let id = id.as_instruction().id;
             if self.func.inst_table[id].opcode == Opcode::Phi {
                 Instruction::replace_operand(
                     &mut self.func.inst_table,
@@ -106,7 +105,6 @@ impl<'a> LoopInvariantCodeMotionOnFunction<'a> {
             block.succ.retain(|&s| s != loop_.header);
             block.succ.insert(pre_header);
             for &id in block.iseq_ref().iter().rev() {
-                let id = id.as_instruction().id;
                 if !self.func.inst_table[id].opcode.is_terminator() {
                     break;
                 }
@@ -142,7 +140,7 @@ impl<'a> LoopInvariantCodeMotionOnFunction<'a> {
 
             for &bb_id in &loop_.set {
                 let bb = &self.func.basic_blocks.arena[bb_id];
-                for inst_id in bb.iseq.borrow().iter().map(|v| v.as_instruction().id) {
+                for &inst_id in &*bb.iseq_ref() {
                     worklist.push_back(inst_id);
                 }
             }

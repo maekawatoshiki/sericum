@@ -188,8 +188,7 @@ impl<'a> ConvertToDAGNode<'a> {
             self.copy_reg_args();
         }
 
-        for inst_val in self.block.iseq_ref().iter() {
-            let inst_id = inst_val.get_inst_id().unwrap();
+        for &inst_id in &*self.block.iseq_ref() {
             let inst = &self.func.inst_table[inst_id];
             match inst.opcode {
                 Opcode::Alloca => {

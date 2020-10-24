@@ -45,12 +45,10 @@ impl<'a> MergeReturnsOnFunction<'a> {
                 // unreachable block
                 continue;
             }
-            let iseq = block.iseq.borrow();
-            let val = match iseq.last() {
-                Some(val) => val,
+            let inst_id = match block.iseq_ref().last() {
+                Some(id) => *id,
                 None => continue,
             };
-            let inst_id = val.get_inst_id().unwrap();
             let inst = &self.func.inst_table[inst_id];
             if inst.opcode == Opcode::Ret {
                 returns.push(inst_id);

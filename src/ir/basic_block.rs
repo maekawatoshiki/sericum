@@ -1,4 +1,4 @@
-use super::{module::Module, opcode::*, value::*, DumpToString};
+use super::{function::Function, module::Module, opcode::*, DumpToString};
 use crate::traits::basic_block::*;
 use id_arena::*;
 use rustc_hash::FxHashSet;
@@ -30,7 +30,7 @@ pub struct BasicBlock {
     pub succ: FxHashSet<BasicBlockId>,
 
     /// Instruction list
-    pub iseq: RefCell<Vec<Value>>,
+    pub iseq: RefCell<Vec<InstructionId>>,
 }
 
 /// The information of Liveness Analysis.
@@ -114,25 +114,18 @@ impl BasicBlock {
     }
 
     /// Get a reference to basicblock's instructions.
-    pub fn iseq_ref<'b>(&'b self) -> Ref<Vec<Value>> {
+    pub fn iseq_ref<'b>(&'b self) -> Ref<Vec<InstructionId>> {
         self.iseq.borrow()
     }
 
     /// Get a mutable reference to basicblock's instructions.
-    pub fn iseq_ref_mut(&self) -> RefMut<Vec<Value>> {
+    pub fn iseq_ref_mut(&self) -> RefMut<Vec<InstructionId>> {
         self.iseq.borrow_mut()
     }
 
     /// Try to find a position of given instruction in the vector of instructions that receiver has.
     pub fn find_inst_pos(&self, id2find: InstructionId) -> Option<usize> {
-        self.iseq_ref()
-            .iter()
-            .enumerate()
-            .find(|(_, val)| match val {
-                Value::Instruction(i) if i.id == id2find => true,
-                _ => false,
-            })
-            .map(|(i, _)| i)
+        self.iseq_ref().iter().position(|&id| id == id2find)
     }
 }
 
@@ -158,12 +151,12 @@ impl BasicBlocksTrait for BasicBlocks {
     }
 }
 
-impl DumpToString for BasicBlock {
-    fn dump(&self, module: &Module) -> String {
+impl BasicBlock {
+    pub fn dump2(&self, module: &Module, f: &Function) -> String {
         self.iseq_ref()
             .iter()
             .fold("".to_string(), |s, inst| {
-                format!("{}{}\n", s, inst.to_string(module, true))
+                format!("CURRENTLY NOT AVAILABLE {}{}\n", s, 1,) // f.inst_table[*inst].to_string(module, true))
             })
             .trim_end()
             .to_string()

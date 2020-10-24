@@ -34,7 +34,7 @@ impl<'a> DeadCodeEliminationOnFunction<'a> {
 
         for &block_id in &self.func.basic_blocks.order {
             let block = &self.func.basic_blocks.arena[block_id];
-            for inst_id in block.iseq.borrow().iter().map(|i| i.as_instruction().id) {
+            for &inst_id in &*block.iseq_ref() {
                 let inst = &self.func.inst_table[inst_id];
                 Self::check_if_elimination_possible(inst, &mut elimination_list, &mut worklist);
             }

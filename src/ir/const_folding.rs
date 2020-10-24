@@ -37,8 +37,7 @@ impl<'a> ConstantFoldingOnFunction<'a> {
 
         for &id in &self.cur_func.basic_blocks.order {
             let bb = &self.cur_func.basic_blocks.arena[id];
-            for val in &*bb.iseq.borrow() {
-                let inst_id = val.get_inst_id().unwrap();
+            for &inst_id in &*bb.iseq.borrow() {
                 let inst = &self.cur_func.inst_table[inst_id];
 
                 if Self::is_foldable(inst) {

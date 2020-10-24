@@ -161,7 +161,7 @@ impl Function {
         self.inst_table[inst_id].remove(&self.inst_table);
     }
 
-    pub fn remove_inst_from_block(&self, inst_id: InstructionId) -> Value {
+    pub fn remove_inst_from_block(&self, inst_id: InstructionId) -> InstructionId {
         let (block_id, pos) = self.find_inst_pos(inst_id).unwrap();
         self.basic_blocks.arena[block_id].iseq_ref_mut().remove(pos)
     }
@@ -252,7 +252,7 @@ impl DumpToString for &Function {
             if self.is_internal {
                 "internal;".to_owned()
             } else {
-                format!("{{\n{}}}", self.basic_blocks.dump(module))
+                format!("{{\n{}}}", self.basic_blocks.dump2(module, self))
             },
         )
     }
@@ -264,8 +264,8 @@ impl DumpToString for FunctionId {
     }
 }
 
-impl DumpToString for BasicBlocks {
-    fn dump(&self, module: &Module) -> String {
+impl BasicBlocks {
+    fn dump2(&self, module: &Module, f: &Function) -> String {
         self.order.iter().fold("".to_string(), |s, &id| {
             let b = &self.arena[id];
             format!(
@@ -298,7 +298,7 @@ impl DumpToString for BasicBlocks {
                     .iter()
                     .fold("".to_string(), |s, x| format!("{}{},", s, x.index()))
                     .trim_matches(','),
-                b.dump(module)
+                b.dump2(module, f)
             )
         })
     }

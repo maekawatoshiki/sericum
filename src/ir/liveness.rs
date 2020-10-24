@@ -40,8 +40,7 @@ impl<'a> LivenessAnalyzerOnFunction<'a> {
 
             let def = &mut bb.liveness.borrow_mut().def;
 
-            for inst_val in &*bb.iseq.borrow() {
-                let inst_id = inst_val.get_inst_id().unwrap();
+            for &inst_id in &*bb.iseq_ref() {
                 let inst = &self.func.inst_table[inst_id];
 
                 if inst.opcode == Opcode::Call && self.func.get_return_type() != Type::Void {
@@ -58,8 +57,8 @@ impl<'a> LivenessAnalyzerOnFunction<'a> {
 
     pub fn visit(&mut self) {
         for (bb_id, bb) in &self.func.basic_blocks.arena {
-            for inst_val in &*bb.iseq.borrow() {
-                let inst = &self.func.inst_table[inst_val.get_inst_id().unwrap()];
+            for &inst_id in &*bb.iseq_ref() {
+                let inst = &self.func.inst_table[inst_id];
                 self.visit_operands(bb_id, &inst.operands, inst.opcode == Opcode::Phi);
             }
         }

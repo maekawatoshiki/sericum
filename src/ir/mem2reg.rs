@@ -63,8 +63,7 @@ impl<'a> Mem2RegOnFunction<'a> {
 
         for &id in &self.cur_func.basic_blocks.order {
             let bb = &self.cur_func.basic_blocks.arena[id];
-            for val in &*bb.iseq.borrow() {
-                let inst_id = val.get_inst_id().unwrap();
+            for &inst_id in &*bb.iseq_ref() {
                 let inst = &self.cur_func.inst_table[inst_id];
                 if !matches!(inst.opcode, Opcode::Alloca) {
                     continue;
@@ -365,14 +364,14 @@ impl<'a> Mem2RegOnFunction<'a> {
                             cur,
                         );
                         let id = self.cur_func.alloc_inst(inst);
+                        self.cur_func.basic_blocks.arena[cur]
+                            .iseq_ref_mut()
+                            .insert(0, id);
                         let val = Value::Instruction(InstructionValue {
                             func_id: self.cur_func.id.unwrap(),
                             id,
                             ty,
                         });
-                        self.cur_func.basic_blocks.arena[cur]
-                            .iseq_ref_mut()
-                            .insert(0, val);
                         added_phi.insert((cur, *alloca_id), Operand::Value(val));
                         *incoming_val = Operand::Value(val);
                     }
@@ -384,8 +383,7 @@ impl<'a> Mem2RegOnFunction<'a> {
                 }
 
                 let mut removal_list = vec![];
-                for inst_id in &*bb.iseq_ref() {
-                    let inst_id = inst_id.as_instruction().id;
+                for &inst_id in &*bb.iseq_ref() {
                     let (opcode, op0, alloca_id) = {
                         let inst = &self.cur_func.inst_table[inst_id];
                         let alloca_id = match inst.opcode {
@@ -488,8 +486,7 @@ impl InstructionIndexes {
         let inst = &cur_func.inst_table[inst_id];
         let mut i = 0;
         let bb = &cur_func.basic_blocks.arena[inst.parent];
-        for val in &*bb.iseq_ref() {
-            let inst_id = val.as_instruction().id;
+        for &inst_id in &*bb.iseq_ref() {
             let opcode = cur_func.inst_table[inst_id].opcode;
             if Self::is_interesting_opcode(opcode) {
                 self.inst2index.insert(inst_id, i);

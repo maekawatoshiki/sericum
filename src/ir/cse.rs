@@ -65,7 +65,7 @@ impl<'a> GlobalCommonSubexprEliminationOnFunction<'a> {
 
         let bb = &self.func.basic_blocks.arena[root];
 
-        for inst_id in bb.iseq.borrow().iter().map(|v| v.as_instruction().id) {
+        for &inst_id in &*bb.iseq_ref() {
             if self.removal_list.contains(&inst_id) {
                 continue;
             }
@@ -156,7 +156,7 @@ impl<'a> GlobalCommonSubexprEliminationOnFunction<'a> {
         };
 
         let mut phis = vec![];
-        for inst_id in bb.iseq.borrow().iter().map(|v| v.as_instruction().id) {
+        for &inst_id in &*bb.iseq_ref() {
             if self.removal_list.contains(&inst_id) {
                 continue;
             }
@@ -189,14 +189,14 @@ impl<'a> GlobalCommonSubexprEliminationOnFunction<'a> {
         for (inst2replace, phi) in phis {
             let ty = phi.ty;
             let id = self.func.alloc_inst(phi);
+            self.func.basic_blocks.arena[*ebb_start]
+                .iseq_ref_mut()
+                .insert(0, id);
             let val = Value::Instruction(InstructionValue {
                 func_id: self.func.id.unwrap(),
                 id,
                 ty,
             });
-            self.func.basic_blocks.arena[*ebb_start]
-                .iseq_ref_mut()
-                .insert(0, val);
             Instruction::replace_all_uses(
                 &mut self.func.inst_table,
                 inst2replace,

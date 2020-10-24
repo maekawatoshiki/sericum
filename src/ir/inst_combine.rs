@@ -33,7 +33,7 @@ impl<'a> InstructionCombineOnFunction<'a> {
         let mut worklist = VecDeque::new();
 
         for (_, block) in &self.func.basic_blocks.arena {
-            for inst_id in block.iseq.borrow().iter().map(|i| i.as_instruction().id) {
+            for &inst_id in &*block.iseq_ref() {
                 let inst = &self.func.inst_table[inst_id];
                 if self.is_combinable(inst) {
                     worklist.push_back(inst_id);

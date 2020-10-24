@@ -90,12 +90,7 @@ impl<'a> SimplifyLoopOnFunction<'a> {
             edge_.succ.remove(&back_edges.dest);
             edge_.succ.insert(merge);
 
-            for id in edge_
-                .iseq_ref()
-                .iter()
-                .rev()
-                .map(|id| id.as_instruction().id)
-            {
+            for &id in edge_.iseq_ref().iter().rev() {
                 if self.func.inst_table[id].opcode.is_terminator() {
                     Instruction::replace_operand(
                         &mut self.func.inst_table,
@@ -123,7 +118,7 @@ impl<'a> SimplifyLoopOnFunction<'a> {
         let dest_ = &mut self.func.basic_blocks.arena[back_edges.dest];
         let mut new_phi_incomings = vec![];
 
-        for id in dest_.iseq_ref().iter().map(|id| id.as_instruction().id) {
+        for &id in &*dest_.iseq_ref() {
             if self.func.inst_table[id].opcode != Opcode::Phi {
                 continue;
             }
