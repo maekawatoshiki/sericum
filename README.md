@@ -11,6 +11,7 @@ Do not expect too much stuff!
 
 # To Do
 
+- [ ] Implement basic block parameters
 - [ ] Verify IR
 - [ ] More optimizations for IR
 - [ ] Support returning struct as value
