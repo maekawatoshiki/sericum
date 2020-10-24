@@ -1,4 +1,4 @@
-use super::{constant_pool::*, function::*, global_val::*, types::*, value, DumpToString};
+use super::{constant_pool::*, function::*, global_val::*, types::*, value};
 use id_arena::*;
 use std::fmt;
 
@@ -137,10 +137,6 @@ impl Module {
         let id = self.const_pool.add(c);
         value::Value::Constant(value::ConstantValue { ty, id })
     }
-
-    pub fn dump<T: DumpToString>(&self, obj: T) -> String {
-        obj.dump(self)
-    }
 }
 
 impl fmt::Debug for Module {
@@ -149,7 +145,7 @@ impl fmt::Debug for Module {
         writeln!(f, "{:?}", self.global_vars)?;
         writeln!(f, "{:?}", self.const_pool)?;
         for (_, func) in &self.functions {
-            writeln!(f, "{}", self.dump(func))?;
+            writeln!(f, "{}", func.dump(self))?;
         }
         fmt::Result::Ok(())
     }

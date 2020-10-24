@@ -1,4 +1,4 @@
-use super::{function::Function, module::Module, opcode::*, DumpToString};
+use super::{function::Function, module::Module, opcode::*, types::Type};
 use crate::traits::basic_block::*;
 use id_arena::*;
 use rustc_hash::FxHashSet;
@@ -155,8 +155,13 @@ impl BasicBlock {
     pub fn dump2(&self, module: &Module, f: &Function) -> String {
         self.iseq_ref()
             .iter()
-            .fold("".to_string(), |s, inst| {
-                format!("CURRENTLY NOT AVAILABLE {}{}\n", s, 1,) // f.inst_table[*inst].to_string(module, true))
+            .fold("".to_string(), |s, id| {
+                let inst = &f.inst_table[*id];
+                if inst.ty == Type::Void {
+                    format!("{}    {}\n", s, inst.to_string(module))
+                } else {
+                    format!("{}    %{} = {}\n", s, id.index(), inst.to_string(module))
+                }
             })
             .trim_end()
             .to_string()

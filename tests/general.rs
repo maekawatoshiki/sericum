@@ -6,15 +6,13 @@ mod x86_64 {
     fn test0_mem2reg() {
         let mut m = Module::new("cilk");
 
-        let func = cilk_ir!(m; define [i32] func [] {
+        cilk_ir!(m; define [i32] func [] {
         entry:
             i = alloca i32;
             store (i32 3), (%i);
             li = load (%i);
             ret (%li);
         });
-
-        println!("{}", m.dump(func));
 
         ir::mem2reg::Mem2Reg::new().run_on_module(&mut m);
 
@@ -27,7 +25,7 @@ mod x86_64 {
     fn test1_mem2reg() {
         let mut m = Module::new("cilk");
 
-        let func = cilk_ir!(m; define [i32] func [] {
+        cilk_ir!(m; define [i32] func [] {
         entry:
             i = alloca i32;
             k = alloca i32;
@@ -44,8 +42,6 @@ mod x86_64 {
             ret (%li);
         });
 
-        println!("{}", m.dump(func));
-
         ir::mem2reg::Mem2Reg::new().run_on_module(&mut m);
 
         let mut jit = exec::jit::JITExecutor::new(m);
@@ -57,7 +53,7 @@ mod x86_64 {
     fn test2_mem2reg() {
         let mut m = Module::new("cilk");
 
-        let func = cilk_ir!(m; define [i32] func [] {
+        cilk_ir!(m; define [i32] func [] {
         entry:
             i = alloca i32;
             br label1;
@@ -71,8 +67,6 @@ mod x86_64 {
             ret (%li);
         });
 
-        println!("{}", m.dump(func));
-
         ir::mem2reg::Mem2Reg::new().run_on_module(&mut m);
 
         let mut jit = exec::jit::JITExecutor::new(m);
@@ -84,7 +78,7 @@ mod x86_64 {
     fn test3_mem2reg() {
         let mut m = Module::new("cilk");
 
-        let func = cilk_ir!(m; define [i32] func [(i32)] {
+        cilk_ir!(m; define [i32] func [(i32)] {
         entry:
             i = alloca i32;
             store (i32 0), (%i);
@@ -101,8 +95,6 @@ mod x86_64 {
             ret (%li);
         });
 
-        println!("{}", m.dump(func));
-
         ir::mem2reg::Mem2Reg::new().run_on_module(&mut m);
 
         let mut jit = exec::jit::JITExecutor::new(m);
@@ -117,7 +109,7 @@ mod x86_64 {
     fn test4_mem2reg() {
         let mut m = Module::new("cilk");
 
-        let func = cilk_ir!(m; define [i32] func [(i32)] {
+        cilk_ir!(m; define [i32] func [(i32)] {
         entry:
             i = alloca i32;
             k = alloca i32;
@@ -140,8 +132,6 @@ mod x86_64 {
             a = add (%li), (%lk);
             ret (%a);
         });
-
-        println!("{}", m.dump(func));
 
         ir::mem2reg::Mem2Reg::new().run_on_module(&mut m);
 
@@ -168,7 +158,7 @@ mod x86_64 {
             vec![ptr_i32_ty, types::Type::i32, types::Type::i32],
         );
 
-        let func = cilk_ir!(m; define [i32] func [] {
+        cilk_ir!(m; define [i32] func [] {
         entry:
             arr = alloca_ ([16; i32]);
 
@@ -179,8 +169,6 @@ mod x86_64 {
 
             ret (%v);
         });
-
-        println!("{}", m.dump(func));
 
         let mut jit = exec::jit::JITExecutor::new(m);
         let func = jit.find_function_by_name("func").unwrap();
@@ -624,8 +612,6 @@ main:
             load_x = load (%x);
             ret (%load_x);
         });
-
-        println!("{}", m.dump(f));
 
         let mut jit = exec::jit::JITExecutor::new(m);
         let func = jit.find_function_by_name("f").unwrap();

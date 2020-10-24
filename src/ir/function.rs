@@ -1,4 +1,4 @@
-use super::{basic_block::*, module::Module, opcode::*, types::*, value::*, DumpToString};
+use super::{basic_block::*, module::Module, opcode::*, types::*, value::*};
 use crate::analysis::Analysis;
 use crate::codegen::is_internal_function;
 use crate::traits::function::FunctionTrait;
@@ -229,8 +229,8 @@ impl FunctionTrait for Function {
     }
 }
 
-impl DumpToString for &Function {
-    fn dump(&self, module: &Module) -> String {
+impl Function {
+    pub fn dump(&self, module: &Module) -> String {
         let base = module.types.base.borrow();
         let ty = base.as_function_ty(self.ty).unwrap();
         format!(
@@ -252,20 +252,20 @@ impl DumpToString for &Function {
             if self.is_internal {
                 "internal;".to_owned()
             } else {
-                format!("{{\n{}}}", self.basic_blocks.dump2(module, self))
+                format!("{{\n{}}}", self.basic_blocks.dump(module, self))
             },
         )
     }
 }
 
-impl DumpToString for FunctionId {
-    fn dump(&self, module: &Module) -> String {
-        module.function_ref(*self).dump(module)
-    }
-}
+// impl FunctionId {
+//     fn dump(&self, module: &Module) -> String {
+//         module.function_ref(*self).dump(module)
+//     }
+// }
 
 impl BasicBlocks {
-    fn dump2(&self, module: &Module, f: &Function) -> String {
+    fn dump(&self, module: &Module, f: &Function) -> String {
         self.order.iter().fold("".to_string(), |s, &id| {
             let b = &self.arena[id];
             format!(

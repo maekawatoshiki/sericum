@@ -1,6 +1,6 @@
 use super::{
     constant_pool::ConstantId, function::*, global_val::GlobalVariableId, module::*, opcode::*,
-    types::*, DumpToString,
+    types::*,
 };
 use std::hash;
 

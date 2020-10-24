@@ -18,7 +18,3 @@ pub mod prelude;
 pub mod simplify_loop;
 pub mod types;
 pub mod value;
-
-pub trait DumpToString {
-    fn dump(&self, module: &module::Module) -> String;
-}
