@@ -1,7 +1,7 @@
 use crate::ir::{
     function::Function,
     module::Module,
-    opcode::{Instruction, Opcode, Operand},
+    opcode::{Instruction, Opcode},
     value::Value,
 };
 use std::collections::VecDeque;
@@ -58,11 +58,11 @@ impl<'a> InstructionCombineOnFunction<'a> {
 
             inst2.operand.args_mut()[0] = op0;
             inst2.operand.args_mut()[1] = match inst2.opcode {
-                Opcode::Add => op1.const_add(inst2.operands[1].as_value()).unwrap(),
-                Opcode::Sub => op1.const_add(inst2.operands[1].as_value()).unwrap(),
-                Opcode::Mul => op1.const_mul(inst2.operands[1].as_value()).unwrap(),
-                Opcode::Div => op1.const_mul(inst2.operands[1].as_value()).unwrap(),
-                Opcode::Rem => op1.const_rem(inst2.operands[1].as_value()).unwrap(),
+                Opcode::Add => op1.const_add(&inst2.operand.args()[1]).unwrap(),
+                Opcode::Sub => op1.const_add(&inst2.operand.args()[1]).unwrap(),
+                Opcode::Mul => op1.const_mul(&inst2.operand.args()[1]).unwrap(),
+                Opcode::Div => op1.const_mul(&inst2.operand.args()[1]).unwrap(),
+                Opcode::Rem => op1.const_rem(&inst2.operand.args()[1]).unwrap(),
                 _ => unreachable!(),
             };
         }

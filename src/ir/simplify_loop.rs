@@ -5,7 +5,7 @@ use crate::{
         builder::{IRBuilder, IRBuilderWithFunction},
         function::Function,
         module::Module,
-        opcode::{Instruction, Opcode, Operand},
+        opcode::{Instruction, Opcode},
     },
 };
 
@@ -92,11 +92,11 @@ impl<'a> SimplifyLoopOnFunction<'a> {
 
             for &id in edge_.iseq_ref().iter().rev() {
                 if self.func.inst_table[id].opcode.is_terminator() {
-                    Instruction::replace_operand(
+                    Instruction::replace_block_operand(
                         &mut self.func.inst_table,
                         id,
-                        &Operand::BasicBlock(back_edges.dest),
-                        Operand::BasicBlock(merge),
+                        &back_edges.dest,
+                        merge,
                     );
                 }
             }
@@ -124,23 +124,21 @@ impl<'a> SimplifyLoopOnFunction<'a> {
             }
             let inst = &mut self.func.inst_table[id];
             let mut phi_incomings = vec![];
-            for i in (0..inst.operands.len()).step_by(2) {
-                let val = inst.operands[i];
-                let block = inst.operands[i + 1];
-                if back_edges.edges.contains(block.as_basic_block()) {
-                    phi_incomings.push((*val.as_value(), *block.as_basic_block()));
+            for (i, &val) in inst.operand.args().into_iter().enumerate() {
+                let block = inst.operand.blocks()[i];
+                if back_edges.edges.contains(&block) {
+                    phi_incomings.push((val, block));
                 }
             }
             for (_val, block) in &phi_incomings {
                 let i = inst
-                    .operands
+                    .operand
+                    .blocks()
                     .iter()
-                    .position(|op| {
-                        matches!(op, Operand::BasicBlock(_)) && op.as_basic_block() == block
-                    })
+                    .position(|b| b == block)
                     .unwrap();
-                inst.operands.remove(i); // remove block
-                inst.operands.remove(i - 1); // remove val
+                inst.operand.phi_args_mut().remove(i);
+                inst.operand.phi_blocks_mut().remove(i);
             }
             if phi_incomings.len() > 0 {
                 new_phi_incomings.push((id, phi_incomings));
@@ -153,8 +151,8 @@ impl<'a> SimplifyLoopOnFunction<'a> {
         for (phi, incomings) in new_phi_incomings {
             let new_phi = builder.build_phi(incomings);
             let phi = &mut builder.func_ref_mut().inst_table[phi];
-            phi.operands.push(Operand::Value(new_phi));
-            phi.operands.push(Operand::BasicBlock(merge));
+            phi.operand.phi_blocks_mut().push(merge);
+            phi.operand.phi_args_mut().push(new_phi);
         }
     }
 }

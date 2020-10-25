@@ -80,9 +80,9 @@ impl MISelector {
                     imm32 b => (mi.ADDr64i32 a, b)
                     GR64  b => (mi.ADDrr64   a, b) }
                 XMM a {
-                    (ir.Load c) b {
-                        (ir.FIAddr d) c {
-                            f64mem d => (mi.ADDSDrm a, [BaseFi %rbp, d]) } }
+                    // (ir.Load c) b {
+                    //     (ir.FIAddr d) c {
+                    //         f64mem d => (mi.ADDSDrm a, [BaseFi %rbp, d]) } }
                     imm_f64 b => (mi.ADDSDrr a, (mi.MOVSDrm64 b))
                     XMM    b => (mi.ADDSDrr a, b)
                 }
@@ -101,9 +101,9 @@ impl MISelector {
                 GR64 a {
                     imm32 b => (mi.SUBr64i32 a, b) }
                 XMM  a {
-                    (ir.Load c) b {
-                        (ir.FIAddr d) c {
-                            f64mem d => (mi.SUBSDrm a, [BaseFi %rbp, d]) } }
+                    // (ir.Load c) b {
+                    //     (ir.FIAddr d) c {
+                    //         f64mem d => (mi.SUBSDrm a, [BaseFi %rbp, d]) } }
                     imm_f64 b => (mi.SUBSDrr a, (mi.MOVSDrm64 b))
                     XMM    b => (mi.SUBSDrr a, b)
                 }
@@ -121,9 +121,9 @@ impl MISelector {
                 GR64 a {
                     imm32 b => (mi.IMULrr64i32 a, b) }
                 XMM a {
-                    (ir.Load c) b {
-                        (ir.FIAddr d) c {
-                            f64mem d => (mi.MULSDrm a, [BaseFi %rbp, d]) } }
+                    // (ir.Load c) b {
+                    //     (ir.FIAddr d) c {
+                    //         f64mem d => (mi.MULSDrm a, [BaseFi %rbp, d]) } }
                     imm_f64 b => (mi.MULSDrr a, (mi.MOVSDrm64 b))
                     XMM    b => (mi.MULSDrr a, b)
                 }

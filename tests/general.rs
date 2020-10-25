@@ -44,6 +44,8 @@ mod x86_64 {
 
         ir::mem2reg::Mem2Reg::new().run_on_module(&mut m);
 
+        println!("{:?}", m);
+
         let mut jit = exec::jit::JITExecutor::new(m);
         let func = jit.find_function_by_name("func").unwrap();
         assert_eq!(jit.run(func, vec![]), exec::jit::GenericValue::Int32(8));

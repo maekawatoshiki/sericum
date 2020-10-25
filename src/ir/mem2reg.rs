@@ -5,7 +5,7 @@ use crate::{
         const_folding::ConstantFolding,
         function::Function,
         module::Module,
-        opcode::{InstOperand, Instruction, InstructionId, Opcode, Operand},
+        opcode::{InstOperand, Instruction, InstructionId, Opcode},
         value::{InstructionValue, Value},
     },
     traits::function::FunctionTrait,
@@ -159,12 +159,7 @@ impl<'a> Mem2RegOnFunction<'a> {
         for (load_id, load_users) in loads_to_remove {
             self.cur_func.remove_inst(load_id);
             for u in load_users {
-                Instruction::replace_operand_inst(
-                    &mut self.cur_func.inst_table,
-                    u,
-                    load_id,
-                    Operand::Value(src),
-                )
+                Instruction::replace_inst_operand(&mut self.cur_func.inst_table, u, load_id, src)
             }
         }
     }
@@ -219,12 +214,7 @@ impl<'a> Mem2RegOnFunction<'a> {
 
             // remove loads and replace them with src
             for u in load_users {
-                Instruction::replace_operand_inst(
-                    &mut self.cur_func.inst_table,
-                    u,
-                    load_id,
-                    Operand::Value(src),
-                )
+                Instruction::replace_inst_operand(&mut self.cur_func.inst_table, u, load_id, src)
             }
         }
 
@@ -366,7 +356,7 @@ impl<'a> Mem2RegOnFunction<'a> {
                             .types
                             .get_element_ty(self.cur_func.inst_table[*alloca_id].ty, None)
                             .unwrap();
-                        let inst = Instruction::new2(
+                        let inst = Instruction::new(
                             Opcode::Phi,
                             InstOperand::Phi {
                                 blocks: vec![pred.unwrap()],
@@ -425,7 +415,7 @@ impl<'a> Mem2RegOnFunction<'a> {
                         }
                         Opcode::Load => {
                             if let Some(val) = incoming.get(&alloca_id) {
-                                Instruction::replace_all_uses2(
+                                Instruction::replace_all_uses(
                                     &mut self.cur_func.inst_table,
                                     inst_id,
                                     *val,

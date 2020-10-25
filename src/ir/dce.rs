@@ -1,7 +1,7 @@
 use crate::ir::{
     function::Function,
     module::Module,
-    opcode::{InstOperand, Instruction, InstructionId, Opcode, Operand},
+    opcode::{Instruction, InstructionId, Opcode},
     value::{InstructionValue, Value},
 };
 
@@ -63,17 +63,9 @@ impl<'a> DeadCodeEliminationOnFunction<'a> {
         // no users then eliminate
         if inst.users.borrow().len() == 0 {
             elimination_list.push(inst.id.unwrap());
-            if !matches!(inst.operand, InstOperand::None) {
-                for op in inst.operand.args() {
-                    if let Value::Instruction(InstructionValue { id, .. }) = op {
-                        worklist.push(*id)
-                    }
-                }
-            } else {
-                for op in &inst.operands {
-                    if let Operand::Value(Value::Instruction(InstructionValue { id, .. })) = op {
-                        worklist.push(*id)
-                    }
+            for op in inst.operand.args() {
+                if let Value::Instruction(InstructionValue { id, .. }) = op {
+                    worklist.push(*id)
                 }
             }
         }

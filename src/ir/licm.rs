@@ -8,7 +8,7 @@ use crate::{
         builder::{IRBuilder, IRBuilderWithFunction},
         function::Function,
         module::Module,
-        opcode::{Instruction, Opcode, Operand},
+        opcode::{Instruction, Opcode},
         simplify_loop::SimplifyLoop,
         value::*,
     },
@@ -152,14 +152,14 @@ impl<'a> LoopInvariantCodeMotionOnFunction<'a> {
                     if inst.opcode.access_memory() || inst.opcode == Opcode::Call {
                         continue;
                     }
-                    let invariant = inst.operands.iter().all(|operand| match operand {
-                        Operand::Value(Value::Instruction(InstructionValue { id, .. })) => {
+                    let invariant = inst.operand.args().iter().all(|val| match val {
+                        Value::Instruction(InstructionValue { id, .. }) => {
                             let inst = &self.func.inst_table[*id];
                             !loop_.contains(&inst.parent)
                         }
-                        Operand::Value(_) => true,
-                        _ => false,
-                    });
+                        _ => true,
+                    }) && inst.operand.blocks().len() == 0
+                        && inst.operand.types().len() == 0;
                     if invariant {
                         count += 1;
                         insts_to_hoist.push(inst_id);

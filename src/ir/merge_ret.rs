@@ -68,7 +68,7 @@ impl<'a> MergeReturnsOnFunction<'a> {
             let ret = &builder.func_ref().inst_table[ret_id];
             let parent = ret.parent;
             if !ret_void {
-                pairs.push((*ret.operands[0].as_value(), parent));
+                pairs.push((ret.operand.args()[0], parent));
             }
             builder.func_ref_mut().remove_inst(ret_id);
             builder.set_insert_point(parent);

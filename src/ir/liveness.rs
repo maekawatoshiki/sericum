@@ -59,44 +59,27 @@ impl<'a> LivenessAnalyzerOnFunction<'a> {
         for (bb_id, bb) in &self.func.basic_blocks.arena {
             for &inst_id in &*bb.iseq_ref() {
                 let inst = &self.func.inst_table[inst_id];
-                self.visit_operands(bb_id, &inst.operands, inst.opcode == Opcode::Phi);
-
-                for (i, v) in inst.operand.args().iter().enumerate() {
-                    some_then!(
-                        id,
-                        v.get_inst_id(),
-                        self.propagate(
-                            bb_id,
-                            id,
-                            if inst.opcode == Opcode::Phi {
-                                Some(inst.operand.blocks()[i])
-                            } else {
-                                None
-                            },
-                            inst.opcode == Opcode::Phi
-                        )
-                    );
-                }
+                self.visit_operands(bb_id, &inst.operand, inst.opcode == Opcode::Phi);
             }
         }
     }
 
-    pub fn visit_operands(&mut self, cur_bb: BasicBlockId, operands: &[Operand], is_phi: bool) {
-        for i in 0..operands.len() {
-            match &operands[i] {
-                Operand::BasicBlock(_)
-                | Operand::Type(_)
-                | Operand::ICmpKind(_)
-                | Operand::FCmpKind(_) => {}
-                Operand::Value(v) if is_phi => some_then!(
+    pub fn visit_operands(&mut self, cur_bb: BasicBlockId, operand: &InstOperand, is_phi: bool) {
+        for (i, v) in operand.args().iter().enumerate() {
+            some_then!(
+                id,
+                v.get_inst_id(),
+                self.propagate(
+                    cur_bb,
                     id,
-                    v.get_inst_id(),
-                    self.propagate(cur_bb, id, Some(*operands[i + 1].as_basic_block()), true)
-                ),
-                Operand::Value(v) => {
-                    some_then!(id, v.get_inst_id(), self.propagate(cur_bb, id, None, false));
-                }
-            }
+                    if is_phi {
+                        Some(operand.blocks()[i])
+                    } else {
+                        None
+                    },
+                    is_phi
+                )
+            );
         }
     }
 

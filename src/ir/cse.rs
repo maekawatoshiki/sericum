@@ -3,7 +3,7 @@ use crate::ir::{
     basic_block::{BasicBlock, BasicBlockId},
     function::Function,
     module::Module,
-    opcode::{Instruction, InstructionId, Opcode, Operand},
+    opcode::{InstOperand, Instruction, InstructionId, Opcode},
     value::{InstructionValue, Value},
 };
 // use crate::traits::basic_block::*;
@@ -41,7 +41,7 @@ impl CommonSubexprElimination {
     }
 }
 
-type Subexprs = FxHashMap<Opcode, FxHashMap<Vec<Operand>, InstructionId>>;
+type Subexprs = FxHashMap<Opcode, FxHashMap<InstOperand, InstructionId>>;
 type AvailsInBB = FxHashMap<BasicBlockId, Subexprs>;
 
 impl<'a> GlobalCommonSubexprEliminationOnFunction<'a> {
@@ -60,7 +60,7 @@ impl<'a> GlobalCommonSubexprEliminationOnFunction<'a> {
             let opcode = inst.opcode;
             commons
                 .get(&opcode)
-                .map_or(None, |map| map.get(&inst.operands))
+                .map_or(None, |map| map.get(&inst.operand))
         };
 
         let bb = &self.func.basic_blocks.arena[root];
@@ -75,11 +75,7 @@ impl<'a> GlobalCommonSubexprEliminationOnFunction<'a> {
                     func_id: self.func.id.unwrap(),
                     ty: self.func.inst_table[*common].ty,
                 });
-                Instruction::replace_all_uses(
-                    &mut self.func.inst_table,
-                    inst_id,
-                    Operand::Value(common_val),
-                );
+                Instruction::replace_all_uses(&mut self.func.inst_table, inst_id, common_val);
                 self.removal_list.push(inst_id);
                 continue;
             }
@@ -100,7 +96,7 @@ impl<'a> GlobalCommonSubexprEliminationOnFunction<'a> {
                 commons
                     .entry(inst.opcode)
                     .or_insert(FxHashMap::default())
-                    .entry(inst.operands.clone())
+                    .entry(inst.operand.clone())
                     .or_insert(inst_id);
             }
         }
@@ -131,7 +127,7 @@ impl<'a> GlobalCommonSubexprEliminationOnFunction<'a> {
             let opcode = inst.opcode;
             commons
                 .get(&opcode)
-                .map_or(None, |map| map.get(&inst.operands))
+                .map_or(None, |map| map.get(&inst.operand))
         };
         fn is_common<'a>(
             preds: &FxHashSet<BasicBlockId>,
@@ -166,22 +162,23 @@ impl<'a> GlobalCommonSubexprEliminationOnFunction<'a> {
                 &self.func.inst_table,
                 &inst_id,
             ) {
-                let incomings: Vec<Operand> = incomings
-                    .into_iter()
-                    .map(|(inst_id, bb_id)| {
-                        vec![
-                            Operand::Value(Value::Instruction(InstructionValue {
-                                func_id: self.func.id.unwrap(),
-                                id: inst_id,
-                                ty: self.func.inst_table[inst_id].ty,
-                            })),
-                            Operand::BasicBlock(bb_id),
-                        ]
-                    })
-                    .flatten()
-                    .collect();
-                let ty = incomings[0].as_value().as_instruction().ty;
-                let phi = Instruction::new(Opcode::Phi, incomings, ty, *ebb_start);
+                let mut args = vec![];
+                let mut blocks = vec![];
+                for (inst_id, block) in incomings {
+                    args.push(Value::Instruction(InstructionValue {
+                        func_id: self.func.id.unwrap(),
+                        id: inst_id,
+                        ty: self.func.inst_table[inst_id].ty,
+                    }));
+                    blocks.push(block);
+                }
+                let ty = args[0].as_instruction().ty;
+                let phi = Instruction::new(
+                    Opcode::Phi,
+                    InstOperand::Phi { args, blocks },
+                    ty,
+                    *ebb_start,
+                );
                 phis.push((inst_id, phi));
             }
         }
@@ -197,11 +194,7 @@ impl<'a> GlobalCommonSubexprEliminationOnFunction<'a> {
                 id,
                 ty,
             });
-            Instruction::replace_all_uses(
-                &mut self.func.inst_table,
-                inst2replace,
-                Operand::Value(val),
-            );
+            Instruction::replace_all_uses(&mut self.func.inst_table, inst2replace, val);
             self.removal_list.push(inst2replace);
         }
 
@@ -215,27 +208,26 @@ impl<'a> GlobalCommonSubexprEliminationOnFunction<'a> {
     }
 
     pub fn run(mut self) {
-        //
-        // let dom_tree = DominatorTreeConstructor::new(&self.func.basic_blocks).construct();
-        //
-        // self.run_sub(
-        //     &dom_tree,
-        //     self.func.basic_blocks.order[0],
-        //     FxHashMap::default(),
-        // );
-        //
-        // for df in self.dom_frontiers.clone() {
-        //     self.run_sub2(&df, &df)
-        // }
-        //
-        // debug!(println!(
-        //     "function '{}': {} insts removed",
-        //     self.func.name,
-        //     self.removal_list.len()
-        // ));
-        //
-        // for remove in self.removal_list {
-        //     self.func.remove_inst(remove);
-        // }
+        let dom_tree = DominatorTreeConstructor::new(&self.func.basic_blocks).construct();
+
+        self.run_sub(
+            &dom_tree,
+            self.func.basic_blocks.order[0],
+            FxHashMap::default(),
+        );
+
+        for df in self.dom_frontiers.clone() {
+            self.run_sub2(&df, &df)
+        }
+
+        debug!(println!(
+            "function '{}': {} insts removed",
+            self.func.name,
+            self.removal_list.len()
+        ));
+
+        for remove in self.removal_list {
+            self.func.remove_inst(remove);
+        }
     }
 }

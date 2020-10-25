@@ -1,4 +1,4 @@
-use super::{basic_block::BasicBlockId, function::FunctionId, module::Module, types::*, value::*};
+use super::{basic_block::BasicBlockId, module::Module, types::*, value::*};
 use id_arena::{Arena, Id};
 use std::cell::RefCell;
 
@@ -11,7 +11,7 @@ pub struct Register(usize);
 #[derive(Clone, Debug)]
 pub struct Instruction {
     pub opcode: Opcode,
-    pub operands: Vec<Operand>,
+    // pub operands: Vec<Operand>,
     pub operand: InstOperand,
     pub ty: Type,
     pub id: Option<InstructionId>,
@@ -43,7 +43,7 @@ pub enum Opcode {
     Ret,    //
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum InstOperand {
     Type {
         ty: Type,
@@ -82,22 +82,13 @@ pub enum InstOperand {
         blocks: Vec<BasicBlockId>,
         args: Vec<Value>,
     },
-    GEP {
+    Gep {
         args: Vec<Value>,
     },
     Ret {
         arg: Value,
     },
     None,
-}
-
-#[derive(Debug, Clone, PartialEq, Copy, Hash, Eq)]
-pub enum Operand {
-    Type(Type),
-    Value(Value),
-    BasicBlock(BasicBlockId),
-    ICmpKind(ICmpKind),
-    FCmpKind(FCmpKind),
 }
 
 #[derive(Clone, Debug, Copy, PartialEq, Hash, Eq)]
@@ -123,22 +114,9 @@ pub enum FCmpKind {
 }
 
 impl Instruction {
-    pub fn new(opcode: Opcode, operands: Vec<Operand>, ty: Type, parent: BasicBlockId) -> Self {
+    pub fn new(opcode: Opcode, operand: InstOperand, ty: Type, parent: BasicBlockId) -> Self {
         Self {
             opcode,
-            operands: operands,
-            operand: InstOperand::None,
-            ty,
-            id: None,
-            parent,
-            users: RefCell::new(vec![]),
-        }
-    }
-
-    pub fn new2(opcode: Opcode, operand: InstOperand, ty: Type, parent: BasicBlockId) -> Self {
-        Self {
-            opcode,
-            operands: vec![],
             operand,
             ty,
             id: None,
@@ -153,43 +131,19 @@ impl Instruction {
 
     pub fn set_users(&self, inst_arena: &Arena<Instruction>) {
         let self_id = self.id.unwrap();
-        for operand in &self.operands {
-            match operand {
-                Operand::Value(Value::Instruction(InstructionValue { id, .. })) => {
-                    let mut users = inst_arena[*id].users.borrow_mut();
-                    if users.contains(&self_id) {
-                        continue;
-                    }
-                    users.push(self_id);
+        for operand in self.operand.args() {
+            if let Value::Instruction(InstructionValue { id, .. }) = operand {
+                let mut users = inst_arena[*id].users.borrow_mut();
+                if users.contains(&self_id) {
+                    continue;
                 }
-                _ => {}
-            }
-        }
-        if self.operands.len() == 0 {
-            for operand in self.operand.args() {
-                if let Value::Instruction(InstructionValue { id, .. }) = operand {
-                    let mut users = inst_arena[*id].users.borrow_mut();
-                    if users.contains(&self_id) {
-                        continue;
-                    }
-                    users.push(self_id);
-                }
+                users.push(self_id);
             }
         }
     }
 
     pub fn set_user(&self, inst_arena: &Arena<Instruction>, new: InstructionId) {
         inst_arena[self.id.unwrap()].users.borrow_mut().push(new);
-    }
-
-    pub fn add_operand(arena: &mut Arena<Instruction>, self_id: InstructionId, operand: Operand) {
-        if let Operand::Value(Value::Instruction(InstructionValue { id, .. })) = &operand {
-            let mut users = arena[*id].users.borrow_mut();
-            if !users.contains(&self_id) {
-                users.push(self_id);
-            }
-        }
-        arena[self_id].operands.push(operand);
     }
 
     pub fn add_value_operand(arena: &mut Arena<Instruction>, self_id: InstructionId, value: Value) {
@@ -202,29 +156,6 @@ impl Instruction {
         arena[self_id].operand.phi_args_mut().push(value)
     }
 
-    // TODO: using two loops is inefficient
-    pub fn replace_operand(
-        arena: &mut Arena<Instruction>,
-        self_id: InstructionId,
-        from: &Operand,
-        to: Operand,
-    ) {
-        for operand in &arena[self_id].operands {
-            if *operand == *from {
-                // remove self from operand's users if necessary
-                operand.remove_from_users(arena, self_id);
-                // add self to operand's users if necessary
-                to.set_user(arena, self_id);
-            }
-        }
-        for operand in &mut arena[self_id].operands {
-            // actually replace from with to
-            if *operand == *from {
-                *operand = to;
-            }
-        }
-    }
-
     pub fn replace_block_operand(
         arena: &mut Arena<Instruction>,
         self_id: InstructionId,
@@ -232,7 +163,9 @@ impl Instruction {
         to: BasicBlockId,
     ) {
         for block in arena[self_id].operand.blocks_mut() {
-            *block = to;
+            if from == block {
+                *block = to;
+            }
         }
     }
 
@@ -242,18 +175,6 @@ impl Instruction {
         from: &Value,
         to: Value,
     ) {
-        for op in &arena[self_id].operands {
-            if *op == Operand::Value(*from) {
-                op.remove_from_users(arena, self_id);
-                to.set_user(arena, self_id)
-            }
-        }
-        for op in &mut arena[self_id].operands {
-            if *op == Operand::Value(*from) {
-                *op = Operand::Value(to);
-            }
-        }
-
         for val in arena[self_id].operand.args() {
             if val == from {
                 val.remove_from_users(arena, self_id);
@@ -267,85 +188,41 @@ impl Instruction {
         }
     }
 
-    // TODO: using two loops is inefficient
-    pub fn replace_operand_inst(
+    pub fn replace_inst_operand(
         arena: &mut Arena<Instruction>,
         self_id: InstructionId,
         from: InstructionId,
-        to: Operand,
+        to: Value,
     ) {
-        for operand in &arena[self_id].operands {
-            match operand {
-                Operand::Value(Value::Instruction(InstructionValue { id, .. })) if *id == from => {}
+        for val in arena[self_id].operand.args() {
+            match val {
+                Value::Instruction(InstructionValue { id, .. }) if *id == from => {
+                    val.remove_from_users(arena, self_id);
+                    to.set_user(arena, self_id);
+                }
                 _ => continue,
             };
-            // remove self from operand's users if necessary
-            operand.remove_from_users(arena, self_id);
-            // add self to operand's users if necessary
-            to.set_user(arena, self_id);
         }
-        for operand in &mut arena[self_id].operands {
-            match operand {
-                Operand::Value(Value::Instruction(InstructionValue { id, .. })) if *id == from => {}
+        for val in arena[self_id].operand.args_mut() {
+            match val {
+                Value::Instruction(InstructionValue { id, .. }) if *id == from => {
+                    // replace 'from' with 'to'
+                    *val = to
+                }
                 _ => continue,
             };
-            // replace 'from' with 'to'
-            *operand = to;
-        }
-
-        ///////
-
-        if arena[self_id].operands.len() == 0 {
-            for val in arena[self_id].operand.args() {
-                match val {
-                    Value::Instruction(InstructionValue { id, .. }) if *id == from => {
-                        val.remove_from_users(arena, self_id);
-                        to.set_user(arena, self_id);
-                    }
-                    _ => continue,
-                };
-            }
-            for val in arena[self_id].operand.args_mut() {
-                match val {
-                    Value::Instruction(InstructionValue { id, .. }) if *id == from => {
-                        // replace 'from' with 'to'
-                        *val = *to.as_value();
-                    }
-                    _ => continue,
-                };
-            }
         }
     }
 
-    pub fn replace_all_uses(arena: &mut Arena<Instruction>, self_id: InstructionId, to: Operand) {
+    pub fn replace_all_uses(arena: &mut Arena<Instruction>, self_id: InstructionId, to: Value) {
         let users = arena[self_id].users.borrow().clone();
         for u in users {
-            Self::replace_operand_inst(arena, u, self_id, to);
-        }
-        assert!(arena[self_id].users.borrow().len() == 0);
-    }
-
-    pub fn replace_all_uses2(arena: &mut Arena<Instruction>, self_id: InstructionId, to: Value) {
-        let users = arena[self_id].users.borrow().clone();
-        for u in users {
-            Self::replace_operand_inst(arena, u, self_id, Operand::Value(to));
+            Self::replace_inst_operand(arena, u, self_id, to);
         }
         assert!(arena[self_id].users.borrow().len() == 0);
     }
 
     pub fn remove(&self, inst_arena: &Arena<Instruction>) {
-        for operand in &self.operands {
-            match operand {
-                Operand::Value(Value::Instruction(InstructionValue { id, .. })) => {
-                    inst_arena[*id]
-                        .users
-                        .borrow_mut()
-                        .retain(|&use_id| use_id != self.id.unwrap());
-                }
-                _ => {}
-            }
-        }
-
         for val in self.operand.args() {
             if let Value::Instruction(InstructionValue { id, .. }) = val {
                 inst_arena[*id]
@@ -372,23 +249,68 @@ impl Instruction {
     }
 
     pub fn to_string(&self, parent: &Module) -> String {
-        let mut output = self.opcode.to_string().to_owned();
-        for (i, operand) in self.operands.iter().enumerate() {
-            output = format!(
-                "{}{}{}",
+        let output = self.opcode.to_string().to_owned();
+        let ty2str = |ty: &Type| -> String { parent.types.to_string(*ty) };
+        match &self.operand {
+            InstOperand::Type { ty } => format!("{} {}", output, ty2str(ty)),
+            InstOperand::Store { args } | InstOperand::Binary { args } => format!(
+                "{} {}, {}",
                 output,
-                if i == 0 { " " } else { ", " },
-                operand.to_string(parent)
-            );
+                args[0].to_string(parent, false),
+                args[1].to_string(parent, false)
+            ),
+            InstOperand::Ret { arg } | InstOperand::Load { arg } | InstOperand::Cast { arg } => {
+                format!("{} {}", output, arg.to_string(parent, false))
+            }
+            InstOperand::IntCmp { cond, args } => format!(
+                "{} {} {}, {}",
+                output,
+                cond.as_str(),
+                args[0].to_string(parent, false),
+                args[1].to_string(parent, false),
+            ),
+            InstOperand::FloatCmp { cond, args } => format!(
+                "{} {} {}, {}",
+                output,
+                cond.as_str(),
+                args[0].to_string(parent, false),
+                args[1].to_string(parent, false),
+            ),
+            InstOperand::Branch { dst } => format!("{} %label.{} ", output, dst.index(),),
+            InstOperand::CondBranch { arg, dsts } => format!(
+                "{} {}, %label.{}, %label.{}",
+                output,
+                arg.to_string(parent, false),
+                dsts[0].index(),
+                dsts[1].index(),
+            ),
+            InstOperand::Call { args } | InstOperand::Gep { args } => {
+                args.iter().enumerate().fold(output, |acc, (i, v)| {
+                    format!(
+                        "{}{}{}",
+                        acc,
+                        if i == 0 { " " } else { ", " },
+                        v.to_string(parent, false)
+                    )
+                })
+            }
+            InstOperand::Phi { blocks, args } => {
+                blocks
+                    .iter()
+                    .zip(args.iter())
+                    .enumerate()
+                    .fold(output, |acc, (i, (b, a))| {
+                        format!(
+                            "{}{}(%label.{}, {})",
+                            acc,
+                            if i == 0 { " " } else { ", " },
+                            b.index(),
+                            a.to_string(parent, false)
+                        )
+                    })
+            }
+            InstOperand::None => output,
         }
-
-        format!(
-            "{}-{:?} ",
-            output,
-            self.operand,
-            // self.id.unwrap().index(),
-            // self.users.borrow().iter().take(10).collect::<Vec<_>>()
-        )
     }
 }
 
@@ -485,13 +407,14 @@ impl InstOperand {
     pub fn args(&self) -> &[Value] {
         match self {
             Self::Store { args } => args,
-            Self::Ret { arg } | Self::CondBranch { arg, .. } | Self::Load { arg } => {
-                ::core::slice::from_ref(arg)
-            }
+            Self::Cast { arg }
+            | Self::Ret { arg }
+            | Self::CondBranch { arg, .. }
+            | Self::Load { arg } => ::core::slice::from_ref(arg),
             Self::Binary { args } | Self::IntCmp { args, .. } | Self::FloatCmp { args, .. } => {
                 args.as_ref()
             }
-            Self::GEP { args } | Self::Phi { args, .. } | Self::Call { args } => args.as_ref(),
+            Self::Gep { args } | Self::Phi { args, .. } | Self::Call { args } => args.as_ref(),
             _ => &[],
         }
     }
@@ -499,13 +422,14 @@ impl InstOperand {
     pub fn args_mut(&mut self) -> &mut [Value] {
         match self {
             Self::Store { args } => args,
-            Self::Ret { arg } | Self::CondBranch { arg, .. } | Self::Load { arg } => {
-                ::core::slice::from_mut(arg)
-            }
+            Self::Cast { arg }
+            | Self::Ret { arg }
+            | Self::CondBranch { arg, .. }
+            | Self::Load { arg } => ::core::slice::from_mut(arg),
             Self::Binary { args } | Self::IntCmp { args, .. } | Self::FloatCmp { args, .. } => {
                 args.as_mut()
             }
-            Self::GEP { args } | Self::Phi { args, .. } | Self::Call { args } => args.as_mut(),
+            Self::Gep { args } | Self::Phi { args, .. } | Self::Call { args } => args.as_mut(),
             _ => &mut [],
         }
     }
@@ -525,75 +449,75 @@ impl InstOperand {
     }
 }
 
-impl Operand {
-    pub fn new_inst(func_id: FunctionId, id: InstructionId, ty: Type) -> Self {
-        Operand::Value(Value::Instruction(InstructionValue { func_id, id, ty }))
-    }
-
-    // TODO: should return cow?
-    pub fn to_string(&self, parent: &Module) -> String {
-        match self {
-            Self::BasicBlock(id) => format!("%label.{}", id.index()),
-            Self::ICmpKind(kind) => kind.as_str().to_owned(),
-            Self::FCmpKind(kind) => kind.as_str().to_owned(),
-            Self::Type(ty) => parent.types.to_string(*ty),
-            Self::Value(v) => v.to_string(parent, false),
-        }
-    }
-
-    pub fn get_value(&self) -> Option<&Value> {
-        match self {
-            Self::Value(val) => Some(val),
-            _ => None,
-        }
-    }
-
-    pub fn as_basic_block(&self) -> &BasicBlockId {
-        match self {
-            Self::BasicBlock(id) => id,
-            _ => panic!(),
-        }
-    }
-    pub fn as_icmp_kind(&self) -> &ICmpKind {
-        match self {
-            Self::ICmpKind(kind) => kind,
-            _ => panic!(),
-        }
-    }
-    pub fn as_fcmp_kind(&self) -> &FCmpKind {
-        match self {
-            Self::FCmpKind(kind) => kind,
-            _ => panic!(),
-        }
-    }
-    pub fn as_type(&self) -> &Type {
-        match self {
-            Self::Type(ty) => ty,
-            _ => panic!(),
-        }
-    }
-    pub fn as_value(&self) -> &Value {
-        match self {
-            Self::Value(v) => v,
-            _ => panic!(),
-        }
-    }
-
-    pub fn remove_from_users(&self, inst_arena: &Arena<Instruction>, remove: InstructionId) {
-        if let Operand::Value(Value::Instruction(InstructionValue { id, .. })) = self {
-            inst_arena[*id]
-                .users
-                .borrow_mut()
-                .retain(|&use_id| use_id != remove);
-        }
-    }
-
-    pub fn set_user(&self, inst_arena: &Arena<Instruction>, new: InstructionId) {
-        if let Operand::Value(Value::Instruction(InstructionValue { id, .. })) = self {
-            inst_arena[*id].set_user(inst_arena, new);
-        }
-    }
-}
+// impl Operand {
+//     pub fn new_inst(func_id: FunctionId, id: InstructionId, ty: Type) -> Self {
+//         Operand::Value(Value::Instruction(InstructionValue { func_id, id, ty }))
+//     }
+//
+//     // TODO: should return cow?
+//     pub fn to_string(&self, parent: &Module) -> String {
+//         match self {
+//             Self::BasicBlock(id) => format!("%label.{}", id.index()),
+//             Self::ICmpKind(kind) => kind.as_str().to_owned(),
+//             Self::FCmpKind(kind) => kind.as_str().to_owned(),
+//             Self::Type(ty) => parent.types.to_string(*ty),
+//             Self::Value(v) => v.to_string(parent, false),
+//         }
+//     }
+//
+//     pub fn get_value(&self) -> Option<&Value> {
+//         match self {
+//             Self::Value(val) => Some(val),
+//             _ => None,
+//         }
+//     }
+//
+//     pub fn as_basic_block(&self) -> &BasicBlockId {
+//         match self {
+//             Self::BasicBlock(id) => id,
+//             _ => panic!(),
+//         }
+//     }
+//     pub fn as_icmp_kind(&self) -> &ICmpKind {
+//         match self {
+//             Self::ICmpKind(kind) => kind,
+//             _ => panic!(),
+//         }
+//     }
+//     pub fn as_fcmp_kind(&self) -> &FCmpKind {
+//         match self {
+//             Self::FCmpKind(kind) => kind,
+//             _ => panic!(),
+//         }
+//     }
+//     pub fn as_type(&self) -> &Type {
+//         match self {
+//             Self::Type(ty) => ty,
+//             _ => panic!(),
+//         }
+//     }
+//     pub fn as_value(&self) -> &Value {
+//         match self {
+//             Self::Value(v) => v,
+//             _ => panic!(),
+//         }
+//     }
+//
+//     pub fn remove_from_users(&self, inst_arena: &Arena<Instruction>, remove: InstructionId) {
+//         if let Operand::Value(Value::Instruction(InstructionValue { id, .. })) = self {
+//             inst_arena[*id]
+//                 .users
+//                 .borrow_mut()
+//                 .retain(|&use_id| use_id != remove);
+//         }
+//     }
+//
+//     pub fn set_user(&self, inst_arena: &Arena<Instruction>, new: InstructionId) {
+//         if let Operand::Value(Value::Instruction(InstructionValue { id, .. })) = self {
+//             inst_arena[*id].set_user(inst_arena, new);
+//         }
+//     }
+// }
 
 impl ICmpKind {
     pub fn as_str(&self) -> &'static str {

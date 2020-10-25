@@ -1,7 +1,7 @@
 use crate::ir::{
     function::Function,
     module::Module,
-    opcode::{Instruction, Opcode, Operand},
+    opcode::{Instruction, Opcode},
     value::Value,
 };
 use std::collections::VecDeque;
@@ -19,7 +19,6 @@ impl ConstantFolding {
     }
 
     pub fn run_on_module(&mut self, module: &mut Module) {
-        println!("CF {:?}", module);
         for (_, func) in &mut module.functions {
             ConstantFoldingOnFunction::new(func).run()
         }
@@ -77,7 +76,7 @@ impl<'a> ConstantFoldingOnFunction<'a> {
 
         while let Some(inst_id) = to_shift.pop_front() {
             let inst = &mut self.cur_func.inst_table[inst_id];
-            assert!(inst.opcode == Opcode::Mul && inst.operands.len() == 0);
+            assert!(inst.opcode == Opcode::Mul);
             inst.opcode = Opcode::Shl;
             inst.operand.args_mut()[1] = Value::new_imm_int8(
                 inst.operand.args()[1]

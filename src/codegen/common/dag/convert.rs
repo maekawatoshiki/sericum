@@ -416,7 +416,6 @@ impl<'a> ConvertToDAGNode<'a> {
                 }
                 Opcode::Phi => {
                     let mut operands = vec![];
-                    assert!(inst.operands.len() == 0);
                     for (i, val) in inst.operand.args().iter().enumerate() {
                         let bb = &inst.operand.blocks()[i];
                         // Remove CopyFromReg if necessary
