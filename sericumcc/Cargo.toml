@@ -1,11 +1,11 @@
 [package]
-name = "cilkcc"
+name = "sericumcc"
 version = "0.1.0"
 authors = ["uint256_t"]
 edition = "2018"
 
 [dependencies]
-cilk       = { path = "../", features = ["x86_64"] }
+sericum    = { path = "../", features = ["x86_64"] }
 argopt     = "= 0.1.1"
 structopt  = "= 0.3.18"
 rustc-hash = "= 1.1.0"

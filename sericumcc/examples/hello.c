@@ -1,4 +1,4 @@
-#include <cilkcc.h>
+#include <sericumcc.h>
 #include <stdio.h>
 #define master(x, y) main(int x, char ** y)
 #define A 10

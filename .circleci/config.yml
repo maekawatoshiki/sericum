@@ -5,7 +5,7 @@ jobs:
     docker:
       - image: ubuntu
 
-    working_directory: /opt/cilk
+    working_directory: /opt/sericum
 
     steps:
       - checkout
@@ -27,8 +27,8 @@ jobs:
             mv /tmp/docker/* /usr/bin
 
       - run: |
-          docker build -t cilk -f Dockerfile_cov .
-          docker run --security-opt seccomp=unconfined cilk bash run_kcov.sh $CODECOV_TOKEN
+          docker build -t sericum -f Dockerfile_cov .
+          docker run --security-opt seccomp=unconfined sericum bash run_kcov.sh $CODECOV_TOKEN
 
       # - run:
       #     command: |
@@ -64,9 +64,9 @@ jobs:
       #       export PATH=~/.cargo/bin:$PATH
       #       RUSTFLAGS='-C link-dead-code -C link-args=-lffi' cargo test
       # 
-      #       REPORT=$(find ./target/debug -maxdepth 2 -regex '.+/deps/cilk-.*' -a ! -name '*.d')
+      #       REPORT=$(find ./target/debug -maxdepth 2 -regex '.+/deps/sericum-.*' -a ! -name '*.d')
       #       for file in $REPORT; do  
       #         echo $file
-      #         /usr/local/bin/kcov --include-pattern=cilk/src --exclude-pattern=/.cargo ./target/cov "$file"
+      #         /usr/local/bin/kcov --include-pattern=sericum/src --exclude-pattern=/.cargo ./target/cov "$file"
       #       done
       #       bash <(curl -s https://codecov.io/bash) -s ./target/cov

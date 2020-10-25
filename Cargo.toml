@@ -1,12 +1,12 @@
 [package]
-name = "cilk"
+name = "sericum"
 version = "0.2.1"
 authors = ["uint256_t"]
 edition = "2018"
 license-file = "LICENSE"
 description = "(Toy) Compiler Infrastructure inspired by LLVM"
 readme = "README.md"
-repository = "https://github.com/maekawatoshiki/cilk"
+repository = "https://github.com/maekawatoshiki/sericum"
 
 [dependencies]
 dyn-clone      = "= 1.0.2"

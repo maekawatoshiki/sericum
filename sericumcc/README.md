@@ -1,6 +1,6 @@
-# Cilkcc
+# Sericumcc
 
-A small C compiler powered by cilk
+A small C compiler powered by sericum
 
 # Todo
 

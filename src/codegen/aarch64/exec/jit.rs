@@ -89,20 +89,20 @@ impl JITCompiler {
             internal_functions: {
                 let internal_names = internal_function_names();
                 let internals = vec![
-                    cilk_memset_p0i32_i32_ as u64,
-                    cilk_println_i32_ as _,
-                    cilk_print_i32_ as _,
-                    cilk_printch_i32_ as _,
-                    cilk_println_f64_ as _,
-                    cilk_print_f64_ as _,
-                    cilk_sin_f64_ as _,
-                    cilk_cos_f64_ as _,
-                    cilk_sqrt_f64_ as _,
-                    cilk_floor_f64_ as _,
-                    cilk_fabs_f64_ as _,
-                    cilk_i32_to_f64_i32_ as _,
-                    cilk_f64_to_i32_f64_ as _,
-                    cilk_malloc_i32_ as _,
+                    sericum_memset_p0i32_i32_ as u64,
+                    sericum_println_i32_ as _,
+                    sericum_print_i32_ as _,
+                    sericum_printch_i32_ as _,
+                    sericum_println_f64_ as _,
+                    sericum_print_f64_ as _,
+                    sericum_sin_f64_ as _,
+                    sericum_cos_f64_ as _,
+                    sericum_sqrt_f64_ as _,
+                    sericum_floor_f64_ as _,
+                    sericum_fabs_f64_ as _,
+                    sericum_i32_to_f64_i32_ as _,
+                    sericum_f64_to_i32_f64_ as _,
+                    sericum_malloc_i32_ as _,
                 ];
                 assert!(
                     internal_names.len() == internals.len(),
@@ -1044,81 +1044,81 @@ impl From<MachineFunctionId> for LabelKey {
     }
 }
 
-// Internal function cilk.println.i32
+// Internal function sericum.println.i32
 #[no_mangle]
-pub extern "C" fn cilk_println_i32_(i: i32) {
+pub extern "C" fn sericum_println_i32_(i: i32) {
     println!("{}", i);
 }
 
-// Internal function cilk.println.f64
+// Internal function sericum.println.f64
 #[no_mangle]
-pub extern "C" fn cilk_print_i32_(i: i32) {
+pub extern "C" fn sericum_print_i32_(i: i32) {
     print!("{}", i);
 }
 
-// Internal function cilk.println.f64
+// Internal function sericum.println.f64
 #[no_mangle]
-pub extern "C" fn cilk_println_f64_(f: f64) {
+pub extern "C" fn sericum_println_f64_(f: f64) {
     println!("{}", f);
 }
 
-// Internal function cilk.println.f64
+// Internal function sericum.println.f64
 #[no_mangle]
-pub extern "C" fn cilk_print_f64_(f: f64) {
+pub extern "C" fn sericum_print_f64_(f: f64) {
     print!("{}", f);
 }
 
-// EXPERIMENTAL Internal function cilk.printch.i32
+// EXPERIMENTAL Internal function sericum.printch.i32
 #[no_mangle]
-pub extern "C" fn cilk_printch_i32_(ch: i32) {
+pub extern "C" fn sericum_printch_i32_(ch: i32) {
     print!("{}", ch as u8 as char);
 }
 
-// EXPERIMENTAL Internal function cilk.sin.f64
+// EXPERIMENTAL Internal function sericum.sin.f64
 #[no_mangle]
-pub extern "C" fn cilk_sin_f64_(x: f64) -> f64 {
+pub extern "C" fn sericum_sin_f64_(x: f64) -> f64 {
     x.sin()
 }
 
-// EXPERIMENTAL Internal function cilk.cos.f64
+// EXPERIMENTAL Internal function sericum.cos.f64
 #[no_mangle]
-pub extern "C" fn cilk_cos_f64_(x: f64) -> f64 {
+pub extern "C" fn sericum_cos_f64_(x: f64) -> f64 {
     x.cos()
 }
 
-// EXPERIMENTAL Internal function cilk.sqrt.f64
+// EXPERIMENTAL Internal function sericum.sqrt.f64
 #[no_mangle]
-pub extern "C" fn cilk_sqrt_f64_(x: f64) -> f64 {
+pub extern "C" fn sericum_sqrt_f64_(x: f64) -> f64 {
     x.sqrt()
 }
 
-// EXPERIMENTAL Internal function cilk.floor.f64
+// EXPERIMENTAL Internal function sericum.floor.f64
 #[no_mangle]
-pub extern "C" fn cilk_floor_f64_(x: f64) -> f64 {
+pub extern "C" fn sericum_floor_f64_(x: f64) -> f64 {
     x.floor()
 }
 
-// EXPERIMENTAL Internal function cilk.floor.f64
+// EXPERIMENTAL Internal function sericum.floor.f64
 #[no_mangle]
-pub extern "C" fn cilk_fabs_f64_(x: f64) -> f64 {
+pub extern "C" fn sericum_fabs_f64_(x: f64) -> f64 {
     x.abs()
 }
 
-// EXPERIMENTAL Internal function cilk.floor.f64
+// EXPERIMENTAL Internal function sericum.floor.f64
 #[no_mangle]
-pub extern "C" fn cilk_f64_to_i32_f64_(x: f64) -> i32 {
+pub extern "C" fn sericum_f64_to_i32_f64_(x: f64) -> i32 {
     x as i32
 }
 
-// EXPERIMENTAL Internal function cilk.floor.f64
+// EXPERIMENTAL Internal function sericum.floor.f64
 #[no_mangle]
-pub extern "C" fn cilk_i32_to_f64_i32_(x: i32) -> f64 {
+pub extern "C" fn sericum_i32_to_f64_i32_(x: i32) -> f64 {
     x as f64
 }
 
-// EXPERIMENTAL Internal function cilk.sqrt.f64
+// EXPERIMENTAL Internal function sericum.sqrt.f64
 #[no_mangle]
-pub extern "C" fn cilk_malloc_i32_(i: i32) -> *mut i64 {
+pub extern "C" fn sericum_malloc_i32_(i: i32) -> *mut i64 {
     let mut vec = Vec::<u8>::with_capacity(i as usize);
     unsafe {
         vec.set_len(i as usize);
@@ -1126,9 +1126,9 @@ pub extern "C" fn cilk_malloc_i32_(i: i32) -> *mut i64 {
     Box::into_raw(vec.into_boxed_slice()) as *mut i64
 }
 
-// EXPERIMENTAL Internal function cilk.memset.p0i32.i32
+// EXPERIMENTAL Internal function sericum.memset.p0i32.i32
 #[no_mangle]
-pub extern "C" fn cilk_memset_p0i32_i32_(p: *mut i32, x: i32, count: i32) {
+pub extern "C" fn sericum_memset_p0i32_i32_(p: *mut i32, x: i32, count: i32) {
     unsafe { ::std::ptr::write_bytes(p, x as u8, count as usize) }
 }
 

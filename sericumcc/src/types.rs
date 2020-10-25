@@ -1,5 +1,5 @@
-use cilk::types;
 use id_arena::{Arena, Id};
+use sericum::types;
 use std::ops::{Index, IndexMut};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -228,11 +228,11 @@ impl CompoundType {
 }
 
 pub trait TypeConversion<T> {
-    fn conv(&self, compound_types: &CompoundTypes, types: &types::Types) -> cilk::types::Type;
+    fn conv(&self, compound_types: &CompoundTypes, types: &types::Types) -> sericum::types::Type;
 }
 
 impl TypeConversion<types::Type> for Type {
-    fn conv(&self, compound_types: &CompoundTypes, types: &types::Types) -> cilk::types::Type {
+    fn conv(&self, compound_types: &CompoundTypes, types: &types::Types) -> sericum::types::Type {
         match self {
             Type::Void => types::Type::Void,
             Type::Char(_) => types::Type::i8,

@@ -1,4 +1,4 @@
-extern crate cilk;
+extern crate sericum;
 mod codegen;
 mod parser;
 use std::{
@@ -57,12 +57,12 @@ fn main() {
     let mut codegen = codegen::CodeGenerator::new();
     codegen.run(input);
 
-    cilk::ir::mem2reg::Mem2Reg::new().run_on_module(&mut codegen.module);
-    cilk::ir::cse::CommonSubexprElimination::new().run_on_module(&mut codegen.module);
+    sericum::ir::mem2reg::Mem2Reg::new().run_on_module(&mut codegen.module);
+    sericum::ir::cse::CommonSubexprElimination::new().run_on_module(&mut codegen.module);
 
     println!("{:?}", codegen.module);
 
-    let mut jit = cilk::codegen::x64::exec::jit::JITExecutor::new(codegen.module);
+    let mut jit = sericum::codegen::x64::exec::jit::JITExecutor::new(codegen.module);
     let func = jit.find_function_by_name("main").unwrap();
     println!("Result: {:?}", jit.run(func, vec![]));
 }
@@ -356,18 +356,18 @@ fn ray_tracing() {
     let mut codegen = codegen::CodeGenerator::new();
     codegen.run(input);
 
-    cilk::ir::mem2reg::Mem2Reg::new().run_on_module(&mut codegen.module);
-    cilk::ir::cse::CommonSubexprElimination::new().run_on_module(&mut codegen.module);
-    cilk::ir::licm::LoopInvariantCodeMotion::new().run_on_module(&mut codegen.module);
+    sericum::ir::mem2reg::Mem2Reg::new().run_on_module(&mut codegen.module);
+    sericum::ir::cse::CommonSubexprElimination::new().run_on_module(&mut codegen.module);
+    sericum::ir::licm::LoopInvariantCodeMotion::new().run_on_module(&mut codegen.module);
 
     println!("{:?}", codegen.module);
 
-    // let mut jit = cilk::codegen::x64::exec::jit::JITExecutor::new(codegen.module);
+    // let mut jit = sericum::codegen::x64::exec::jit::JITExecutor::new(codegen.module);
     // let func = jit.find_function_by_name("main").unwrap();
     // println!("Result: {:?}", jit.run(func, vec![]));
 
-    use cilk::codegen::x64::asm::print::MachineAsmPrinter;
-    use cilk::codegen::x64::standard_conversion_into_machine_module;
+    use sericum::codegen::x64::asm::print::MachineAsmPrinter;
+    use sericum::codegen::x64::standard_conversion_into_machine_module;
     let machine_module = standard_conversion_into_machine_module(codegen.module);
     let mut printer = MachineAsmPrinter::new();
     // println!("{:?}", machine_module);
@@ -377,12 +377,12 @@ fn ray_tracing() {
         "
     #include <stdio.h>
     #include <math.h>
-extern char *cilk_malloc_i32(int x) { return malloc(x); }
-extern double cilk_floor_f64(double x) { return floor(x); }
-extern int cilk_fabs_f64(double x) { return fabs(x); }
-extern int cilk_cos_f64(double x) { return cos(x); }
-extern int cilk_print_i32(int x) { printf(\"%d\", x); }
-extern int cilk_printch_i32(int x) { putchar(x); }
+extern char *sericum_malloc_i32(int x) { return malloc(x); }
+extern double sericum_floor_f64(double x) { return floor(x); }
+extern int sericum_fabs_f64(double x) { return fabs(x); }
+extern int sericum_cos_f64(double x) { return cos(x); }
+extern int sericum_print_i32(int x) { printf(\"%d\", x); }
+extern int sericum_printch_i32(int x) { putchar(x); }
         ",
         printer.output.as_str(),
         Some("8b3272fe6057ba7c5d493aaad6128973"),
@@ -415,14 +415,14 @@ fn eratosthenes_sieve() {
     let mut codegen = codegen::CodeGenerator::new();
     codegen.run(input);
 
-    cilk::ir::mem2reg::Mem2Reg::new().run_on_module(&mut codegen.module);
-    cilk::ir::cse::CommonSubexprElimination::new().run_on_module(&mut codegen.module);
-    cilk::ir::licm::LoopInvariantCodeMotion::new().run_on_module(&mut codegen.module);
+    sericum::ir::mem2reg::Mem2Reg::new().run_on_module(&mut codegen.module);
+    sericum::ir::cse::CommonSubexprElimination::new().run_on_module(&mut codegen.module);
+    sericum::ir::licm::LoopInvariantCodeMotion::new().run_on_module(&mut codegen.module);
 
     // println!("{:?}", codegen.module);
 
-    use cilk::codegen::x64::asm::print::MachineAsmPrinter;
-    use cilk::codegen::x64::standard_conversion_into_machine_module;
+    use sericum::codegen::x64::asm::print::MachineAsmPrinter;
+    use sericum::codegen::x64::standard_conversion_into_machine_module;
     let machine_module = standard_conversion_into_machine_module(codegen.module);
     let mut printer = MachineAsmPrinter::new();
     // println!("{:?}", machine_module);
@@ -476,18 +476,18 @@ fn loop_licm() {
     let mut codegen = codegen::CodeGenerator::new();
     codegen.run(input);
 
-    cilk::ir::mem2reg::Mem2Reg::new().run_on_module(&mut codegen.module);
-    cilk::ir::cse::CommonSubexprElimination::new().run_on_module(&mut codegen.module);
-    cilk::ir::licm::LoopInvariantCodeMotion::new().run_on_module(&mut codegen.module);
+    sericum::ir::mem2reg::Mem2Reg::new().run_on_module(&mut codegen.module);
+    sericum::ir::cse::CommonSubexprElimination::new().run_on_module(&mut codegen.module);
+    sericum::ir::licm::LoopInvariantCodeMotion::new().run_on_module(&mut codegen.module);
 
     println!("{:?}", codegen.module);
 
-    // let mut jit = cilk::codegen::x64::exec::jit::JITExecutor::new(codegen.module);
+    // let mut jit = sericum::codegen::x64::exec::jit::JITExecutor::new(codegen.module);
     // let func = jit.find_function_by_name("main").unwrap();
     // println!("Result: {:?}", jit.run(func, vec![]));
 
-    use cilk::codegen::x64::asm::print::MachineAsmPrinter;
-    use cilk::codegen::x64::standard_conversion_into_machine_module;
+    use sericum::codegen::x64::asm::print::MachineAsmPrinter;
+    use sericum::codegen::x64::standard_conversion_into_machine_module;
     let machine_module = standard_conversion_into_machine_module(codegen.module);
     let mut printer = MachineAsmPrinter::new();
     println!("{:?}", machine_module);
@@ -530,13 +530,13 @@ fn pass_struct() {
     let mut codegen = codegen::CodeGenerator::new();
     codegen.run(input);
 
-    cilk::ir::mem2reg::Mem2Reg::new().run_on_module(&mut codegen.module);
-    cilk::ir::cse::CommonSubexprElimination::new().run_on_module(&mut codegen.module);
+    sericum::ir::mem2reg::Mem2Reg::new().run_on_module(&mut codegen.module);
+    sericum::ir::cse::CommonSubexprElimination::new().run_on_module(&mut codegen.module);
 
     println!("{:?}", codegen.module);
 
-    use cilk::codegen::x64::asm::print::MachineAsmPrinter;
-    use cilk::codegen::x64::standard_conversion_into_machine_module;
+    use sericum::codegen::x64::asm::print::MachineAsmPrinter;
+    use sericum::codegen::x64::standard_conversion_into_machine_module;
     let machine_module = standard_conversion_into_machine_module(codegen.module);
     let mut printer = MachineAsmPrinter::new();
     printer.run_on_module(&machine_module);
@@ -579,13 +579,13 @@ fn rand_mandelbrot() {
     let mut codegen = codegen::CodeGenerator::new();
     codegen.run(input);
 
-    cilk::ir::mem2reg::Mem2Reg::new().run_on_module(&mut codegen.module);
-    cilk::ir::cse::CommonSubexprElimination::new().run_on_module(&mut codegen.module);
+    sericum::ir::mem2reg::Mem2Reg::new().run_on_module(&mut codegen.module);
+    sericum::ir::cse::CommonSubexprElimination::new().run_on_module(&mut codegen.module);
 
     // println!("{:?}", codegen.module);
 
-    use cilk::codegen::x64::asm::print::MachineAsmPrinter;
-    use cilk::codegen::x64::standard_conversion_into_machine_module;
+    use sericum::codegen::x64::asm::print::MachineAsmPrinter;
+    use sericum::codegen::x64::standard_conversion_into_machine_module;
     let machine_module = standard_conversion_into_machine_module(codegen.module);
     let mut printer = MachineAsmPrinter::new();
     printer.run_on_module(&machine_module);
@@ -651,11 +651,11 @@ fn bubble_sort() {
     let mut codegen = codegen::CodeGenerator::new();
     codegen.run(input);
 
-    cilk::ir::mem2reg::Mem2Reg::new().run_on_module(&mut codegen.module);
-    cilk::ir::cse::CommonSubexprElimination::new().run_on_module(&mut codegen.module);
+    sericum::ir::mem2reg::Mem2Reg::new().run_on_module(&mut codegen.module);
+    sericum::ir::cse::CommonSubexprElimination::new().run_on_module(&mut codegen.module);
 
-    use cilk::codegen::x64::asm::print::MachineAsmPrinter;
-    use cilk::codegen::x64::standard_conversion_into_machine_module;
+    use sericum::codegen::x64::asm::print::MachineAsmPrinter;
+    use sericum::codegen::x64::standard_conversion_into_machine_module;
     let machine_module = standard_conversion_into_machine_module(codegen.module);
     let mut printer = MachineAsmPrinter::new();
     printer.run_on_module(&machine_module);
@@ -716,11 +716,11 @@ fn quick_sort() {
     let mut codegen = codegen::CodeGenerator::new();
     codegen.run(input);
 
-    cilk::ir::mem2reg::Mem2Reg::new().run_on_module(&mut codegen.module);
-    cilk::ir::cse::CommonSubexprElimination::new().run_on_module(&mut codegen.module);
+    sericum::ir::mem2reg::Mem2Reg::new().run_on_module(&mut codegen.module);
+    sericum::ir::cse::CommonSubexprElimination::new().run_on_module(&mut codegen.module);
 
-    use cilk::codegen::x64::asm::print::MachineAsmPrinter;
-    use cilk::codegen::x64::standard_conversion_into_machine_module;
+    use sericum::codegen::x64::asm::print::MachineAsmPrinter;
+    use sericum::codegen::x64::standard_conversion_into_machine_module;
     let machine_module = standard_conversion_into_machine_module(codegen.module);
     // println!("{:?}", machine_module);
     let mut printer = MachineAsmPrinter::new();
@@ -794,15 +794,15 @@ fn pi() {
     let mut codegen = codegen::CodeGenerator::new();
     codegen.run(input);
 
-    cilk::ir::cse::CommonSubexprElimination::new().run_on_module(&mut codegen.module);
-    cilk::ir::mem2reg::Mem2Reg::new().run_on_module(&mut codegen.module);
+    sericum::ir::cse::CommonSubexprElimination::new().run_on_module(&mut codegen.module);
+    sericum::ir::mem2reg::Mem2Reg::new().run_on_module(&mut codegen.module);
 
-    let mut jit = cilk::codegen::x64::exec::jit::JITExecutor::new(codegen.module);
+    let mut jit = sericum::codegen::x64::exec::jit::JITExecutor::new(codegen.module);
     let func = jit.find_function_by_name("main").unwrap();
     let output: [i32; 600] = [0; 600];
     jit.run(
         func,
-        vec![cilk::codegen::x64::exec::jit::GenericValue::Address(
+        vec![sericum::codegen::x64::exec::jit::GenericValue::Address(
             output.as_ptr() as *mut u8,
         )],
     );
@@ -871,15 +871,15 @@ fn pi2() {
     let mut codegen = codegen::CodeGenerator::new();
     codegen.run(input);
 
-    cilk::ir::cse::CommonSubexprElimination::new().run_on_module(&mut codegen.module);
-    cilk::ir::mem2reg::Mem2Reg::new().run_on_module(&mut codegen.module);
+    sericum::ir::cse::CommonSubexprElimination::new().run_on_module(&mut codegen.module);
+    sericum::ir::mem2reg::Mem2Reg::new().run_on_module(&mut codegen.module);
 
-    let mut jit = cilk::codegen::x64::exec::jit::JITExecutor::new(codegen.module);
+    let mut jit = sericum::codegen::x64::exec::jit::JITExecutor::new(codegen.module);
     let func = jit.find_function_by_name("main").unwrap();
     let output: [i32; 3750] = [0; 3750];
     jit.run(
         func,
-        vec![cilk::codegen::x64::exec::jit::GenericValue::Address(
+        vec![sericum::codegen::x64::exec::jit::GenericValue::Address(
             output.as_ptr() as *mut u8,
         )],
     );

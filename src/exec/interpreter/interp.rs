@@ -22,7 +22,7 @@ impl<'a> Interpreter<'a> {
         Self {
             _module: module,
             _internal_func: {
-                vec![("cilk.println.i32".to_string(), cilk_println_i32 as _)]
+                vec![("sericum.println.i32".to_string(), sericum_println_i32 as _)]
                     .into_iter()
                     .collect::<FxHashMap<_, _>>()
             },
@@ -295,7 +295,7 @@ impl ConcreteValue {
     }
 }
 
-fn cilk_println_i32(args: &[ConcreteValue]) -> ConcreteValue {
+fn sericum_println_i32(args: &[ConcreteValue]) -> ConcreteValue {
     match args[0] {
         ConcreteValue::Int32(i) => println!("{}", i),
         _ => unimplemented!(),

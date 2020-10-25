@@ -1,5 +1,5 @@
-extern crate cilkcc;
-use cilkcc::compile;
+extern crate sericumcc;
+use sericumcc::compile;
 
 extern crate argopt;
 use argopt::cmd;

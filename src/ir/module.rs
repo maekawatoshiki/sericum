@@ -30,7 +30,7 @@ impl Module {
     /// # Examples
     ///
     /// ```
-    /// use cilk::module::Module;
+    /// use sericum::module::Module;
     /// let m = Module::new("sample");
     /// assert_eq!(m.functions.len(), 0);
     /// ```
@@ -56,7 +56,7 @@ impl Module {
     ///
     /// # Examples
     /// ```
-    /// use cilk::{module::Module, types::Type};
+    /// use sericum::{module::Module, types::Type};
     /// let mut m = Module::new("owner");
     /// let _f_id = m.create_function("f", Type::Void, vec![]);
     /// ```
@@ -99,7 +99,7 @@ impl Module {
     ///
     /// # Examples
     /// ```
-    /// use cilk::{module::Module, types::Type};
+    /// use sericum::{module::Module, types::Type};
     ///
     /// let mut m1 = Module::new("owner");
     /// let m2 = Module::new("other");

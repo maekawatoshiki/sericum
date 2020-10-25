@@ -4,14 +4,14 @@ use super::{
     token::SourceLoc,
     types::{CompoundType, CompoundTypes, Sign, StorageClass, Type, TypeConversion},
 };
-use cilk::ir::{
+use rustc_hash::FxHashMap;
+use sericum::ir::{
     builder::IRBuilderWithModuleAndFuncId,
     constant_pool::{Constant, ConstantArrayElement, ConstantKind},
     opcode::ICmpKind,
     prelude::*,
     types, value,
 };
-use rustc_hash::FxHashMap;
 use std::result;
 
 pub struct Codegenerator<'a> {
@@ -30,7 +30,7 @@ pub struct Variables(Vec<FxHashMap<String, Variable>>);
 
 pub struct Variable {
     pub ty: Type,
-    pub cilk_ty: types::Type,
+    pub sericum_ty: types::Type,
     pub val: Value,
 }
 
@@ -43,7 +43,7 @@ pub enum Error {
 
 impl<'a> Codegenerator<'a> {
     pub fn new(compound_types: &'a mut CompoundTypes) -> Self {
-        let mut module = Module::new("cilk");
+        let mut module = Module::new("sericum");
         {
             let ptr_i64 = module.types.new_pointer_ty(types::Type::i64);
             module.create_function("memcpy", ptr_i64, vec![ptr_i64, ptr_i64, types::Type::i32]);
@@ -105,21 +105,26 @@ impl<'a> Codegenerator<'a> {
     ) -> Result<Value> {
         match ty {
             Type::Func(_) => {
-                let cilk_ty = ty.conv(self.compound_types, &self.module.types);
-                let cilk_func_ty = self.module.types.compound_ty(cilk_ty).as_function().clone();
+                let sericum_ty = ty.conv(self.compound_types, &self.module.types);
+                let sericum_func_ty = self
+                    .module
+                    .types
+                    .compound_ty(sericum_ty)
+                    .as_function()
+                    .clone();
                 let func_id = self.module.create_function(
                     name.as_str(),
-                    cilk_func_ty.ret_ty,
-                    cilk_func_ty.params_ty.clone(),
+                    sericum_func_ty.ret_ty,
+                    sericum_func_ty.params_ty.clone(),
                 );
                 let val = Value::Function(value::FunctionValue {
                     func_id,
-                    ty: cilk_ty,
+                    ty: sericum_ty,
                 });
-                let p_cilk_ty = self.module.types.new_pointer_ty(cilk_ty);
+                let p_sericum_ty = self.module.types.new_pointer_ty(sericum_ty);
                 let p_ty = self.compound_types.pointer(ty);
                 self.variables
-                    .add_global_var(name.clone(), Variable::new(p_ty, p_cilk_ty, val));
+                    .add_global_var(name.clone(), Variable::new(p_ty, p_sericum_ty, val));
             }
             _ => todo!(),
         }
@@ -138,20 +143,20 @@ impl<'a> FunctionCodeGenerator<'a> {
         body: &AST,
     ) -> Result<Value> {
         let func_ty = ty.conv(compound_types, &module.types);
-        let cilk_func_ty = module.types.compound_ty(func_ty).as_function().clone();
+        let sericum_func_ty = module.types.compound_ty(func_ty).as_function().clone();
         let func_id = module.create_function(
             name.as_str(),
-            cilk_func_ty.ret_ty,
-            cilk_func_ty.params_ty.clone(),
+            sericum_func_ty.ret_ty,
+            sericum_func_ty.params_ty.clone(),
         );
         let val = Value::Function(value::FunctionValue {
             func_id,
             ty: func_ty,
         });
 
-        let p_cilk_ty = module.types.new_pointer_ty(func_ty);
+        let p_sericum_ty = module.types.new_pointer_ty(func_ty);
         let p_ty = compound_types.pointer(*ty);
-        variables.add_local_var(name.clone(), Variable::new(p_ty, p_cilk_ty, val));
+        variables.add_local_var(name.clone(), Variable::new(p_ty, p_sericum_ty, val));
         variables.push_env();
 
         let mut gen = Self {
@@ -166,15 +171,20 @@ impl<'a> FunctionCodeGenerator<'a> {
         };
 
         for (i, name) in param_names.iter().enumerate() {
-            let cilk_ty = cilk_func_ty.params_ty[i];
+            let sericum_ty = sericum_func_ty.params_ty[i];
             let ty = gen.compound_types[*ty].as_func().1[i];
             let val = gen.builder.func_ref().get_param_value(i).unwrap();
-            let var = gen.builder.build_alloca(cilk_ty);
+            let var = gen.builder.build_alloca(sericum_ty);
             gen.builder.build_store(val, var);
-            let p_cilk_ty = gen.builder.module().unwrap().types.new_pointer_ty(cilk_ty);
+            let p_sericum_ty = gen
+                .builder
+                .module()
+                .unwrap()
+                .types
+                .new_pointer_ty(sericum_ty);
             let p_ty = gen.compound_types.pointer(ty);
             gen.variables
-                .add_local_var(name.clone(), Variable::new(p_ty, p_cilk_ty, var));
+                .add_local_var(name.clone(), Variable::new(p_ty, p_sericum_ty, var));
         }
 
         gen.generate(body)?;
@@ -397,12 +407,15 @@ impl<'a> FunctionCodeGenerator<'a> {
         }
 
         let kind = ConstantKind::Array(new_elements);
-        let cilk_ty = array_ty.conv(self.compound_types, &self.builder.module().unwrap().types);
+        let sericum_ty = array_ty.conv(self.compound_types, &self.builder.module().unwrap().types);
         let val = self
             .builder
             .module_mut()
             .unwrap()
-            .create_constant(Constant { ty: cilk_ty, kind });
+            .create_constant(Constant {
+                ty: sericum_ty,
+                kind,
+            });
 
         Ok((val, *array_ty))
     }
@@ -437,16 +450,14 @@ impl<'a> FunctionCodeGenerator<'a> {
         val: Option<&AST>,
     ) -> Result<(Value, Type)> {
         let (saved_bb, saved_pt) = (self.builder.block(), self.builder.insert_point());
-        let cilk_ty = ty.conv(self.compound_types, &self.builder.module().unwrap().types);
+        let sericum_ty = ty.conv(self.compound_types, &self.builder.module().unwrap().types);
         let entry = self.builder.func_ref().get_entry_block().unwrap();
         let pt = self.builder.func_ref().basic_blocks.arena[entry]
             .iseq_ref()
             .iter()
             .enumerate()
             .find_map(|(i, inst)| {
-                if self.builder.func_ref().inst_table[*inst].opcode
-                    == Opcode::Alloca
-                {
+                if self.builder.func_ref().inst_table[*inst].opcode == Opcode::Alloca {
                     None
                 } else {
                     Some(i)
@@ -454,11 +465,16 @@ impl<'a> FunctionCodeGenerator<'a> {
             })
             .unwrap_or(0);
         self.builder.set_insert_point_at(pt, entry);
-        let alloca = self.builder.build_alloca(cilk_ty);
-        let p_cilk_ty = self.builder.module().unwrap().types.new_pointer_ty(cilk_ty);
+        let alloca = self.builder.build_alloca(sericum_ty);
+        let p_sericum_ty = self
+            .builder
+            .module()
+            .unwrap()
+            .types
+            .new_pointer_ty(sericum_ty);
         let p_ty = self.compound_types.pointer(ty);
         self.variables
-            .add_local_var(name.clone(), Variable::new(p_ty, p_cilk_ty, alloca));
+            .add_local_var(name.clone(), Variable::new(p_ty, p_sericum_ty, alloca));
 
         // Adjust the insert point of global builder
         *self.builder.block_mut() = saved_bb;
@@ -482,7 +498,7 @@ impl<'a> FunctionCodeGenerator<'a> {
                     func_id,
                     ty: self.builder.module().unwrap().functions[func_id].ty,
                 });
-                use cilk::ir::types::TypeSize;
+                use sericum::ir::types::TypeSize;
                 self.builder.build_call(
                     memcpy,
                     vec![
@@ -731,8 +747,12 @@ impl Variables {
 }
 
 impl Variable {
-    pub fn new(ty: Type, cilk_ty: types::Type, val: Value) -> Self {
-        Self { ty, cilk_ty, val }
+    pub fn new(ty: Type, sericum_ty: types::Type, val: Value) -> Self {
+        Self {
+            ty,
+            sericum_ty,
+            val,
+        }
     }
 }
 

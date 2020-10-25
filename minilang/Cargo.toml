@@ -1,13 +1,13 @@
 [package]
 name = "minilang"
 version = "0.1.0"
-authors = ["maekawatoshiki <konndennsa@gmail.com>"]
+authors = ["maekawatoshiki"]
 edition = "2018"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-cilk = { path = "../", features = ["x86_64"] }
+sericum = { path = "../", features = ["x86_64"] }
 peg = "0.6.2"
 md5 = "0.7.0"
 rand = "0.7.3"

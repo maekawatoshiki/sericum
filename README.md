@@ -1,9 +1,9 @@
-# Cilk
+# Sericum
 
-[![CircleCI](https://circleci.com/gh/maekawatoshiki/cilk.svg?style=shield)](https://circleci.com/gh/maekawatoshiki/cilk)
+[![CircleCI](https://circleci.com/gh/maekawatoshiki/sericum.svg?style=shield)](https://circleci.com/gh/maekawatoshiki/sericum)
 [![](http://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
-[![cilk at crates.io](https://img.shields.io/crates/v/cilk.svg)](https://crates.io/crates/cilk)
-[![cilk at docs.rs](https://docs.rs/cilk/badge.svg)](https://docs.rs/cilk)
+[![sericum at crates.io](https://img.shields.io/crates/v/sericum.svg)](https://crates.io/crates/sericum)
+[![sericum at docs.rs](https://docs.rs/sericum/badge.svg)](https://docs.rs/sericum)
 
 Toy Compiler Infrastructure influenced by LLVM written in Rust.
 
@@ -33,7 +33,7 @@ cargo test --features riscv64 # currently it doesn't work. need help.
 - Fibonacci (**the following code may not work. take a look at ./tests**)
 
 ```rust
-use cilk::{
+use sericum::{
     codegen::x64::exec,
     ir::{
       builder::{FunctionIdWithModule, Builder}, 
@@ -43,7 +43,7 @@ use cilk::{
     },
 };
 
-let mut m = Module::new("cilk");
+let mut m = Module::new("sericum");
 let fibo = m.create_function(
     "fibo", Type::Int32, vec![Type::Int32]
 );
@@ -113,7 +113,7 @@ println!( "fibo(10) = {:?}",
 - Useful macro is available to describe IR
 
 ```rust
-let fibo = cilk_ir!(m; define [i32] f [(i32)] {
+let fibo = sericum_ir!(m; define [i32] f [(i32)] {
     entry:
         cond = icmp le (%arg.0), (i32 2);
         br (%cond) l1, l2;
@@ -129,6 +129,6 @@ let fibo = cilk_ir!(m; define [i32] f [(i32)] {
 });
 ```
 
-# Make your own language using cilk as backend
+# Make your own language using sericum as backend
 
-``./minilang`` and ``./cilkcc`` may help you.
+``./minilang`` and ``./sericumcc`` may help you.

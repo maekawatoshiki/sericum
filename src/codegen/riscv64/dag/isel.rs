@@ -148,7 +148,7 @@ impl MISelector {
     //     mut node: Raw<DAGNode>,
     // ) -> Raw<DAGNode> {
     //     unimplemented!()
-    // const SQRT_F64: &str = "cilk.sqrt.f64";
+    // const SQRT_F64: &str = "sericum.sqrt.f64";
     // let supported = [SQRT_F64];
     //
     // let name = match &node.operand[0].kind {

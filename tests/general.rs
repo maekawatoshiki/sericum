@@ -1,12 +1,12 @@
 #[cfg(feature = "x86_64")]
 mod x86_64 {
-    use cilk::{cilk_ir, codegen::x64::exec, ir, ir::prelude::*};
+    use sericum::{codegen::x64::exec, ir, ir::prelude::*, sericum_ir};
 
     #[test]
     fn test0_mem2reg() {
-        let mut m = Module::new("cilk");
+        let mut m = Module::new("sericum");
 
-        cilk_ir!(m; define [i32] func [] {
+        sericum_ir!(m; define [i32] func [] {
         entry:
             i = alloca i32;
             store (i32 3), (%i);
@@ -23,9 +23,9 @@ mod x86_64 {
 
     #[test]
     fn test1_mem2reg() {
-        let mut m = Module::new("cilk");
+        let mut m = Module::new("sericum");
 
-        cilk_ir!(m; define [i32] func [] {
+        sericum_ir!(m; define [i32] func [] {
         entry:
             i = alloca i32;
             k = alloca i32;
@@ -53,9 +53,9 @@ mod x86_64 {
 
     #[test]
     fn test2_mem2reg() {
-        let mut m = Module::new("cilk");
+        let mut m = Module::new("sericum");
 
-        cilk_ir!(m; define [i32] func [] {
+        sericum_ir!(m; define [i32] func [] {
         entry:
             i = alloca i32;
             br label1;
@@ -78,9 +78,9 @@ mod x86_64 {
 
     #[test]
     fn test3_mem2reg() {
-        let mut m = Module::new("cilk");
+        let mut m = Module::new("sericum");
 
-        cilk_ir!(m; define [i32] func [(i32)] {
+        sericum_ir!(m; define [i32] func [(i32)] {
         entry:
             i = alloca i32;
             store (i32 0), (%i);
@@ -109,9 +109,9 @@ mod x86_64 {
 
     #[test]
     fn test4_mem2reg() {
-        let mut m = Module::new("cilk");
+        let mut m = Module::new("sericum");
 
-        cilk_ir!(m; define [i32] func [(i32)] {
+        sericum_ir!(m; define [i32] func [(i32)] {
         entry:
             i = alloca i32;
             k = alloca i32;
@@ -151,20 +151,20 @@ mod x86_64 {
 
     #[test]
     fn pointer() {
-        let mut m = Module::new("cilk");
+        let mut m = Module::new("sericum");
 
         let ptr_i32_ty = m.types.new_pointer_ty(types::Type::i32);
-        let cilk_memset_i32 = m.create_function(
-            "cilk.memset.p0i32.i32",
+        let sericum_memset_i32 = m.create_function(
+            "sericum.memset.p0i32.i32",
             types::Type::Void,
             vec![ptr_i32_ty, types::Type::i32, types::Type::i32],
         );
 
-        cilk_ir!(m; define [i32] func [] {
+        sericum_ir!(m; define [i32] func [] {
         entry:
             arr = alloca_ ([16; i32]);
 
-            __ = call (->cilk_memset_i32) [(%arr), (i32 0), (i32 16)];
+            __ = call (->sericum_memset_i32) [(%arr), (i32 0), (i32 16)];
 
             p = gep (%arr), [(i32 0), (i32 15)];
             v = load (%p);
@@ -179,9 +179,9 @@ mod x86_64 {
 
     #[test]
     fn pointer2() {
-        let mut m = Module::new("cilk");
+        let mut m = Module::new("sericum");
 
-        cilk_ir!(m; define [i32] main [] {
+        sericum_ir!(m; define [i32] main [] {
         entry:
             a = alloca i32;
             pa = alloca_ (ptr i32);
@@ -201,15 +201,15 @@ mod x86_64 {
 
     #[test]
     fn pointer3() {
-        let mut m = Module::new("cilk");
+        let mut m = Module::new("sericum");
 
-        cilk_ir!(m; define [void] func [(ptr i32)] {
+        sericum_ir!(m; define [void] func [(ptr i32)] {
         entry:
             store (i32 123), (%arg.0);
             ret (void);
         });
 
-        cilk_ir!(m; define [i32] main [] {
+        sericum_ir!(m; define [i32] main [] {
         entry:
             a = alloca i32;
             pa = alloca_ (ptr i32);
@@ -228,9 +228,9 @@ mod x86_64 {
 
     #[test]
     fn phi() {
-        let mut m = Module::new("cilk");
+        let mut m = Module::new("sericum");
 
-        let _ = cilk_ir!(m; define [i32] func [(i32)] {
+        let _ = sericum_ir!(m; define [i32] func [(i32)] {
             entry:
                 cond = icmp le (%arg.0), (i32 2);
                 br (%cond) l1, l2;
@@ -258,11 +258,11 @@ mod x86_64 {
 
     #[test]
     fn arr_2d() {
-        let mut m = Module::new("cilk");
+        let mut m = Module::new("sericum");
 
         // Internal function must be defined before you use it
 
-        let _ = cilk_ir!(m; define [i32] func [] {
+        let _ = sericum_ir!(m; define [i32] func [] {
         // for (int i = 0; i < 2; i++)
         //   for (int k = 0; k < 2; k++)
         //     a[i][k] = i + k;
@@ -322,16 +322,16 @@ mod x86_64 {
 
     #[test]
     fn jit_executor1() {
-        let mut m = Module::new("cilk");
+        let mut m = Module::new("sericum");
 
         // Internal function must be defined before you use it
-        let cilk_println_i32 = m.create_function(
-            "cilk.println.i32",
+        let sericum_println_i32 = m.create_function(
+            "sericum.println.i32",
             ir::types::Type::Void,
             vec![ir::types::Type::i32],
         );
 
-        let func = cilk_ir!(m; define [i32] func [(i32)] {
+        let func = sericum_ir!(m; define [i32] func [(i32)] {
             // primarity test
             entry:
                 i = alloca i32;
@@ -368,7 +368,7 @@ mod x86_64 {
                 ret (i32 1);
         });
 
-        let _main = cilk_ir!(m; define [void] main [(i32)] {
+        let _main = sericum_ir!(m; define [void] main [(i32)] {
             entry:
                 i = alloca i32;
                 store (i32 2), (%i);
@@ -382,7 +382,7 @@ mod x86_64 {
                 c = icmp eq (%x), (i32 1);
                 br (%c) p, not_p;
             p:
-                __ = call (->cilk_println_i32) [(%li)];
+                __ = call (->sericum_println_i32) [(%li)];
                 br not_p;
             not_p:
                 inc = add (%li), (i32 1);
@@ -402,16 +402,16 @@ mod x86_64 {
 
     #[test]
     fn jit_executor2() {
-        let mut m = Module::new("cilk");
+        let mut m = Module::new("sericum");
 
         // Internal function must be defined before you use it
-        let cilk_println_i32 = m.create_function(
-            "cilk.println.i32",
+        let sericum_println_i32 = m.create_function(
+            "sericum.println.i32",
             ir::types::Type::Void,
             vec![ir::types::Type::i32],
         );
 
-        let func = cilk_ir!(m; define [i32] func [(i32)] {
+        let func = sericum_ir!(m; define [i32] func [(i32)] {
             entry:
                 cond = icmp le (%arg.0), (i32 2);
                 br (%cond) l1, l2;
@@ -431,7 +431,7 @@ mod x86_64 {
                 ret (%p);
         });
 
-        let _main = cilk_ir!(m; define [void] main [(i32)] {
+        let _main = sericum_ir!(m; define [void] main [(i32)] {
             entry:
                 i = alloca i32;
                 store (i32 1), (%i);
@@ -442,7 +442,7 @@ mod x86_64 {
                 br (%c) loop_, end;
             loop_:
                 x = call (->func) [(%li)];
-                __ = call (->cilk_println_i32) [(%x)];
+                __ = call (->sericum_println_i32) [(%x)];
                 inc = add (%li), (i32 1);
                 store (%inc), (%i);
                 br cond;
@@ -460,11 +460,11 @@ mod x86_64 {
 
     #[test]
     fn fibo() {
-        use cilk::codegen::x64::standard_conversion_into_machine_module;
+        use sericum::codegen::x64::standard_conversion_into_machine_module;
 
-        let mut m = Module::new("cilk");
+        let mut m = Module::new("sericum");
 
-        let _fibo = cilk_ir!(m; define [i32] fibo [(i32)] {
+        let _fibo = sericum_ir!(m; define [i32] fibo [(i32)] {
             entry:
                 cond = icmp le (%arg.0), (i32 2);
                 br (%cond) l1, l2;
@@ -479,7 +479,7 @@ mod x86_64 {
                 ret (%r3);
         });
 
-        let _main = cilk_ir!(m; define [i32] main [] {
+        let _main = sericum_ir!(m; define [i32] main [] {
             entry:
                 r = call fibo [(i32 10)];
                 ret (%r);
@@ -487,7 +487,7 @@ mod x86_64 {
 
         let machine_module = standard_conversion_into_machine_module(m);
         // println!("{:?}", machine_module);
-        use cilk::codegen::x64::asm::print::MachineAsmPrinter;
+        use sericum::codegen::x64::asm::print::MachineAsmPrinter;
         let mut printer = MachineAsmPrinter::new();
         printer.run_on_module(&machine_module);
         println!("ASM DUMP: \n{}", printer.output);
@@ -538,9 +538,9 @@ main:
 
     #[test]
     fn spill() {
-        let mut m = Module::new("cilk");
+        let mut m = Module::new("sericum");
 
-        let _ = cilk_ir!(m; define [i32] func [(i32)] {
+        let _ = sericum_ir!(m; define [i32] func [(i32)] {
             entry:
                 x1  = add (%arg.0), (i32 1);  // 2
                 x2  = add (%arg.0), (i32 2);  // 3
@@ -587,7 +587,7 @@ main:
 
     #[test]
     fn struct1() {
-        let mut m = Module::new("cilk");
+        let mut m = Module::new("sericum");
 
         let f = m.create_function("f", types::Type::i32, vec![]);
 
@@ -608,7 +608,7 @@ main:
             .new_struct_ty(vec![ary_ty, types::Type::i32]);
         let var = builder.build_alloca(struct_ty);
 
-        cilk_ir!((builder) {
+        sericum_ir!((builder) {
             x = gep (%var), [(i32 0), (i32 1)];
             store (i32 3), (%x);
             load_x = load (%x);
@@ -623,7 +623,7 @@ main:
 
     #[test]
     fn struct2() {
-        let mut m = Module::new("cilk");
+        let mut m = Module::new("sericum");
 
         let struct_ty = m
             .types
@@ -637,7 +637,7 @@ main:
         let entry = builder.append_basic_block();
         builder.set_insert_point(entry);
 
-        cilk_ir!((builder) {
+        sericum_ir!((builder) {
             x = gep (%arg.0), [(i32 0), (i32 1)];
             store (i32 123), (%x);
             ret (void);
@@ -652,7 +652,7 @@ main:
 
         let var = builder.build_alloca(struct_ty);
 
-        cilk_ir!((builder) {
+        sericum_ir!((builder) {
             __ = call f [(%var)];
             x = gep (%var), [(i32 0), (i32 1)];
             r = load (%x);
@@ -667,9 +667,9 @@ main:
 
     #[test]
     fn many_arguments() {
-        let mut m = Module::new("cilk");
+        let mut m = Module::new("sericum");
 
-        let _ = cilk_ir!(m; define [i32] func [
+        let _ = sericum_ir!(m; define [i32] func [
                 (i32), (i32), (i32), (i32), (i32), (i32), (i32), (i32), (i32) ] {
             entry:
                 x = add (%arg.0), (%arg.1);//1
@@ -683,7 +683,7 @@ main:
                 ret (%x);
         });
 
-        let _ = cilk_ir!(m; define [i32] main [] {
+        let _ = sericum_ir!(m; define [i32] main [] {
             entry:
                 x = call func [(i32 0),(i32 1),(i32 2),(i32 3),(i32 4),(i32 5),(i32 6),(i32 7),(i32 8)];
                 ret (%x);
@@ -700,7 +700,7 @@ main:
 
     #[test]
     fn fact() {
-        let mut m = Module::new("cilk");
+        let mut m = Module::new("sericum");
 
         /*
          * int fact(int x) {
@@ -708,7 +708,7 @@ main:
          *   return x * fact(x - 1);
          * }
          */
-        let _ = cilk_ir!(m; define [i32] fact [(i32)] {
+        let _ = sericum_ir!(m; define [i32] fact [(i32)] {
             entry:
                 cond = icmp eq (%arg.0), (i32 1);
                 br (%cond) l1, l2;
@@ -730,9 +730,9 @@ main:
 
     #[test]
     fn float2() {
-        let mut m = Module::new("cilk");
+        let mut m = Module::new("sericum");
 
-        let _ = cilk_ir!(m; define [f64] func [] {
+        let _ = sericum_ir!(m; define [f64] func [] {
             entry:
                 a = alloca f64;
                 store (f64 1.23), (%a);
@@ -748,9 +748,9 @@ main:
 
     #[test]
     fn float3() {
-        let mut m = Module::new("cilk");
+        let mut m = Module::new("sericum");
 
-        let _ = cilk_ir!(m; define [f64] func [] {
+        let _ = sericum_ir!(m; define [f64] func [] {
             entry:
                 a = alloca f64;
                 store (f64 1.23), (%a);
@@ -770,9 +770,9 @@ main:
 
     #[test]
     fn float4() {
-        let mut m = Module::new("cilk");
+        let mut m = Module::new("sericum");
 
-        let _ = cilk_ir!(m; define [f64] func [] {
+        let _ = sericum_ir!(m; define [f64] func [] {
             entry:
                 a = alloca f64;
                 store (f64 1.2), (%a);
@@ -792,9 +792,9 @@ main:
 
     #[test]
     fn float5() {
-        let mut m = Module::new("cilk");
+        let mut m = Module::new("sericum");
 
-        let _ = cilk_ir!(m; define [i32] func [] {
+        let _ = sericum_ir!(m; define [i32] func [] {
             entry:
                 a = alloca f64;
                 store (f64 2.14), (%a);
@@ -815,9 +815,9 @@ main:
 
     #[test]
     fn pass_arr() {
-        let mut m = Module::new("cilk");
+        let mut m = Module::new("sericum");
 
-        cilk_ir!(m; define [i32] func [(ptr [16; i32])] {
+        sericum_ir!(m; define [i32] func [(ptr [16; i32])] {
         entry:
             p = gep (%arg.0), [(i32 0), (i32 1)];
             store (i32 12), (%p);
@@ -836,9 +836,9 @@ main:
 
     #[test]
     fn branch_folding() {
-        let mut m = Module::new("cilk");
+        let mut m = Module::new("sericum");
 
-        cilk_ir!(m; define [i32] func [(i32)] {
+        sericum_ir!(m; define [i32] func [(i32)] {
         entry:
             a = add (%arg.0), (i32 1);
             br l1;
@@ -874,9 +874,9 @@ main:
 
     #[test]
     fn cse0() {
-        let mut m = Module::new("cilk");
+        let mut m = Module::new("sericum");
 
-        cilk_ir!(m; define [i32] func [] {
+        sericum_ir!(m; define [i32] func [] {
         entry:
             a = alloca i32;
             store (i32 1), (%a);
@@ -900,9 +900,9 @@ main:
 
     #[test]
     fn cse1() {
-        let mut m = Module::new("cilk");
+        let mut m = Module::new("sericum");
 
-        cilk_ir!(m; define [i32] func [(i32)] {
+        sericum_ir!(m; define [i32] func [(i32)] {
         entry:
             a = alloca i32;
             store (i32 1), (%a);
@@ -945,7 +945,7 @@ main:
 
     #[test]
     fn pass_struct() {
-        let mut m = Module::new("cilk");
+        let mut m = Module::new("sericum");
 
         let struct_ty = m
             .types
@@ -955,7 +955,7 @@ main:
             let mut builder = builder::IRBuilderWithModuleAndFuncId::new(&mut m, f);
             let entry = builder.append_basic_block();
             builder.set_insert_point(entry);
-            cilk_ir!((builder) {
+            sericum_ir!((builder) {
                 x = gep (%arg.0), [(i32 0), (i32 0)];
                 load_x = load (%x);
                 y = gep (%arg.0), [(i32 0), (i32 1)];
@@ -970,7 +970,7 @@ main:
             let entry = builder.append_basic_block();
             builder.set_insert_point(entry);
             let var = builder.build_alloca(struct_ty);
-            cilk_ir!((builder) {
+            sericum_ir!((builder) {
                 x = gep (%var), [(i32 0), (i32 1)];
                 store (i32 12), (%x);
                 x = gep (%var), [(i32 0), (i32 0)];
@@ -989,7 +989,7 @@ main:
 
     #[test]
     fn pass_struct1() {
-        let mut m = Module::new("cilk");
+        let mut m = Module::new("sericum");
 
         let struct_ty = m.types.new_struct_ty(vec![
             types::Type::i32,
@@ -1003,7 +1003,7 @@ main:
             let mut builder = builder::IRBuilderWithModuleAndFuncId::new(&mut m, f);
             let entry = builder.append_basic_block();
             builder.set_insert_point(entry);
-            cilk_ir!((builder) {
+            sericum_ir!((builder) {
                 x = gep (%arg.1), [(i32 0), (i32 0)];
                 load_x = load (%x);
                 y = gep (%arg.1), [(i32 0), (i32 1)];
@@ -1022,7 +1022,7 @@ main:
             let entry = builder.append_basic_block();
             builder.set_insert_point(entry);
             let var = builder.build_alloca(struct_ty);
-            cilk_ir!((builder) {
+            sericum_ir!((builder) {
                 x = gep (%var), [(i32 0), (i32 0)];
                 store (i32 10), (%x);
                 x = gep (%var), [(i32 0), (i32 1)];
@@ -1043,7 +1043,7 @@ main:
 
     #[test]
     fn pass_struct2() {
-        let mut m = Module::new("cilk");
+        let mut m = Module::new("sericum");
 
         let struct_ty = m
             .types
@@ -1053,7 +1053,7 @@ main:
             let mut builder = builder::IRBuilderWithModuleAndFuncId::new(&mut m, f);
             let entry = builder.append_basic_block();
             builder.set_insert_point(entry);
-            cilk_ir!((builder) {
+            sericum_ir!((builder) {
                 x = gep (%arg.0), [(i32 0), (i32 1)];
                 load_x = load (%x);
                 ret (%load_x);
@@ -1065,7 +1065,7 @@ main:
             let entry = builder.append_basic_block();
             builder.set_insert_point(entry);
             let var = builder.build_alloca(struct_ty);
-            cilk_ir!((builder) {
+            sericum_ir!((builder) {
                 x = gep (%var), [(i32 0), (i32 1)];
                 store (f64 12.3), (%x);
                 r = call f [(%var)];
@@ -1082,7 +1082,7 @@ main:
 
     #[test]
     fn pass_struct3() {
-        let mut m = Module::new("cilk");
+        let mut m = Module::new("sericum");
 
         let struct_ty = m
             .types
@@ -1095,7 +1095,7 @@ main:
             let mut builder = builder::IRBuilderWithModuleAndFuncId::new(&mut m, f);
             let entry = builder.append_basic_block();
             builder.set_insert_point(entry);
-            cilk_ir!((builder) {
+            sericum_ir!((builder) {
                 x = gep (%arg.0), [(i32 0), (i32 1)];
                 load_x = load (%x);
                 y = gep (%arg.1), [(i32 0), (i32 0)];
@@ -1111,7 +1111,7 @@ main:
             builder.set_insert_point(entry);
             let var = builder.build_alloca(struct_ty);
             let var2 = builder.build_alloca(struct_ty2);
-            cilk_ir!((builder) {
+            sericum_ir!((builder) {
                 x = gep (%var), [(i32 0), (i32 1)];
                 store (f64 12.3), (%x);
                 x = gep (%var2), [(i32 0), (i32 0)];

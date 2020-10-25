@@ -13,9 +13,9 @@ RUN set -x && \
   cargo install cargo-kcov && \
   cargo kcov --print-install-kcov-sh | sh
 
-ADD . /opt/cilk
+ADD . /opt/sericum
 
-WORKDIR /opt/cilk
+WORKDIR /opt/sericum
 
 RUN set -x && \
   export PATH=~/.cargo/bin:$PATH && \

@@ -1,5 +1,5 @@
 #define _LP64 1
-#define __CILKCC__ 1
+#define __SERICUMCC__ 1
 #define __ELF__ 1
 #define __LP64__ 1
 #define __SIZEOF_DOUBLE__ 8

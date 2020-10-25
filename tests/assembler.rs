@@ -1,7 +1,6 @@
 #[cfg(feature = "x86_64")]
 mod x86_64 {
-    use cilk::{
-        cilk_ir,
+    use sericum::{
         codegen::x64::{
             asm::assembler::Assembler,
             exec::executor::{Executor, GenericValue},
@@ -9,6 +8,7 @@ mod x86_64 {
         },
         ir::{builder, /*global_val,*/ types, value},
         module::Module,
+        sericum_ir,
         *, // for macro
     };
     use std::{
@@ -71,13 +71,13 @@ mod x86_64 {
 
     #[test]
     fn asmer_jit_call() {
-        let mut m = Module::new("cilk");
-        cilk_ir!(m; define [i32] add [(i32)] {
+        let mut m = Module::new("sericum");
+        sericum_ir!(m; define [i32] add [(i32)] {
             entry: x = add (%arg.0), (i32 2);
                    ret (%x);
         });
 
-        cilk_ir!(m; define [i32] main [(i32)] {
+        sericum_ir!(m; define [i32] main [(i32)] {
             entry: x = call add [(%arg.0)];
                    ret (%x);
         });
@@ -96,8 +96,8 @@ mod x86_64 {
 
     #[test]
     fn asmer_jit_local_var() {
-        let mut m = Module::new("cilk");
-        cilk_ir!(m; define [i32] test [] {
+        let mut m = Module::new("sericum");
+        sericum_ir!(m; define [i32] test [] {
             entry:
                 a = alloca i32;
                 store (i32 2), (%a);
@@ -115,8 +115,8 @@ mod x86_64 {
 
     #[test]
     fn asmer_minimum() {
-        let mut m = Module::new("cilk");
-        cilk_ir!(m; define [i32] test [] {
+        let mut m = Module::new("sericum");
+        sericum_ir!(m; define [i32] test [] {
             entry:
                 ret (i32 42);
         });
@@ -130,8 +130,8 @@ mod x86_64 {
 
     #[test]
     fn asmer_local() {
-        let mut m = Module::new("cilk");
-        cilk_ir!(m; define [i32] test [] {
+        let mut m = Module::new("sericum");
+        sericum_ir!(m; define [i32] test [] {
             entry:
                 i = alloca i32;
                 store (i32 42), (%i);
@@ -148,8 +148,8 @@ mod x86_64 {
 
     #[test]
     fn asmer_br() {
-        let mut m = Module::new("cilk");
-        cilk_ir!(m; define [i32] test [(i32)] {
+        let mut m = Module::new("sericum");
+        sericum_ir!(m; define [i32] test [(i32)] {
             entry:
                 c = icmp eq (%arg.0), (i32 1);
                 br (%c) label1, label2;
@@ -173,12 +173,12 @@ mod x86_64 {
 
     #[test]
     fn asmer_call() {
-        let mut m = Module::new("cilk");
-        cilk_ir!(m; define [i32] add [(i32)] {
+        let mut m = Module::new("sericum");
+        sericum_ir!(m; define [i32] add [(i32)] {
             entry: x = add (%arg.0), (i32 2);
                    ret (%x);
         });
-        cilk_ir!(m; define [i32] caller [(i32)] {
+        sericum_ir!(m; define [i32] caller [(i32)] {
             entry: x = call add [(%arg.0)];
                    ret (%x);
         });
@@ -196,17 +196,17 @@ mod x86_64 {
 
     #[test]
     fn asmer_arith_ri() {
-        let mut m = Module::new("cilk");
-        cilk_ir!(m; define [i32] add [(i32)] {
+        let mut m = Module::new("sericum");
+        sericum_ir!(m; define [i32] add [(i32)] {
             entry: x = add (%arg.0), (i32 2);
                    ret (%x); });
-        cilk_ir!(m; define [i32] sub [(i32)] {
+        sericum_ir!(m; define [i32] sub [(i32)] {
             entry: x = sub (%arg.0), (i32 2);
                    ret (%x); });
-        cilk_ir!(m; define [i32] mul [(i32)] {
+        sericum_ir!(m; define [i32] mul [(i32)] {
             entry: x = mul (%arg.0), (i32 3);
                    ret (%x); });
-        cilk_ir!(m; define [i32] div [(i32)] {
+        sericum_ir!(m; define [i32] div [(i32)] {
             entry: x = div (%arg.0), (i32 3);
                    ret (%x); });
         compile(

@@ -4,8 +4,8 @@ version = "0.1.0"
 authors = ["uint256_t"]
 edition = "2018"
 license = "MIT"
-description = "Macros to define architecture-dependent information for cilk"
-repository = "https://github.com/maekawatoshiki/cilk/defs"
+description = "Macros to define architecture-dependent information for sericum"
+repository = "https://github.com/maekawatoshiki/sericum/defs"
 
 [dependencies]
 proc-quote = "0.3.0"

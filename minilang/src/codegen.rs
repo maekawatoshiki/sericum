@@ -1,6 +1,6 @@
 use crate::parser::{self, Node};
-use cilk;
-use cilk::ir::{builder::IRBuilder, module};
+use sericum;
+use sericum::ir::{builder::IRBuilder, module};
 use std::collections::HashMap;
 
 pub struct CodeGenerator {
@@ -9,21 +9,21 @@ pub struct CodeGenerator {
 }
 
 pub struct CodeGeneratorForFunction<'a> {
-    builder: cilk::builder::IRBuilderWithModuleAndFuncId<'a>,
+    builder: sericum::builder::IRBuilderWithModuleAndFuncId<'a>,
     types: &'a Types,
     func: &'a parser::Function,
-    vars: Vec<HashMap<String, (bool, parser::Type, cilk::value::Value)>>, // name, (is_arg, ty, val)
+    vars: Vec<HashMap<String, (bool, parser::Type, sericum::value::Value)>>, // name, (is_arg, ty, val)
 }
 
 pub struct Types {
-    records: HashMap<String, (cilk::types::Type, HashMap<String, (usize, parser::Type)>)>,
-    functions: HashMap<cilk::function::FunctionId, (parser::Type, Vec<parser::Type>)>,
+    records: HashMap<String, (sericum::types::Type, HashMap<String, (usize, parser::Type)>)>,
+    functions: HashMap<sericum::function::FunctionId, (parser::Type, Vec<parser::Type>)>,
 }
 
 impl CodeGenerator {
     pub fn new() -> Self {
         Self {
-            module: cilk::module::Module::new("minilang"),
+            module: sericum::module::Module::new("minilang"),
             types: Types {
                 records: HashMap::new(),
                 functions: HashMap::new(),
@@ -35,105 +35,107 @@ impl CodeGenerator {
         println!("input:\n{}", input);
         let module = parser::parser::module(input).expect("parse failed");
         let id = self.module.create_function(
-            "cilk.println.i32",
-            cilk::types::Type::Void,
-            vec![cilk::types::Type::i32],
+            "sericum.println.i32",
+            sericum::types::Type::Void,
+            vec![sericum::types::Type::i32],
         );
         self.types
             .functions
             .insert(id, (parser::Type::Void, vec![parser::Type::Int32]));
         let id = self.module.create_function(
-            "cilk.print.i32",
-            cilk::types::Type::Void,
-            vec![cilk::types::Type::i32],
+            "sericum.print.i32",
+            sericum::types::Type::Void,
+            vec![sericum::types::Type::i32],
         );
         self.types
             .functions
             .insert(id, (parser::Type::Void, vec![parser::Type::Int32]));
         let id = self.module.create_function(
-            "cilk.printch.i32",
-            cilk::types::Type::Void,
-            vec![cilk::types::Type::i32],
+            "sericum.printch.i32",
+            sericum::types::Type::Void,
+            vec![sericum::types::Type::i32],
         );
         self.types
             .functions
             .insert(id, (parser::Type::Void, vec![parser::Type::Int32]));
         let id = self.module.create_function(
-            "cilk.println.f64",
-            cilk::types::Type::Void,
-            vec![cilk::types::Type::f64],
+            "sericum.println.f64",
+            sericum::types::Type::Void,
+            vec![sericum::types::Type::f64],
         );
         self.types
             .functions
             .insert(id, (parser::Type::Void, vec![parser::Type::F64]));
         let id = self.module.create_function(
-            "cilk.print.f64",
-            cilk::types::Type::Void,
-            vec![cilk::types::Type::f64],
+            "sericum.print.f64",
+            sericum::types::Type::Void,
+            vec![sericum::types::Type::f64],
         );
         self.types
             .functions
             .insert(id, (parser::Type::Void, vec![parser::Type::F64]));
         let id = self.module.create_function(
-            "cilk.sin.f64",
-            cilk::types::Type::f64,
-            vec![cilk::types::Type::f64],
+            "sericum.sin.f64",
+            sericum::types::Type::f64,
+            vec![sericum::types::Type::f64],
         );
         self.types
             .functions
             .insert(id, (parser::Type::F64, vec![parser::Type::F64]));
         let id = self.module.create_function(
-            "cilk.cos.f64",
-            cilk::types::Type::f64,
-            vec![cilk::types::Type::f64],
+            "sericum.cos.f64",
+            sericum::types::Type::f64,
+            vec![sericum::types::Type::f64],
         );
         self.types
             .functions
             .insert(id, (parser::Type::F64, vec![parser::Type::F64]));
         let id = self.module.create_function(
-            "cilk.sqrt.f64",
-            cilk::types::Type::f64,
-            vec![cilk::types::Type::f64],
+            "sericum.sqrt.f64",
+            sericum::types::Type::f64,
+            vec![sericum::types::Type::f64],
         );
         self.types
             .functions
             .insert(id, (parser::Type::F64, vec![parser::Type::F64]));
         let id = self.module.create_function(
-            "cilk.floor.f64",
-            cilk::types::Type::f64,
-            vec![cilk::types::Type::f64],
+            "sericum.floor.f64",
+            sericum::types::Type::f64,
+            vec![sericum::types::Type::f64],
         );
         self.types
             .functions
             .insert(id, (parser::Type::F64, vec![parser::Type::F64]));
         let id = self.module.create_function(
-            "cilk.fabs.f64",
-            cilk::types::Type::f64,
-            vec![cilk::types::Type::f64],
+            "sericum.fabs.f64",
+            sericum::types::Type::f64,
+            vec![sericum::types::Type::f64],
         );
         self.types
             .functions
             .insert(id, (parser::Type::F64, vec![parser::Type::F64]));
         let id = self.module.create_function(
-            "cilk.i32_to_f64.i32",
-            cilk::types::Type::f64,
-            vec![cilk::types::Type::i32],
+            "sericum.i32_to_f64.i32",
+            sericum::types::Type::f64,
+            vec![sericum::types::Type::i32],
         );
         self.types
             .functions
             .insert(id, (parser::Type::F64, vec![parser::Type::Int32]));
         let id = self.module.create_function(
-            "cilk.f64_to_i32.f64",
-            cilk::types::Type::i32,
-            vec![cilk::types::Type::f64],
+            "sericum.f64_to_i32.f64",
+            sericum::types::Type::i32,
+            vec![sericum::types::Type::f64],
         );
         self.types
             .functions
             .insert(id, (parser::Type::Int32, vec![parser::Type::F64]));
-        let ptr_i64 = self.module.types.new_pointer_ty(cilk::types::Type::i64);
-        let id =
-            self.module
-                .create_function("cilk.malloc.i32", ptr_i64, vec![cilk::types::Type::i32]);
+        let ptr_i64 = self.module.types.new_pointer_ty(sericum::types::Type::i64);
+        let id = self.module.create_function(
+            "sericum.malloc.i32",
+            ptr_i64,
+            vec![sericum::types::Type::i32],
+        );
         self.types.functions.insert(
             id,
             (
@@ -152,7 +154,7 @@ impl CodeGenerator {
         for (name, decls) in &module.structs {
             let decls_ = decls
                 .iter()
-                .map(|(_, ty)| ty.into_cilk_type(&self.types, &mut self.module.types))
+                .map(|(_, ty)| ty.into_sericum_type(&self.types, &mut self.module.types))
                 .collect();
             let name2idx: HashMap<String, (usize, parser::Type)> = decls
                 .iter()
@@ -170,12 +172,12 @@ impl CodeGenerator {
         for func in &module.functions {
             let ret_ty = func
                 .ret_ty
-                .into_cilk_type(&self.types, &mut self.module.types);
+                .into_sericum_type(&self.types, &mut self.module.types);
             let params_ty = func
                 .params
                 .iter()
-                .map(|(_name, ty)| ty.into_cilk_type(&self.types, &mut self.module.types))
-                .collect::<Vec<cilk::types::Type>>();
+                .map(|(_name, ty)| ty.into_sericum_type(&self.types, &mut self.module.types))
+                .collect::<Vec<sericum::types::Type>>();
             let func_id = self
                 .module
                 .create_function(func.name.as_str(), ret_ty, params_ty);
@@ -195,7 +197,7 @@ impl CodeGenerator {
         // Actaully generate function
         for (func_id, func) in worklist {
             CodeGeneratorForFunction::new(
-                cilk::builder::IRBuilderWithModuleAndFuncId::new(&mut self.module, func_id),
+                sericum::builder::IRBuilderWithModuleAndFuncId::new(&mut self.module, func_id),
                 &self.types,
                 func,
             )
@@ -206,7 +208,7 @@ impl CodeGenerator {
 
 impl<'a> CodeGeneratorForFunction<'a> {
     pub fn new(
-        builder: cilk::builder::IRBuilderWithModuleAndFuncId<'a>,
+        builder: sericum::builder::IRBuilderWithModuleAndFuncId<'a>,
         types: &'a Types,
         func: &'a parser::Function,
     ) -> Self {
@@ -237,10 +239,10 @@ impl<'a> CodeGeneratorForFunction<'a> {
         }
     }
 
-    pub fn run_on_node(&mut self, node: &Node) -> (cilk::value::Value, parser::Type) {
+    pub fn run_on_node(&mut self, node: &Node) -> (sericum::value::Value, parser::Type) {
         match node {
             Node::VarDecl(name, ty) => {
-                let ty_ = ty.into_cilk_type(&self.types, &mut self.builder.func_ref_mut().types);
+                let ty_ = ty.into_sericum_type(&self.types, &mut self.builder.func_ref_mut().types);
                 let alloca = self.builder.build_alloca(ty_);
                 self.create_var(
                     name.clone(),
@@ -248,7 +250,7 @@ impl<'a> CodeGeneratorForFunction<'a> {
                     parser::Type::Pointer(Box::new(ty.clone())),
                     alloca,
                 );
-                (cilk::value::Value::None, parser::Type::Void)
+                (sericum::value::Value::None, parser::Type::Void)
             }
             Node::Assign(dst, src) => {
                 let (dst, _) = self.run_on_node(dst);
@@ -282,7 +284,7 @@ impl<'a> CodeGeneratorForFunction<'a> {
                     }
                 }
                 self.builder.set_insert_point(merge_bb);
-                (cilk::value::Value::None, parser::Type::Void)
+                (sericum::value::Value::None, parser::Type::Void)
             }
             Node::WhileLoop(cond, body) => {
                 let header_bb = self.builder.append_basic_block();
@@ -300,7 +302,7 @@ impl<'a> CodeGeneratorForFunction<'a> {
                     self.builder.build_br(header_bb);
                 }
                 self.builder.set_insert_point(post_bb);
-                (cilk::value::Value::None, parser::Type::Void)
+                (sericum::value::Value::None, parser::Type::Void)
             }
             Node::Return(e) => {
                 let (e, _) = self.run_on_node(e);
@@ -316,23 +318,23 @@ impl<'a> CodeGeneratorForFunction<'a> {
                 let (rhs, _) = self.run_on_node(rhs);
                 if ty.is_integer() {
                     let cmp = match node {
-                        Node::Eq(_, _) => cilk::opcode::ICmpKind::Eq,
-                        Node::Ne(_, _) => cilk::opcode::ICmpKind::Ne,
-                        Node::Lt(_, _) => cilk::opcode::ICmpKind::Lt,
-                        Node::Le(_, _) => cilk::opcode::ICmpKind::Le,
-                        Node::Gt(_, _) => cilk::opcode::ICmpKind::Gt,
-                        Node::Ge(_, _) => cilk::opcode::ICmpKind::Ge,
+                        Node::Eq(_, _) => sericum::opcode::ICmpKind::Eq,
+                        Node::Ne(_, _) => sericum::opcode::ICmpKind::Ne,
+                        Node::Lt(_, _) => sericum::opcode::ICmpKind::Lt,
+                        Node::Le(_, _) => sericum::opcode::ICmpKind::Le,
+                        Node::Gt(_, _) => sericum::opcode::ICmpKind::Gt,
+                        Node::Ge(_, _) => sericum::opcode::ICmpKind::Ge,
                         _ => unreachable!(),
                     };
                     (self.builder.build_icmp(cmp, lhs, rhs), parser::Type::Int1)
                 } else {
                     let cmp = match node {
-                        Node::Eq(_, _) => cilk::opcode::FCmpKind::UEq,
-                        Node::Ne(_, _) => cilk::opcode::FCmpKind::UNe,
-                        Node::Lt(_, _) => cilk::opcode::FCmpKind::ULt,
-                        Node::Le(_, _) => cilk::opcode::FCmpKind::ULe,
-                        Node::Gt(_, _) => cilk::opcode::FCmpKind::UGt,
-                        Node::Ge(_, _) => cilk::opcode::FCmpKind::UGe,
+                        Node::Eq(_, _) => sericum::opcode::FCmpKind::UEq,
+                        Node::Ne(_, _) => sericum::opcode::FCmpKind::UNe,
+                        Node::Lt(_, _) => sericum::opcode::FCmpKind::ULt,
+                        Node::Le(_, _) => sericum::opcode::FCmpKind::ULe,
+                        Node::Gt(_, _) => sericum::opcode::FCmpKind::UGt,
+                        Node::Ge(_, _) => sericum::opcode::FCmpKind::UGe,
                         _ => unreachable!(),
                     };
                     (self.builder.build_fcmp(cmp, lhs, rhs), parser::Type::Int1)
@@ -356,28 +358,28 @@ impl<'a> CodeGeneratorForFunction<'a> {
             }
             Node::Call(name, args) => {
                 let name = match name.as_str() {
-                    "println_i32" => "cilk.println.i32",
-                    "print_i32" => "cilk.print.i32",
-                    "printch_i32" => "cilk.printch.i32",
-                    "println_f64" => "cilk.println.f64",
-                    "print_f64" => "cilk.print.f64",
-                    "sin" => "cilk.sin.f64",
-                    "cos" => "cilk.cos.f64",
-                    "sqrt" => "cilk.sqrt.f64",
-                    "floor" => "cilk.floor.f64",
-                    "fabs" => "cilk.fabs.f64",
-                    "i32_to_f64" => "cilk.i32_to_f64.i32",
-                    "f64_to_i32" => "cilk.f64_to_i32.f64",
-                    "malloc" => "cilk.malloc.i32",
+                    "println_i32" => "sericum.println.i32",
+                    "print_i32" => "sericum.print.i32",
+                    "printch_i32" => "sericum.printch.i32",
+                    "println_f64" => "sericum.println.f64",
+                    "print_f64" => "sericum.print.f64",
+                    "sin" => "sericum.sin.f64",
+                    "cos" => "sericum.cos.f64",
+                    "sqrt" => "sericum.sqrt.f64",
+                    "floor" => "sericum.floor.f64",
+                    "fabs" => "sericum.fabs.f64",
+                    "i32_to_f64" => "sericum.i32_to_f64.i32",
+                    "f64_to_i32" => "sericum.f64_to_i32.f64",
+                    "malloc" => "sericum.malloc.i32",
                     name => name,
                 };
                 let func_id = self.builder.module().unwrap().find_function(name).unwrap();
-                let args: Vec<cilk::value::Value> =
+                let args: Vec<sericum::value::Value> =
                     args.iter().map(|i| self.run_on_node(i).0).collect();
                 let ret_ty = self.types.functions.get(&func_id).unwrap().0.clone();
                 (
                     self.builder.build_call(
-                        cilk::value::Value::new_func(cilk::value::FunctionValue {
+                        sericum::value::Value::new_func(sericum::value::FunctionValue {
                             func_id,
                             ty: self.builder.module().unwrap().function_ref(func_id).ty,
                         }),
@@ -418,7 +420,7 @@ impl<'a> CodeGeneratorForFunction<'a> {
             Node::Addr(e) => self.run_on_node(e),
             Node::TypeCast(val, to) => {
                 let (val, ty) = self.run_on_node(val);
-                let to_ = to.into_cilk_type(&self.types, &mut self.builder.func_ref_mut().types);
+                let to_ = to.into_sericum_type(&self.types, &mut self.builder.func_ref_mut().types);
                 if ty.is_integer() {
                     return (self.builder.build_sitofp(val, to_), to.clone());
                 }
@@ -431,7 +433,7 @@ impl<'a> CodeGeneratorForFunction<'a> {
             Node::Index(base, idx) => {
                 let (base, ty) = self.run_on_node(base);
                 let indices = vec![
-                    cilk::value::Value::new_imm_int32(0),
+                    sericum::value::Value::new_imm_int32(0),
                     self.run_on_node(idx).0,
                 ];
                 let gep = self.builder.build_gep(base, indices);
@@ -456,14 +458,17 @@ impl<'a> CodeGeneratorForFunction<'a> {
                     )
                     .clone();
                 let indices = vec![
-                    cilk::value::Value::new_imm_int32(0),
-                    cilk::value::Value::new_imm_int32(idx as i32),
+                    sericum::value::Value::new_imm_int32(0),
+                    sericum::value::Value::new_imm_int32(idx as i32),
                 ];
                 let gep = self.builder.build_gep(base, indices);
                 (gep, parser::Type::Pointer(Box::new(ty)))
             }
-            Node::Number(i) => (cilk::value::Value::new_imm_int32(*i), parser::Type::Int32),
-            Node::FPNumber(f) => (cilk::value::Value::new_imm_f64(*f), parser::Type::F64),
+            Node::Number(i) => (
+                sericum::value::Value::new_imm_int32(*i),
+                parser::Type::Int32,
+            ),
+            Node::FPNumber(f) => (sericum::value::Value::new_imm_f64(*f), parser::Type::F64),
         }
     }
 
@@ -472,7 +477,7 @@ impl<'a> CodeGeneratorForFunction<'a> {
         name: String,
         is_arg: bool,
         ty: parser::Type,
-        value: cilk::value::Value,
+        value: sericum::value::Value,
     ) {
         self.vars
             .last_mut()
@@ -480,30 +485,30 @@ impl<'a> CodeGeneratorForFunction<'a> {
             .insert(name, (is_arg, ty, value));
     }
 
-    fn lookup_var(&self, name: &str) -> Option<&(bool, parser::Type, cilk::value::Value)> {
+    fn lookup_var(&self, name: &str) -> Option<&(bool, parser::Type, sericum::value::Value)> {
         self.vars.last().unwrap().get(name)
     }
 }
 
 impl parser::Type {
-    pub fn into_cilk_type(
+    pub fn into_sericum_type(
         &self,
         types1: &Types,
-        types2: &mut cilk::types::Types,
-    ) -> cilk::types::Type {
+        types2: &mut sericum::types::Types,
+    ) -> sericum::types::Type {
         match self {
-            parser::Type::Void => cilk::types::Type::Void,
-            parser::Type::Int1 => cilk::types::Type::i1,
-            parser::Type::Int32 => cilk::types::Type::i32,
-            parser::Type::Int64 => cilk::types::Type::i64,
-            parser::Type::F64 => cilk::types::Type::f64,
+            parser::Type::Void => sericum::types::Type::Void,
+            parser::Type::Int1 => sericum::types::Type::i1,
+            parser::Type::Int32 => sericum::types::Type::i32,
+            parser::Type::Int64 => sericum::types::Type::i64,
+            parser::Type::F64 => sericum::types::Type::f64,
             parser::Type::Struct(name) => types1.records.get(name.as_str()).unwrap().0,
             parser::Type::Pointer(inner) => {
-                let inner = inner.into_cilk_type(types1, types2);
+                let inner = inner.into_sericum_type(types1, types2);
                 types2.new_pointer_ty(inner)
             }
             parser::Type::Array(len, inner) => {
-                let inner = inner.into_cilk_type(types1, types2);
+                let inner = inner.into_sericum_type(types1, types2);
                 types2.new_array_ty(inner, *len)
             }
         }

@@ -1,6 +1,6 @@
 #[cfg(feature = "x86_64")]
 mod x86_64 {
-    use cilk::{cilk_ir, codegen::x64::exec, ir, ir::prelude::*};
+    use sericum::{codegen::x64::exec, ir, ir::prelude::*, sericum_ir};
 
     #[test]
     // #[ignore]
@@ -158,15 +158,15 @@ mod x86_64 {
         let mut m = Module::new("brainfuxk");
 
         // Internal function must be defined before you use it
-        let cilk_printch_i32 = m.create_function(
-            "cilk.printch.i32",
+        let sericum_printch_i32 = m.create_function(
+            "sericum.printch.i32",
             types::Type::Void,
             vec![types::Type::i32],
         );
 
         let ptr_i32_ty = m.types.new_pointer_ty(types::Type::i32);
-        let cilk_memset_i32 = m.create_function(
-            "cilk.memset.p0i32.i32",
+        let sericum_memset_i32 = m.create_function(
+            "sericum.memset.p0i32.i32",
             types::Type::Void,
             vec![ptr_i32_ty, types::Type::i32, types::Type::i32],
         );
@@ -188,9 +188,9 @@ mod x86_64 {
         let idx = builder.build_alloca(types::Type::i32);
 
         // initialize (idx = 0, fill tape with 0)
-        cilk_ir!((builder) {
+        sericum_ir!((builder) {
             store (i32 0), (%idx);
-            __ = call (->cilk_memset_i32) [(%tape), (i32 0), (i32 tape_len as i32)];
+            __ = call (->sericum_memset_i32) [(%tape), (i32 0), (i32 tape_len as i32)];
         });
 
         let mut br_stack = vec![]; // branches corresponding to each [ ]
@@ -233,8 +233,12 @@ mod x86_64 {
 
                     builder.build_call(
                         value::Value::new_func(value::FunctionValue {
-                            func_id: cilk_printch_i32,
-                            ty: builder.module().unwrap().function_ref(cilk_printch_i32).ty,
+                            func_id: sericum_printch_i32,
+                            ty: builder
+                                .module()
+                                .unwrap()
+                                .function_ref(sericum_printch_i32)
+                                .ty,
                         }),
                         vec![cur_val],
                     );
@@ -290,8 +294,8 @@ mod x86_64 {
 
         // println!("{:?}", m);
 
-        // use cilk::codegen::x64::asm::print::MachineAsmPrinter;
-        // use cilk::codegen::x64::standard_conversion_into_machine_module;
+        // use sericum::codegen::x64::asm::print::MachineAsmPrinter;
+        // use sericum::codegen::x64::standard_conversion_into_machine_module;
         // let machine_module = standard_conversion_into_machine_module(&mut m);
         // let mut printer = MachineAsmPrinter::new();
         // // println!("{:?}", machine_module);
@@ -309,7 +313,7 @@ mod x86_64 {
 
 #[cfg(feature = "riscv64")]
 mod riscv64 {
-    use cilk::{
+    use sericum::{
         // codegen::riscv64::exec,
         // exec::{interpreter::interp, jit::riscv64::compiler},
         ir::{builder, opcode, types, value},
@@ -472,15 +476,15 @@ mod riscv64 {
         let mut m = module::Module::new("brainfuxk");
 
         // Internal function must be defined before you use it
-        let cilk_printch_i32 = m.create_function(
-            "cilk.printch.i32",
+        let sericum_printch_i32 = m.create_function(
+            "sericum.printch.i32",
             types::Type::Void,
             vec![types::Type::i32],
         );
 
         let ptr_i32_ty = m.types.new_pointer_ty(types::Type::i32);
-        let cilk_memset_i32 = m.create_function(
-            "cilk.memset.p0i32.i32",
+        let sericum_memset_i32 = m.create_function(
+            "sericum.memset.p0i32.i32",
             types::Type::Void,
             vec![ptr_i32_ty, types::Type::i32, types::Type::i32],
         );
@@ -502,9 +506,9 @@ mod riscv64 {
         let idx = builder.build_alloca(types::Type::i32);
 
         // initialize (idx = 0, fill tape with 0)
-        cilk_ir!((builder) {
+        sericum_ir!((builder) {
             store (i32 0), (%idx);
-            __ = call (->cilk_memset_i32) [(%tape), (i32 0), (i32 tape_len as i32)];
+            __ = call (->sericum_memset_i32) [(%tape), (i32 0), (i32 tape_len as i32)];
         });
 
         let mut br_stack = vec![]; // branches corresponding to each [ ]
@@ -547,8 +551,8 @@ mod riscv64 {
 
                     builder.build_call(
                         value::Value::new_func(value::FunctionValue {
-                            func_id: cilk_printch_i32,
-                            ty: builder.func.module.function_ref(cilk_printch_i32).ty,
+                            func_id: sericum_printch_i32,
+                            ty: builder.func.module.function_ref(sericum_printch_i32).ty,
                         }),
                         vec![cur_val],
                     );
@@ -605,8 +609,8 @@ mod riscv64 {
 
         // println!("IR: {}", m.dump(f_id));
 
-        use cilk::codegen::riscv64::asm::print::MachineAsmPrinter;
-        use cilk::codegen::riscv64::standard_conversion_into_machine_module;
+        use sericum::codegen::riscv64::asm::print::MachineAsmPrinter;
+        use sericum::codegen::riscv64::standard_conversion_into_machine_module;
         let machine_module = standard_conversion_into_machine_module(&mut m);
         let mut printer = MachineAsmPrinter::new();
         // println!("{:?}", machine_module);
@@ -624,7 +628,7 @@ mod riscv64 {
 
 #[cfg(feature = "aarch64")]
 mod aarch64 {
-    use cilk::{
+    use sericum::{
         // codegen::riscv64::exec,
         // exec::{interpreter::interp, jit::riscv64::compiler},
         ir::builder::IRBuilder,
@@ -788,15 +792,15 @@ mod aarch64 {
         let mut m = module::Module::new("brainfuxk");
 
         // Internal function must be defined before you use it
-        let cilk_printch_i32 = m.create_function(
-            "cilk.printch.i32",
+        let sericum_printch_i32 = m.create_function(
+            "sericum.printch.i32",
             types::Type::Void,
             vec![types::Type::i32],
         );
 
         let ptr_i32_ty = m.types.new_pointer_ty(types::Type::i32);
-        let cilk_memset_i32 = m.create_function(
-            "cilk.memset.p0i32.i32",
+        let sericum_memset_i32 = m.create_function(
+            "sericum.memset.p0i32.i32",
             types::Type::Void,
             vec![ptr_i32_ty, types::Type::i32, types::Type::i32],
         );
@@ -818,9 +822,9 @@ mod aarch64 {
         let idx = builder.build_alloca(types::Type::i32);
 
         // initialize (idx = 0, fill tape with 0)
-        cilk_ir!((builder) {
+        sericum_ir!((builder) {
             store (i32 0), (%idx);
-            __ = call (->cilk_memset_i32) [(%tape), (i32 0), (i32 tape_len as i32)];
+            __ = call (->sericum_memset_i32) [(%tape), (i32 0), (i32 tape_len as i32)];
         });
 
         let mut br_stack = vec![]; // branches corresponding to each [ ]
@@ -863,8 +867,12 @@ mod aarch64 {
 
                     builder.build_call(
                         value::Value::new_func(value::FunctionValue {
-                            func_id: cilk_printch_i32,
-                            ty: builder.module().unwrap().function_ref(cilk_printch_i32).ty,
+                            func_id: sericum_printch_i32,
+                            ty: builder
+                                .module()
+                                .unwrap()
+                                .function_ref(sericum_printch_i32)
+                                .ty,
                         }),
                         vec![cur_val],
                     );
@@ -922,8 +930,8 @@ mod aarch64 {
 
         // println!("IR: {}", m.dump(f_id));
 
-        use cilk::codegen::aarch64::asm::print::MachineAsmPrinter;
-        use cilk::codegen::aarch64::standard_conversion_into_machine_module;
+        use sericum::codegen::aarch64::asm::print::MachineAsmPrinter;
+        use sericum::codegen::aarch64::standard_conversion_into_machine_module;
         let machine_module = standard_conversion_into_machine_module(&mut m);
         let mut printer = MachineAsmPrinter::new();
         // println!("{:?}", machine_module);

@@ -51,7 +51,7 @@ impl BasicBlocks {
     /// # Examples
     ///
     /// ```
-    /// use cilk::ir::basic_block::BasicBlocks;
+    /// use sericum::ir::basic_block::BasicBlocks;
     /// let bbs = BasicBlocks::new();
     ///
     /// assert!(bbs.arena.len() == 0);
@@ -97,7 +97,7 @@ impl BasicBlock {
     /// # Examples
     ///
     /// ```
-    /// use cilk::ir::basic_block::BasicBlock;
+    /// use sericum::ir::basic_block::BasicBlock;
     ///
     /// let bb = BasicBlock::new();
     /// assert!(bb.iseq.borrow().is_empty());
@@ -174,7 +174,7 @@ impl LivenessInfo {
     /// # Examples
     ///
     /// ```
-    /// use cilk::ir::basic_block::LivenessInfo;
+    /// use sericum::ir::basic_block::LivenessInfo;
     ///
     /// let info = LivenessInfo::new();
     /// assert!(info.def.is_empty());

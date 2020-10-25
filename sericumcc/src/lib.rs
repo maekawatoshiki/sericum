@@ -1,6 +1,6 @@
-extern crate cilk;
 extern crate id_arena;
 extern crate rustc_hash;
+extern crate sericum;
 
 use std::path::PathBuf;
 use std::{
@@ -60,13 +60,13 @@ pub fn compile(path: PathBuf) {
     }
     println!("{:?}", codegen.module);
 
-    // cilk::ir::mem2reg::Mem2Reg::new().run_on_module(&mut codegen.module);
-    // cilk::ir::cse::CommonSubexprElimination::new().run_on_module(&mut codegen.module);
-    // cilk::ir::licm::LoopInvariantCodeMotion::new().run_on_module(&mut codegen.module);
+    // sericum::ir::mem2reg::Mem2Reg::new().run_on_module(&mut codegen.module);
+    // sericum::ir::cse::CommonSubexprElimination::new().run_on_module(&mut codegen.module);
+    // sericum::ir::licm::LoopInvariantCodeMotion::new().run_on_module(&mut codegen.module);
 
     let machine_module =
-        cilk::codegen::x64::standard_conversion_into_machine_module(codegen.module);
-    let mut printer = cilk::codegen::x64::asm::print::MachineAsmPrinter::new();
+        sericum::codegen::x64::standard_conversion_into_machine_module(codegen.module);
+    let mut printer = sericum::codegen::x64::asm::print::MachineAsmPrinter::new();
     printer.run_on_module(&machine_module);
     println!("{}", printer.output);
 
