@@ -352,6 +352,23 @@ pub trait IRBuilder {
         inst
     }
 
+    fn build_br2(&mut self, dst: BasicBlockId, args: Vec<Value>) -> Value {
+        let inst = self.create_inst_value(
+            Opcode::Br,
+            InstOperand::BranchArgs { dst, args },
+            Type::Void,
+        );
+        self.append_inst_to_current_block(inst.as_instruction().id);
+
+        let cur_bb_id = self.block().unwrap();
+        self.with_function(|f| {
+            f.basic_block_ref_mut(cur_bb_id).succ.insert(dst);
+            f.basic_block_ref_mut(dst).pred.insert(cur_bb_id);
+        });
+
+        inst
+    }
+
     fn build_cond_br(&mut self, cond: Value, bb1: BasicBlockId, bb2: BasicBlockId) -> Value {
         let cur_bb_id = self.block().unwrap();
         let inst = self.create_inst_value(

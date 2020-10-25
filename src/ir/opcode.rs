@@ -71,6 +71,10 @@ pub enum InstOperand {
     Branch {
         dst: BasicBlockId,
     },
+    BranchArgs {
+        dst: BasicBlockId,
+        args: Vec<Value>,
+    },
     CondBranch {
         arg: Value,
         dsts: [BasicBlockId; 2],
@@ -277,6 +281,7 @@ impl Instruction {
                 args[1].to_string(parent, false),
             ),
             InstOperand::Branch { dst } => format!("{} %label.{} ", output, dst.index(),),
+            InstOperand::BranchArgs { dst, .. } => format!("{} %label.{} ", output, dst.index(),),
             InstOperand::CondBranch { arg, dsts } => format!(
                 "{} {}, %label.{}, %label.{}",
                 output,
@@ -388,7 +393,7 @@ impl InstOperand {
 
     pub fn blocks(&self) -> &[BasicBlockId] {
         match self {
-            Self::Branch { dst } => ::core::slice::from_ref(dst),
+            Self::BranchArgs { dst, .. } | Self::Branch { dst } => ::core::slice::from_ref(dst),
             Self::CondBranch { dsts, .. } => dsts,
             Self::Phi { blocks, .. } => blocks.as_ref(),
             _ => &[],
@@ -397,7 +402,7 @@ impl InstOperand {
 
     pub fn blocks_mut(&mut self) -> &mut [BasicBlockId] {
         match self {
-            Self::Branch { dst } => ::core::slice::from_mut(dst),
+            Self::BranchArgs { dst, .. } | Self::Branch { dst } => ::core::slice::from_mut(dst),
             Self::CondBranch { dsts, .. } => dsts,
             Self::Phi { blocks, .. } => blocks.as_mut(),
             _ => &mut [],
@@ -414,7 +419,10 @@ impl InstOperand {
             Self::Binary { args } | Self::IntCmp { args, .. } | Self::FloatCmp { args, .. } => {
                 args.as_ref()
             }
-            Self::Gep { args } | Self::Phi { args, .. } | Self::Call { args } => args.as_ref(),
+            Self::BranchArgs { args, .. }
+            | Self::Gep { args }
+            | Self::Phi { args, .. }
+            | Self::Call { args } => args.as_ref(),
             _ => &[],
         }
     }
@@ -429,7 +437,10 @@ impl InstOperand {
             Self::Binary { args } | Self::IntCmp { args, .. } | Self::FloatCmp { args, .. } => {
                 args.as_mut()
             }
-            Self::Gep { args } | Self::Phi { args, .. } | Self::Call { args } => args.as_mut(),
+            Self::BranchArgs { args, .. }
+            | Self::Gep { args }
+            | Self::Phi { args, .. }
+            | Self::Call { args } => args.as_mut(),
             _ => &mut [],
         }
     }
@@ -448,76 +459,6 @@ impl InstOperand {
         }
     }
 }
-
-// impl Operand {
-//     pub fn new_inst(func_id: FunctionId, id: InstructionId, ty: Type) -> Self {
-//         Operand::Value(Value::Instruction(InstructionValue { func_id, id, ty }))
-//     }
-//
-//     // TODO: should return cow?
-//     pub fn to_string(&self, parent: &Module) -> String {
-//         match self {
-//             Self::BasicBlock(id) => format!("%label.{}", id.index()),
-//             Self::ICmpKind(kind) => kind.as_str().to_owned(),
-//             Self::FCmpKind(kind) => kind.as_str().to_owned(),
-//             Self::Type(ty) => parent.types.to_string(*ty),
-//             Self::Value(v) => v.to_string(parent, false),
-//         }
-//     }
-//
-//     pub fn get_value(&self) -> Option<&Value> {
-//         match self {
-//             Self::Value(val) => Some(val),
-//             _ => None,
-//         }
-//     }
-//
-//     pub fn as_basic_block(&self) -> &BasicBlockId {
-//         match self {
-//             Self::BasicBlock(id) => id,
-//             _ => panic!(),
-//         }
-//     }
-//     pub fn as_icmp_kind(&self) -> &ICmpKind {
-//         match self {
-//             Self::ICmpKind(kind) => kind,
-//             _ => panic!(),
-//         }
-//     }
-//     pub fn as_fcmp_kind(&self) -> &FCmpKind {
-//         match self {
-//             Self::FCmpKind(kind) => kind,
-//             _ => panic!(),
-//         }
-//     }
-//     pub fn as_type(&self) -> &Type {
-//         match self {
-//             Self::Type(ty) => ty,
-//             _ => panic!(),
-//         }
-//     }
-//     pub fn as_value(&self) -> &Value {
-//         match self {
-//             Self::Value(v) => v,
-//             _ => panic!(),
-//         }
-//     }
-//
-//     pub fn remove_from_users(&self, inst_arena: &Arena<Instruction>, remove: InstructionId) {
-//         if let Operand::Value(Value::Instruction(InstructionValue { id, .. })) = self {
-//             inst_arena[*id]
-//                 .users
-//                 .borrow_mut()
-//                 .retain(|&use_id| use_id != remove);
-//         }
-//     }
-//
-//     pub fn set_user(&self, inst_arena: &Arena<Instruction>, new: InstructionId) {
-//         if let Operand::Value(Value::Instruction(InstructionValue { id, .. })) = self {
-//             inst_arena[*id].set_user(inst_arena, new);
-//         }
-//     }
-// }
 
 impl ICmpKind {
     pub fn as_str(&self) -> &'static str {

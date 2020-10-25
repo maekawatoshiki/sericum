@@ -24,6 +24,7 @@ pub struct ConvertToDAGFunction<'a> {
     bb_order: Vec<DAGBasicBlockId>,
     bb_map: FxHashMap<BasicBlockId, DAGBasicBlockId>,
     inst_to_node: FxHashMap<InstructionId, Raw<DAGNode>>,
+    block_param_to_node: FxHashMap<(BasicBlockId, usize), Raw<DAGNode>>,
     arg_regs: FxHashMap<usize, Raw<DAGNode>>,
     regs_info: RegistersInfo,
     local_mgr: LocalVariables,
@@ -35,6 +36,7 @@ pub struct ConvertToDAGNode<'a> {
     pub block: &'a BasicBlock,
     pub node_heap: &'a mut DAGHeap,
     pub inst_to_node: &'a mut FxHashMap<InstructionId, Raw<DAGNode>>,
+    pub block_param_to_node: &'a mut FxHashMap<(BasicBlockId, usize), Raw<DAGNode>>,
     pub regs_info: &'a mut RegistersInfo,
     pub arg_regs: &'a mut FxHashMap<usize, Raw<DAGNode>>,
     pub local_mgr: &'a mut LocalVariables,
@@ -58,6 +60,7 @@ pub fn convert_to_dag_module(module: Module) -> DAGModule {
                 bb_map: FxHashMap::default(),
                 node_heap: DAGHeap::new(),
                 inst_to_node: FxHashMap::default(),
+                block_param_to_node: FxHashMap::default(),
                 regs_info: RegistersInfo::new(),
                 arg_regs: FxHashMap::default(),
                 local_mgr: LocalVariables::new(),
@@ -94,6 +97,7 @@ impl<'a> ConvertToDAGModule<'a> {
                     bb_map: FxHashMap::default(),
                     node_heap: DAGHeap::new(),
                     inst_to_node: FxHashMap::default(),
+                    block_param_to_node: FxHashMap::default(),
                     regs_info: RegistersInfo::new(),
                     arg_regs: FxHashMap::default(),
                     local_mgr: LocalVariables::new(),
@@ -131,6 +135,7 @@ impl<'a> ConvertToDAGFunction<'a> {
                 block,
                 node_heap: &mut self.node_heap,
                 inst_to_node: &mut self.inst_to_node,
+                block_param_to_node: &mut self.block_param_to_node,
                 regs_info: &mut self.regs_info,
                 arg_regs: &mut self.arg_regs,
                 local_mgr: &mut self.local_mgr,
@@ -187,6 +192,7 @@ impl<'a> ConvertToDAGNode<'a> {
             // Copy physical argument registers to virtual regieters
             self.copy_reg_args();
         }
+        {}
 
         for &inst_id in &*self.block.iseq_ref() {
             let inst = &self.func.inst_table[inst_id];
@@ -569,6 +575,9 @@ impl<'a> ConvertToDAGNode<'a> {
                     *ty,
                 ))
             }
+            Value::BlockParam(BlockParamValue {
+                block_id, index, ..
+            }) => *self.block_param_to_node.get(&(*block_id, *index)).unwrap(),
             Value::None => self.alloc_node(DAGNode::new(NodeKind::None, vec![], Type::Void)),
         }
     }

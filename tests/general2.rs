@@ -153,6 +153,59 @@ mod x86_64 {
     }
 
     #[test]
+    fn asm_fibo_bb_params() {
+        let mut m = Module::new("cilk");
+        let f = m.create_function("test", Type::i32, vec![Type::i32]);
+        let mut builder = builder::IRBuilderWithModuleAndFuncId::new(&mut m, f);
+        let entry = builder.append_basic_block();
+        let b1 = builder.append_basic_block();
+        let b2 = builder.append_basic_block();
+        let b3 = builder.append_basic_block();
+
+        builder.set_insert_point(entry);
+        let arg0 = builder.get_param(0).unwrap();
+        let cond = builder.build_icmp(opcode::ICmpKind::Le, arg0, Value::new_imm_int32(2));
+        builder.build_cond_br(cond, b1, b2);
+
+        builder.set_insert_point(b1);
+        builder.build_br2(b3, vec![Value::new_imm_int32(1)]);
+
+        builder.set_insert_point(b2);
+        let t1 = builder.build_sub(arg0, Value::new_imm_int32(1));
+        let f_val = builder.module().unwrap().function_val(f);
+        let t2 = builder.build_call(f_val, vec![t1]);
+        let t3 = builder.build_sub(arg0, Value::new_imm_int32(2));
+        let t4 = builder.build_call(f_val, vec![t3]);
+        let t5 = builder.build_add(t2, t4);
+        builder.build_br2(b3, vec![t5]);
+
+        builder.set_insert_point(b3);
+        let p = value::Value::BlockParam(value::BlockParamValue {
+            block_id: builder.block().unwrap(),
+            index: 0,
+            ty: Type::i32,
+        });
+        builder.build_ret(p);
+
+        println!("{:?}", m);
+
+        compile_and_run(
+            "#include <assert.h>
+            extern int test(int);
+            int test_ref(int x) {
+                if (x <= 2) return 1;
+                return test_ref(x - 1) + test_ref(x - 2);
+            }
+            int main() { 
+                for (int i = 0; i < 30; i++)
+                    assert(test(i) == test_ref(i)); 
+                return 0;
+            }",
+            m,
+        );
+    }
+
+    #[test]
     fn asm_global_var() {
         let mut m = Module::new("cilk");
         let ty = m.types.new_array_ty(types::Type::i32, 8);

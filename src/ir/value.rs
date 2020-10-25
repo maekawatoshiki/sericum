@@ -1,6 +1,6 @@
 use super::{
-    constant_pool::ConstantId, function::*, global_val::GlobalVariableId, module::*, opcode::*,
-    types::*,
+    basic_block::BasicBlockId, constant_pool::ConstantId, function::*,
+    global_val::GlobalVariableId, module::*, opcode::*, types::*,
 };
 use id_arena::Arena;
 use std::hash;
@@ -35,7 +35,15 @@ pub enum Value {
     Function(FunctionValue),
     Global(GlobalValue),
     Constant(ConstantValue),
+    BlockParam(BlockParamValue),
     None,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Hash, Eq)]
+pub struct BlockParamValue {
+    pub block_id: BasicBlockId,
+    pub index: usize,
+    pub ty: Type,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Hash, Eq)]
@@ -132,6 +140,7 @@ impl Value {
             Value::Global(GlobalValue { ty, .. }) => *ty,
             Value::Immediate(ref im) => *im.get_type(),
             Value::Constant(ConstantValue { ty, .. }) => *ty,
+            Value::BlockParam(BlockParamValue { ty, .. }) => *ty,
             Value::None => Type::Void,
         }
     }
@@ -205,6 +214,16 @@ impl Value {
             Value::Constant(ConstantValue { id, ty }) => {
                 format!("{} @const.{}", parent.types.to_string(*ty), id.index())
             }
+            Value::BlockParam(BlockParamValue {
+                block_id,
+                index,
+                ty,
+            }) => format!(
+                "{} bb{}.{}",
+                parent.types.to_string(*ty),
+                block_id.index(),
+                index
+            ),
             Value::None => "".to_string(),
         }
     }

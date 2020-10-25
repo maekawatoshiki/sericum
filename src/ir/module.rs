@@ -95,6 +95,11 @@ impl Module {
         &mut self.functions[id]
     }
 
+    pub fn function_val(&self, id: FunctionId) -> value::Value {
+        let ty = self.function_ref(id).ty;
+        value::Value::Function(value::FunctionValue { func_id: id, ty })
+    }
+
     /// Finds a function defined in the module by name
     ///
     /// # Examples
