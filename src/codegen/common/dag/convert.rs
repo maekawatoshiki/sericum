@@ -234,8 +234,8 @@ impl<'a> ConvertToDAGNode<'a> {
                 }
                 Opcode::GetElementPtr => {
                     let indices: Vec<Value> =
-                        inst.operands[1..].iter().map(|v| *v.as_value()).collect();
-                    let gep = self.construct_node_for_gep(inst.operands[0].as_value(), &indices);
+                        inst.operand.args()[1..].into_iter().map(|x| *x).collect();
+                    let gep = self.construct_node_for_gep(&inst.operand.args()[0], &indices);
                     if self.block.liveness.borrow().live_out.contains(&inst_id) {
                         let gep = self.make_chain_with_copying(gep);
                         self.inst_to_node.insert(inst_id, gep);
@@ -244,11 +244,11 @@ impl<'a> ConvertToDAGNode<'a> {
                     }
                 }
                 Opcode::Call => {
-                    let mut operands: Vec<Raw<DAGNode>> = inst.operands[1..]
+                    let mut operands: Vec<Raw<DAGNode>> = inst.operand.args()[1..]
                         .iter()
-                        .map(|v| self.get_node_from_value(v.as_value()))
+                        .map(|v| self.get_node_from_value(v))
                         .collect();
-                    operands.insert(0, self.get_node_from_value(inst.operands[0].as_value()));
+                    operands.insert(0, self.get_node_from_value(&inst.operand.args()[0]));
                     let id = self.alloc_node_as_necessary(
                         inst_id,
                         DAGNode::new(NodeKind::IR(IRNodeKind::Call), operands, inst.ty.clone()),
@@ -294,7 +294,7 @@ impl<'a> ConvertToDAGNode<'a> {
                     }
                 }
                 Opcode::SIToFP | Opcode::FPToSI => {
-                    let v = self.get_node_from_value(inst.operands[0].as_value());
+                    let v = self.get_node_from_value(&inst.operand.args()[0]);
                     let inst = self.alloc_node_as_necessary(
                         inst_id,
                         DAGNode::new(
@@ -315,7 +315,7 @@ impl<'a> ConvertToDAGNode<'a> {
                     }
                 }
                 Opcode::Sext => {
-                    let x = self.get_node_from_value(inst.operands[0].as_value());
+                    let x = self.get_node_from_value(&inst.operand.args()[0]);
                     let inst = self.alloc_node_as_necessary(
                         inst_id,
                         DAGNode::new(NodeKind::IR(IRNodeKind::Sext), vec![x], inst.ty),
@@ -330,7 +330,7 @@ impl<'a> ConvertToDAGNode<'a> {
                 Opcode::Br => {
                     let bb = self.node_heap.alloc(DAGNode::new(
                         NodeKind::Operand(OperandNodeKind::BasicBlock(
-                            self.bb_map[inst.operands[0].as_basic_block()],
+                            self.bb_map[&inst.operand.blocks()[0]],
                         )),
                         vec![],
                         Type::Void,
@@ -343,9 +343,9 @@ impl<'a> ConvertToDAGNode<'a> {
                     self.make_chain(br);
                 }
                 Opcode::CondBr => {
-                    let v = *inst.operands[0].as_value();
-                    let then_ = inst.operands[1].as_basic_block();
-                    let else_ = inst.operands[2].as_basic_block();
+                    let v = inst.operand.args()[0];
+                    let then_ = &inst.operand.blocks()[0];
+                    let else_ = &inst.operand.blocks()[1];
                     let v = self.get_node_from_value(&v);
                     let brcond = {
                         let bb = self.node_heap.alloc(DAGNode::new(
@@ -375,9 +375,9 @@ impl<'a> ConvertToDAGNode<'a> {
                     self.make_chain(br);
                 }
                 Opcode::ICmp => {
-                    let c = *inst.operands[0].as_icmp_kind();
-                    let v1 = self.get_node_from_value(inst.operands[1].as_value());
-                    let v2 = self.get_node_from_value(inst.operands[2].as_value());
+                    let c = inst.operand.int_cmp()[0];
+                    let v1 = self.get_node_from_value(&inst.operand.args()[0]);
+                    let v2 = self.get_node_from_value(&inst.operand.args()[1]);
                     let cond = self.alloc_node(DAGNode::new(
                         NodeKind::Operand(OperandNodeKind::CondKind((c).into())),
                         vec![],
@@ -395,9 +395,9 @@ impl<'a> ConvertToDAGNode<'a> {
                     }
                 }
                 Opcode::FCmp => {
-                    let c = *inst.operands[0].as_fcmp_kind();
-                    let v1 = self.get_node_from_value(inst.operands[1].as_value());
-                    let v2 = self.get_node_from_value(inst.operands[2].as_value());
+                    let c = inst.operand.float_cmp()[0];
+                    let v1 = self.get_node_from_value(&inst.operand.args()[0]);
+                    let v2 = self.get_node_from_value(&inst.operand.args()[1]);
                     let cond = self.alloc_node(DAGNode::new(
                         NodeKind::Operand(OperandNodeKind::CondKind((c).into())),
                         vec![],
@@ -416,11 +416,9 @@ impl<'a> ConvertToDAGNode<'a> {
                 }
                 Opcode::Phi => {
                     let mut operands = vec![];
-                    for i in (0..inst.operands.len()).step_by(2) {
-                        let (val, bb) = (
-                            *inst.operands[i].as_value(),
-                            inst.operands[i + 1].as_basic_block(),
-                        );
+                    assert!(inst.operands.len() == 0);
+                    for (i, val) in inst.operand.args().iter().enumerate() {
+                        let bb = &inst.operand.blocks()[i];
                         // Remove CopyFromReg if necessary
                         let val = self.get_node_from_value(&val);
                         operands.push(match val.kind {
@@ -445,7 +443,7 @@ impl<'a> ConvertToDAGNode<'a> {
                     }
                 }
                 Opcode::Ret => {
-                    let v = self.get_node_from_value(inst.operands[0].as_value());
+                    let v = self.get_node_from_value(&inst.operand.args()[0]);
                     let ret = self.alloc_node(DAGNode::new(
                         NodeKind::IR(IRNodeKind::Ret),
                         vec![v],

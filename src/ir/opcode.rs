@@ -21,34 +21,73 @@ pub struct Instruction {
 
 #[derive(Clone, Debug, Copy, PartialEq, Eq, Hash)]
 pub enum Opcode {
-    Alloca,
-    Load,
-    Store,
-    GetElementPtr, // ptr val, indices
-    Add,
-    Sub,
-    Mul,
-    Div,
-    Rem,
-    Shl,
-    SIToFP,
-    FPToSI,
-    Sext,
-    ICmp,
-    FCmp,
-    Br,
-    CondBr,
-    Phi,
-    Call,
-    Ret,
+    Alloca, //
+    Load,   //
+    Store,  //
+    GetElementPtr,
+    Add,    //
+    Sub,    //
+    Mul,    //
+    Div,    //
+    Rem,    //
+    Shl,    //
+    SIToFP, //
+    FPToSI, //
+    Sext,   //
+    ICmp,   //
+    FCmp,   //
+    Br,     //
+    CondBr, //
+    Phi,    //
+    Call,   //
+    Ret,    //
 }
 
 #[derive(Debug, Clone)]
 pub enum InstOperand {
-    Type { ty: Type },
-    Store { args: [Value; 2] },
-    Load { arg: Value },
-    Binary { args: [Value; 2] },
+    Type {
+        ty: Type,
+    },
+    Store {
+        args: [Value; 2],
+    },
+    Load {
+        arg: Value,
+    },
+    Binary {
+        args: [Value; 2],
+    },
+    Cast {
+        arg: Value,
+    },
+    IntCmp {
+        cond: ICmpKind,
+        args: [Value; 2],
+    },
+    FloatCmp {
+        cond: FCmpKind,
+        args: [Value; 2],
+    },
+    Branch {
+        dst: BasicBlockId,
+    },
+    CondBranch {
+        arg: Value,
+        dsts: [BasicBlockId; 2],
+    },
+    Call {
+        args: Vec<Value>,
+    },
+    Phi {
+        blocks: Vec<BasicBlockId>,
+        args: Vec<Value>,
+    },
+    GEP {
+        args: Vec<Value>,
+    },
+    Ret {
+        arg: Value,
+    },
     None,
 }
 
@@ -89,6 +128,18 @@ impl Instruction {
             opcode,
             operands: operands,
             operand: InstOperand::None,
+            ty,
+            id: None,
+            parent,
+            users: RefCell::new(vec![]),
+        }
+    }
+
+    pub fn new2(opcode: Opcode, operand: InstOperand, ty: Type, parent: BasicBlockId) -> Self {
+        Self {
+            opcode,
+            operands: vec![],
+            operand,
             ty,
             id: None,
             parent,
@@ -141,6 +192,16 @@ impl Instruction {
         arena[self_id].operands.push(operand);
     }
 
+    pub fn add_value_operand(arena: &mut Arena<Instruction>, self_id: InstructionId, value: Value) {
+        if let Value::Instruction(InstructionValue { id, .. }) = &value {
+            let mut users = arena[*id].users.borrow_mut();
+            if !users.contains(&self_id) {
+                users.push(self_id);
+            }
+        }
+        arena[self_id].operand.phi_args_mut().push(value)
+    }
+
     // TODO: using two loops is inefficient
     pub fn replace_operand(
         arena: &mut Arena<Instruction>,
@@ -161,6 +222,17 @@ impl Instruction {
             if *operand == *from {
                 *operand = to;
             }
+        }
+    }
+
+    pub fn replace_block_operand(
+        arena: &mut Arena<Instruction>,
+        self_id: InstructionId,
+        from: &BasicBlockId,
+        to: BasicBlockId,
+    ) {
+        for block in arena[self_id].operand.blocks_mut() {
+            *block = to;
         }
     }
 
@@ -190,9 +262,7 @@ impl Instruction {
         }
         for val in arena[self_id].operand.args_mut() {
             if val == from {
-                println!("HERE {:?}", val);
                 *val = to;
-                println!("HERE {:?}", val);
             }
         }
     }
@@ -251,6 +321,14 @@ impl Instruction {
         let users = arena[self_id].users.borrow().clone();
         for u in users {
             Self::replace_operand_inst(arena, u, self_id, to);
+        }
+        assert!(arena[self_id].users.borrow().len() == 0);
+    }
+
+    pub fn replace_all_uses2(arena: &mut Arena<Instruction>, self_id: InstructionId, to: Value) {
+        let users = arena[self_id].users.borrow().clone();
+        for u in users {
+            Self::replace_operand_inst(arena, u, self_id, Operand::Value(to));
         }
         assert!(arena[self_id].users.borrow().len() == 0);
     }
@@ -365,11 +443,55 @@ impl InstOperand {
         }
     }
 
+    pub fn types_mut(&mut self) -> &mut [Type] {
+        match self {
+            Self::Type { ty } => ::core::slice::from_mut(ty),
+            _ => &mut [],
+        }
+    }
+
+    pub fn int_cmp(&self) -> &[ICmpKind] {
+        match self {
+            Self::IntCmp { cond, .. } => ::core::slice::from_ref(cond),
+            _ => &[],
+        }
+    }
+
+    pub fn float_cmp(&self) -> &[FCmpKind] {
+        match self {
+            Self::FloatCmp { cond, .. } => ::core::slice::from_ref(cond),
+            _ => &[],
+        }
+    }
+
+    pub fn blocks(&self) -> &[BasicBlockId] {
+        match self {
+            Self::Branch { dst } => ::core::slice::from_ref(dst),
+            Self::CondBranch { dsts, .. } => dsts,
+            Self::Phi { blocks, .. } => blocks.as_ref(),
+            _ => &[],
+        }
+    }
+
+    pub fn blocks_mut(&mut self) -> &mut [BasicBlockId] {
+        match self {
+            Self::Branch { dst } => ::core::slice::from_mut(dst),
+            Self::CondBranch { dsts, .. } => dsts,
+            Self::Phi { blocks, .. } => blocks.as_mut(),
+            _ => &mut [],
+        }
+    }
+
     pub fn args(&self) -> &[Value] {
         match self {
             Self::Store { args } => args,
-            Self::Load { arg } => ::core::slice::from_ref(arg),
-            Self::Binary { args } => args.as_ref(),
+            Self::Ret { arg } | Self::CondBranch { arg, .. } | Self::Load { arg } => {
+                ::core::slice::from_ref(arg)
+            }
+            Self::Binary { args } | Self::IntCmp { args, .. } | Self::FloatCmp { args, .. } => {
+                args.as_ref()
+            }
+            Self::GEP { args } | Self::Phi { args, .. } | Self::Call { args } => args.as_ref(),
             _ => &[],
         }
     }
@@ -377,9 +499,28 @@ impl InstOperand {
     pub fn args_mut(&mut self) -> &mut [Value] {
         match self {
             Self::Store { args } => args,
-            Self::Load { arg } => ::core::slice::from_mut(arg),
-            Self::Binary { args } => args.as_mut(),
+            Self::Ret { arg } | Self::CondBranch { arg, .. } | Self::Load { arg } => {
+                ::core::slice::from_mut(arg)
+            }
+            Self::Binary { args } | Self::IntCmp { args, .. } | Self::FloatCmp { args, .. } => {
+                args.as_mut()
+            }
+            Self::GEP { args } | Self::Phi { args, .. } | Self::Call { args } => args.as_mut(),
             _ => &mut [],
+        }
+    }
+
+    pub fn phi_args_mut(&mut self) -> &mut Vec<Value> {
+        match self {
+            Self::Phi { args, .. } => args,
+            _ => panic!(),
+        }
+    }
+
+    pub fn phi_blocks_mut(&mut self) -> &mut Vec<BasicBlockId> {
+        match self {
+            Self::Phi { blocks, .. } => blocks,
+            _ => panic!(),
         }
     }
 }

@@ -91,11 +91,11 @@ impl<'a> LoopInvariantCodeMotionOnFunction<'a> {
         header_preds.insert(pre_header);
         for &id in header_bb.iseq_ref().iter().rev() {
             if self.func.inst_table[id].opcode == Opcode::Phi {
-                Instruction::replace_operand(
+                Instruction::replace_block_operand(
                     &mut self.func.inst_table,
                     id,
-                    &Operand::BasicBlock(*preds_not_in_loop.iter().next().unwrap()),
-                    Operand::BasicBlock(pre_header),
+                    preds_not_in_loop.iter().next().unwrap(),
+                    pre_header,
                 );
             }
         }
@@ -108,11 +108,11 @@ impl<'a> LoopInvariantCodeMotionOnFunction<'a> {
                 if !self.func.inst_table[id].opcode.is_terminator() {
                     break;
                 }
-                Instruction::replace_operand(
+                Instruction::replace_block_operand(
                     &mut self.func.inst_table,
                     id,
-                    &Operand::BasicBlock(loop_.header),
-                    Operand::BasicBlock(pre_header),
+                    &loop_.header,
+                    pre_header,
                 );
             }
         }

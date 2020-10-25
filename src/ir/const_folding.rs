@@ -58,7 +58,6 @@ impl<'a> ConstantFoldingOnFunction<'a> {
                 None => continue,
             };
             let users = inst.users.clone();
-            println!("USERS {:?}", users);
             for &user_id in &*users.borrow() {
                 let ty = self.cur_func.inst_table[inst_id].ty;
                 Instruction::replace_operand_value(

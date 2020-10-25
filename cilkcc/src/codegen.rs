@@ -444,7 +444,7 @@ impl<'a> FunctionCodeGenerator<'a> {
             .iter()
             .enumerate()
             .find_map(|(i, inst)| {
-                if self.builder.func_ref().inst_table[inst.as_instruction().id].opcode
+                if self.builder.func_ref().inst_table[*inst].opcode
                     == Opcode::Alloca
                 {
                     None

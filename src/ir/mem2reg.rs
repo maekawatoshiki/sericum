@@ -5,7 +5,7 @@ use crate::{
         const_folding::ConstantFolding,
         function::Function,
         module::Module,
-        opcode::{Instruction, InstructionId, Opcode, Operand},
+        opcode::{InstOperand, Instruction, InstructionId, Opcode, Operand},
         value::{InstructionValue, Value},
     },
     traits::function::FunctionTrait,
@@ -322,10 +322,10 @@ impl<'a> Mem2RegOnFunction<'a> {
         let mut worklist: Vec<(
             BasicBlockId,
             Option<BasicBlockId>,
-            FxHashMap<InstructionId, Operand>, // alloca id -> incoming
+            FxHashMap<InstructionId, Value>, // alloca id -> incoming
         )> = vec![(entry, None, FxHashMap::default())];
         let mut visited = FxHashSet::default();
-        let mut added_phi: FxHashMap<(BasicBlockId, InstructionId), Operand> = FxHashMap::default(); // Alloca id -> phi
+        let mut added_phi: FxHashMap<(BasicBlockId, InstructionId), Value> = FxHashMap::default(); // Alloca id -> phi
 
         // TODO: refactoring
         while let Some((mut cur, mut pred, mut incoming)) = worklist.pop() {
@@ -340,17 +340,16 @@ impl<'a> Mem2RegOnFunction<'a> {
                         }
 
                         // append new incoming to phi
-                        let phi_id = val.as_value().as_instruction().id;
-                        Instruction::add_operand(
+                        let phi_id = val.as_instruction().id;
+                        Instruction::add_value_operand(
                             &mut self.cur_func.inst_table,
                             phi_id,
                             *incoming_val,
                         );
-                        Instruction::add_operand(
-                            &mut self.cur_func.inst_table,
-                            phi_id,
-                            Operand::BasicBlock(pred.unwrap()),
-                        );
+                        self.cur_func.inst_table[phi_id]
+                            .operand
+                            .phi_blocks_mut()
+                            .push(pred.unwrap());
 
                         let phi = &self.cur_func.inst_table[phi_id];
                         phi.set_users(&self.cur_func.inst_table); // add phi_id to operands' users
@@ -359,7 +358,7 @@ impl<'a> Mem2RegOnFunction<'a> {
                     } else {
                         if !incoming.contains_key(alloca_id) {
                             let ty = self.cur_func.inst_table[*alloca_id].operand.types()[0];
-                            incoming.insert(*alloca_id, Operand::Value(Value::null(ty)));
+                            incoming.insert(*alloca_id, Value::null(ty));
                         }
                         let incoming_val = incoming.get_mut(alloca_id).unwrap();
                         let ty = self
@@ -367,9 +366,12 @@ impl<'a> Mem2RegOnFunction<'a> {
                             .types
                             .get_element_ty(self.cur_func.inst_table[*alloca_id].ty, None)
                             .unwrap();
-                        let inst = Instruction::new(
+                        let inst = Instruction::new2(
                             Opcode::Phi,
-                            vec![*incoming_val, Operand::BasicBlock(pred.unwrap())],
+                            InstOperand::Phi {
+                                blocks: vec![pred.unwrap()],
+                                args: vec![*incoming_val],
+                            },
                             ty,
                             cur,
                         );
@@ -382,8 +384,8 @@ impl<'a> Mem2RegOnFunction<'a> {
                             id,
                             ty,
                         });
-                        added_phi.insert((cur, *alloca_id), Operand::Value(val));
-                        *incoming_val = Operand::Value(val);
+                        added_phi.insert((cur, *alloca_id), val);
+                        *incoming_val = val;
                     }
                 }
 
@@ -418,14 +420,12 @@ impl<'a> Mem2RegOnFunction<'a> {
                     };
                     match opcode {
                         Opcode::Store => {
-                            *incoming
-                                .entry(alloca_id)
-                                .or_insert(Operand::Value(Value::None)) = Operand::Value(op0);
+                            *incoming.entry(alloca_id).or_insert(Value::None) = op0;
                             removal_list.push(inst_id);
                         }
                         Opcode::Load => {
                             if let Some(val) = incoming.get(&alloca_id) {
-                                Instruction::replace_all_uses(
+                                Instruction::replace_all_uses2(
                                     &mut self.cur_func.inst_table,
                                     inst_id,
                                     *val,

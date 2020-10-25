@@ -176,9 +176,13 @@ pub trait IRBuilder {
             .get_element_ty_with_indices(v.get_type(), &indices)
             .unwrap();
         let ptr_ty = self.func_ref_mut().types.new_pointer_ty(elem_ty);
-        let mut operands = vec![Operand::Value(v)];
-        operands.extend(indices.iter().map(|v| Operand::Value(*v)));
-        let inst = self.create_inst_value(Opcode::GetElementPtr, operands, ptr_ty);
+        let mut operands = vec![v];
+        operands.extend(indices.iter().map(|v| *v));
+        let inst = self.create_inst_value2(
+            Opcode::GetElementPtr,
+            InstOperand::GEP { args: operands },
+            ptr_ty,
+        );
         self.append_inst_to_current_block(inst.as_instruction().id);
         inst
     }
@@ -292,31 +296,30 @@ pub trait IRBuilder {
     }
 
     fn build_sitofp(&mut self, v: Value, ty: Type) -> Value {
-        let inst = self.create_inst_value(Opcode::SIToFP, vec![Operand::Value(v)], ty);
+        let inst = self.create_inst_value2(Opcode::SIToFP, InstOperand::Cast { arg: v }, ty);
         self.append_inst_to_current_block(inst.as_instruction().id);
         inst
     }
 
     fn build_fptosi(&mut self, v: Value, ty: Type) -> Value {
-        let inst = self.create_inst_value(Opcode::FPToSI, vec![Operand::Value(v)], ty);
+        let inst = self.create_inst_value2(Opcode::FPToSI, InstOperand::Cast { arg: v }, ty);
         self.append_inst_to_current_block(inst.as_instruction().id);
         inst
     }
 
     fn build_sext(&mut self, v: Value, ty: Type) -> Value {
-        let inst = self.create_inst_value(Opcode::Sext, vec![Operand::Value(v)], ty);
+        let inst = self.create_inst_value2(Opcode::Sext, InstOperand::Cast { arg: v }, ty);
         self.append_inst_to_current_block(inst.as_instruction().id);
         inst
     }
 
     fn build_icmp(&mut self, kind: ICmpKind, v1: Value, v2: Value) -> Value {
-        let inst = self.create_inst_value(
+        let inst = self.create_inst_value2(
             Opcode::ICmp,
-            vec![
-                Operand::ICmpKind(kind),
-                Operand::Value(v1),
-                Operand::Value(v2),
-            ],
+            InstOperand::IntCmp {
+                cond: kind,
+                args: [v1, v2],
+            },
             Type::i1,
         );
         self.append_inst_to_current_block(inst.as_instruction().id);
@@ -324,28 +327,26 @@ pub trait IRBuilder {
     }
 
     fn build_fcmp(&mut self, kind: FCmpKind, v1: Value, v2: Value) -> Value {
-        let inst = self.create_inst_value(
+        let inst = self.create_inst_value2(
             Opcode::FCmp,
-            vec![
-                Operand::FCmpKind(kind),
-                Operand::Value(v1),
-                Operand::Value(v2),
-            ],
+            InstOperand::FloatCmp {
+                cond: kind,
+                args: [v1, v2],
+            },
             Type::i1,
         );
         self.append_inst_to_current_block(inst.as_instruction().id);
         inst
     }
 
-    fn build_br(&mut self, dst_id: BasicBlockId) -> Value {
-        let inst =
-            self.create_inst_value(Opcode::Br, vec![Operand::BasicBlock(dst_id)], Type::Void);
+    fn build_br(&mut self, dst: BasicBlockId) -> Value {
+        let inst = self.create_inst_value2(Opcode::Br, InstOperand::Branch { dst }, Type::Void);
         self.append_inst_to_current_block(inst.as_instruction().id);
 
         let cur_bb_id = self.block().unwrap();
         self.with_function(|f| {
-            f.basic_block_ref_mut(cur_bb_id).succ.insert(dst_id);
-            f.basic_block_ref_mut(dst_id).pred.insert(cur_bb_id);
+            f.basic_block_ref_mut(cur_bb_id).succ.insert(dst);
+            f.basic_block_ref_mut(dst).pred.insert(cur_bb_id);
         });
 
         inst
@@ -353,13 +354,12 @@ pub trait IRBuilder {
 
     fn build_cond_br(&mut self, cond: Value, bb1: BasicBlockId, bb2: BasicBlockId) -> Value {
         let cur_bb_id = self.block().unwrap();
-        let inst = self.create_inst_value(
+        let inst = self.create_inst_value2(
             Opcode::CondBr,
-            vec![
-                Operand::Value(cond),
-                Operand::BasicBlock(bb1),
-                Operand::BasicBlock(bb2),
-            ],
+            InstOperand::CondBranch {
+                arg: cond,
+                dsts: [bb1, bb2],
+            },
             Type::Void,
         );
         self.append_inst_to_current_block(inst.as_instruction().id);
@@ -378,12 +378,13 @@ pub trait IRBuilder {
 
     fn build_phi(&mut self, pairs: Vec<(Value, BasicBlockId)>) -> Value {
         let ty = pairs.get(0).unwrap().0.get_type();
-        let mut operands = vec![];
+        let mut blocks = vec![];
+        let mut args = vec![];
         for (v, bb) in pairs {
-            operands.push(Operand::Value(v));
-            operands.push(Operand::BasicBlock(bb));
+            blocks.push(bb);
+            args.push(v);
         }
-        let inst = self.create_inst_value(Opcode::Phi, operands, ty);
+        let inst = self.create_inst_value2(Opcode::Phi, InstOperand::Phi { blocks, args }, ty);
         self.append_inst_to_current_block(inst.as_instruction().id);
         inst
     }
@@ -395,15 +396,16 @@ pub trait IRBuilder {
             .compound_ty(f.get_type())
             .as_function()
             .ret_ty;
-        let mut operands = vec![Operand::Value(f)];
-        operands.extend(args.iter().map(|&v| Operand::Value(v)));
-        let inst = self.create_inst_value(Opcode::Call, operands, ret_ty);
+        let mut operands = vec![f];
+        operands.extend(args);
+        let inst =
+            self.create_inst_value2(Opcode::Call, InstOperand::Call { args: operands }, ret_ty);
         self.append_inst_to_current_block(inst.as_instruction().id);
         inst
     }
 
     fn build_ret(&mut self, v: Value) -> Value {
-        let inst = self.create_inst_value(Opcode::Ret, vec![Operand::Value(v)], Type::Void);
+        let inst = self.create_inst_value2(Opcode::Ret, InstOperand::Ret { arg: v }, Type::Void);
         self.append_inst_to_current_block(inst.as_instruction().id);
         inst
     }
