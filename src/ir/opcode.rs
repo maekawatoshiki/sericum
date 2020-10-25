@@ -12,6 +12,7 @@ pub struct Register(usize);
 pub struct Instruction {
     pub opcode: Opcode,
     pub operands: Vec<Operand>,
+    pub operand: InstOperand,
     pub ty: Type,
     pub id: Option<InstructionId>,
     pub parent: BasicBlockId,
@@ -40,6 +41,15 @@ pub enum Opcode {
     Phi,
     Call,
     Ret,
+}
+
+#[derive(Debug, Clone)]
+pub enum InstOperand {
+    Type { ty: Type },
+    Store { args: [Value; 2] },
+    Load { arg: Value },
+    Binary { args: [Value; 2] },
+    None,
 }
 
 #[derive(Debug, Clone, PartialEq, Copy, Hash, Eq)]
@@ -78,6 +88,7 @@ impl Instruction {
         Self {
             opcode,
             operands: operands,
+            operand: InstOperand::None,
             ty,
             id: None,
             parent,
@@ -101,6 +112,17 @@ impl Instruction {
                     users.push(self_id);
                 }
                 _ => {}
+            }
+        }
+        if self.operands.len() == 0 {
+            for operand in self.operand.args() {
+                if let Value::Instruction(InstructionValue { id, .. }) = operand {
+                    let mut users = inst_arena[*id].users.borrow_mut();
+                    if users.contains(&self_id) {
+                        continue;
+                    }
+                    users.push(self_id);
+                }
             }
         }
     }
@@ -142,6 +164,39 @@ impl Instruction {
         }
     }
 
+    pub fn replace_operand_value(
+        arena: &mut Arena<Instruction>,
+        self_id: InstructionId,
+        from: &Value,
+        to: Value,
+    ) {
+        for op in &arena[self_id].operands {
+            if *op == Operand::Value(*from) {
+                op.remove_from_users(arena, self_id);
+                to.set_user(arena, self_id)
+            }
+        }
+        for op in &mut arena[self_id].operands {
+            if *op == Operand::Value(*from) {
+                *op = Operand::Value(to);
+            }
+        }
+
+        for val in arena[self_id].operand.args() {
+            if val == from {
+                val.remove_from_users(arena, self_id);
+                to.set_user(arena, self_id)
+            }
+        }
+        for val in arena[self_id].operand.args_mut() {
+            if val == from {
+                println!("HERE {:?}", val);
+                *val = to;
+                println!("HERE {:?}", val);
+            }
+        }
+    }
+
     // TODO: using two loops is inefficient
     pub fn replace_operand_inst(
         arena: &mut Arena<Instruction>,
@@ -167,6 +222,29 @@ impl Instruction {
             // replace 'from' with 'to'
             *operand = to;
         }
+
+        ///////
+
+        if arena[self_id].operands.len() == 0 {
+            for val in arena[self_id].operand.args() {
+                match val {
+                    Value::Instruction(InstructionValue { id, .. }) if *id == from => {
+                        val.remove_from_users(arena, self_id);
+                        to.set_user(arena, self_id);
+                    }
+                    _ => continue,
+                };
+            }
+            for val in arena[self_id].operand.args_mut() {
+                match val {
+                    Value::Instruction(InstructionValue { id, .. }) if *id == from => {
+                        // replace 'from' with 'to'
+                        *val = *to.as_value();
+                    }
+                    _ => continue,
+                };
+            }
+        }
     }
 
     pub fn replace_all_uses(arena: &mut Arena<Instruction>, self_id: InstructionId, to: Operand) {
@@ -189,16 +267,24 @@ impl Instruction {
                 _ => {}
             }
         }
+
+        for val in self.operand.args() {
+            if let Value::Instruction(InstructionValue { id, .. }) = val {
+                inst_arena[*id]
+                    .users
+                    .borrow_mut()
+                    .retain(|&use_id| use_id != self.id.unwrap());
+            }
+        }
     }
 
     pub fn fold_const(&self) -> Option<Value> {
-        let operands = &self.operands;
         match self.opcode {
-            Opcode::Add => operands[0].as_value().const_add(&operands[1].as_value()),
-            Opcode::Sub => operands[0].as_value().const_sub(&operands[1].as_value()),
-            Opcode::Mul => operands[0].as_value().const_mul(&operands[1].as_value()),
-            Opcode::Div => operands[0].as_value().const_div(&operands[1].as_value()),
-            Opcode::Rem => operands[0].as_value().const_rem(&operands[1].as_value()),
+            Opcode::Add => self.operand.args()[0].const_add(&self.operand.args()[1]),
+            Opcode::Sub => self.operand.args()[0].const_sub(&self.operand.args()[1]),
+            Opcode::Mul => self.operand.args()[0].const_mul(&self.operand.args()[1]),
+            Opcode::Div => self.operand.args()[0].const_div(&self.operand.args()[1]),
+            Opcode::Rem => self.operand.args()[0].const_rem(&self.operand.args()[1]),
             _ => None,
         }
     }
@@ -219,8 +305,9 @@ impl Instruction {
         }
 
         format!(
-            "{} ",
+            "{}-{:?} ",
             output,
+            self.operand,
             // self.id.unwrap().index(),
             // self.users.borrow().iter().take(10).collect::<Vec<_>>()
         )
@@ -230,7 +317,7 @@ impl Instruction {
 impl Opcode {
     pub fn returns_value(&self) -> bool {
         match self {
-            Opcode::Br | Opcode::CondBr | Opcode::Ret | Opcode::Store | Opcode::Call|
+            Opcode::Br | Opcode::CondBr | Opcode::Ret | Opcode::Store | Opcode::Call |
                 /* alloca doesn't return value = */ Opcode::Alloca => false,
             _ => true,
         }
@@ -266,6 +353,33 @@ impl Opcode {
             Opcode::Phi => "phi",
             Opcode::Call => "call",
             Opcode::Ret => "ret",
+        }
+    }
+}
+
+impl InstOperand {
+    pub fn types(&self) -> &[Type] {
+        match self {
+            Self::Type { ty } => ::core::slice::from_ref(ty),
+            _ => &[],
+        }
+    }
+
+    pub fn args(&self) -> &[Value] {
+        match self {
+            Self::Store { args } => args,
+            Self::Load { arg } => ::core::slice::from_ref(arg),
+            Self::Binary { args } => args.as_ref(),
+            _ => &[],
+        }
+    }
+
+    pub fn args_mut(&mut self) -> &mut [Value] {
+        match self {
+            Self::Store { args } => args,
+            Self::Load { arg } => ::core::slice::from_mut(arg),
+            Self::Binary { args } => args.as_mut(),
+            _ => &mut [],
         }
     }
 }

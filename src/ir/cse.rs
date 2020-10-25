@@ -215,26 +215,27 @@ impl<'a> GlobalCommonSubexprEliminationOnFunction<'a> {
     }
 
     pub fn run(mut self) {
-        let dom_tree = DominatorTreeConstructor::new(&self.func.basic_blocks).construct();
-
-        self.run_sub(
-            &dom_tree,
-            self.func.basic_blocks.order[0],
-            FxHashMap::default(),
-        );
-
-        for df in self.dom_frontiers.clone() {
-            self.run_sub2(&df, &df)
-        }
-
-        debug!(println!(
-            "function '{}': {} insts removed",
-            self.func.name,
-            self.removal_list.len()
-        ));
-
-        for remove in self.removal_list {
-            self.func.remove_inst(remove);
-        }
+        //
+        // let dom_tree = DominatorTreeConstructor::new(&self.func.basic_blocks).construct();
+        //
+        // self.run_sub(
+        //     &dom_tree,
+        //     self.func.basic_blocks.order[0],
+        //     FxHashMap::default(),
+        // );
+        //
+        // for df in self.dom_frontiers.clone() {
+        //     self.run_sub2(&df, &df)
+        // }
+        //
+        // debug!(println!(
+        //     "function '{}': {} insts removed",
+        //     self.func.name,
+        //     self.removal_list.len()
+        // ));
+        //
+        // for remove in self.removal_list {
+        //     self.func.remove_inst(remove);
+        // }
     }
 }

@@ -19,6 +19,7 @@ impl ConstantFolding {
     }
 
     pub fn run_on_module(&mut self, module: &mut Module) {
+        println!("CF {:?}", module);
         for (_, func) in &mut module.functions {
             ConstantFoldingOnFunction::new(func).run()
         }
@@ -57,14 +58,15 @@ impl<'a> ConstantFoldingOnFunction<'a> {
                 None => continue,
             };
             let users = inst.users.clone();
+            println!("USERS {:?}", users);
             for &user_id in &*users.borrow() {
                 let ty = self.cur_func.inst_table[inst_id].ty;
-                Instruction::replace_operand(
+                Instruction::replace_operand_value(
                     &mut self.cur_func.inst_table,
                     user_id,
                     // TODO: Very inefficient!
-                    &Operand::new_inst(self.cur_func.id.unwrap(), inst_id, ty),
-                    Operand::Value(folded),
+                    &Value::new_inst(self.cur_func.id.unwrap(), inst_id, ty),
+                    folded,
                 );
                 let user = &self.cur_func.inst_table[user_id];
                 if Self::is_foldable(user) {
@@ -76,17 +78,15 @@ impl<'a> ConstantFoldingOnFunction<'a> {
 
         while let Some(inst_id) = to_shift.pop_front() {
             let inst = &mut self.cur_func.inst_table[inst_id];
-            assert!(inst.opcode == Opcode::Mul);
+            assert!(inst.opcode == Opcode::Mul && inst.operands.len() == 0);
             inst.opcode = Opcode::Shl;
-            inst.operands[1] = Operand::Value(Value::new_imm_int8(
-                inst.operands[1]
-                    .get_value()
-                    .unwrap()
+            inst.operand.args_mut()[1] = Value::new_imm_int8(
+                inst.operand.args()[1]
                     .get_imm()
                     .unwrap()
                     .is_power_of_two()
                     .unwrap() as i8,
-            ))
+            );
         }
     }
 
@@ -95,18 +95,17 @@ impl<'a> ConstantFoldingOnFunction<'a> {
             inst.opcode,
             Opcode::Add | Opcode::Sub | Opcode::Mul | Opcode::Div
         ) && inst
-            .operands
+            .operand
+            .args()
             .iter()
-            .all(|op| matches!(op, Operand::Value(Value::Immediate(_))))
+            .all(|op| matches!(op, Value::Immediate(_)))
     }
 
     fn is_mul_power_of_two(inst: &Instruction) -> bool {
         inst.opcode == Opcode::Mul
-            && inst.operands[0]
-                .get_value()
-                .map_or(false, |v| v.get_imm().is_none())
-            && inst.operands[1].get_value().map_or(false, |v| {
-                v.get_imm().map_or(false, |i| i.is_power_of_two().is_some())
-            })
+            && inst.operand.args()[0].get_imm().is_none()
+            && inst.operand.args()[1]
+                .get_imm()
+                .map_or(false, |i| i.is_power_of_two().is_some())
     }
 }

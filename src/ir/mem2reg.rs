@@ -123,7 +123,7 @@ impl<'a> Mem2RegOnFunction<'a> {
             let inst = &self.cur_func.inst_table[use_id];
             match inst.opcode {
                 Opcode::Store => {
-                    src = Some(inst.operands[0]);
+                    src = Some(inst.operand.args()[0]);
                     store_to_remove = Some(use_id);
                 }
                 Opcode::Load => loads_to_remove.push((use_id, inst.users.borrow().clone())),
@@ -159,7 +159,12 @@ impl<'a> Mem2RegOnFunction<'a> {
         for (load_id, load_users) in loads_to_remove {
             self.cur_func.remove_inst(load_id);
             for u in load_users {
-                Instruction::replace_operand_inst(&mut self.cur_func.inst_table, u, load_id, src)
+                Instruction::replace_operand_inst(
+                    &mut self.cur_func.inst_table,
+                    u,
+                    load_id,
+                    Operand::Value(src),
+                )
             }
         }
     }
@@ -207,14 +212,19 @@ impl<'a> Mem2RegOnFunction<'a> {
             };
 
             let nearest_store = &self.cur_func.inst_table[nearest_store_id];
-            let src = nearest_store.operands[0];
+            let src = nearest_store.operand.args()[0];
 
             stores_to_remove.insert(nearest_store_id);
             self.cur_func.remove_inst(load_id);
 
             // remove loads and replace them with src
             for u in load_users {
-                Instruction::replace_operand_inst(&mut self.cur_func.inst_table, u, load_id, src)
+                Instruction::replace_operand_inst(
+                    &mut self.cur_func.inst_table,
+                    u,
+                    load_id,
+                    Operand::Value(src),
+                )
             }
         }
 
@@ -348,7 +358,7 @@ impl<'a> Mem2RegOnFunction<'a> {
                         *incoming_val = *val;
                     } else {
                         if !incoming.contains_key(alloca_id) {
-                            let ty = *self.cur_func.inst_table[*alloca_id].operands[0].as_type();
+                            let ty = self.cur_func.inst_table[*alloca_id].operand.types()[0];
                             incoming.insert(*alloca_id, Operand::Value(Value::null(ty)));
                         }
                         let incoming_val = incoming.get_mut(alloca_id).unwrap();
@@ -387,23 +397,30 @@ impl<'a> Mem2RegOnFunction<'a> {
                     let (opcode, op0, alloca_id) = {
                         let inst = &self.cur_func.inst_table[inst_id];
                         let alloca_id = match inst.opcode {
-                            Opcode::Store => inst.operands[1],
-                            Opcode::Load => inst.operands[0],
+                            Opcode::Store => inst.operand.args()[1], // inst.operands[1],
+                            Opcode::Load => inst.operand.args()[0],
                             _ => continue,
                         }
-                        .as_value()
                         .as_instruction()
                         .id;
                         if !allocas.contains(&alloca_id) {
                             continue;
                         }
-                        (inst.opcode, inst.operands[0], alloca_id)
+                        (
+                            inst.opcode,
+                            if inst.opcode == Opcode::Store {
+                                inst.operand.args()[0]
+                            } else {
+                                Value::None
+                            },
+                            alloca_id,
+                        )
                     };
                     match opcode {
                         Opcode::Store => {
                             *incoming
                                 .entry(alloca_id)
-                                .or_insert(Operand::Value(Value::None)) = op0;
+                                .or_insert(Operand::Value(Value::None)) = Operand::Value(op0);
                             removal_list.push(inst_id);
                         }
                         Opcode::Load => {

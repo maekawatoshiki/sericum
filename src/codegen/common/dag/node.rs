@@ -383,6 +383,7 @@ impl DAGNode {
                 write!(f, ",")?
             }
             if op.kind == NodeKind::None {
+                write!(f, "None")?;
                 continue;
             }
             if op.may_contain_children() {

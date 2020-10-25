@@ -47,8 +47,8 @@ impl<'a> InstructionCombineOnFunction<'a> {
                 continue;
             }
             let inst2_id = *inst1.users.borrow().iter().next().unwrap();
-            let op0 = inst1.operands[0].clone();
-            let op1 = inst1.operands[1].clone();
+            let op0 = inst1.operand.args()[0].clone();
+            let op1 = inst1.operand.args()[1].clone();
 
             if inst1.has_one_use() {
                 self.func.remove_inst(inst_id);
@@ -56,30 +56,15 @@ impl<'a> InstructionCombineOnFunction<'a> {
 
             let inst2 = &mut self.func.inst_table[inst2_id];
 
-            inst2.operands[0] = op0;
-            inst2.operands[1] = Operand::Value(match inst2.opcode {
-                Opcode::Add => op1
-                    .as_value()
-                    .const_add(inst2.operands[1].as_value())
-                    .unwrap(),
-                Opcode::Sub => op1
-                    .as_value()
-                    .const_add(inst2.operands[1].as_value())
-                    .unwrap(),
-                Opcode::Mul => op1
-                    .as_value()
-                    .const_mul(inst2.operands[1].as_value())
-                    .unwrap(),
-                Opcode::Div => op1
-                    .as_value()
-                    .const_mul(inst2.operands[1].as_value())
-                    .unwrap(),
-                Opcode::Rem => op1
-                    .as_value()
-                    .const_rem(inst2.operands[1].as_value())
-                    .unwrap(),
+            inst2.operand.args_mut()[0] = op0;
+            inst2.operand.args_mut()[1] = match inst2.opcode {
+                Opcode::Add => op1.const_add(inst2.operands[1].as_value()).unwrap(),
+                Opcode::Sub => op1.const_add(inst2.operands[1].as_value()).unwrap(),
+                Opcode::Mul => op1.const_mul(inst2.operands[1].as_value()).unwrap(),
+                Opcode::Div => op1.const_mul(inst2.operands[1].as_value()).unwrap(),
+                Opcode::Rem => op1.const_rem(inst2.operands[1].as_value()).unwrap(),
                 _ => unreachable!(),
-            });
+            };
         }
     }
 
@@ -97,7 +82,7 @@ impl<'a> InstructionCombineOnFunction<'a> {
         matches!(
             inst.opcode,
             Opcode::Add | Opcode::Sub | Opcode::Mul | Opcode::Div | Opcode::Rem
-        ) && matches!(inst.operands[0], Operand::Value(Value::Instruction(_)))
-            && matches!(inst.operands[1], Operand::Value(Value::Immediate(_)))
+        ) && matches!(inst.operand.args()[0], Value::Instruction(_))
+            && matches!(inst.operand.args()[1], Value::Immediate(_))
     }
 }

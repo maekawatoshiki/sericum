@@ -2,6 +2,7 @@ use super::{
     constant_pool::ConstantId, function::*, global_val::GlobalVariableId, module::*, opcode::*,
     types::*,
 };
+use id_arena::Arena;
 use std::hash;
 
 macro_rules! const_op {
@@ -105,6 +106,10 @@ impl Value {
 
     pub fn new_func(f: FunctionValue) -> Self {
         Self::Function(f)
+    }
+
+    pub fn new_inst(func_id: FunctionId, id: InstructionId, ty: Type) -> Self {
+        Value::Instruction(InstructionValue { func_id, id, ty })
     }
 
     pub fn null(ty: Type) -> Self {
@@ -222,6 +227,21 @@ impl Value {
         match self {
             Self::Instruction(iv) => iv,
             _ => panic!(),
+        }
+    }
+
+    pub fn remove_from_users(&self, inst_arena: &Arena<Instruction>, remove: InstructionId) {
+        if let Value::Instruction(InstructionValue { id, .. }) = self {
+            inst_arena[*id]
+                .users
+                .borrow_mut()
+                .retain(|&use_id| use_id != remove);
+        }
+    }
+
+    pub fn set_user(&self, inst_arena: &Arena<Instruction>, new: InstructionId) {
+        if let Value::Instruction(InstructionValue { id, .. }) = self {
+            inst_arena[*id].set_user(inst_arena, new);
         }
     }
 }

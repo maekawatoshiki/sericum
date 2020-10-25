@@ -164,7 +164,7 @@ pub trait IRBuilder {
 
     fn build_alloca(&mut self, ty: Type) -> Value {
         let ptr_ty = self.func_ref_mut().types.new_pointer_ty(ty);
-        let inst = self.create_inst_value(Opcode::Alloca, vec![Operand::Type(ty)], ptr_ty);
+        let inst = self.create_inst_value2(Opcode::Alloca, InstOperand::Type { ty }, ptr_ty);
         self.append_inst_to_current_block(inst.as_instruction().id);
         inst
     }
@@ -183,13 +183,13 @@ pub trait IRBuilder {
         inst
     }
 
-    fn build_load(&mut self, v: Value) -> Value {
-        let inst = self.create_inst_value(
+    fn build_load(&mut self, arg: Value) -> Value {
+        let inst = self.create_inst_value2(
             Opcode::Load,
-            vec![Operand::Value(v)],
+            InstOperand::Load { arg },
             self.func_ref()
                 .types
-                .get_element_ty(v.get_type(), None)
+                .get_element_ty(arg.get_type(), None)
                 .unwrap()
                 .clone(),
         );
@@ -198,9 +198,9 @@ pub trait IRBuilder {
     }
 
     fn build_store(&mut self, src: Value, dst: Value) -> Value {
-        let inst = self.create_inst_value(
+        let inst = self.create_inst_value2(
             Opcode::Store,
-            vec![Operand::Value(src), Operand::Value(dst)],
+            InstOperand::Store { args: [src, dst] },
             Type::Void,
         );
         self.append_inst_to_current_block(inst.as_instruction().id);
@@ -212,9 +212,9 @@ pub trait IRBuilder {
             return konst;
         }
 
-        let inst = self.create_inst_value(
+        let inst = self.create_inst_value2(
             Opcode::Add,
-            vec![Operand::Value(v1), Operand::Value(v2)],
+            InstOperand::Binary { args: [v1, v2] },
             v1.get_type(),
         );
         self.append_inst_to_current_block(inst.as_instruction().id);
@@ -226,9 +226,9 @@ pub trait IRBuilder {
             return konst;
         }
 
-        let inst = self.create_inst_value(
+        let inst = self.create_inst_value2(
             Opcode::Sub,
-            vec![Operand::Value(v1), Operand::Value(v2)],
+            InstOperand::Binary { args: [v1, v2] },
             v1.get_type(),
         );
         self.append_inst_to_current_block(inst.as_instruction().id);
@@ -240,9 +240,9 @@ pub trait IRBuilder {
             return konst;
         }
 
-        let inst = self.create_inst_value(
+        let inst = self.create_inst_value2(
             Opcode::Mul,
-            vec![Operand::Value(v1), Operand::Value(v2)],
+            InstOperand::Binary { args: [v1, v2] },
             v1.get_type(),
         );
         self.append_inst_to_current_block(inst.as_instruction().id);
@@ -254,9 +254,9 @@ pub trait IRBuilder {
             return konst;
         }
 
-        let inst = self.create_inst_value(
+        let inst = self.create_inst_value2(
             Opcode::Div,
-            vec![Operand::Value(v1), Operand::Value(v2)],
+            InstOperand::Binary { args: [v1, v2] },
             v1.get_type(),
         );
         self.append_inst_to_current_block(inst.as_instruction().id);
@@ -268,9 +268,9 @@ pub trait IRBuilder {
             return konst;
         }
 
-        let inst = self.create_inst_value(
+        let inst = self.create_inst_value2(
             Opcode::Rem,
-            vec![Operand::Value(v1), Operand::Value(v2)],
+            InstOperand::Binary { args: [v1, v2] },
             v1.get_type(),
         );
         self.append_inst_to_current_block(inst.as_instruction().id);
@@ -282,9 +282,9 @@ pub trait IRBuilder {
         //     return konst;
         // }
 
-        let inst = self.create_inst_value(
+        let inst = self.create_inst_value2(
             Opcode::Shl,
-            vec![Operand::Value(v1), Operand::Value(v2)],
+            InstOperand::Binary { args: [v1, v2] },
             v1.get_type(),
         );
         self.append_inst_to_current_block(inst.as_instruction().id);
@@ -431,6 +431,17 @@ pub trait IRBuilder {
         })
     }
 
+    fn create_inst_value2(&mut self, opcode: Opcode, operand: InstOperand, ret_ty: Type) -> Value {
+        let mut inst = Instruction::new(opcode, vec![], ret_ty, self.block().unwrap());
+        inst.operand = operand;
+        let inst_id = self.func_ref_mut().alloc_inst(inst);
+        Value::Instruction(InstructionValue {
+            func_id: self.func_ref().id.unwrap(),
+            id: inst_id,
+            ty: ret_ty,
+        })
+    }
+
     fn append_inst_to_current_block(&mut self, inst_id: InstructionId) {
         let bb_id = self.block().unwrap();
         let insert_point = self.insert_point();
@@ -439,9 +450,9 @@ pub trait IRBuilder {
         bb.iseq_ref_mut().insert(insert_point, inst_id);
     }
 
-    fn with_function<Func, T>(&mut self, mut f: Func) -> T
+    fn with_function<Func, T>(&mut self, f: Func) -> T
     where
-        Func: FnMut(&mut Function) -> T,
+        Func: FnOnce(&mut Function) -> T,
     {
         let function = self.func_ref_mut();
         f(function)

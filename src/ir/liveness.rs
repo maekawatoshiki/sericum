@@ -60,6 +60,22 @@ impl<'a> LivenessAnalyzerOnFunction<'a> {
             for &inst_id in &*bb.iseq_ref() {
                 let inst = &self.func.inst_table[inst_id];
                 self.visit_operands(bb_id, &inst.operands, inst.opcode == Opcode::Phi);
+
+                if matches!(
+                    inst.opcode,
+                    Opcode::Add
+                        | Opcode::Sub
+                        | Opcode::Mul
+                        | Opcode::Div
+                        | Opcode::Rem
+                        | Opcode::Load
+                        | Opcode::Store
+                        | Opcode::Alloca
+                ) {
+                    for v in inst.operand.args() {
+                        some_then!(id, v.get_inst_id(), self.propagate(bb_id, id, None, false));
+                    }
+                }
             }
         }
     }

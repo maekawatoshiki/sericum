@@ -192,7 +192,7 @@ impl<'a> ConvertToDAGNode<'a> {
             let inst = &self.func.inst_table[inst_id];
             match inst.opcode {
                 Opcode::Alloca => {
-                    let ty = *inst.operands[0].as_type();
+                    let ty = inst.operand.types()[0];
                     let fi_ty = self.func.types.new_pointer_ty(ty);
                     let frinfo = self.local_mgr.alloc(&ty);
                     let fi = self.alloc_node(DAGNode::new(
@@ -208,7 +208,7 @@ impl<'a> ConvertToDAGNode<'a> {
                     self.inst_to_node.insert(inst_id, fiaddr);
                 }
                 Opcode::Load => {
-                    let v = *inst.operands[0].as_value();
+                    let v = inst.operand.args()[0];
                     let v = self.get_node_from_value(&v);
                     let load_id = self.alloc_node_as_necessary(
                         inst_id,
@@ -224,8 +224,8 @@ impl<'a> ConvertToDAGNode<'a> {
                     }
                 }
                 Opcode::Store => {
-                    let src = self.get_node_from_value(inst.operands[0].as_value());
-                    let dst = self.get_node_from_value(inst.operands[1].as_value());
+                    let src = self.get_node_from_value(&inst.operand.args()[0]);
+                    let dst = self.get_node_from_value(&inst.operand.args()[1]);
                     let id = self.alloc_node_as_necessary(
                         inst_id,
                         DAGNode::new(NodeKind::IR(IRNodeKind::Store), vec![dst, src], Type::Void),
@@ -268,8 +268,8 @@ impl<'a> ConvertToDAGNode<'a> {
                 | Opcode::Div
                 | Opcode::Rem
                 | Opcode::Shl => {
-                    let v1 = self.get_node_from_value(inst.operands[0].as_value());
-                    let v2 = self.get_node_from_value(inst.operands[1].as_value());
+                    let v1 = self.get_node_from_value(&inst.operand.args()[0]);
+                    let v2 = self.get_node_from_value(&inst.operand.args()[1]);
                     let bin_id = self.alloc_node_as_necessary(
                         inst_id,
                         DAGNode::new(
