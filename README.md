@@ -12,6 +12,7 @@ Do not expect too much stuff!
 # To Do
 
 - [ ] Implement basic block parameters
+- [ ] Make it possible to generate code for multiple targets without rebuilding sericum itself
 - [ ] Verify IR
 - [ ] More optimizations for IR
 - [ ] Support returning struct as value
