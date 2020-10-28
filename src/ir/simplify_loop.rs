@@ -2,7 +2,7 @@ use crate::{
     analysis::dom_tree::{DominatorTree, DominatorTreeConstructor},
     ir::{
         basic_block::{BasicBlock, BasicBlockId},
-        builder::{IRBuilder, IRBuilderWithFunction},
+        builder::IRBuilder,
         function::Function,
         module::Module,
         opcode::{Instruction, Opcode},
@@ -107,7 +107,7 @@ impl<'a> SimplifyLoopOnFunction<'a> {
             dest_.pred.remove(&edge);
         }
 
-        let mut builder = IRBuilderWithFunction::new(self.func);
+        let mut builder = self.func.ir_builder();
         builder.set_insert_point(merge);
         builder.build_br(back_edges.dest);
 
@@ -145,7 +145,7 @@ impl<'a> SimplifyLoopOnFunction<'a> {
             }
         }
 
-        let mut builder = IRBuilderWithFunction::new(self.func);
+        let mut builder = self.func.ir_builder();
         builder.set_insert_point_at(0, merge);
 
         for (phi, incomings) in new_phi_incomings {

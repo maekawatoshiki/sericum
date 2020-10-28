@@ -1,4 +1,6 @@
-use super::{basic_block::*, module::Module, opcode::*, types::*, value::*};
+use super::{
+    basic_block::*, builder::IRBuilderWithFunction, module::Module, opcode::*, types::*, value::*,
+};
 use crate::analysis::Analysis;
 use crate::codegen::is_internal_function;
 use crate::traits::function::FunctionTrait;
@@ -97,6 +99,10 @@ impl Function {
 
     pub fn basic_block_ref_mut(&mut self, id: BasicBlockId) -> &mut BasicBlock {
         &mut self.basic_blocks.arena[id]
+    }
+
+    pub fn ir_builder<'a>(&'a mut self) -> IRBuilderWithFunction<'a> {
+        IRBuilderWithFunction::new(self)
     }
 
     pub fn get_return_type(&self) -> Type {
