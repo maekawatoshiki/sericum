@@ -259,7 +259,7 @@ macro_rules! sericum_ir {
         let f_id = $m.create_function(
             stringify!($name), ret_ty, args_ty
         );
-        let mut builder = builder::IRBuilderWithModuleAndFuncId::new(&mut $m, f_id);
+        let mut builder = $m.ir_builder(f_id);
         let mut bb_map: FxHashMap<&str, basic_block::BasicBlockId> = FxHashMap::default();
         $crate::sericum_expr!(builder; bb_map; $( $exp )*);
         f_id

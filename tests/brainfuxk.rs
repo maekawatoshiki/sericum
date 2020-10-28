@@ -173,7 +173,7 @@ mod x86_64 {
 
         let f_id = m.create_function("compiled_brainfuxk_code", types::Type::Void, vec![]);
 
-        let mut builder = builder::IRBuilderWithModuleAndFuncId::new(&mut m, f_id);
+        let mut builder = m.ir_builder(f_id);
         let entry = builder.append_basic_block();
         builder.set_insert_point(entry);
 
@@ -807,7 +807,7 @@ mod aarch64 {
 
         let f_id = m.create_function("main", types::Type::Void, vec![]);
 
-        let mut builder = builder::IRBuilderWithModuleAndFuncId::new(&mut m, f_id);
+        let mut builder = m.ir_builder(f_id);
         let entry = builder.append_basic_block();
         builder.set_insert_point(entry);
 

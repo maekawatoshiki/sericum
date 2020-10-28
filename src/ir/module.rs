@@ -1,4 +1,7 @@
-use super::{constant_pool::*, function::*, global_val::*, types::*, value};
+use super::{
+    builder::IRBuilderWithModuleAndFuncId, constant_pool::*, function::*, global_val::*, types::*,
+    value,
+};
 use id_arena::*;
 use std::fmt;
 
@@ -136,6 +139,10 @@ impl Module {
         let ty = self.types.new_pointer_ty(c.ty);
         let id = self.const_pool.add(c);
         value::Value::Constant(value::ConstantValue { ty, id })
+    }
+
+    pub fn ir_builder<'a>(&'a mut self, func_id: FunctionId) -> IRBuilderWithModuleAndFuncId<'a> {
+        IRBuilderWithModuleAndFuncId::new(self, func_id)
     }
 }
 

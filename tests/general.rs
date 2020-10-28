@@ -591,7 +591,7 @@ main:
 
         let f = m.create_function("f", types::Type::i32, vec![]);
 
-        let mut builder = builder::IRBuilderWithModuleAndFuncId::new(&mut m, f);
+        let mut builder = m.ir_builder(f);
 
         let entry = builder.append_basic_block();
         builder.set_insert_point(entry);
@@ -632,7 +632,7 @@ main:
 
         let f = m.create_function("f", types::Type::Void, vec![ptr_struct_ty]);
 
-        let mut builder = builder::IRBuilderWithModuleAndFuncId::new(&mut m, f);
+        let mut builder = m.ir_builder(f);
 
         let entry = builder.append_basic_block();
         builder.set_insert_point(entry);
@@ -645,7 +645,7 @@ main:
 
         let main = m.create_function("main", types::Type::i32, vec![]);
 
-        let mut builder = builder::IRBuilderWithModuleAndFuncId::new(&mut m, main);
+        let mut builder = m.ir_builder(main);
 
         let entry = builder.append_basic_block();
         builder.set_insert_point(entry);
@@ -952,7 +952,7 @@ main:
             .new_struct_ty(vec![types::Type::i32, types::Type::i32]);
         let f = m.create_function("f", types::Type::i32, vec![struct_ty]);
         {
-            let mut builder = builder::IRBuilderWithModuleAndFuncId::new(&mut m, f);
+            let mut builder = m.ir_builder(f);
             let entry = builder.append_basic_block();
             builder.set_insert_point(entry);
             sericum_ir!((builder) {
@@ -966,7 +966,7 @@ main:
         }
         let main = m.create_function("main", types::Type::i32, vec![]);
         {
-            let mut builder = builder::IRBuilderWithModuleAndFuncId::new(&mut m, main);
+            let mut builder = m.ir_builder(main);
             let entry = builder.append_basic_block();
             builder.set_insert_point(entry);
             let var = builder.build_alloca(struct_ty);
@@ -1000,7 +1000,7 @@ main:
         ]);
         let f = m.create_function("f", types::Type::i32, vec![types::Type::i32, struct_ty]);
         {
-            let mut builder = builder::IRBuilderWithModuleAndFuncId::new(&mut m, f);
+            let mut builder = m.ir_builder(f);
             let entry = builder.append_basic_block();
             builder.set_insert_point(entry);
             sericum_ir!((builder) {
@@ -1018,7 +1018,7 @@ main:
         }
         let main = m.create_function("main", types::Type::i32, vec![]);
         {
-            let mut builder = builder::IRBuilderWithModuleAndFuncId::new(&mut m, main);
+            let mut builder = m.ir_builder(main);
             let entry = builder.append_basic_block();
             builder.set_insert_point(entry);
             let var = builder.build_alloca(struct_ty);
@@ -1050,7 +1050,7 @@ main:
             .new_struct_ty(vec![types::Type::i32, types::Type::f64]);
         let f = m.create_function("f", types::Type::f64, vec![struct_ty]);
         {
-            let mut builder = builder::IRBuilderWithModuleAndFuncId::new(&mut m, f);
+            let mut builder = m.ir_builder(f);
             let entry = builder.append_basic_block();
             builder.set_insert_point(entry);
             sericum_ir!((builder) {
@@ -1061,7 +1061,7 @@ main:
         }
         let main = m.create_function("main", types::Type::f64, vec![]);
         {
-            let mut builder = builder::IRBuilderWithModuleAndFuncId::new(&mut m, main);
+            let mut builder = m.ir_builder(main);
             let entry = builder.append_basic_block();
             builder.set_insert_point(entry);
             let var = builder.build_alloca(struct_ty);
@@ -1092,7 +1092,7 @@ main:
                 .new_struct_ty(vec![types::Type::f64, types::Type::i32, types::Type::i32]);
         let f = m.create_function("f", types::Type::f64, vec![struct_ty, struct_ty2]);
         {
-            let mut builder = builder::IRBuilderWithModuleAndFuncId::new(&mut m, f);
+            let mut builder = m.ir_builder(f);
             let entry = builder.append_basic_block();
             builder.set_insert_point(entry);
             sericum_ir!((builder) {
@@ -1106,7 +1106,7 @@ main:
         }
         let main = m.create_function("main", types::Type::f64, vec![]);
         {
-            let mut builder = builder::IRBuilderWithModuleAndFuncId::new(&mut m, main);
+            let mut builder = m.ir_builder(main);
             let entry = builder.append_basic_block();
             builder.set_insert_point(entry);
             let var = builder.build_alloca(struct_ty);

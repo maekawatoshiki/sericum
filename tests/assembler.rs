@@ -6,7 +6,7 @@ mod x86_64 {
             exec::executor::{Executor, GenericValue},
             standard_conversion_into_machine_module,
         },
-        ir::{builder, /*global_val,*/ types, value},
+        ir::{/*global_val,*/ types, value},
         module::Module,
         sericum_ir,
         *, // for macro
