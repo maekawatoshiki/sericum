@@ -1,6 +1,6 @@
 use super::value::Value;
 use id_arena::*;
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 use std::convert::From;
 use std::fmt;
 use std::{
@@ -353,6 +353,11 @@ impl TypesBase {
     }
 
     pub fn to_string(&self, ty: Type) -> String {
+        let mut structs = FxHashSet::default();
+        self.to_string_sub(&mut structs, ty)
+    }
+
+    pub fn to_string_sub(&self, structs: &mut FxHashSet<CompoundTypeId>, ty: Type) -> String {
         match ty {
             Type::Void => "void".to_string(),
             Type::i1 => "i1".to_string(),
@@ -362,26 +367,63 @@ impl TypesBase {
             Type::f64 => "f64".to_string(),
             Type::Pointer(id) => {
                 let elem_ty = self.compound_types[id].as_pointer();
-                format!("{}*", self.to_string(*elem_ty))
+                format!("{}*", self.to_string_sub(structs, *elem_ty))
             }
             Type::Array(id) => {
                 let arr = self.compound_types[id].as_array();
-                arr.to_string(self)
+                format!(
+                    "[{} x {}]",
+                    arr.len,
+                    self.to_string_sub(structs, arr.elem_ty)
+                )
             }
             Type::Function(id) => {
                 let f = self.compound_types[id].as_function();
-                f.to_string(self)
+                format!(
+                    "{} ({})",
+                    self.to_string_sub(structs, f.ret_ty),
+                    f.params_ty
+                        .iter()
+                        .enumerate()
+                        .fold("".to_string(), |mut s, (i, p)| {
+                            s += &(self.to_string_sub(structs, *p)
+                                + f.params_attr.get(&i).map_or("", |a| {
+                                    if a.byval {
+                                        " byval"
+                                    } else {
+                                        ""
+                                    }
+                                })
+                                + ", ");
+                            s
+                        })
+                        .trim_matches(&[',', ' '][0..]),
+                )
             }
             Type::Struct(id) => {
                 let s = self.compound_types[id].as_struct();
-                s.to_string(self)
+                if structs.insert(id) {
+                    format!(
+                        "struct{} {{{}}}",
+                        if let Some(name) = &s.name {
+                            format!(".{}", name)
+                        } else {
+                            "".to_string()
+                        },
+                        s.fields_ty
+                            .iter()
+                            .fold("".to_string(), |mut s, t| {
+                                s += &(self.to_string_sub(structs, *t) + ", ");
+                                s
+                            })
+                            .trim_matches(&[',', ' '][0..])
+                    )
+                } else {
+                    format!("struct.{}", s.name.as_ref().unwrap())
+                }
             }
         }
     }
-
-    // pub fn get_pointer_ty(&self) -> Type {
-    //     Type::Pointer(Box::new(self.clone()))
-    // }
 }
 
 impl Type {
@@ -428,35 +470,11 @@ impl FunctionType {
             params_attr,
         }
     }
-
-    pub fn to_string(&self, tys: &TypesBase) -> String {
-        format!(
-            "{} ({})",
-            tys.to_string(self.ret_ty),
-            self.params_ty
-                .iter()
-                .enumerate()
-                .fold("".to_string(), |mut s, (i, p)| {
-                    s += &(tys.to_string(*p)
-                        + self
-                            .params_attr
-                            .get(&i)
-                            .map_or("", |a| if a.byval { " byval" } else { "" })
-                        + ", ");
-                    s
-                })
-                .trim_matches(&[',', ' '][0..]),
-        )
-    }
 }
 
 impl ArrayType {
     pub fn new(elem_ty: Type, len: usize) -> Self {
         Self { elem_ty, len }
-    }
-
-    pub fn to_string(&self, tys: &TypesBase) -> String {
-        format!("[{} x {}]", self.len, tys.to_string(self.elem_ty))
     }
 }
 
@@ -516,19 +534,6 @@ impl StructType {
             .iter()
             .position(|&off| off == i)
             .map_or(None, |n| Some(&self.fields_ty[n]))
-    }
-
-    pub fn to_string(&self, tys: &TypesBase) -> String {
-        format!(
-            "struct {{{}}}",
-            self.fields_ty
-                .iter()
-                .fold("".to_string(), |mut s, t| {
-                    s += &(tys.to_string(*t) + ", ");
-                    s
-                })
-                .trim_matches(&[',', ' '][0..])
-        )
     }
 }
 
