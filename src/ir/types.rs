@@ -3,7 +3,11 @@ use id_arena::*;
 use rustc_hash::FxHashMap;
 use std::convert::From;
 use std::fmt;
-use std::{cell::Ref, cell::RefCell, rc::Rc};
+use std::{
+    cell::RefCell,
+    cell::{Ref, RefMut},
+    rc::Rc,
+};
 
 #[derive(Clone)]
 pub struct Types {
@@ -66,6 +70,7 @@ pub struct ArrayType {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StructType {
+    name: Option<String>,
     fields_ty: Vec<Type>,
     fields_offset: Vec<usize>,
     align: usize,
@@ -125,8 +130,34 @@ impl Types {
         Type::Struct(id)
     }
 
+    pub fn new_named_struct_ty(&self, name: String, fields_ty: Vec<Type>) -> Type {
+        let id = self.new_compound_ty(CompoundType::Struct(
+            StructType::new(self, fields_ty).with_name(name),
+        ));
+        Type::Struct(id)
+    }
+
+    pub fn find_named_struct(&self, name: &str) -> Option<Type> {
+        self.base
+            .borrow()
+            .compound_types
+            .iter()
+            .find_map(|(id, t)| match t {
+                CompoundType::Struct(ref inner)
+                    if inner.name.is_some() && inner.name.as_ref().unwrap() == name =>
+                {
+                    Some(Type::Struct(id))
+                }
+                _ => None,
+            })
+    }
+
     pub fn compound_ty<T: Into<CompoundTypeId>>(&self, id: T) -> Ref<CompoundType> {
         Ref::map(self.base.borrow(), |x| &x.compound_types[id.into()])
+    }
+
+    pub fn compound_ty_mut<T: Into<CompoundTypeId>>(&self, id: T) -> RefMut<CompoundType> {
+        RefMut::map(self.base.borrow_mut(), |x| &mut x.compound_types[id.into()])
     }
 
     pub fn get_element_ty(&self, ty: Type, index: Option<&Value>) -> Option<Type> {
@@ -432,6 +463,7 @@ impl ArrayType {
 impl StructType {
     pub fn new(tys: &Types, fields_ty: Vec<Type>) -> Self {
         let mut self_ = Self {
+            name: None,
             fields_ty,
             fields_offset: vec![],
             align: 0,
@@ -439,6 +471,11 @@ impl StructType {
         };
         self_.compute_elem_offsets(tys);
         self_
+    }
+
+    pub fn with_name(mut self, name: String) -> Self {
+        self.name = Some(name);
+        self
     }
 
     pub fn compute_elem_offsets(&mut self, tys: &Types) {
@@ -455,6 +492,11 @@ impl StructType {
         }
         self.size = offset + padding(offset, align);
         self.align = align;
+    }
+
+    pub fn set_fields(&mut self, tys: &Types, fields: Vec<Type>) {
+        self.fields_ty = fields;
+        self.compute_elem_offsets(tys);
     }
 
     pub const fn size(&self) -> usize {
@@ -513,6 +555,13 @@ impl CompoundType {
     }
 
     pub fn as_struct(&self) -> &StructType {
+        match self {
+            CompoundType::Struct(s) => s,
+            _ => panic!(),
+        }
+    }
+
+    pub fn as_struct_mut(&mut self) -> &mut StructType {
         match self {
             CompoundType::Struct(s) => s,
             _ => panic!(),

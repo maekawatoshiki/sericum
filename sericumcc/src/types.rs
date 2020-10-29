@@ -236,7 +236,7 @@ impl TypeConversion<types::Type> for Type {
         match self {
             Type::Void => types::Type::Void,
             Type::Char(_) => types::Type::i8,
-            Type::Short(_) => panic!(),
+            Type::Short(_) => types::Type::i32, // panic!(),
             Type::Int(_) => types::Type::i32,
             Type::Long(_) => types::Type::i64,
             Type::LLong(_) => types::Type::i64,
@@ -262,14 +262,24 @@ impl TypeConversion<types::Type> for Type {
                 types.new_function_ty(ret, params)
             }
             Type::Struct(id) => {
-                let (_name, fields) = compound_types[*id].as_struct();
-                let fields = fields
-                    .iter()
-                    .map(|t| t.0.conv(compound_types, types))
-                    .collect();
-                types.new_struct_ty(fields)
+                let (name, fields) = compound_types[*id].as_struct();
+                if let Some(t) = types.find_named_struct(name.as_str()) {
+                    t
+                } else {
+                    let t = types.new_named_struct_ty(name.to_string(), vec![]);
+                    let fields: Vec<types::Type> = fields
+                        .iter()
+                        .map(|t| t.0.conv(compound_types, types))
+                        .collect();
+                    // TODO: ????
+                    let strct = types.find_named_struct(name.as_str()).unwrap();
+                    let mut strct_ = types.compound_ty_mut(strct).as_struct().clone();
+                    strct_.set_fields(types, fields);
+                    *types.compound_ty_mut(strct).as_struct_mut() = strct_;
+                    t
+                }
             }
-            Type::Union(_id) => panic!(),
+            Type::Union(_id) => types::Type::i32, // panic!(),
         }
     }
 }
