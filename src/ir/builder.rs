@@ -254,6 +254,10 @@ pub trait IRBuilder {
     }
 
     fn build_div(&mut self, v1: Value, v2: Value) -> Value {
+        if matches!(v2, Value::Immediate(ImmediateValue::Int32(0))) {
+            return v2;
+        }
+
         if let Some(konst) = v1.const_div(&v2) {
             return konst;
         }

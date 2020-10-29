@@ -126,7 +126,7 @@ impl<'a> Codegenerator<'a> {
                 self.variables
                     .add_global_var(name.clone(), Variable::new(p_ty, p_sericum_ty, val));
             }
-            _ => todo!(),
+            _ => {} // todo!(),
         }
         Ok(Value::None)
     }
@@ -227,6 +227,7 @@ impl<'a> FunctionCodeGenerator<'a> {
             }
             ast::Kind::Assign { dst, src } => self.generate_assign(dst, src),
             ast::Kind::Load(val) => self.generate_load(val),
+            ast::Kind::TypeCast(expr, ty) => self.generate_type_cast(expr, ty),
             ast::Kind::UnaryOp(op, expr) => self.generate_unary_op(*op, expr),
             ast::Kind::BinaryOp(op, lhs, rhs) => self.generate_binary_op(*op, lhs, rhs),
             ast::Kind::TernaryOp(cond, then_, else_) => {
@@ -549,6 +550,20 @@ impl<'a> FunctionCodeGenerator<'a> {
         } else {
             panic!()
         }
+    }
+
+    fn generate_type_cast(&mut self, expr: &AST, to: &Type) -> Result<(Value, Type)> {
+        let (val, ty) = self.generate(expr)?;
+
+        if matches!(ty, Type::Pointer(_)) && matches!(to, Type::Pointer(_)) {
+            return Ok((val, *to));
+            // todo!()
+        }
+
+        println!("{:?} {:?}", ty, to);
+
+        todo!()
+        // self.builder.build_
     }
 
     fn generate_unary_op(&mut self, op: ast::UnaryOp, expr: &AST) -> Result<(Value, Type)> {
