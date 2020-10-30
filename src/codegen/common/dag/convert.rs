@@ -327,6 +327,19 @@ impl<'a> ConvertToDAGNode<'a> {
                         self.inst_to_node.insert(inst_id, inst);
                     }
                 }
+                Opcode::Bitcast => {
+                    let x = self.get_node_from_value(&inst.operand.args()[0]);
+                    let inst = self.alloc_node_as_necessary(
+                        inst_id,
+                        DAGNode::new(NodeKind::IR(IRNodeKind::Bitcast), vec![x], inst.ty),
+                    );
+                    if self.block.liveness.borrow().live_out.contains(&inst_id) {
+                        let copy_from_reg = self.make_chain_with_copying(inst);
+                        self.inst_to_node.insert(inst_id, copy_from_reg);
+                    } else {
+                        self.inst_to_node.insert(inst_id, inst);
+                    }
+                }
                 Opcode::Br => {
                     let bb = self.node_heap.alloc(DAGNode::new(
                         NodeKind::Operand(OperandNodeKind::BasicBlock(

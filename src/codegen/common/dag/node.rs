@@ -73,6 +73,7 @@ pub enum IRNodeKind {
     Br,
     Ret,
     Sext,
+    Bitcast,
     FCmp,
 
     FIAddr,

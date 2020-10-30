@@ -500,6 +500,7 @@ impl StructType {
         let mut align = 1;
         let mut offset = 0;
         let padding = |off, align| -> usize { (align - off % align) % align };
+        self.fields_offset.clear();
         for ty in &self.fields_ty {
             align = ::std::cmp::max(ty.align_in_byte(tys), align);
             let size = ty.size_in_byte(tys);
