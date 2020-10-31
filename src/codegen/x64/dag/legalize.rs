@@ -67,6 +67,9 @@ impl Legalize {
             NodeKind::IR(IRNodeKind::Store) => self.run_on_node_store(tys, regs_info, heap, node),
             NodeKind::IR(IRNodeKind::Add) => self.run_on_node_add(tys, regs_info, heap, node),
             NodeKind::IR(IRNodeKind::Sext) => self.run_on_node_sext(tys, regs_info, heap, node),
+            NodeKind::IR(IRNodeKind::Bitcast) => {
+                self.run_on_node_bitcast(tys, regs_info, heap, node)
+            }
             NodeKind::IR(IRNodeKind::Brcc) => self.run_on_node_brcc(tys, regs_info, heap, node),
             NodeKind::IR(IRNodeKind::FPBrcc) => self.run_on_node_fpbrcc(tys, regs_info, heap, node),
             _ => {
@@ -331,6 +334,28 @@ impl Legalize {
 
         if node.ty == Type::i64 && !node.operand[0].is_constant() && node.operand[0].ty == Type::i32
         // && node.operand[0].operand[0].kind == NodeKind::IR(IRNodeKind::FIAddr)
+        {
+            let op = self.run_on_node(tys, regs_info, heap, node.operand[0]);
+            return heap.alloc(DAGNode::new(
+                NodeKind::IR(IRNodeKind::RegClass),
+                vec![op],
+                node.ty,
+            ));
+        }
+
+        self.run_on_node_operand(tys, regs_info, heap, node);
+        node
+    }
+
+    fn run_on_node_bitcast(
+        &mut self,
+        tys: &Types,
+        regs_info: &RegistersInfo,
+        heap: &mut DAGHeap,
+        node: Raw<DAGNode>,
+    ) -> Raw<DAGNode> {
+        if !node.operand[0].is_constant()
+            && node.ty.size_in_byte(tys) == node.operand[0].ty.size_in_byte(tys)
         {
             let op = self.run_on_node(tys, regs_info, heap, node.operand[0]);
             return heap.alloc(DAGNode::new(

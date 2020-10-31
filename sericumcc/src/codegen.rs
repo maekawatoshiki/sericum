@@ -553,12 +553,19 @@ impl<'a> FunctionCodeGenerator<'a> {
     }
 
     fn generate_type_cast(&mut self, expr: &AST, to: &Type) -> Result<(Value, Type)> {
+        use sericum::types::TypeSize;
         let (val, ty) = self.generate(expr)?;
 
-        if matches!(ty, Type::Pointer(_)) && matches!(to, Type::Pointer(_)) {
-            return Ok((val, *to));
-            // todo!()
+        let ty_ = ty.conv(self.compound_types, &self.builder.module().unwrap().types);
+        let to_ = to.conv(self.compound_types, &self.builder.module().unwrap().types);
+        let ty_sz = ty_.size_in_byte(&self.builder.module().unwrap().types);
+        let to_sz = to_.size_in_byte(&self.builder.module().unwrap().types);
+
+        if ty_sz == to_sz {
+            return Ok((self.builder.build_bitcast(val, to_), *to));
         }
+
+        if ty_sz < to_sz {}
 
         println!("{:?} {:?}", ty, to);
 
