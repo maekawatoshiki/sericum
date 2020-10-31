@@ -113,11 +113,12 @@ impl Combine {
                 vec![],
                 const_folded.get_type(),
             ));
-            return heap.alloc(DAGNode::new(
+            let new_add = heap.alloc(DAGNode::new(
                 NodeKind::IR(IRNodeKind::Add),
                 vec![op0, c],
                 node.ty,
             ));
+            return self.combine_node_add(replace, heap, new_add);
         }
 
         self.combine_operands(replace, heap, node)
