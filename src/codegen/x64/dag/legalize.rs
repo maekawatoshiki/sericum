@@ -358,11 +358,7 @@ impl Legalize {
             && node.ty.size_in_byte(tys) == node.operand[0].ty.size_in_byte(tys)
         {
             let op = self.run_on_node(tys, regs_info, heap, node.operand[0]);
-            return heap.alloc(DAGNode::new(
-                NodeKind::IR(IRNodeKind::RegClass),
-                vec![op],
-                node.ty,
-            ));
+            return op;
         }
 
         self.run_on_node_operand(tys, regs_info, heap, node);
