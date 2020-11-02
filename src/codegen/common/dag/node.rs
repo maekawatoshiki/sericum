@@ -4,7 +4,7 @@ use crate::codegen::{
         frame_object::FrameIndexInfo,
         machine::{inst::MachineOpcode, register::*},
     },
-    common::dag::basic_block::*,
+    common::{dag::basic_block::*, types::MVType},
 };
 use crate::ir::{constant_pool, global_val::GlobalVariableId, opcode::*, types::*};
 use crate::util::allocator::*;
@@ -19,6 +19,7 @@ pub struct DAGNode {
     pub kind: NodeKind,
     pub operand: Vec<Raw<DAGNode>>,
     pub ty: Type,
+    pub mvty: MVType,
     pub next: Option<Raw<DAGNode>>,
     pub chain: Option<Raw<DAGNode>>,
 }
@@ -239,6 +240,7 @@ impl DAGNode {
         Self {
             kind,
             ty,
+            mvty: ty.into(),
             next: None,
             chain: None,
             operand,
@@ -249,6 +251,7 @@ impl DAGNode {
         Self {
             kind: NodeKind::None,
             ty: Type::Void,
+            mvty: MVType::Void,
             next: None,
             chain: None,
             operand: vec![],
@@ -256,9 +259,11 @@ impl DAGNode {
     }
 
     pub fn new_phys_reg<T: TargetRegisterTrait>(regs_info: &RegistersInfo, reg: T) -> Self {
+        let ty = rc2ty(reg.as_phys_reg().reg_class());
         Self {
             kind: NodeKind::Operand(OperandNodeKind::Register(regs_info.get_phys_reg(reg))),
-            ty: rc2ty(reg.as_phys_reg().reg_class()),
+            ty,
+            mvty: ty.into(),
             next: None,
             chain: None,
             operand: vec![],

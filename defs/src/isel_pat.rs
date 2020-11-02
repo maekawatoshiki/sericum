@@ -314,39 +314,39 @@ impl PatternMatchConstructible for OperandPattern {
         let parent = &self.parent;
         let cond = match self.name.as_str() {
             "imm8" => {
-                quote! { #parent.is_constant() && matches!(#parent.ty, Type::i8) }
+                quote! { #parent.is_constant() && matches!(#parent.mvty, MVType::i8) }
             }
             "imm32" => {
-                quote! { #parent.is_constant() && matches!(#parent.ty, Type::i32) }
+                quote! { #parent.is_constant() && matches!(#parent.mvty, MVType::i32) }
             }
             "imm_f64" => {
-                quote! { #parent.is_constant() && matches!(#parent.ty, Type::f64) }
+                quote! { #parent.is_constant() && matches!(#parent.mvty, MVType::f64) }
             }
             _ if self.name.as_str().starts_with("imm") => {
                 let bit = self.name.as_str()["imm".len()..].parse::<u32>().unwrap();
                 quote! { #parent.is_constant()
-                && #parent.ty.is_integer()
+                && #parent.mvty.is_integer()
                 && #parent.as_constant().bits_within(#bit).unwrap() }
             }
             // TODO
             "mem" => quote! { #parent.is_frame_index() },
             "mem32" | "mem64" => {
                 let bits = match self.name.as_str() {
-                    "mem32" => 32usize,
-                    "mem64" => 64usize,
+                    "mem32" => 32i32,
+                    "mem64" => 64i32,
                     _ => unimplemented!(),
                 };
                 quote! {
-                    #parent.is_frame_index() && #parent.ty.size_in_bits(tys) == #bits
+                    #parent.is_frame_index() && #parent.mvty.size_in_bits() == #bits
                 }
             }
             "f64mem" => {
                 let ty = match self.name.as_str() {
-                    "f64mem" => quote! { Type::f64 },
+                    "f64mem" => quote! { MVType::f64 },
                     _ => unimplemented!(),
                 };
                 quote! {
-                    #parent.is_frame_index() && matches!(#parent.ty, #ty)
+                    #parent.is_frame_index() && matches!(#parent.mvty, #ty)
                 }
             }
             "addr" => {

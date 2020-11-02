@@ -381,12 +381,12 @@ impl TypesBase {
                 let f = self.compound_types[id].as_function();
                 format!(
                     "{} ({})",
-                    self.to_string_sub(structs, f.ret_ty),
+                    self.to_string_sub(&mut FxHashSet::default(), f.ret_ty),
                     f.params_ty
                         .iter()
                         .enumerate()
                         .fold("".to_string(), |mut s, (i, p)| {
-                            s += &(self.to_string_sub(structs, *p)
+                            s += &(self.to_string_sub(&mut FxHashSet::default(), *p)
                                 + f.params_attr.get(&i).map_or("", |a| {
                                     if a.byval {
                                         " byval"
@@ -413,7 +413,7 @@ impl TypesBase {
                         s.fields_ty
                             .iter()
                             .fold("".to_string(), |mut s, t| {
-                                s += &(self.to_string_sub(structs, *t) + ", ");
+                                s += &(self.to_string_sub(&mut FxHashSet::default(), *t) + ", ");
                                 s
                             })
                             .trim_matches(&[',', ' '][0..])
