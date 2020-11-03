@@ -35,15 +35,15 @@ pub struct BasicBlock {
     pub iseq: RefCell<Vec<InstructionId>>,
 }
 
-/// Information of Liveness Analysis.
+/// Liveness analysis information for a basic block 
 /// See also [liveness analysis](../liveness/struct.IRLivenessAnalyzer.html#method.analyze) to know how it's used.
 #[derive(Clone, Debug)]
 pub struct LivenessInfo {
-    /// The set of variables that are used in an instruction.
+    /// Set of instructions executed in a basic block 
     pub def: FxHashSet<InstructionId>,
-    /// The set of "in" information that is living at before an instruction executing.
+    /// Set of live-in instructions
     pub live_in: FxHashSet<InstructionId>,
-    /// The set of "out" information that is living at after executed an instruction.
+    /// Set of live-out instructions
     pub live_out: FxHashSet<InstructionId>,
 }
 
@@ -65,32 +65,6 @@ impl BasicBlocks {
             order: vec![],
             liveness: FxHashMap::default(),
         }
-    }
-
-    /// Let src-basicblock to absorb into dst basicblock.
-    pub fn merge(&mut self, dst: &BasicBlockId, src: &BasicBlockId) {
-        let src_block = ::std::mem::replace(&mut self.arena[*src], BasicBlock::new());
-        let BasicBlock {
-            // liveness: src_liveness,
-            succ: src_succ,
-            iseq: src_iseq,
-            ..
-        } = src_block;
-        for &succ in &src_succ {
-            self.arena[succ].pred.remove(src);
-            self.arena[succ].pred.insert(*dst);
-        }
-        let dst_block = &mut self.arena[*dst];
-        dst_block.succ = src_succ;
-        dst_block
-            .iseq
-            .borrow_mut()
-            .append(&mut src_iseq.borrow_mut());
-        // dst_block
-        //     .liveness
-        //     .borrow_mut()
-        //     .merge(src_liveness.into_inner());
-        self.order.retain(|bb| bb != src);
     }
 }
 
