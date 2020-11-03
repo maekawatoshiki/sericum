@@ -632,12 +632,12 @@ mod aarch64 {
         // codegen::riscv64::exec,
         // exec::{interpreter::interp, jit::riscv64::compiler},
         ir::builder::IRBuilder,
-        ir::{builder, opcode, types, value},
+        ir::{opcode, types, value},
         *,
     };
 
     #[test]
-    #[ignore]
+    // #[ignore]
     fn brainfuxk() {
         // let code = "+++++++++[>++++++++>+++++++++++>+++>+<<<<-]>.>++.+++++++..+++.>+++++.<<
         //     +++++++++++++++.>.+++.------.--------.>+.>+.";
@@ -932,7 +932,7 @@ mod aarch64 {
 
         use sericum::codegen::aarch64::asm::print::MachineAsmPrinter;
         use sericum::codegen::aarch64::standard_conversion_into_machine_module;
-        let machine_module = standard_conversion_into_machine_module(&mut m);
+        let machine_module = standard_conversion_into_machine_module(m);
         let mut printer = MachineAsmPrinter::new();
         // println!("{:?}", machine_module);
         printer.run_on_module(&machine_module);

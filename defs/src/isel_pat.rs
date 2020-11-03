@@ -403,10 +403,9 @@ impl PatternMatchConstructible for Inst {
         let (defs, ops) = selected_operands(&self.operands);
         quote! {
             #defs
-            return heap.alloc(DAGNode::new(
-                    #opcode,
-                    vec![#ops],
-                    node.ty));
+            return heap.alloc(DAGNode::new(#opcode)
+                                .with_operand(vec![#ops])
+                                .with_ty(node.ty))
         }
     }
 }
@@ -440,10 +439,8 @@ fn selected_operands(operands: &Vec<Selected>) -> (TS, TS) {
                     #def_operands_ts
                     let #imm = heap.alloc(DAGNode::new(
                             NodeKind::Operand(OperandNodeKind::Constant(
-                                    ConstantKind::Int32(#i))),
-                            vec![],
-                            Type::i32
-                    ));
+                                    ConstantKind::Int32(#i)))).with_ty(Type::i32)
+                    );
                 };
                 operands_ts = quote! {
                     #operands_ts #imm,
@@ -471,19 +468,17 @@ fn selected_operands(operands: &Vec<Selected>) -> (TS, TS) {
                     def_operands_ts = quote! {
                         #def_operands_ts
                         #defs
-                        let #iname = heap.alloc(DAGNode::new(
-                            #opcode,
-                            vec![#ops],
-                            #ty));
+                        let #iname = heap.alloc(DAGNode::new(#opcode)
+                                                .with_operand(vec![#ops])
+                                                .with_ty(#ty));
                     };
                 } else {
                     def_operands_ts = quote! {
                         #def_operands_ts
                         #defs
-                        let #iname = heap.alloc(DAGNode::new(
-                            #opcode,
-                            vec![#ops],
-                            #opcode.as_mi().get_def_type()));
+                        let #iname = heap.alloc(DAGNode::new(#opcode)
+                                                .with_operand(vec![#ops])
+                                                .with_ty(#opcode.as_mi().get_def_type()));
                     };
                 }
                 operands_ts = quote! {

@@ -41,16 +41,14 @@ impl<'a> ConvertToDAGNode<'a> {
                 };
                 let arg_reg = self.alloc_node(DAGNode::new_phys_reg(&self.regs_info, arg_reg));
                 let vreg = self.regs_info.new_virt_reg(arg_reg_class);
-                let vreg = self.alloc_node(DAGNode::new(
-                    NodeKind::Operand(OperandNodeKind::Register(vreg)),
-                    vec![],
-                    ty,
-                ));
-                let copy = self.alloc_node(DAGNode::new(
-                    NodeKind::IR(IRNodeKind::CopyToReg),
-                    vec![vreg, arg_reg],
-                    ty,
-                ));
+                let vreg = self.alloc_node(
+                    DAGNode::new(NodeKind::Operand(OperandNodeKind::Register(vreg))).with_ty(ty),
+                );
+                let copy = self.alloc_node(
+                    DAGNode::new(NodeKind::IR(IRNodeKind::CopyToReg))
+                        .with_operand(vec![vreg, arg_reg])
+                        .with_ty(ty),
+                );
                 self.make_chain(copy);
                 self.arg_regs.insert(i, vreg);
             }

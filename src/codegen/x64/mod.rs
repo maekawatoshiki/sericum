@@ -97,13 +97,10 @@ pub fn standard_conversion_into_machine_module(mut module: Module) -> MachineMod
     let mut dag_module = convert::convert_to_dag_module(module);
 
     let mut pass_mgr = ModulePassManager::new();
-    // TODO: This is so nonsense
     pass_mgr.add_pass(combine::Combine::new());
     pass_mgr.add_pass(dag::legalize::Legalize::new());
     pass_mgr.add_pass(dag::isel::MISelector::new());
     pass_mgr.run_on_module(&mut dag_module);
-
-    println!("{:?}", dag_module);
 
     let mut machine_module = dag::mc_convert::convert_module(dag_module);
 

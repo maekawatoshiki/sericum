@@ -136,11 +136,7 @@ impl<'a> ConvertToDAGFunction<'a> {
 impl<'a> ConvertToDAGNode<'a> {
     pub fn run(mut self) -> (Raw<DAGNode>, Raw<DAGNode>) {
         // basic block entry
-        let entry = self.alloc_node(DAGNode::new(
-            NodeKind::IR(IRNodeKind::Entry),
-            vec![],
-            Type::Void,
-        ));
+        let entry = self.alloc_node(DAGNode::new(NodeKind::IR(IRNodeKind::Entry)));
         self.last_chained_node = Some(entry);
 
         // program entry
@@ -156,16 +152,15 @@ impl<'a> ConvertToDAGNode<'a> {
                     let ty = inst.operand.types()[0];
                     let fi_ty = self.func.types.new_pointer_ty(ty);
                     let frinfo = self.local_mgr.alloc(&ty);
-                    let fi = self.alloc_node(DAGNode::new(
-                        NodeKind::Operand(OperandNodeKind::FrameIndex(frinfo)), // TODO
-                        vec![],
-                        ty,
-                    ));
-                    let fiaddr = self.alloc_node(DAGNode::new(
-                        NodeKind::IR(IRNodeKind::FIAddr),
-                        vec![fi],
-                        fi_ty,
-                    ));
+                    let fi = self.alloc_node(
+                        DAGNode::new(NodeKind::Operand(OperandNodeKind::FrameIndex(frinfo)))
+                            .with_ty(ty),
+                    );
+                    let fiaddr = self.alloc_node(
+                        DAGNode::new(NodeKind::IR(IRNodeKind::FIAddr))
+                            .with_operand(vec![fi])
+                            .with_ty(fi_ty),
+                    );
                     self.inst_to_node.insert(inst_id, fiaddr);
                 }
                 Opcode::Load => {
@@ -173,7 +168,9 @@ impl<'a> ConvertToDAGNode<'a> {
                     let v = self.get_node_from_value(&v);
                     let load_id = self.alloc_node_as_necessary(
                         inst_id,
-                        DAGNode::new(NodeKind::IR(IRNodeKind::Load), vec![v], inst.ty),
+                        DAGNode::new(NodeKind::IR(IRNodeKind::Load))
+                            .with_operand(vec![v])
+                            .with_ty(inst.ty),
                     );
                     // TODO
                     if self.func.basic_blocks.liveness[&self.block_id]
@@ -192,7 +189,7 @@ impl<'a> ConvertToDAGNode<'a> {
                     let dst = self.get_node_from_value(&inst.operand.args()[1]);
                     let id = self.alloc_node_as_necessary(
                         inst_id,
-                        DAGNode::new(NodeKind::IR(IRNodeKind::Store), vec![dst, src], Type::Void),
+                        DAGNode::new(NodeKind::IR(IRNodeKind::Store)).with_operand(vec![dst, src]),
                     );
                     self.make_chain(id);
                 }
@@ -218,7 +215,9 @@ impl<'a> ConvertToDAGNode<'a> {
                     operands.insert(0, self.get_node_from_value(&inst.operand.args()[0]));
                     let id = self.alloc_node_as_necessary(
                         inst_id,
-                        DAGNode::new(NodeKind::IR(IRNodeKind::Call), operands, inst.ty.clone()),
+                        DAGNode::new(NodeKind::IR(IRNodeKind::Call))
+                            .with_operand(operands)
+                            .with_ty(inst.ty),
                     );
                     if self.func.basic_blocks.liveness[&self.block_id]
                         .live_out
@@ -242,19 +241,17 @@ impl<'a> ConvertToDAGNode<'a> {
                     let v2 = self.get_node_from_value(&inst.operand.args()[1]);
                     let bin_id = self.alloc_node_as_necessary(
                         inst_id,
-                        DAGNode::new(
-                            match inst.opcode {
-                                Opcode::Add => NodeKind::IR(IRNodeKind::Add),
-                                Opcode::Sub => NodeKind::IR(IRNodeKind::Sub),
-                                Opcode::Mul => NodeKind::IR(IRNodeKind::Mul),
-                                Opcode::Div => NodeKind::IR(IRNodeKind::Div),
-                                Opcode::Rem => NodeKind::IR(IRNodeKind::Rem),
-                                Opcode::Shl => NodeKind::IR(IRNodeKind::Shl),
-                                _ => unreachable!(),
-                            },
-                            vec![v1, v2],
-                            inst.ty,
-                        ),
+                        DAGNode::new(match inst.opcode {
+                            Opcode::Add => NodeKind::IR(IRNodeKind::Add),
+                            Opcode::Sub => NodeKind::IR(IRNodeKind::Sub),
+                            Opcode::Mul => NodeKind::IR(IRNodeKind::Mul),
+                            Opcode::Div => NodeKind::IR(IRNodeKind::Div),
+                            Opcode::Rem => NodeKind::IR(IRNodeKind::Rem),
+                            Opcode::Shl => NodeKind::IR(IRNodeKind::Shl),
+                            _ => unreachable!(),
+                        })
+                        .with_operand(vec![v1, v2])
+                        .with_ty(inst.ty),
                     );
                     if self.func.basic_blocks.liveness[&self.block_id]
                         .live_out
@@ -270,15 +267,13 @@ impl<'a> ConvertToDAGNode<'a> {
                     let v = self.get_node_from_value(&inst.operand.args()[0]);
                     let inst = self.alloc_node_as_necessary(
                         inst_id,
-                        DAGNode::new(
-                            match inst.opcode {
-                                Opcode::SIToFP => NodeKind::IR(IRNodeKind::SIToFP),
-                                Opcode::FPToSI => NodeKind::IR(IRNodeKind::FPToSI),
-                                _ => unreachable!(),
-                            },
-                            vec![v],
-                            inst.ty,
-                        ),
+                        DAGNode::new(match inst.opcode {
+                            Opcode::SIToFP => NodeKind::IR(IRNodeKind::SIToFP),
+                            Opcode::FPToSI => NodeKind::IR(IRNodeKind::FPToSI),
+                            _ => unreachable!(),
+                        })
+                        .with_operand(vec![v])
+                        .with_ty(inst.ty),
                     );
                     if self.func.basic_blocks.liveness[&self.block_id]
                         .live_out
@@ -294,7 +289,9 @@ impl<'a> ConvertToDAGNode<'a> {
                     let x = self.get_node_from_value(&inst.operand.args()[0]);
                     let inst = self.alloc_node_as_necessary(
                         inst_id,
-                        DAGNode::new(NodeKind::IR(IRNodeKind::Sext), vec![x], inst.ty),
+                        DAGNode::new(NodeKind::IR(IRNodeKind::Sext))
+                            .with_operand(vec![x])
+                            .with_ty(inst.ty),
                     );
                     if self.func.basic_blocks.liveness[&self.block_id]
                         .live_out
@@ -310,7 +307,9 @@ impl<'a> ConvertToDAGNode<'a> {
                     let x = self.get_node_from_value(&inst.operand.args()[0]);
                     let inst = self.alloc_node_as_necessary(
                         inst_id,
-                        DAGNode::new(NodeKind::IR(IRNodeKind::Bitcast), vec![x], inst.ty),
+                        DAGNode::new(NodeKind::IR(IRNodeKind::Bitcast))
+                            .with_operand(vec![x])
+                            .with_ty(inst.ty),
                     );
                     if self.func.basic_blocks.liveness[&self.block_id]
                         .live_out
@@ -323,18 +322,12 @@ impl<'a> ConvertToDAGNode<'a> {
                     }
                 }
                 Opcode::Br => {
-                    let bb = self.node_heap.alloc(DAGNode::new(
-                        NodeKind::Operand(OperandNodeKind::BasicBlock(
-                            self.bb_map[&inst.operand.blocks()[0]],
-                        )),
-                        vec![],
-                        Type::Void,
-                    ));
-                    let br = self.node_heap.alloc(DAGNode::new(
-                        NodeKind::IR(IRNodeKind::Br),
-                        vec![bb],
-                        Type::Void,
-                    ));
+                    let bb = self.node_heap.alloc(DAGNode::new(NodeKind::Operand(
+                        OperandNodeKind::BasicBlock(self.bb_map[&inst.operand.blocks()[0]]),
+                    )));
+                    let br = self
+                        .node_heap
+                        .alloc(DAGNode::new(NodeKind::IR(IRNodeKind::Br)).with_operand(vec![bb]));
                     self.make_chain(br);
                 }
                 Opcode::CondBr => {
@@ -343,29 +336,22 @@ impl<'a> ConvertToDAGNode<'a> {
                     let else_ = &inst.operand.blocks()[1];
                     let v = self.get_node_from_value(&v);
                     let brcond = {
-                        let bb = self.node_heap.alloc(DAGNode::new(
-                            NodeKind::Operand(OperandNodeKind::BasicBlock(self.bb_map[then_])),
-                            vec![],
-                            Type::Void,
-                        ));
-                        self.node_heap.alloc(DAGNode::new(
-                            NodeKind::IR(IRNodeKind::BrCond),
-                            vec![v, bb],
-                            Type::Void,
-                        ))
+                        let bb = self.node_heap.alloc(DAGNode::new(NodeKind::Operand(
+                            OperandNodeKind::BasicBlock(self.bb_map[then_]),
+                        )));
+                        self.node_heap.alloc(
+                            DAGNode::new(NodeKind::IR(IRNodeKind::BrCond))
+                                .with_operand(vec![v, bb]),
+                        )
                     };
                     self.make_chain(brcond);
                     let br = {
-                        let bb = self.node_heap.alloc(DAGNode::new(
-                            NodeKind::Operand(OperandNodeKind::BasicBlock(self.bb_map[else_])),
-                            vec![],
-                            Type::Void,
-                        ));
-                        self.node_heap.alloc(DAGNode::new(
-                            NodeKind::IR(IRNodeKind::Br),
-                            vec![bb],
-                            Type::Void,
-                        ))
+                        let bb = self.node_heap.alloc(DAGNode::new(NodeKind::Operand(
+                            OperandNodeKind::BasicBlock(self.bb_map[else_]),
+                        )));
+                        self.node_heap.alloc(
+                            DAGNode::new(NodeKind::IR(IRNodeKind::Br)).with_operand(vec![bb]),
+                        )
                     };
                     self.make_chain(br);
                 }
@@ -373,14 +359,14 @@ impl<'a> ConvertToDAGNode<'a> {
                     let c = inst.operand.int_cmp()[0];
                     let v1 = self.get_node_from_value(&inst.operand.args()[0]);
                     let v2 = self.get_node_from_value(&inst.operand.args()[1]);
-                    let cond = self.alloc_node(DAGNode::new(
-                        NodeKind::Operand(OperandNodeKind::CondKind((c).into())),
-                        vec![],
-                        Type::Void,
-                    ));
+                    let cond = self.alloc_node(DAGNode::new(NodeKind::Operand(
+                        OperandNodeKind::CondKind((c).into()),
+                    )));
                     let id = self.alloc_node_as_necessary(
                         inst_id,
-                        DAGNode::new(NodeKind::IR(IRNodeKind::Setcc), vec![cond, v1, v2], inst.ty),
+                        DAGNode::new(NodeKind::IR(IRNodeKind::Setcc))
+                            .with_operand(vec![cond, v1, v2])
+                            .with_ty(inst.ty),
                     );
                     if self.func.basic_blocks.liveness[&self.block_id]
                         .live_out
@@ -396,14 +382,14 @@ impl<'a> ConvertToDAGNode<'a> {
                     let c = inst.operand.float_cmp()[0];
                     let v1 = self.get_node_from_value(&inst.operand.args()[0]);
                     let v2 = self.get_node_from_value(&inst.operand.args()[1]);
-                    let cond = self.alloc_node(DAGNode::new(
-                        NodeKind::Operand(OperandNodeKind::CondKind((c).into())),
-                        vec![],
-                        Type::Void,
-                    ));
+                    let cond = self.alloc_node(DAGNode::new(NodeKind::Operand(
+                        OperandNodeKind::CondKind((c).into()),
+                    )));
                     let id = self.alloc_node_as_necessary(
                         inst_id,
-                        DAGNode::new(NodeKind::IR(IRNodeKind::FCmp), vec![cond, v1, v2], inst.ty),
+                        DAGNode::new(NodeKind::IR(IRNodeKind::FCmp))
+                            .with_operand(vec![cond, v1, v2])
+                            .with_ty(inst.ty),
                     );
                     if self.func.basic_blocks.liveness[&self.block_id]
                         .live_out
@@ -425,15 +411,15 @@ impl<'a> ConvertToDAGNode<'a> {
                             NodeKind::IR(IRNodeKind::CopyFromReg) => val.operand[0],
                             _ => val,
                         });
-                        operands.push(self.node_heap.alloc(DAGNode::new(
-                            NodeKind::Operand(OperandNodeKind::BasicBlock(self.bb_map[bb])),
-                            vec![],
-                            Type::Void,
-                        )))
+                        operands.push(self.node_heap.alloc(DAGNode::new(NodeKind::Operand(
+                            OperandNodeKind::BasicBlock(self.bb_map[bb]),
+                        ))))
                     }
                     let id = self.alloc_node_as_necessary(
                         inst_id,
-                        DAGNode::new(NodeKind::IR(IRNodeKind::Phi), operands, inst.ty),
+                        DAGNode::new(NodeKind::IR(IRNodeKind::Phi))
+                            .with_operand(operands)
+                            .with_ty(inst.ty),
                     );
                     if self.func.basic_blocks.liveness[&self.block_id]
                         .live_out
@@ -447,21 +433,15 @@ impl<'a> ConvertToDAGNode<'a> {
                 }
                 Opcode::Ret => {
                     let v = self.get_node_from_value(&inst.operand.args()[0]);
-                    let ret = self.alloc_node(DAGNode::new(
-                        NodeKind::IR(IRNodeKind::Ret),
-                        vec![v],
-                        Type::Void,
-                    ));
+                    let ret = self.alloc_node(
+                        DAGNode::new(NodeKind::IR(IRNodeKind::Ret)).with_operand(vec![v]),
+                    );
                     self.make_chain(ret)
                 }
             }
         }
 
-        let root = self.alloc_node(DAGNode::new(
-            NodeKind::IR(IRNodeKind::Root),
-            vec![],
-            Type::Void,
-        ));
+        let root = self.alloc_node(DAGNode::new(NodeKind::IR(IRNodeKind::Root)));
 
         if let Some(last_chained_node) = &mut self.last_chained_node {
             last_chained_node.next = Some(root);
@@ -476,7 +456,7 @@ impl<'a> ConvertToDAGNode<'a> {
                 if let Some(node) = self.inst_to_node.get(&iv.id) {
                     return *node;
                 }
-                let empty_node = self.alloc_node(DAGNode::new(NodeKind::None, vec![], Type::Void));
+                let empty_node = self.alloc_node(DAGNode::new_none());
                 self.inst_to_node.insert(iv.id, empty_node);
                 empty_node
             }
@@ -487,11 +467,10 @@ impl<'a> ConvertToDAGNode<'a> {
                     ImmediateValue::Int64(i) => ConstantKind::Int64(*i),
                     ImmediateValue::F64(f) => ConstantKind::F64(*f),
                 };
-                self.alloc_node(DAGNode::new(
-                    NodeKind::Operand(OperandNodeKind::Constant(imm)),
-                    vec![],
-                    imm.get_type(),
-                ))
+                self.alloc_node(
+                    DAGNode::new(NodeKind::Operand(OperandNodeKind::Constant(imm)))
+                        .with_ty(imm.get_type()),
+                )
             }
             Value::Argument(av) => {
                 if let Some(r) = self.arg_regs.get(&av.index) {
@@ -508,72 +487,73 @@ impl<'a> ConvertToDAGNode<'a> {
                     .get_param_attr(av.index)
                     .map_or(false, |attr| attr.byval);
                 if byval {
-                    let fi = self.alloc_node(DAGNode::new(
-                        NodeKind::Operand(OperandNodeKind::FrameIndex(FrameIndexInfo::new(
-                            ty,
-                            FrameIndexKind::Arg(av.index),
-                        ))),
-                        vec![],
-                        ty,
-                    ));
-                    self.alloc_node(DAGNode::new(NodeKind::IR(IRNodeKind::FIAddr), vec![fi], ty))
+                    let fi = self.alloc_node(
+                        DAGNode::new(NodeKind::Operand(OperandNodeKind::FrameIndex(
+                            FrameIndexInfo::new(ty, FrameIndexKind::Arg(av.index)),
+                        )))
+                        .with_ty(ty),
+                    );
+                    self.alloc_node(
+                        DAGNode::new(NodeKind::IR(IRNodeKind::FIAddr))
+                            .with_operand(vec![fi])
+                            .with_ty(ty),
+                    )
                 } else {
                     let fi_ty = self.func.types.new_pointer_ty(ty);
-                    let fi = self.alloc_node(DAGNode::new(
-                        NodeKind::Operand(OperandNodeKind::FrameIndex(FrameIndexInfo::new(
-                            ty,
-                            FrameIndexKind::Arg(av.index),
-                        ))),
-                        vec![],
-                        ty,
-                    ));
-                    let fiaddr = self.alloc_node(DAGNode::new(
-                        NodeKind::IR(IRNodeKind::FIAddr),
-                        vec![fi],
-                        fi_ty,
-                    ));
-                    self.alloc_node(DAGNode::new(
-                        NodeKind::IR(IRNodeKind::Load),
-                        vec![fiaddr],
-                        ty,
-                    ))
+                    let fi = self.alloc_node(
+                        DAGNode::new(NodeKind::Operand(OperandNodeKind::FrameIndex(
+                            FrameIndexInfo::new(ty, FrameIndexKind::Arg(av.index)),
+                        )))
+                        .with_ty(ty),
+                    );
+                    let fiaddr = self.alloc_node(
+                        DAGNode::new(NodeKind::IR(IRNodeKind::FIAddr))
+                            .with_operand(vec![fi])
+                            .with_ty(fi_ty),
+                    );
+                    self.alloc_node(
+                        DAGNode::new(NodeKind::IR(IRNodeKind::Load))
+                            .with_operand(vec![fiaddr])
+                            .with_ty(ty),
+                    )
                 }
             }
             Value::Function(FunctionValue { func_id, ty }) => {
                 let f = self.module.function_ref(*func_id);
-                self.alloc_node(DAGNode::new(
-                    NodeKind::Operand(OperandNodeKind::Address(AddressKind::FunctionName(
-                        f.name.to_string(),
-                    ))),
-                    vec![],
-                    *ty,
-                ))
+                self.alloc_node(
+                    DAGNode::new(NodeKind::Operand(OperandNodeKind::Address(
+                        AddressKind::FunctionName(f.name.to_string()),
+                    )))
+                    .with_ty(*ty),
+                )
             }
             Value::Global(GlobalValue { id, ty }) => {
-                let g = self.alloc_node(DAGNode::new(
-                    NodeKind::Operand(OperandNodeKind::Address(AddressKind::Global(*id))),
-                    vec![],
-                    *ty,
-                ));
-                self.alloc_node(DAGNode::new(
-                    NodeKind::IR(IRNodeKind::GlobalAddr),
-                    vec![g],
-                    *ty,
-                ))
+                let g = self.alloc_node(
+                    DAGNode::new(NodeKind::Operand(OperandNodeKind::Address(
+                        AddressKind::Global(*id),
+                    )))
+                    .with_ty(*ty),
+                );
+                self.alloc_node(
+                    DAGNode::new(NodeKind::IR(IRNodeKind::GlobalAddr))
+                        .with_operand(vec![g])
+                        .with_ty(*ty),
+                )
             }
             Value::Constant(ConstantValue { id, ty }) => {
-                let c = self.alloc_node(DAGNode::new(
-                    NodeKind::Operand(OperandNodeKind::Address(AddressKind::Const(*id))),
-                    vec![],
-                    *ty,
-                ));
-                self.alloc_node(DAGNode::new(
-                    NodeKind::IR(IRNodeKind::ConstAddr),
-                    vec![c],
-                    *ty,
-                ))
+                let c = self.alloc_node(
+                    DAGNode::new(NodeKind::Operand(OperandNodeKind::Address(
+                        AddressKind::Const(*id),
+                    )))
+                    .with_ty(*ty),
+                );
+                self.alloc_node(
+                    DAGNode::new(NodeKind::IR(IRNodeKind::ConstAddr))
+                        .with_operand(vec![c])
+                        .with_ty(*ty),
+                )
             }
-            Value::None => self.alloc_node(DAGNode::new(NodeKind::None, vec![], Type::Void)),
+            Value::None => self.alloc_node(DAGNode::new_none()),
         }
     }
 
@@ -600,13 +580,14 @@ impl<'a> ConvertToDAGNode<'a> {
             let idx = self.get_node_from_value(idx);
             let idx = match idx.kind {
                 NodeKind::Operand(OperandNodeKind::Constant(ConstantKind::Int32(i))) => {
-                    self.node_heap.alloc(DAGNode::new(
-                        NodeKind::Operand(OperandNodeKind::Constant(ConstantKind::Int32(
-                            size.unwrap_or(i * ty.size_in_byte(&self.module.types) as i32),
-                        ))),
-                        vec![],
-                        Type::i32,
-                    ))
+                    self.node_heap.alloc(
+                        DAGNode::new(NodeKind::Operand(OperandNodeKind::Constant(
+                            ConstantKind::Int32(
+                                size.unwrap_or(i * ty.size_in_byte(&self.module.types) as i32),
+                            ),
+                        )))
+                        .with_ty(Type::i32),
+                    )
                 }
                 NodeKind::IR(IRNodeKind::FIAddr) => idx.operand[0], // retrieve frame index
                 NodeKind::Operand(OperandNodeKind::FrameIndex(_)) => unreachable!(),
@@ -614,29 +595,28 @@ impl<'a> ConvertToDAGNode<'a> {
                 | NodeKind::Operand(OperandNodeKind::Address(_))
                 | NodeKind::Operand(OperandNodeKind::BasicBlock(_)) => idx,
                 _ => {
-                    let tysz = self.node_heap.alloc(DAGNode::new(
-                        NodeKind::Operand(OperandNodeKind::Constant(ConstantKind::Int32(
-                            ty.size_in_byte(&self.module.types) as i32,
-                        ))),
-                        vec![],
-                        Type::i32,
-                    ));
+                    let tysz = self.node_heap.alloc(
+                        DAGNode::new(NodeKind::Operand(OperandNodeKind::Constant(
+                            ConstantKind::Int32(ty.size_in_byte(&self.module.types) as i32),
+                        )))
+                        .with_ty(Type::i32),
+                    );
                     let cast = sext_if_necessary(&self.func.types, self.node_heap, idx, Type::i64);
                     // assert!(cast.ty == Type::i64);
-                    self.node_heap.alloc(DAGNode::new(
-                        NodeKind::IR(IRNodeKind::Mul),
-                        vec![cast, tysz],
-                        Type::i64, // TODO
-                    ))
+                    self.node_heap.alloc(
+                        DAGNode::new(NodeKind::IR(IRNodeKind::Mul))
+                            .with_operand(vec![cast, tysz])
+                            .with_ty(Type::i64),
+                    )
                 }
             };
 
             let ptr_ty = self.module.types.new_pointer_ty(ty);
-            gep = self.node_heap.alloc(DAGNode::new(
-                NodeKind::IR(IRNodeKind::Add),
-                vec![gep, idx],
-                ptr_ty,
-            ));
+            gep = self.node_heap.alloc(
+                DAGNode::new(NodeKind::IR(IRNodeKind::Add))
+                    .with_operand(vec![gep, idx])
+                    .with_ty(ptr_ty),
+            );
         }
 
         gep
@@ -654,15 +634,13 @@ impl<'a> ConvertToDAGNode<'a> {
         let kind = NodeKind::Operand(OperandNodeKind::Register(
             self.regs_info.new_virt_reg(ty2rc(&node.ty).unwrap()),
         ));
-        let reg = self.node_heap.alloc(DAGNode::new(kind, vec![], node.ty));
+        let reg = self.node_heap.alloc(DAGNode::new(kind).with_ty(node.ty));
         let old_node = self
             .node_heap
             .alloc(mem::replace(&mut *node, (*reg).clone()));
-        let copy = self.node_heap.alloc(DAGNode::new(
-            NodeKind::IR(IRNodeKind::CopyToReg),
-            vec![reg, old_node],
-            Type::Void,
-        ));
+        let copy = self.node_heap.alloc(
+            DAGNode::new(NodeKind::IR(IRNodeKind::CopyToReg)).with_operand(vec![reg, old_node]),
+        );
         self.make_chain(copy);
         node
     }
@@ -722,5 +700,9 @@ fn sext_if_necessary(
         return node;
     }
 
-    heap.alloc(DAGNode::new(NodeKind::IR(IRNodeKind::Sext), vec![node], to))
+    heap.alloc(
+        DAGNode::new(NodeKind::IR(IRNodeKind::Sext))
+            .with_operand(vec![node])
+            .with_ty(to),
+    )
 }

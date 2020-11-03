@@ -3,10 +3,6 @@ use id_arena::{Arena, Id};
 use std::cell::RefCell;
 
 pub type InstructionId = Id<Instruction>;
-pub type VirtualRegister = usize;
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct Register(usize);
 
 #[derive(Clone, Debug)]
 pub struct Instruction {
@@ -544,15 +540,5 @@ impl FCmpKind {
             FCmpKind::UGt => "ugt",
             FCmpKind::UGe => "uge",
         }
-    }
-}
-
-impl Register {
-    pub fn shift(self, n: usize) -> Register {
-        Register(self.0 + n)
-    }
-
-    pub fn as_u8(&self) -> u8 {
-        self.0 as u8
     }
 }

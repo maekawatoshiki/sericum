@@ -1,6 +1,6 @@
 use crate::codegen::arch::dag::node::*;
 use crate::codegen::common::dag::{function::*, module::*};
-use crate::{ir::types::*, traits::pass::ModulePassTrait, util::allocator::*};
+use crate::{traits::pass::ModulePassTrait, util::allocator::*};
 use rustc_hash::FxHashMap;
 
 pub struct Combine {}
@@ -108,16 +108,15 @@ impl Combine {
             let const_folded = node.operand[0].operand[1]
                 .as_constant()
                 .add(node.operand[1].as_constant());
-            let c = heap.alloc(DAGNode::new(
-                NodeKind::Operand(OperandNodeKind::Constant(const_folded)),
-                vec![],
-                const_folded.get_type(),
-            ));
-            let new_add = heap.alloc(DAGNode::new(
-                NodeKind::IR(IRNodeKind::Add),
-                vec![op0, c],
-                node.ty,
-            ));
+            let c = heap.alloc(
+                DAGNode::new(NodeKind::Operand(OperandNodeKind::Constant(const_folded)))
+                    .with_ty(const_folded.get_type()),
+            );
+            let new_add = heap.alloc(
+                DAGNode::new(NodeKind::IR(IRNodeKind::Add))
+                    .with_operand(vec![op0, c])
+                    .with_ty(node.ty),
+            );
             return self.combine_node_add(replace, heap, new_add);
         }
 
@@ -161,15 +160,14 @@ impl Combine {
                 let cond_kind = cond.operand[0];
                 let lhs = self.combine_node(replace, heap, cond.operand[1]);
                 let rhs = self.combine_node(replace, heap, cond.operand[2]);
-                heap.alloc(DAGNode::new(
-                    match cond.kind {
+                heap.alloc(
+                    DAGNode::new(match cond.kind {
                         NodeKind::IR(IRNodeKind::Setcc) => NodeKind::IR(IRNodeKind::Brcc),
                         NodeKind::IR(IRNodeKind::FCmp) => NodeKind::IR(IRNodeKind::FPBrcc),
                         _ => unreachable!(),
-                    },
-                    vec![cond_kind, lhs, rhs, br],
-                    Type::Void,
-                ))
+                    })
+                    .with_operand(vec![cond_kind, lhs, rhs, br]),
+                )
             }
             _ => self.combine_operands(replace, heap, node),
         }

@@ -236,17 +236,17 @@ impl ConstantKind {
 }
 
 impl DAGNode {
-    pub fn new(kind: NodeKind, operand: Vec<Raw<DAGNode>>, ty: Type) -> Self {
-        Self {
-            kind,
-            ty,
-            mvty: ty.into(),
-            next: None,
-            chain: None,
-            operand,
-        }
-    }
-
+    // pub fn new(kind: NodeKind, operand: Vec<Raw<DAGNode>>, ty: Type) -> Self {
+    //     Self {
+    //         kind,
+    //         ty,
+    //         mvty: ty.into(),
+    //         next: None,
+    //         chain: None,
+    //         operand,
+    //     }
+    // }
+    //
     pub fn new_simple(kind: NodeKind, operand: Vec<Raw<DAGNode>>) -> Self {
         Self {
             kind,
@@ -255,6 +255,17 @@ impl DAGNode {
             chain: None,
             ty: Type::Void,
             mvty: MVType::Invalid,
+        }
+    }
+
+    pub fn new(kind: NodeKind) -> Self {
+        Self {
+            kind,
+            operand: vec![],
+            ty: Type::Void,
+            mvty: MVType::Invalid,
+            next: None,
+            chain: None,
         }
     }
 
@@ -282,11 +293,18 @@ impl DAGNode {
     }
 
     pub fn new_mem(mem: MemNodeKind, operands: Vec<Raw<DAGNode>>) -> Self {
-        Self::new(
-            NodeKind::Operand(OperandNodeKind::Mem(mem)),
-            operands,
-            Type::Void,
-        )
+        Self::new(NodeKind::Operand(OperandNodeKind::Mem(mem))).with_operand(operands)
+    }
+
+    pub fn with_ty(mut self, ty: Type) -> Self {
+        self.ty = ty;
+        self.mvty = ty.into();
+        self
+    }
+
+    pub fn with_operand(mut self, operand: Vec<Raw<DAGNode>>) -> Self {
+        self.operand = operand;
+        self
     }
 
     pub fn set_next(mut self, next: Raw<DAGNode>) -> Self {

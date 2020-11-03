@@ -234,11 +234,11 @@ impl MISelector {
         match name {
             SQRT_F64 => {
                 let x = self.run_on_node(tys, regs_info, heap, node.operand[1]);
-                heap.alloc(DAGNode::new(
-                    NodeKind::MI(MINodeKind::SQRTSDrr),
-                    vec![x],
-                    Type::f64,
-                ))
+                heap.alloc(
+                    DAGNode::new(NodeKind::MI(MINodeKind::SQRTSDrr))
+                        .with_operand(vec![x])
+                        .with_ty(Type::f64),
+                )
             }
             _ => unreachable!(),
         }

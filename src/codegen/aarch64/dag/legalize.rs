@@ -258,11 +258,11 @@ impl Legalize {
             let fi = node.operand[0].operand[0].operand[0];
             let x29 = heap.alloc_phys_reg(regs_info, GR64::X29);
             let mem = heap.alloc(DAGNode::new_mem(MemNodeKind::RegFi, vec![x29, fi]));
-            return heap.alloc(DAGNode::new(
-                NodeKind::MI(MINodeKind::LDRSW64),
-                vec![mem],
-                node.ty,
-            ));
+            return heap.alloc(
+                DAGNode::new(NodeKind::MI(MINodeKind::LDRSW64))
+                    .with_operand(vec![mem])
+                    .with_ty(node.ty),
+            );
         }
 
         if node.ty == Type::i64
@@ -272,21 +272,21 @@ impl Legalize {
         {
             let op = self.run_on_node(tys, regs_info, heap, node.operand[0].operand[0]);
             let mem = heap.alloc(DAGNode::new_mem(MemNodeKind::Reg, vec![op]));
-            return heap.alloc(DAGNode::new(
-                NodeKind::MI(MINodeKind::LDRSW64),
-                vec![mem],
-                node.ty,
-            ));
+            return heap.alloc(
+                DAGNode::new(NodeKind::MI(MINodeKind::LDRSW64))
+                    .with_operand(vec![mem])
+                    .with_ty(node.ty),
+            );
         }
 
         if node.ty == Type::i64 && !node.operand[0].is_constant() && node.operand[0].ty == Type::i32
         {
             let op = self.run_on_node(tys, regs_info, heap, node.operand[0]);
-            return heap.alloc(DAGNode::new(
-                NodeKind::MI(MINodeKind::SXTW64rr),
-                vec![op],
-                node.ty,
-            ));
+            return heap.alloc(
+                DAGNode::new(NodeKind::MI(MINodeKind::SXTW64rr))
+                    .with_operand(vec![op])
+                    .with_ty(node.ty),
+            );
         }
 
         self.run_on_node_operand(tys, regs_info, heap, node);

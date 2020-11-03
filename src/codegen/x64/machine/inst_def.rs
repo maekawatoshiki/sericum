@@ -514,21 +514,10 @@ pub enum TargetOpcode {
     MOVSDrm,   // movsd r, MEM
     MOVSDrr,
 
-    // TODO: MachineMemOperand is introduced, this is no longer correct info
-    // out = mov [rbp  - fi.off              ] | out = mov rbp,  fi,   none,  none
-    // out = mov [rbp  - fi.off + const.off  ] | out = mov rbp,  fi,   none,  off
-    // out = mov [rbp  - fi.off + align * off] | out = mov rbp,  fi,   align, off
-    // out = mov [base          + align * off] | out = mov base, none, align, off
-    // out = mov [base                       ] | out = mov base, none, none,  none
     MOVrm32,
     MOVrm8,
     MOVri8,
 
-    // mov [rbp  - fi.off              ], r | mov rbp,  fi,   none,  none, r
-    // mov [rbp  - fi.off + const.off  ], r | mov rbp,  fi,   none,  off,  r
-    // mov [rbp  - fi.off + align * off], r | mov rbp,  fi,   align, off,  r
-    // mov [base          + align * off], r | mov base, none, align, off,  r
-    // mov [base                       ], r | mov base, none, none,  none, r
     MOVmr8,
     MOVmi8,
     MOVmr32,
@@ -540,11 +529,6 @@ pub enum TargetOpcode {
     MOVSXDr64m32, // out = movsxd [rbp - fi.off]
     MOVSXDr64r32, // r64 = movsxd r32
 
-    // out = lea [rbp  - fi.off              ] | out = lea rbp,  fi,   none,  none
-    // out = lea [rbp  - fi.off + const.off  ] | out = lea rbp,  fi,   none,  off
-    // out = lea [rbp  - fi.off + align * off] | out = lea rbp,  fi,   align, off
-    // out = lea [base          + align * off] | out = lea base, none, align, off
-    // out = lea [base                       ] | out = lea base, none, none,  none
     LEAr64m,
 
     ADDrr8,

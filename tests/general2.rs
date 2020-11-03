@@ -1041,7 +1041,7 @@ mod aarch64 {
         codegen::aarch64::{
             asm::print::MachineAsmPrinter, standard_conversion_into_machine_module,
         },
-        ir::{builder, types, value},
+        ir::{types, value},
         module::Module,
         sericum_ir,
         *, // for macro
@@ -1104,7 +1104,7 @@ mod aarch64 {
         fs::remove_file(target_name).unwrap();
     }
 
-    fn compile_and_run(c_parent: &str, module: &mut Module) {
+    fn compile_and_run(c_parent: &str, module: Module) {
         let machine_module = standard_conversion_into_machine_module(module);
         let mut printer = MachineAsmPrinter::new();
         println!("{:?}", machine_module);
@@ -1128,7 +1128,7 @@ mod aarch64 {
         assert(test() == 42);
     }
             ",
-            &mut m,
+            m,
         );
     }
 
@@ -1150,7 +1150,7 @@ mod aarch64 {
         assert(test() == 42);
     }
             ",
-            &mut m,
+            m,
         );
     }
 
@@ -1172,7 +1172,7 @@ mod aarch64 {
         assert(test(1, 42) == 42);
     }
             ",
-            &mut m,
+            m,
         );
     }
 
@@ -1207,7 +1207,7 @@ mod aarch64 {
         assert(test_sub(3) == 39);
     }
             ",
-            &mut m,
+            m,
         );
     }
 
@@ -1242,7 +1242,7 @@ mod aarch64 {
         assert(test_div(3) == 14);
     }
             ",
-            &mut m,
+            m,
         );
     }
 
@@ -1267,7 +1267,7 @@ mod aarch64 {
         assert(test(0) == 1);
     }
             ",
-            &mut m,
+            m,
         );
     }
 
@@ -1292,7 +1292,7 @@ mod aarch64 {
         assert(test() == 42);
     }
             ",
-            &mut m,
+            m,
         );
     }
 
@@ -1320,7 +1320,7 @@ mod aarch64 {
         assert(test() == 42);
     }
             ",
-            &mut m,
+            m,
         );
     }
 
@@ -1346,7 +1346,7 @@ mod aarch64 {
         assert(test() == 42);
     }
             ",
-            &mut m,
+            m,
         );
     }
 
@@ -1443,7 +1443,7 @@ mod aarch64 {
         }
     }
             ",
-            &mut m,
+            m,
         );
     }
 
@@ -1472,7 +1472,7 @@ mod aarch64 {
         assert(fibo(10) == 55);
     }
             ",
-            &mut m,
+            m,
         );
     }
 }
