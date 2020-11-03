@@ -1,57 +1,64 @@
 use crate::ir::{basic_block::*, function::*, module::*, opcode::*, types::*};
+use rustc_hash::FxHashMap;
 
 pub struct IRLivenessAnalyzer<'a> {
-    module: &'a Module,
+    module: &'a mut Module,
 }
 
 pub struct LivenessAnalyzerOnFunction<'a> {
     func: &'a Function,
+    liveness: FxHashMap<BasicBlockId, LivenessInfo>,
 }
 
 impl<'a> IRLivenessAnalyzer<'a> {
-    pub fn new(module: &'a Module) -> Self {
+    pub fn new(module: &'a mut Module) -> Self {
         Self { module }
     }
 
     pub fn analyze(&mut self) {
-        for (_, f) in &self.module.functions {
+        for (_, f) in &mut self.module.functions {
             if f.is_internal {
                 continue;
             }
 
-            LivenessAnalyzerOnFunction::new(f).analyze();
+            let liveness = LivenessAnalyzerOnFunction::new(f).analyze();
+            f.basic_blocks.liveness = liveness;
         }
     }
 }
 
 impl<'a> LivenessAnalyzerOnFunction<'a> {
     pub fn new(func: &'a Function) -> Self {
-        Self { func }
+        Self {
+            func,
+            liveness: FxHashMap::default(),
+        }
     }
 
-    pub fn analyze(&mut self) {
+    pub fn analyze(mut self) -> FxHashMap<BasicBlockId, LivenessInfo> {
         self.set_def();
         self.visit();
+        self.liveness
     }
 
     pub fn set_def(&mut self) {
-        for (_, bb) in &self.func.basic_blocks.arena {
-            *bb.liveness.borrow_mut() = LivenessInfo::new();
+        for (id, block) in &self.func.basic_blocks.arena {
+            let mut liveness = LivenessInfo::new();
 
-            let def = &mut bb.liveness.borrow_mut().def;
-
-            for &inst_id in &*bb.iseq_ref() {
+            for &inst_id in &*block.iseq_ref() {
                 let inst = &self.func.inst_table[inst_id];
 
                 if inst.opcode == Opcode::Call && self.func.get_return_type() != Type::Void {
-                    def.insert(inst_id);
+                    liveness.def.insert(inst_id);
                     continue;
                 }
 
                 if inst.opcode.returns_value() {
-                    def.insert(inst_id);
+                    liveness.def.insert(inst_id);
                 }
             }
+
+            self.liveness.insert(id, liveness);
         }
     }
 
@@ -93,13 +100,13 @@ impl<'a> LivenessAnalyzerOnFunction<'a> {
         let bb = &self.func.basic_blocks.arena[bb_id];
 
         {
-            let mut bb_liveness = bb.liveness.borrow_mut();
+            let liveness = self.liveness.get_mut(&bb_id).unwrap();
 
-            if bb_liveness.def.contains(&inst_id) {
+            if liveness.def.contains(&inst_id) {
                 return;
             }
 
-            if !bb_liveness.live_in.insert(inst_id) && !phi {
+            if !liveness.live_in.insert(inst_id) && !phi {
                 // live_in already had the value inst_id
                 return;
             }
@@ -115,8 +122,13 @@ impl<'a> LivenessAnalyzerOnFunction<'a> {
     }
 
     fn propagate_if_necessary(&mut self, pred_id: BasicBlockId, inst_id: InstructionId, phi: bool) {
-        let pred = &self.func.basic_blocks.arena[pred_id];
-        if pred.liveness.borrow_mut().live_out.insert(inst_id) {
+        if self
+            .liveness
+            .get_mut(&pred_id)
+            .unwrap()
+            .live_out
+            .insert(inst_id)
+        {
             // live_out didn't have the value inst_id
             self.propagate(pred_id, inst_id, None, phi);
         }

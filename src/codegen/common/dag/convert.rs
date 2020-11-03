@@ -12,10 +12,6 @@ use id_arena::*;
 use rustc_hash::FxHashMap;
 use std::mem;
 
-pub struct ConvertToDAGModule<'a> {
-    pub module: &'a Module,
-}
-
 pub struct ConvertToDAGFunction<'a> {
     module: &'a Module,
     func: &'a Function,
@@ -33,6 +29,7 @@ pub struct ConvertToDAGNode<'a> {
     pub module: &'a Module,
     pub func: &'a Function,
     pub block: &'a BasicBlock,
+    pub block_id: BasicBlockId,
     pub node_heap: &'a mut DAGHeap,
     pub inst_to_node: &'a mut FxHashMap<InstructionId, Raw<DAGNode>>,
     pub regs_info: &'a mut RegistersInfo,
@@ -43,8 +40,8 @@ pub struct ConvertToDAGNode<'a> {
     pub last_chained_node: Option<Raw<DAGNode>>,
 }
 
-pub fn convert_to_dag_module(module: Module) -> DAGModule {
-    IRLivenessAnalyzer::new(&module).analyze();
+pub fn convert_to_dag_module(mut module: Module) -> DAGModule {
+    IRLivenessAnalyzer::new(&mut module).analyze();
 
     let mut functions: Arena<DAGFunction> = Arena::new();
 
@@ -75,43 +72,6 @@ pub fn convert_to_dag_module(module: Module) -> DAGModule {
     }
 }
 
-impl<'a> ConvertToDAGModule<'a> {
-    pub fn new(module: &'a Module) -> Self {
-        IRLivenessAnalyzer::new(&module).analyze();
-        Self { module }
-    }
-
-    pub fn run(self) -> DAGModule {
-        let mut functions: Arena<DAGFunction> = Arena::new();
-
-        for (_, func) in &self.module.functions {
-            functions.alloc(
-                ConvertToDAGFunction {
-                    module: self.module,
-                    func,
-                    bb_arena: Arena::new(),
-                    bb_order: vec![],
-                    bb_map: FxHashMap::default(),
-                    node_heap: DAGHeap::new(),
-                    inst_to_node: FxHashMap::default(),
-                    regs_info: RegistersInfo::new(),
-                    arg_regs: FxHashMap::default(),
-                    local_mgr: LocalVariables::new(),
-                }
-                .run(),
-            );
-        }
-
-        DAGModule {
-            name: self.module.name.to_owned(),
-            functions,
-            types: self.module.types.clone(),
-            global_vars: self.module.global_vars.clone(),
-            const_pool: self.module.const_pool.clone(),
-        }
-    }
-}
-
 impl<'a> ConvertToDAGFunction<'a> {
     pub fn run(mut self) -> DAGFunction {
         for &bb_id in &self.func.basic_blocks.order {
@@ -129,6 +89,7 @@ impl<'a> ConvertToDAGFunction<'a> {
                 module: self.module,
                 func: self.func,
                 block,
+                block_id: bb_id,
                 node_heap: &mut self.node_heap,
                 inst_to_node: &mut self.inst_to_node,
                 regs_info: &mut self.regs_info,
@@ -215,7 +176,10 @@ impl<'a> ConvertToDAGNode<'a> {
                         DAGNode::new(NodeKind::IR(IRNodeKind::Load), vec![v], inst.ty),
                     );
                     // TODO
-                    if self.block.liveness.borrow().live_out.contains(&inst_id) {
+                    if self.func.basic_blocks.liveness[&self.block_id]
+                        .live_out
+                        .contains(&inst_id)
+                    {
                         let copy_from_reg = self.make_chain_with_copying(load_id);
                         self.inst_to_node.insert(inst_id, copy_from_reg);
                     } else {
@@ -236,7 +200,10 @@ impl<'a> ConvertToDAGNode<'a> {
                     let indices: Vec<Value> =
                         inst.operand.args()[1..].into_iter().map(|x| *x).collect();
                     let gep = self.construct_node_for_gep(&inst.operand.args()[0], &indices);
-                    if self.block.liveness.borrow().live_out.contains(&inst_id) {
+                    if self.func.basic_blocks.liveness[&self.block_id]
+                        .live_out
+                        .contains(&inst_id)
+                    {
                         let gep = self.make_chain_with_copying(gep);
                         self.inst_to_node.insert(inst_id, gep);
                     } else {
@@ -253,7 +220,10 @@ impl<'a> ConvertToDAGNode<'a> {
                         inst_id,
                         DAGNode::new(NodeKind::IR(IRNodeKind::Call), operands, inst.ty.clone()),
                     );
-                    if self.block.liveness.borrow().live_out.contains(&inst_id) {
+                    if self.func.basic_blocks.liveness[&self.block_id]
+                        .live_out
+                        .contains(&inst_id)
+                    {
                         let copy_from_reg = self.make_chain_with_copying(id);
                         self.inst_to_node.insert(inst_id, copy_from_reg);
                     } else {
@@ -286,7 +256,10 @@ impl<'a> ConvertToDAGNode<'a> {
                             inst.ty,
                         ),
                     );
-                    if self.block.liveness.borrow().live_out.contains(&inst_id) {
+                    if self.func.basic_blocks.liveness[&self.block_id]
+                        .live_out
+                        .contains(&inst_id)
+                    {
                         let copy_from_reg = self.make_chain_with_copying(bin_id);
                         self.inst_to_node.insert(inst_id, copy_from_reg);
                     } else {
@@ -307,7 +280,10 @@ impl<'a> ConvertToDAGNode<'a> {
                             inst.ty,
                         ),
                     );
-                    if self.block.liveness.borrow().live_out.contains(&inst_id) {
+                    if self.func.basic_blocks.liveness[&self.block_id]
+                        .live_out
+                        .contains(&inst_id)
+                    {
                         let copy_from_reg = self.make_chain_with_copying(inst);
                         self.inst_to_node.insert(inst_id, copy_from_reg);
                     } else {
@@ -320,7 +296,10 @@ impl<'a> ConvertToDAGNode<'a> {
                         inst_id,
                         DAGNode::new(NodeKind::IR(IRNodeKind::Sext), vec![x], inst.ty),
                     );
-                    if self.block.liveness.borrow().live_out.contains(&inst_id) {
+                    if self.func.basic_blocks.liveness[&self.block_id]
+                        .live_out
+                        .contains(&inst_id)
+                    {
                         let copy_from_reg = self.make_chain_with_copying(inst);
                         self.inst_to_node.insert(inst_id, copy_from_reg);
                     } else {
@@ -333,7 +312,10 @@ impl<'a> ConvertToDAGNode<'a> {
                         inst_id,
                         DAGNode::new(NodeKind::IR(IRNodeKind::Bitcast), vec![x], inst.ty),
                     );
-                    if self.block.liveness.borrow().live_out.contains(&inst_id) {
+                    if self.func.basic_blocks.liveness[&self.block_id]
+                        .live_out
+                        .contains(&inst_id)
+                    {
                         let copy_from_reg = self.make_chain_with_copying(inst);
                         self.inst_to_node.insert(inst_id, copy_from_reg);
                     } else {
@@ -400,7 +382,10 @@ impl<'a> ConvertToDAGNode<'a> {
                         inst_id,
                         DAGNode::new(NodeKind::IR(IRNodeKind::Setcc), vec![cond, v1, v2], inst.ty),
                     );
-                    if self.block.liveness.borrow().live_out.contains(&inst_id) {
+                    if self.func.basic_blocks.liveness[&self.block_id]
+                        .live_out
+                        .contains(&inst_id)
+                    {
                         let copy_from_reg = self.make_chain_with_copying(id);
                         self.inst_to_node.insert(inst_id, copy_from_reg);
                     } else {
@@ -420,7 +405,10 @@ impl<'a> ConvertToDAGNode<'a> {
                         inst_id,
                         DAGNode::new(NodeKind::IR(IRNodeKind::FCmp), vec![cond, v1, v2], inst.ty),
                     );
-                    if self.block.liveness.borrow().live_out.contains(&inst_id) {
+                    if self.func.basic_blocks.liveness[&self.block_id]
+                        .live_out
+                        .contains(&inst_id)
+                    {
                         let copy_from_reg = self.make_chain_with_copying(id);
                         self.inst_to_node.insert(inst_id, copy_from_reg);
                     } else {
@@ -447,7 +435,10 @@ impl<'a> ConvertToDAGNode<'a> {
                         inst_id,
                         DAGNode::new(NodeKind::IR(IRNodeKind::Phi), operands, inst.ty),
                     );
-                    if self.block.liveness.borrow().live_out.contains(&inst_id) {
+                    if self.func.basic_blocks.liveness[&self.block_id]
+                        .live_out
+                        .contains(&inst_id)
+                    {
                         let copy_from_reg = self.make_chain_with_copying(id);
                         self.inst_to_node.insert(inst_id, copy_from_reg);
                     } else {

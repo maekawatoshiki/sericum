@@ -1,7 +1,7 @@
 use super::{function::Function, module::Module, opcode::*, types::Type};
 use crate::traits::basic_block::*;
 use id_arena::*;
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxHashMap, FxHashSet};
 use std::cell::{Ref, RefCell, RefMut};
 
 /// BasicBlockId that indicates a BasicBlock uniquely is given by [id_arena::Arena](https://docs.rs/id-arena).
@@ -11,18 +11,20 @@ pub type BasicBlockId = Id<BasicBlock>;
 /// See also [Builder](../builder/struct.Builder.html) to know how it's used.
 #[derive(Debug, Clone)]
 pub struct BasicBlocks {
+    /// Arena for Basic Block
     pub arena: Arena<BasicBlock>,
+
+    /// Ordering of Basic Block
     pub order: Vec<BasicBlockId>,
+
+    /// Liveness information
+    pub liveness: FxHashMap<BasicBlockId, LivenessInfo>,
 }
 
 /// The representation of BasicBlock.
 /// A BasicBlock has a set of Predecessors, Successors and a sequence of [Value](../value/enum.Value.html).
 #[derive(Clone, Debug)]
 pub struct BasicBlock {
-    /// Information for liveness analysis
-    // TODO: Will be removed
-    pub liveness: RefCell<LivenessInfo>,
-
     /// Predecessors
     pub pred: FxHashSet<BasicBlockId>,
 
@@ -33,7 +35,7 @@ pub struct BasicBlock {
     pub iseq: RefCell<Vec<InstructionId>>,
 }
 
-/// The information of Liveness Analysis.
+/// Information of Liveness Analysis.
 /// See also [liveness analysis](../liveness/struct.IRLivenessAnalyzer.html#method.analyze) to know how it's used.
 #[derive(Clone, Debug)]
 pub struct LivenessInfo {
@@ -61,6 +63,7 @@ impl BasicBlocks {
         Self {
             arena: Arena::new(),
             order: vec![],
+            liveness: FxHashMap::default(),
         }
     }
 
@@ -68,7 +71,7 @@ impl BasicBlocks {
     pub fn merge(&mut self, dst: &BasicBlockId, src: &BasicBlockId) {
         let src_block = ::std::mem::replace(&mut self.arena[*src], BasicBlock::new());
         let BasicBlock {
-            liveness: src_liveness,
+            // liveness: src_liveness,
             succ: src_succ,
             iseq: src_iseq,
             ..
@@ -83,10 +86,10 @@ impl BasicBlocks {
             .iseq
             .borrow_mut()
             .append(&mut src_iseq.borrow_mut());
-        dst_block
-            .liveness
-            .borrow_mut()
-            .merge(src_liveness.into_inner());
+        // dst_block
+        //     .liveness
+        //     .borrow_mut()
+        //     .merge(src_liveness.into_inner());
         self.order.retain(|bb| bb != src);
     }
 }
@@ -109,7 +112,7 @@ impl BasicBlock {
             iseq: RefCell::new(Vec::new()),
             pred: FxHashSet::default(),
             succ: FxHashSet::default(),
-            liveness: RefCell::new(LivenessInfo::new()),
+            // liveness: RefCell::new(LivenessInfo::new()),
         }
     }
 

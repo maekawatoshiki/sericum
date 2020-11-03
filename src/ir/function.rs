@@ -274,8 +274,13 @@ impl BasicBlocks {
     fn dump(&self, module: &Module, f: &Function) -> String {
         self.order.iter().fold("".to_string(), |s, &id| {
             let b = &self.arena[id];
+            // let liveness = &self
+            //     .liveness
+            //     .get(&id)
+            //     .unwrap_or_else(|| &LivenessInfo::new());
             format!(
-                "{}label.{}:\t// pred({}), succ({}), def({}), in({}), out({})\n{}\n",
+                // "{}label.{}:\t// pred({}), succ({}), def({}), in({}), out({})\n{}\n",
+                "{}label.{}:\t// pred({}), succ({})\n{}\n",
                 s,
                 id.index(),
                 &b.pred
@@ -286,24 +291,21 @@ impl BasicBlocks {
                     .iter()
                     .fold("".to_string(), |s, x| format!("{}{},", s, x.index()))
                     .trim_matches(','),
-                &b.liveness
-                    .borrow()
-                    .def
-                    .iter()
-                    .fold("".to_string(), |s, x| format!("{}{},", s, x.index()))
-                    .trim_matches(','),
-                &b.liveness
-                    .borrow()
-                    .live_in
-                    .iter()
-                    .fold("".to_string(), |s, x| format!("{}{},", s, x.index()))
-                    .trim_matches(','),
-                &b.liveness
-                    .borrow()
-                    .live_out
-                    .iter()
-                    .fold("".to_string(), |s, x| format!("{}{},", s, x.index()))
-                    .trim_matches(','),
+                // &liveness
+                //     .def
+                //     .iter()
+                //     .fold("".to_string(), |s, x| format!("{}{},", s, x.index()))
+                //     .trim_matches(','),
+                // &liveness
+                //     .live_in
+                //     .iter()
+                //     .fold("".to_string(), |s, x| format!("{}{},", s, x.index()))
+                //     .trim_matches(','),
+                // &liveness
+                //     .live_out
+                //     .iter()
+                //     .fold("".to_string(), |s, x| format!("{}{},", s, x.index()))
+                //     .trim_matches(','),
                 b.dump2(module, f)
             )
         })
