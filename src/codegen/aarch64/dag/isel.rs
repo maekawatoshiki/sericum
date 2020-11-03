@@ -4,6 +4,7 @@ use crate::codegen::common::dag::{
     function::{DAGFunction, DAGHeap},
     module::DAGModule,
 };
+use crate::codegen::common::types::MVType;
 use crate::{ir::types::*, traits::pass::ModulePassTrait, util::allocator::*};
 use defs::isel_pat;
 use rustc_hash::FxHashMap;

@@ -92,7 +92,7 @@ impl Parse for InstPattern {
     fn parse(input: ParseStream) -> Result<Self, Error> {
         let group = input.parse::<Group>()?;
         let inst: InstBase = syn::parse2(group.stream())?;
-        let ty = parse_type(input)?;
+        let ty = parse_mvtype(input)?;
         // let if_ = parse_if(input)?;
         let parent = parse_parent(input)?;
         let body = parse_pattern(input)?;
@@ -109,7 +109,7 @@ impl Parse for InstPattern {
 impl Parse for OperandPattern {
     fn parse(input: ParseStream) -> Result<Self, Error> {
         let name = input.parse::<Ident>()?.to_string();
-        let ty = parse_type(input)?;
+        let ty = parse_mvtype(input)?;
         let parent = parse_parent(input)?;
         let if_ = parse_if(input)?;
         let body = parse_pattern(input)?;
@@ -226,6 +226,15 @@ fn parse_type(input: ParseStream) -> Result<Option<TS>, Error> {
     }))
 }
 
+fn parse_mvtype(input: ParseStream) -> Result<Option<TS>, Error> {
+    if !input.peek(Token![:]) {
+        return Ok(None);
+    }
+    assert!(input.parse::<Token![:]>().is_ok());
+    let ty: Ident = input.parse()?;
+    Ok(Some(quote! { MVType::#ty }))
+}
+
 fn parse_if(input: ParseStream) -> Result<Option<TS>, Error> {
     if !input.peek(Token![if]) {
         return Ok(None);
@@ -295,7 +304,7 @@ impl PatternMatchConstructible for InstPattern {
             }
         }
         if let Some(ty) = &self.ty {
-            quote! { if #parent.kind == #inst && matches!(#parent.ty, #ty) {
+            quote! { if #parent.kind == #inst && matches!(#parent.mvty, #ty) {
                 #def_operands
                 #body
             }}

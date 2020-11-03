@@ -147,9 +147,9 @@ impl MISelector {
                 GR32 a {
                     imm8 b => (mi.SHLr32i8 a, b) }
             }
-            (ir.SIToFP x): f64 { GR32 x => (mi.CVTSI2SDrr32 x) }
-            (ir.FPToSI x): i32 { XMM x => (mi.CVTTSD2SIr32r x) }
-            (ir.Sext x): i32 { GR8 x => (mi.MOVSXr32r8 x) }
+            (ir.SIToFP x): f64  { GR32 x => (mi.CVTSI2SDrr32 x) }
+            (ir.FPToSI x): i32  { XMM x => (mi.CVTTSD2SIr32r x) }
+            (ir.Sext x): i32    { GR8 x => (mi.MOVSXr32r8 x) }
             (ir.Load a): i8     { (ir.FIAddr     b) a => (mi.MOVrm8  [BaseFi %rbp, b])
                                                GR64 a => (mi.MOVrm8  [Base a]) }
             (ir.Load a): i64    { (ir.FIAddr     b) a => (mi.MOVrm64 [BaseFi %rbp, b])
@@ -159,8 +159,6 @@ impl MISelector {
                                                  GR64 a => (mi.MOVrm32 [Base a]) }
             (ir.Load a): f64      { (ir.FIAddr     b) a => (mi.MOVSDrm [BaseFi %rbp, b])
                                                  GR64 a => (mi.MOVSDrm [Base a]) }
-            (ir.Load a): Pointer! { (ir.FIAddr     b) a => (mi.MOVrm64 [BaseFi %rbp, b])
-                                                 GR64 a => (mi.MOVrm64 [Base a]) }
             (ir.Store a, b) {
                 (ir.FIAddr c) a {
                     f64mem c {

@@ -247,6 +247,17 @@ impl DAGNode {
         }
     }
 
+    pub fn new_simple(kind: NodeKind, operand: Vec<Raw<DAGNode>>) -> Self {
+        Self {
+            kind,
+            operand,
+            next: None,
+            chain: None,
+            ty: Type::Void,
+            mvty: MVType::Invalid,
+        }
+    }
+
     pub fn new_none() -> Self {
         Self {
             kind: NodeKind::None,
