@@ -1,5 +1,5 @@
 use crate::codegen::arch::machine::{inst::*, register::*};
-use crate::codegen::common::machine::{basic_block::*, function::*, module::*};
+use crate::codegen::common::machine::{basic_block::*, function::*};
 use crate::util::allocator::{Raw, RawAllocator};
 use rustc_hash::FxHashMap;
 use std::cmp::Ordering;
@@ -756,47 +756,59 @@ impl LivenessAnalysis {
         Self {}
     }
 
-    pub fn analyze_module(&mut self, module: &MachineModule) {
-        for (_, func) in &module.functions {
-            self.analyze_function(func);
-        }
-    }
+    // pub fn analyze_module(&mut self, module: &mut MachineModule) {
+    //     for (_, func) in &module.functions {
+    //         self.analyze_function(func);
+    //     }
+    // }
 
-    pub fn analyze_function(&mut self, cur_func: &MachineFunction) -> LiveRegMatrix {
-        self.clear_liveness_info(cur_func);
-        self.set_def(cur_func);
-        self.visit(cur_func);
+    pub fn analyze_function(&mut self, cur_func: &mut MachineFunction) -> LiveRegMatrix {
+        // self.clear_liveness_info(cur_func);
+        let mut liveness = FxHashMap::default();
+        self.set_def(cur_func, &mut liveness);
+        self.visit(cur_func, &mut liveness);
+        cur_func.body.basic_blocks.liveness = liveness;
         self.construct_live_reg_matrix(cur_func)
     }
 
-    fn clear_liveness_info(&mut self, cur_func: &MachineFunction) {
-        for (_, bb) in &cur_func.body.basic_blocks.arena {
-            bb.liveness_ref_mut().clear();
-        }
-    }
+    // fn clear_liveness_info(&mut self, cur_func: &MachineFunction) {
+    //     for (_, bb) in &cur_func.body.basic_blocks.arena {
+    //         bb.liveness_ref_mut().clear();
+    //     }
+    // }
 
-    fn set_def(&mut self, cur_func: &MachineFunction) {
-        for (_, bb, iiter) in cur_func.body.mbb_iter() {
+    fn set_def(
+        &mut self,
+        cur_func: &MachineFunction,
+        liveness: &mut FxHashMap<MachineBasicBlockId, LivenessInfo>,
+    ) {
+        for (id, _, iiter) in cur_func.body.mbb_iter() {
+            let mut l = LivenessInfo::new();
             for (_, inst) in iiter {
-                self.set_def_on_inst(bb, inst);
+                self.set_def_on_inst(&mut l, inst);
             }
+            liveness.insert(id, l);
         }
     }
 
-    fn set_def_on_inst(&mut self, bb: &MachineBasicBlock, inst: &MachineInst) {
-        bb.liveness_ref_mut().has_call |= inst.opcode == MachineOpcode::CALL;
+    fn set_def_on_inst(&mut self, liveness: &mut LivenessInfo, inst: &MachineInst) {
+        liveness.has_call |= inst.opcode == MachineOpcode::CALL;
         for &reg in &inst.def {
-            bb.liveness.borrow_mut().add_def(reg.id);
+            liveness.add_def(reg.id);
         }
         for &reg in &inst.imp_def {
-            bb.liveness.borrow_mut().add_def(reg.id);
+            liveness.add_def(reg.id);
         }
     }
 
-    fn visit(&mut self, cur_func: &MachineFunction) {
+    fn visit(
+        &mut self,
+        cur_func: &MachineFunction,
+        liveness: &mut FxHashMap<MachineBasicBlockId, LivenessInfo>,
+    ) {
         for (bb_id, _, iiter) in cur_func.body.mbb_iter() {
             for (_, inst) in iiter {
-                self.visit_inst(cur_func, bb_id, inst);
+                self.visit_inst(cur_func, bb_id, inst, liveness);
             }
         }
     }
@@ -806,36 +818,42 @@ impl LivenessAnalysis {
         cur_func: &MachineFunction,
         bb: MachineBasicBlockId,
         inst: &MachineInst,
+        liveness: &mut FxHashMap<MachineBasicBlockId, LivenessInfo>,
     ) {
         for operand in &inst.operand {
             // live_in and live_out should contain no assigned(physical) registers
             for r in operand.registers() {
-                self.propagate(cur_func, bb, r.id);
+                self.propagate(cur_func, bb, r.id, liveness);
             }
         }
     }
 
-    fn propagate(&self, cur_func: &MachineFunction, bb: MachineBasicBlockId, reg: RegisterId) {
-        let bb = &cur_func.body.basic_blocks.arena[bb];
+    fn propagate(
+        &self,
+        cur_func: &MachineFunction,
+        bb_id: MachineBasicBlockId,
+        reg: RegisterId,
+        liveness: &mut FxHashMap<MachineBasicBlockId, LivenessInfo>,
+    ) {
+        let bb = &cur_func.body.basic_blocks.arena[bb_id];
 
         {
-            let mut bb_liveness = bb.liveness.borrow_mut();
+            let liveness = liveness.get_mut(&bb_id).unwrap();
 
-            if bb_liveness.def.contains(&reg) {
+            if liveness.def.contains(&reg) {
                 return;
             }
 
-            if !bb_liveness.add_live_in(reg) {
+            if !liveness.add_live_in(reg) {
                 // live_in already had the reg
                 return;
             }
         }
 
         for pred_id in &bb.pred {
-            let pred = &cur_func.body.basic_blocks.arena[*pred_id];
-            if pred.liveness.borrow_mut().add_live_out(reg) {
+            if liveness.get_mut(pred_id).unwrap().add_live_out(reg) {
                 // live_out didn't have the reg
-                self.propagate(cur_func, *pred_id, reg);
+                self.propagate(cur_func, *pred_id, reg, liveness);
             }
         }
     }
@@ -855,9 +873,9 @@ impl LivenessAnalysis {
 
         // completely ignore callee saved registers
 
-        for (_, bb, iiter) in cur_func.body.mbb_iter() {
+        for (id, _, iiter) in cur_func.body.mbb_iter() {
             let mut index = 0;
-            let liveness = bb.liveness_ref();
+            let liveness = &cur_func.body.basic_blocks.liveness[&id];
 
             #[rustfmt::skip]
             macro_rules! cur_pp { () => {{

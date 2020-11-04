@@ -62,8 +62,12 @@ impl<'a> Spiller<'a> {
                     .add(new_reg.as_virt_reg(), LiveRange::new_empty())
                     .is_spillable = false;
                 def_inst.set_def(&self.func.regs_info, RegisterOperand::new(new_reg));
-                self.func.body.basic_blocks.arena[def_inst.parent]
-                    .liveness_ref_mut()
+                self.func
+                    .body
+                    .basic_blocks
+                    .liveness
+                    .get_mut(&def_inst.parent)
+                    .unwrap()
                     .add_def(new_reg);
 
                 let start = self.matrix.get_program_point(def_id).unwrap();
@@ -136,8 +140,12 @@ impl<'a> Spiller<'a> {
             )
             .with_def(vec![RegisterOperand::new(new_reg)]);
 
-            self.func.body.basic_blocks.arena[parent]
-                .liveness_ref_mut()
+            self.func
+                .body
+                .basic_blocks
+                .liveness
+                .get_mut(&parent)
+                .unwrap()
                 .add_def(new_reg);
 
             {

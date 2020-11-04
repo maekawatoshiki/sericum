@@ -45,14 +45,14 @@ impl<'a> LiveIntervalSplitter<'a> {
             new_reg: RegisterId,
             start: MachineBasicBlockId,
             bb_id: MachineBasicBlockId,
-            bbs: &MachineBasicBlocks,
+            bbs: &mut MachineBasicBlocks,
             ss: &mut FxHashSet<MachineBasicBlockId>,
         ) {
             let bb = &bbs.arena[bb_id];
             if !ss.insert(bb_id) {
                 return;
             }
-            let liveness = &mut bb.liveness_ref_mut();
+            let liveness = bbs.liveness.get_mut(&bb_id).unwrap();
             let live_in_removed = bb_id != start && liveness.live_in.remove(reg);
             let live_out_removed = liveness.live_out.remove(reg);
             if live_in_removed {
@@ -65,8 +65,8 @@ impl<'a> LiveIntervalSplitter<'a> {
             if !updated {
                 return;
             }
-            for s in &bb.succ {
-                update_live_info(reg, new_reg, start, *s, bbs, ss);
+            for s in bb.succ.clone() {
+                update_live_info(reg, new_reg, start, s, bbs, ss);
             }
         }
 
@@ -159,7 +159,7 @@ impl<'a> LiveIntervalSplitter<'a> {
             new_reg,
             parent,
             parent,
-            &self.func.body.basic_blocks,
+            &mut self.func.body.basic_blocks,
             &mut s,
         );
 
@@ -179,7 +179,13 @@ impl<'a> LiveIntervalSplitter<'a> {
             LiveRange::new(vec![LiveSegment::new(load_pp, new_reg_end_point)]),
         );
         {
-            let liveness = &mut *self.func.body.basic_blocks.arena[parent].liveness_ref_mut();
+            let liveness = self
+                .func
+                .body
+                .basic_blocks
+                .liveness
+                .get_mut(&parent)
+                .unwrap();
             liveness.add_def(new_reg);
         }
 

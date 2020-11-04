@@ -65,7 +65,7 @@ pub fn coalesce_function(matrix: &mut LiveRegMatrix, f: &mut MachineFunction) {
         {
             let can_eliminate_copy =
                 !matrix.interferes(copy_src.id.as_virt_reg(), copy_dst.id.as_phys_reg()) && {
-                    let l = &f.body.basic_blocks.arena[copy.parent].liveness_ref();
+                    let l = &f.body.basic_blocks.liveness[&copy.parent];
                     !l.live_in.contains(&copy_src.id) && !l.live_out.contains(&copy_src.id)
                 };
             if !can_eliminate_copy {
@@ -88,8 +88,7 @@ pub fn coalesce_function(matrix: &mut LiveRegMatrix, f: &mut MachineFunction) {
             let can_eliminate_copy = no_tied_use(f, &copy_dst.id)
                 && !matrix.interferes(copy_dst.id.as_virt_reg(), copy_src.id.as_phys_reg())
                 && {
-                    let bb = &f.body.basic_blocks.arena[copy.parent];
-                    let l = &bb.liveness_ref();
+                    let l = &f.body.basic_blocks.liveness[&copy.parent];
                     !l.live_in.contains(&copy_dst.id) && !l.live_out.contains(&copy_dst.id)
                 };
             if !can_eliminate_copy {
@@ -115,8 +114,7 @@ pub fn coalesce_function(matrix: &mut LiveRegMatrix, f: &mut MachineFunction) {
                 && no_tied_use(f, &copy_dst.id)
                 && no_tied_use(f, &copy_src.id)
                 && {
-                    let bb = &f.body.basic_blocks.arena[copy.parent];
-                    let l = &bb.liveness_ref();
+                    let l = &f.body.basic_blocks.liveness[&copy.parent];
                     !l.live_in.contains(&copy_dst.id)
                         && !l.live_out.contains(&copy_dst.id)
                         && !l.live_in.contains(&copy_src.id)
@@ -160,7 +158,12 @@ fn replace_regs(
         f.body.inst_arena[use_].replace_operand_register(&f.regs_info, from.id, to.id);
     }
     if f.regs_info.arena_ref()[from.id].defs.len() == 0 {
-        let bb = &f.body.basic_blocks.arena[parent];
-        bb.liveness_ref_mut().def.remove(&from.id);
+        f.body
+            .basic_blocks
+            .liveness
+            .get_mut(&parent)
+            .unwrap()
+            .def
+            .remove(&from.id);
     }
 }

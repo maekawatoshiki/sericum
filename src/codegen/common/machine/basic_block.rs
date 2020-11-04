@@ -5,11 +5,8 @@ use crate::codegen::arch::machine::register::{
 };
 use crate::traits::basic_block::*;
 use id_arena::*;
-use rustc_hash::FxHashSet;
-use std::{
-    cell::{Ref, RefCell, RefMut},
-    rc::Rc,
-};
+use rustc_hash::{FxHashMap, FxHashSet};
+use std::cell::{Ref, RefCell, RefMut};
 
 pub type MachineBasicBlockId = Id<MachineBasicBlock>;
 
@@ -17,13 +14,11 @@ pub type MachineBasicBlockId = Id<MachineBasicBlock>;
 pub struct MachineBasicBlocks {
     pub arena: Arena<MachineBasicBlock>,
     pub order: Vec<MachineBasicBlockId>,
+    pub liveness: FxHashMap<MachineBasicBlockId, LivenessInfo>,
 }
 
 #[derive(Clone, Debug)]
 pub struct MachineBasicBlock {
-    /// Information for liveness analysis
-    pub liveness: Rc<RefCell<LivenessInfo>>,
-
     /// Predecessors
     pub pred: FxHashSet<MachineBasicBlockId>,
 
@@ -70,6 +65,7 @@ impl MachineBasicBlocks {
         Self {
             arena: Arena::new(),
             order: vec![],
+            liveness: FxHashMap::default(),
         }
     }
 
@@ -79,8 +75,8 @@ impl MachineBasicBlocks {
 
     pub fn get_def_phys_regs(&self) -> PhysRegSet {
         let mut set = PhysRegSet::new();
-        for (_id, block) in self.id_and_block() {
-            set = set | block.liveness_ref().phys_def.clone();
+        for (id, _) in self.id_and_block() {
+            set = set | self.liveness[&id].phys_def.clone();
         }
         set
     }
@@ -88,7 +84,6 @@ impl MachineBasicBlocks {
     pub fn merge(&mut self, dst: &MachineBasicBlockId, src: &MachineBasicBlockId) {
         let src_block = ::std::mem::replace(&mut self.arena[*src], MachineBasicBlock::new());
         let MachineBasicBlock {
-            liveness: src_liveness,
             succ: src_succ,
             iseq: src_iseq,
             ..
@@ -103,16 +98,14 @@ impl MachineBasicBlocks {
             .iseq
             .borrow_mut()
             .append(&mut src_iseq.borrow_mut());
-        dst_block
-            .liveness
-            .borrow_mut()
-            .merge(Rc::try_unwrap(src_liveness).unwrap().into_inner());
+        let src_liveness = self.liveness[src].clone();
+        self.liveness.get_mut(dst).unwrap().merge(src_liveness);
         self.order.retain(|bb| bb != src);
     }
 
     pub fn remove_reg_from_live_info(&mut self, r: &RegisterId) {
-        for (_, block) in self.id_and_block() {
-            let mut liveness_ref = block.liveness_ref_mut();
+        for id in &self.order {
+            let liveness_ref = self.liveness.get_mut(id).unwrap();
             liveness_ref.def.remove(&r);
             liveness_ref.live_in.remove(&r);
             liveness_ref.live_out.remove(&r);
@@ -126,7 +119,6 @@ impl MachineBasicBlock {
             iseq: RefCell::new(vec![]),
             pred: FxHashSet::default(),
             succ: FxHashSet::default(),
-            liveness: Rc::new(RefCell::new(LivenessInfo::new())),
         }
     }
 
@@ -144,14 +136,6 @@ impl MachineBasicBlock {
             .enumerate()
             .find(|(_, id)| *id == &id2find)
             .map(|(i, _)| i)
-    }
-
-    pub fn liveness_ref(&self) -> Ref<LivenessInfo> {
-        self.liveness.borrow()
-    }
-
-    pub fn liveness_ref_mut(&self) -> RefMut<LivenessInfo> {
-        self.liveness.borrow_mut()
     }
 }
 

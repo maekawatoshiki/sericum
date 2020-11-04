@@ -167,8 +167,9 @@ impl RegisterAllocator {
 
     pub fn rewrite_vregs(&mut self, cur_func: &mut MachineFunction, matrix: &LiveRegMatrix) {
         let mut arena = cur_func.regs_info.arena_ref_mut();
-        for (_id, bb) in cur_func.body.basic_blocks.id_and_block() {
-            let mut liveness = bb.liveness_ref_mut();
+        for &id in &cur_func.body.basic_blocks.order {
+            let bb = &cur_func.body.basic_blocks.arena[id];
+            let liveness = cur_func.body.basic_blocks.liveness.get_mut(&id).unwrap();
             for inst_id in &*bb.iseq_ref() {
                 let inst = &mut cur_func.body.inst_arena[*inst_id];
                 for reg in inst.collect_all_regs_mut() {
@@ -229,9 +230,8 @@ impl RegisterAllocator {
 
         // TODO: Slow. Any better algorithms?
         {
-            let bb_containing_call =
-                &cur_func.body.basic_blocks.arena[cur_func.body.inst_arena[call_inst_id].parent];
-            let liveness = bb_containing_call.liveness_ref();
+            let liveness = &cur_func.body.basic_blocks.liveness
+                [&cur_func.body.inst_arena[call_inst_id].parent];
             let mut regs_that_may_interfere = &liveness.def | &liveness.live_in;
             // remove registers defined by call like rbp, rsp, rax...
             for def in cur_func.body.inst_arena[call_inst_id]

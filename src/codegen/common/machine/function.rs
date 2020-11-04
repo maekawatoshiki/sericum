@@ -76,13 +76,13 @@ impl MachineFunctionBody {
     pub fn has_call(&self) -> bool {
         self.basic_blocks
             .id_and_block()
-            .any(|(_, block)| block.liveness_ref().has_call)
+            .any(|(id, _)| self.basic_blocks.liveness[&id].has_call)
     }
 
     pub fn appeared_phys_regs(&self) -> PhysRegSet {
         let mut set = PhysRegSet::new();
-        for (_, block) in self.basic_blocks.id_and_block() {
-            set.unite(&block.liveness_ref().phys_def);
+        for (id, _) in self.basic_blocks.id_and_block() {
+            set.unite(&self.basic_blocks.liveness[&id].phys_def);
         }
         set
     }

@@ -153,12 +153,12 @@ impl MISelector {
             (ir.Load a): i8     { (ir.FIAddr     b) a => (mi.MOVrm8  [BaseFi %rbp, b])
                                                GR64 a => (mi.MOVrm8  [Base a]) }
             (ir.Load a): i64    { (ir.FIAddr     b) a => (mi.MOVrm64 [BaseFi %rbp, b])
-                                                 GR64 a => (mi.MOVrm64 [Base a]) }
+                                               GR64 a => (mi.MOVrm64 [Base a]) }
             (ir.Load a): i32    { (ir.FIAddr     b) a => (mi.MOVrm32 [BaseFi %rbp, b])
-                                    (ir.GlobalAddr b) a => (mi.MOVrm32 [Address b])
-                                                 GR64 a => (mi.MOVrm32 [Base a]) }
-            (ir.Load a): f64      { (ir.FIAddr     b) a => (mi.MOVSDrm [BaseFi %rbp, b])
-                                                 GR64 a => (mi.MOVSDrm [Base a]) }
+                                  (ir.GlobalAddr b) a => (mi.MOVrm32 [Address b])
+                                               GR64 a => (mi.MOVrm32 [Base a]) }
+            (ir.Load a): f64    { (ir.FIAddr     b) a => (mi.MOVSDrm [BaseFi %rbp, b])
+                                               GR64 a => (mi.MOVSDrm [Base a]) }
             (ir.Store a, b) {
                 (ir.FIAddr c) a {
                     f64mem c {
