@@ -16,12 +16,16 @@ use std::fmt;
 
 pub type NodeId = Id<Node>;
 
+pub type IROpcode = IRNodeKind;
+
+#[derive(Debug)]
 pub enum Node {
     IR(IRNode),
     MI(MINode),
     Operand(OperandNode),
 }
 
+#[derive(Debug)]
 pub struct IRNode {
     pub opcode: IROpcode,
     pub args: Vec<NodeId>,
@@ -31,6 +35,7 @@ pub struct IRNode {
     pub chain: Option<Raw<DAGNode>>,
 }
 
+#[derive(Debug)]
 pub struct MINode {
     pub opcode: MachineOpcode,
     pub args: Vec<NodeId>,
@@ -38,29 +43,86 @@ pub struct MINode {
     pub chain: Option<Raw<DAGNode>>,
 }
 
-#[derive(PartialEq, Eq)]
+#[derive(Debug, PartialEq)]
 pub enum OperandNode {
-    Immediate,
+    Immediate(ImmediateKind),
     Reg,
     // Cond(CondKind),
 }
 
-pub enum Node2<'a> {
-    IR(IRNode2<'a>),
-    MI(MINode2<'a>),
-    Operand(OperandNode),
+#[derive(Debug, Clone, PartialEq, Copy)]
+pub enum ImmediateKind {
+    Int8(i8),
+    Int32(i32),
+    Int64(i64),
+    F64(f64),
 }
 
-pub type IROpcode = IRNodeKind;
+impl Node {
+    pub fn as_operand(&self) -> &OperandNode {
+        match self {
+            Node::Operand(x) => x,
+            _ => panic!(),
+        }
+    }
 
-pub struct IRNode2<'a> {
-    pub opcode: IROpcode,
-    pub args: Vec<&'a Node2<'a>>,
+    pub fn as_i32(&self) -> i32 {
+        self.as_operand().as_imm().as_i32()
+    }
 }
 
-pub struct MINode2<'a> {
-    pub opcode: MachineOpcode,
-    pub args: Vec<&'a Node2<'a>>,
+impl IRNode {
+    pub fn new(opcode: IROpcode) -> Self {
+        Self {
+            opcode,
+            args: vec![],
+            ty: Type::Void,
+            mvty: MVType::Void,
+            next: None,
+            chain: None,
+        }
+    }
+
+    pub fn args(mut self, args: Vec<NodeId>) -> Self {
+        self.args = args;
+        self
+    }
+
+    pub fn ty(mut self, ty: Type) -> Self {
+        self.ty = ty;
+        self.mvty = ty.into();
+        self
+    }
+}
+
+impl OperandNode {
+    pub fn as_imm(&self) -> &ImmediateKind {
+        match self {
+            Self::Immediate(x) => x,
+            _ => panic!(),
+        }
+    }
+}
+
+impl ImmediateKind {
+    pub fn as_i32(&self) -> i32 {
+        match self {
+            Self::Int32(x) => *x,
+            _ => panic!(),
+        }
+    }
+}
+
+impl Into<Node> for i32 {
+    fn into(self) -> Node {
+        Node::Operand(OperandNode::Immediate(ImmediateKind::Int32(self)))
+    }
+}
+
+impl Into<Node> for IRNode {
+    fn into(self) -> Node {
+        Node::IR(self)
+    }
 }
 
 //////////

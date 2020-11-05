@@ -97,7 +97,7 @@ impl Combine {
             return self.combine_node(replace, heap, node.operand[0]);
         }
 
-        // ((node + C1) + C2) -> (node + (C1 + C2))
+        // ((node + C1) + C2) -> (node + C3)
         if node.operand[0].is_operation()
             && node.operand[0].kind == NodeKind::IR(IRNodeKind::Add)
             && !node.operand[0].operand[0].is_constant()
