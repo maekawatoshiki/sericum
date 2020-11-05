@@ -5,3 +5,4 @@ pub mod function;
 pub mod mc_convert;
 pub mod module;
 pub mod node;
+pub mod pat_match;

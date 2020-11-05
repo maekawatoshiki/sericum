@@ -12,7 +12,58 @@ use id_arena::*;
 use rustc_hash::FxHashMap;
 use std::fmt;
 
-pub type DAGNodeId = Id<DAGNode>;
+//////////
+
+pub type NodeId = Id<Node>;
+
+pub enum Node {
+    IR(IRNode),
+    MI(MINode),
+    Operand(OperandNode),
+}
+
+pub struct IRNode {
+    pub opcode: IROpcode,
+    pub args: Vec<NodeId>,
+    pub ty: Type,
+    pub mvty: MVType,
+    pub next: Option<Raw<DAGNode>>,
+    pub chain: Option<Raw<DAGNode>>,
+}
+
+pub struct MINode {
+    pub opcode: MachineOpcode,
+    pub args: Vec<NodeId>,
+    pub next: Option<Raw<DAGNode>>,
+    pub chain: Option<Raw<DAGNode>>,
+}
+
+#[derive(PartialEq, Eq)]
+pub enum OperandNode {
+    Immediate,
+    Reg,
+    // Cond(CondKind),
+}
+
+pub enum Node2<'a> {
+    IR(IRNode2<'a>),
+    MI(MINode2<'a>),
+    Operand(OperandNode),
+}
+
+pub type IROpcode = IRNodeKind;
+
+pub struct IRNode2<'a> {
+    pub opcode: IROpcode,
+    pub args: Vec<&'a Node2<'a>>,
+}
+
+pub struct MINode2<'a> {
+    pub opcode: MachineOpcode,
+    pub args: Vec<&'a Node2<'a>>,
+}
+
+//////////
 
 #[derive(Debug, Clone)]
 pub struct DAGNode {
@@ -48,7 +99,7 @@ pub enum OperandNodeKind {
     Mem(MemNodeKind),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Copy)]
 pub enum IRNodeKind {
     Entry,
     Root,
