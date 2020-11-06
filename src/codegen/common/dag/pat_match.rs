@@ -3,6 +3,7 @@ use crate::codegen::common::types::MVType;
 use crate::ir::types::Type;
 use id_arena::{Arena, Id};
 use rustc_hash::FxHashMap;
+use std::ops::BitOr;
 
 pub struct InstPatternMatcherOnFunction<'a> {
     func: &'a mut DAGFunction,
@@ -12,7 +13,7 @@ enum Pat {
     IR(IRPat),
     MI,
     Operand(OperandPat),
-    Compound,
+    Compound(CompoundPat),
     Invalid,
 }
 
@@ -33,6 +34,11 @@ struct OperandPat {
     pub name: &'static str,
     pub kind: OperandKind,
     pub not: bool,
+}
+
+struct CompoundPat {
+    pub name: &'static str,
+    pub pats: Vec<Pat>,
 }
 
 #[derive(PartialEq, Eq)]
@@ -112,6 +118,13 @@ impl OperandPat {
     }
 }
 
+impl CompoundPat {
+    fn named(mut self, name: &'static str) -> Self {
+        self.name = name;
+        self
+    }
+}
+
 const fn not() -> OperandPat {
     OperandPat {
         name: "",
@@ -156,6 +169,36 @@ impl Into<Pat> for OperandPat {
     }
 }
 
+impl Into<Pat> for CompoundPat {
+    fn into(self) -> Pat {
+        Pat::Compound(self)
+    }
+}
+
+impl BitOr for IRPat {
+    type Output = CompoundPat;
+
+    fn bitor(self, rhs: Self) -> Self::Output {
+        CompoundPat {
+            name: "",
+            pats: vec![self.into(), rhs.into()],
+        }
+    }
+}
+
+impl BitOr for OperandPat {
+    type Output = CompoundPat;
+
+    fn bitor(self, rhs: Self) -> Self::Output {
+        CompoundPat {
+            name: "",
+            pats: vec![self.into(), rhs.into()],
+        }
+    }
+}
+
+// impl BitOr for IRPat {}
+
 // if node.operand[0].is_operation()
 //     && node.operand[0].kind == NodeKind::IR(IRNodeKind::Add)
 //     && !node.operand[0].operand[0].is_constant()
@@ -171,7 +214,7 @@ fn xxx() {
         2,
     ))));
     let imm2 = arena.alloc(Node::Operand(OperandNode::Immediate(ImmediateKind::Int32(
-        3,
+        5,
     ))));
     let add1 = arena.alloc(Node::IR(IRNode {
         opcode: IROpcode::Add,
@@ -191,7 +234,7 @@ fn xxx() {
     }));
     let node = add2;
 
-    // ( (X + C1) + C2 ) => (X + C3)
+    // ((X + C) + (3|5)) => (X + (C+3|C+5))
     let pat: Pat = ir(IROpcode::Add)
         .args(vec![
             ir(IROpcode::Add)
@@ -200,7 +243,7 @@ fn xxx() {
                     any_i32_immediate().named("d").into(),
                 ])
                 .into(),
-            i32_immediate(3).named("e").into(),
+            (i32_immediate(3) | i32_immediate(5)).named("e").into(),
         ])
         .generate(|m, a| {
             let lhs = m["c"];
@@ -243,7 +286,7 @@ fn try_match(arena: &Arena<Node>, id: NodeId, pat: &Pat, m: &mut NameMap) -> Opt
         Pat::IR(pat) => return pat.generate.clone(),
         Pat::MI => {}
         Pat::Operand(_) => {}
-        Pat::Compound => todo!(),
+        Pat::Compound(_) => todo!(),
         Pat::Invalid => panic!(),
     }
 
@@ -297,7 +340,13 @@ fn matches(arena: &Arena<Node>, id: NodeId, pat: &Pat, m: &mut NameMap) -> bool 
             }
             matches_
         }
-        Pat::Compound => todo!(),
+        Pat::Compound(pat) => {
+            let matches_ = pat.pats.iter().any(|pat| matches(arena, id, pat, m));
+            if matches_ && !pat.name.is_empty() {
+                m.insert(pat.name, id);
+            }
+            matches_
+        }
         Pat::Invalid => panic!(),
     }
 }
