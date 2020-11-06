@@ -25,16 +25,6 @@ macro_rules! debug {
     };
 }
 
-macro_rules! matches {
-    ($e:expr, $($p:pat)|*) => {
-        #[allow(unreachable_patterns)]
-        match $e {
-            $($p)|* => true,
-            _ => false,
-        }
-    };
-}
-
 #[macro_export]
 macro_rules! sericum_parse_ty {
     ($_:expr, i8) => {

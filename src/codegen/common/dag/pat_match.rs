@@ -12,6 +12,7 @@ enum Pat {
     IR(IRPat),
     MI,
     Operand(OperandPat),
+    Compound,
     Invalid,
 }
 
@@ -36,15 +37,32 @@ struct OperandPat {
 
 #[derive(PartialEq, Eq)]
 enum OperandKind {
-    Immediate,
+    Immediate(Immediate),
     Reg,
     Invalid,
+}
+
+#[derive(PartialEq, Eq)]
+enum Immediate {
+    AnyInt32,
+    Int32(i32),
+    Any,
 }
 
 const fn ir_node() -> IRPat {
     IRPat {
         name: "",
         opcode: None,
+        operands: vec![],
+        ty: Type::Void,
+        generate: None,
+    }
+}
+
+const fn ir(opcode: IROpcode) -> IRPat {
+    IRPat {
+        name: "",
+        opcode: Some(opcode),
         operands: vec![],
         ty: Type::Void,
         generate: None,
@@ -84,7 +102,12 @@ impl OperandPat {
     }
 
     pub fn immediate(mut self) -> Self {
-        self.kind = OperandKind::Immediate;
+        self.kind = OperandKind::Immediate(Immediate::Any);
+        self
+    }
+
+    pub fn any_i32_immediate(mut self) -> Self {
+        self.kind = OperandKind::Immediate(Immediate::AnyInt32);
         self
     }
 }
@@ -100,7 +123,23 @@ const fn not() -> OperandPat {
 const fn immediate() -> OperandPat {
     OperandPat {
         name: "",
-        kind: OperandKind::Immediate,
+        kind: OperandKind::Immediate(Immediate::Any),
+        not: false,
+    }
+}
+
+const fn i32_immediate(i: i32) -> OperandPat {
+    OperandPat {
+        name: "",
+        kind: OperandKind::Immediate(Immediate::Int32(i)),
+        not: false,
+    }
+}
+
+const fn any_i32_immediate() -> OperandPat {
+    OperandPat {
+        name: "",
+        kind: OperandKind::Immediate(Immediate::AnyInt32),
         not: false,
     }
 }
@@ -152,17 +191,16 @@ fn xxx() {
     }));
     let node = add2;
 
-    let pat: Pat = ir_node()
-        .opcode(IROpcode::Add)
+    // ( (X + C1) + C2 ) => (X + C3)
+    let pat: Pat = ir(IROpcode::Add)
         .args(vec![
-            ir_node()
-                .opcode(IROpcode::Add)
+            ir(IROpcode::Add)
                 .args(vec![
-                    not().immediate().named("c").into(),
-                    immediate().named("d").into(),
+                    not().any_i32_immediate().named("c").into(),
+                    any_i32_immediate().named("d").into(),
                 ])
                 .into(),
-            immediate().named("e").into(),
+            i32_immediate(3).named("e").into(),
         ])
         .generate(|m, a| {
             let lhs = m["c"];
@@ -186,40 +224,6 @@ fn xxx() {
     panic!()
 }
 
-// impl Pat {
-//     fn opcode(
-// }
-
-// if node.
-// let node = arena[node_id];
-// if node.is_ir() {
-//     let node = node.as_ir();
-//     if node.args()[0].is_operation() {
-//         let node2 = arena[node.args()[0].operation_id()];
-//         if node2.opcode == Add
-//             && !node2.args()[0].is_constant()
-//             && node2.args()[1].is_constant()
-//         {}
-//     }
-// }
-
-// ir_node().opcode(Add).matcher(|m| {
-//     m.args(
-//         0,
-//         ir_node()
-//             .opcode(Add)
-//             .args(0, not_constant)
-//             .args(1, constant),
-//     )
-//     .into(|nodes| {
-//         let n1 = nodes[0];
-//         let n2 = nodes[1];
-//         Node::IR(IRNode{
-//             Add,
-//         })
-//     });
-//     m.args(0, ..);
-
 impl<'a> InstPatternMatcherOnFunction<'a> {
     pub fn new(func: &'a mut DAGFunction) -> Self {
         Self { func }
@@ -239,6 +243,7 @@ fn try_match(arena: &Arena<Node>, id: NodeId, pat: &Pat, m: &mut NameMap) -> Opt
         Pat::IR(pat) => return pat.generate.clone(),
         Pat::MI => {}
         Pat::Operand(_) => {}
+        Pat::Compound => todo!(),
         Pat::Invalid => panic!(),
     }
 
@@ -275,24 +280,24 @@ fn matches(arena: &Arena<Node>, id: NodeId, pat: &Pat, m: &mut NameMap) -> bool 
                 Node::Operand(op) => op,
                 _ => return false,
             };
-            let matches_ = if op.not {
-                match op.kind {
-                    OperandKind::Immediate => !matches!(n, &OperandNode::Immediate(_)),
-                    OperandKind::Reg => n != &OperandNode::Reg,
-                    OperandKind::Invalid => panic!(),
+            let matches_ = match op.kind {
+                OperandKind::Immediate(Immediate::AnyInt32) => {
+                    matches!(n, &OperandNode::Immediate(ImmediateKind::Int32(_)))
                 }
-            } else {
-                match op.kind {
-                    OperandKind::Immediate => matches!(n, &OperandNode::Immediate(_)),
-                    OperandKind::Reg => n == &OperandNode::Reg,
-                    OperandKind::Invalid => panic!(),
+                OperandKind::Immediate(Immediate::Int32(i)) => {
+                    matches!(n, &OperandNode::Immediate(ImmediateKind::Int32(x)) if x == i)
                 }
+                OperandKind::Immediate(Immediate::Any) => matches!(n, &OperandNode::Immediate(_)),
+                OperandKind::Reg => n == &OperandNode::Reg,
+                OperandKind::Invalid => panic!(),
             };
+            let matches_ = if op.not { !matches_ } else { matches_ };
             if matches_ && !op.name.is_empty() {
                 m.insert(op.name, id);
             }
             matches_
         }
+        Pat::Compound => todo!(),
         Pat::Invalid => panic!(),
     }
 }
