@@ -29,11 +29,11 @@ struct IRPat {
 
 struct MIPat {}
 
-#[derive(PartialEq, Eq)]
 struct OperandPat {
     pub name: &'static str,
     pub kind: OperandKind,
     pub not: bool,
+    pub generate: Option<Box<GenFn>>,
 }
 
 struct CompoundPat {
@@ -116,6 +116,11 @@ impl OperandPat {
         self.kind = OperandKind::Immediate(Immediate::AnyInt32);
         self
     }
+
+    fn generate(mut self, f: GenFn) -> Self {
+        self.generate = Some(Box::new(f));
+        self
+    }
 }
 
 impl CompoundPat {
@@ -130,6 +135,7 @@ const fn not() -> OperandPat {
         name: "",
         kind: OperandKind::Invalid,
         not: true,
+        generate: None,
     }
 }
 
@@ -138,6 +144,7 @@ const fn immediate() -> OperandPat {
         name: "",
         kind: OperandKind::Immediate(Immediate::Any),
         not: false,
+        generate: None,
     }
 }
 
@@ -146,6 +153,7 @@ const fn i32_immediate(i: i32) -> OperandPat {
         name: "",
         kind: OperandKind::Immediate(Immediate::Int32(i)),
         not: false,
+        generate: None,
     }
 }
 
@@ -154,6 +162,7 @@ const fn any_i32_immediate() -> OperandPat {
         name: "",
         kind: OperandKind::Immediate(Immediate::AnyInt32),
         not: false,
+        generate: None,
     }
 }
 
@@ -258,13 +267,42 @@ fn xxx() {
         })
         .into();
 
-    let mut map = NameMap::default();
-    if let Some(gen) = try_match(&arena, node, &pat, &mut map) {
-        let _id = gen(&map, &mut arena);
-        return;
-    }
+    // (C + X) => (X + C)
+    // let _: Pat = ir(IROpcode::Add)
+    //     .named("a")
+    //     .args(vec![
+    //         any_i32_immediate().into(),
+    //         not().any_i32_immediate().into(),
+    //     ])
+    //     .generate(|m, a| {
+    //         a.get_mut(m["a"]).unwrap().as_ir_mut().args.swap(0, 1);
+    //         m["a"]
+    //     })
+    //     .into();
 
-    panic!()
+    let pats = vec![
+        pat,
+        i32_immediate(7)
+            .named("E")
+            .generate(|m, a| a.alloc(OperandNode::i32(11).into()))
+            .into(),
+    ];
+
+    let new_node = inst_select(&mut ReplacedNodeMap::default(), &mut arena, node, &pats);
+
+    println!("{:#?}", arena);
+    println!("{:?}: {:?}", new_node, arena[new_node]);
+
+    // let mut map = NameMap::default();
+    // if let Some(gen) = try_match(&arena, node, &pat, &mut map) {
+    //     for (_, &id) in &map {
+    //         try_match(&arena, id, &pat, &mut NameMap::default());
+    //     }
+    //     let _id = gen(&map, &mut arena);
+    //     return;
+    // }
+
+    // panic!()
 }
 
 impl<'a> InstPatternMatcherOnFunction<'a> {
@@ -273,6 +311,51 @@ impl<'a> InstPatternMatcherOnFunction<'a> {
     }
 
     pub fn try_match(&self, list: Vec<i32>) -> () {}
+}
+
+type ReplacedNodeMap = FxHashMap<NodeId, NodeId>;
+
+fn inst_select(
+    replaced: &mut ReplacedNodeMap,
+    arena: &mut Arena<Node>,
+    id: NodeId,
+    pats: &[Pat],
+) -> NodeId {
+    if let Some(replaced) = replaced.get(&id) {
+        return *replaced;
+    }
+
+    let mut map = NameMap::default();
+    for pat in pats {
+        if let Some(gen) = try_match(&arena, id, &pat, &mut map) {
+            for (_, named_id) in &mut map {
+                if named_id == &id {
+                    continue;
+                }
+                *named_id = inst_select(replaced, arena, *named_id, pats);
+            }
+            let new_id = gen(&map, arena);
+            replaced.insert(id, new_id);
+            return inst_select(replaced, arena, new_id, pats);
+        }
+    }
+
+    // Operand selection
+    let args_id = match &arena[id] {
+        Node::IR(ir) => ir.args.clone(),
+        Node::MI(mi) => mi.args.clone(),
+        Node::Operand(_) => vec![],
+    };
+    let mut replaced_args = ReplacedNodeMap::default();
+    for id in args_id {
+        let new_id = inst_select(replaced, arena, id, pats);
+        replaced_args.insert(id, new_id);
+    }
+    // Actually replace args
+    for id in arena[id].args_mut() {
+        *id = replaced_args[id];
+    }
+    id
 }
 
 fn try_match(arena: &Arena<Node>, id: NodeId, pat: &Pat, m: &mut NameMap) -> Option<Box<GenFn>> {
@@ -285,7 +368,7 @@ fn try_match(arena: &Arena<Node>, id: NodeId, pat: &Pat, m: &mut NameMap) -> Opt
     match pat {
         Pat::IR(pat) => return pat.generate.clone(),
         Pat::MI => {}
-        Pat::Operand(_) => {}
+        Pat::Operand(pat) => return pat.generate.clone(),
         Pat::Compound(_) => todo!(),
         Pat::Invalid => panic!(),
     }

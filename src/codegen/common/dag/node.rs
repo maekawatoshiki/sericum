@@ -59,10 +59,32 @@ pub enum ImmediateKind {
 }
 
 impl Node {
+    pub fn as_ir(&self) -> &IRNode {
+        match self {
+            Node::IR(x) => x,
+            _ => panic!(),
+        }
+    }
+
+    pub fn as_ir_mut(&mut self) -> &mut IRNode {
+        match self {
+            Node::IR(x) => x,
+            _ => panic!(),
+        }
+    }
+
     pub fn as_operand(&self) -> &OperandNode {
         match self {
             Node::Operand(x) => x,
             _ => panic!(),
+        }
+    }
+
+    pub fn args_mut(&mut self) -> &mut [NodeId] {
+        match self {
+            Self::IR(ir) => &mut ir.args,
+            Self::MI(mi) => &mut mi.args,
+            Self::Operand(_) => &mut [],
         }
     }
 
@@ -96,6 +118,10 @@ impl IRNode {
 }
 
 impl OperandNode {
+    pub fn i32(i: i32) -> OperandNode {
+        Self::Immediate(ImmediateKind::Int32(i))
+    }
+
     pub fn as_imm(&self) -> &ImmediateKind {
         match self {
             Self::Immediate(x) => x,
@@ -122,6 +148,12 @@ impl Into<Node> for i32 {
 impl Into<Node> for IRNode {
     fn into(self) -> Node {
         Node::IR(self)
+    }
+}
+
+impl Into<Node> for OperandNode {
+    fn into(self) -> Node {
+        Node::Operand(self)
     }
 }
 
