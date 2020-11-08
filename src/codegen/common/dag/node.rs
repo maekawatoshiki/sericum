@@ -45,10 +45,21 @@ pub struct MINode {
 
 #[derive(Debug, PartialEq)]
 pub enum OperandNode {
-    Immediate(ImmediateKind),
-    Reg,
-    // Cond(CondKind),
+    Imm(ImmediateKind),
+    Reg(RegisterId),
+    Addr(AddressKind),
+    Slot(FrameIndexInfo), // TODO: FrameIndex will be named Slot
+    Block(DAGBasicBlockId),
+    Mem(MemNodeKind),
+    CC(CondKind),
 }
+// CondKind(CondKind),
+// FrameIndex(FrameIndexInfo), // TODO
+// Constant(ConstantKind),
+// Address(AddressKind),
+// BasicBlock(DAGBasicBlockId),
+// Register(RegisterId),
+// Mem(MemNodeKind),
 
 #[derive(Debug, Clone, PartialEq, Copy)]
 pub enum ImmediateKind {
@@ -119,12 +130,12 @@ impl IRNode {
 
 impl OperandNode {
     pub fn i32(i: i32) -> OperandNode {
-        Self::Immediate(ImmediateKind::Int32(i))
+        Self::Imm(ImmediateKind::Int32(i))
     }
 
     pub fn as_imm(&self) -> &ImmediateKind {
         match self {
-            Self::Immediate(x) => x,
+            Self::Imm(x) => x,
             _ => panic!(),
         }
     }
@@ -141,7 +152,7 @@ impl ImmediateKind {
 
 impl Into<Node> for i32 {
     fn into(self) -> Node {
-        Node::Operand(OperandNode::Immediate(ImmediateKind::Int32(self)))
+        Node::Operand(OperandNode::Imm(ImmediateKind::Int32(self)))
     }
 }
 

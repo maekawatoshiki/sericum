@@ -1,4 +1,6 @@
 use super::{function::DAGFunction, node::*};
+use crate::codegen::arch::machine::register::RegisterClassKind as RC;
+use crate::codegen::common::machine::register::RegistersInfo;
 use crate::codegen::common::types::MVType;
 use crate::ir::types::Type;
 use id_arena::{Arena, Id};
@@ -9,6 +11,11 @@ pub struct InstPatternMatcherOnFunction<'a> {
     func: &'a mut DAGFunction,
 }
 
+struct MatchContext<'a> {
+    arena: &'a mut Arena<Node>,
+    regs: &'a RegistersInfo,
+}
+
 enum Pat {
     IR(IRPat),
     MI,
@@ -17,7 +24,7 @@ enum Pat {
     Invalid,
 }
 
-type GenFn = fn(&FxHashMap<&'static str, NodeId>, &mut Arena<Node>) -> NodeId;
+type GenFn = fn(&FxHashMap<&'static str, NodeId>, &mut MatchContext) -> NodeId;
 
 struct IRPat {
     pub name: &'static str,
@@ -39,12 +46,12 @@ struct OperandPat {
 struct CompoundPat {
     pub name: &'static str,
     pub pats: Vec<Pat>,
+    pub generate: Option<Box<GenFn>>,
 }
 
-#[derive(PartialEq, Eq)]
 enum OperandKind {
-    Immediate(Immediate),
-    Reg,
+    Imm(Immediate),
+    Reg(Register),
     Invalid,
 }
 
@@ -53,6 +60,10 @@ enum Immediate {
     AnyInt32,
     Int32(i32),
     Any,
+}
+
+enum Register {
+    Class(RC),
 }
 
 const fn ir_node() -> IRPat {
@@ -107,13 +118,13 @@ impl OperandPat {
         self
     }
 
-    pub fn immediate(mut self) -> Self {
-        self.kind = OperandKind::Immediate(Immediate::Any);
+    pub fn imm(mut self) -> Self {
+        self.kind = OperandKind::Imm(Immediate::Any);
         self
     }
 
-    pub fn any_i32_immediate(mut self) -> Self {
-        self.kind = OperandKind::Immediate(Immediate::AnyInt32);
+    pub fn any_i32_imm(mut self) -> Self {
+        self.kind = OperandKind::Imm(Immediate::AnyInt32);
         self
     }
 
@@ -128,6 +139,11 @@ impl CompoundPat {
         self.name = name;
         self
     }
+
+    fn generate(mut self, f: GenFn) -> Self {
+        self.generate = Some(Box::new(f));
+        self
+    }
 }
 
 const fn not() -> OperandPat {
@@ -139,28 +155,37 @@ const fn not() -> OperandPat {
     }
 }
 
-const fn immediate() -> OperandPat {
+const fn imm() -> OperandPat {
     OperandPat {
         name: "",
-        kind: OperandKind::Immediate(Immediate::Any),
+        kind: OperandKind::Imm(Immediate::Any),
         not: false,
         generate: None,
     }
 }
 
-const fn i32_immediate(i: i32) -> OperandPat {
+const fn i32_imm(i: i32) -> OperandPat {
     OperandPat {
         name: "",
-        kind: OperandKind::Immediate(Immediate::Int32(i)),
+        kind: OperandKind::Imm(Immediate::Int32(i)),
         not: false,
         generate: None,
     }
 }
 
-const fn any_i32_immediate() -> OperandPat {
+const fn any_i32_imm() -> OperandPat {
     OperandPat {
         name: "",
-        kind: OperandKind::Immediate(Immediate::AnyInt32),
+        kind: OperandKind::Imm(Immediate::AnyInt32),
+        not: false,
+        generate: None,
+    }
+}
+
+const fn reg_class(rc: RC) -> OperandPat {
+    OperandPat {
+        name: "",
+        kind: OperandKind::Reg(Register::Class(rc)),
         not: false,
         generate: None,
     }
@@ -191,6 +216,7 @@ impl BitOr for IRPat {
         CompoundPat {
             name: "",
             pats: vec![self.into(), rhs.into()],
+            generate: None,
         }
     }
 }
@@ -202,6 +228,7 @@ impl BitOr for OperandPat {
         CompoundPat {
             name: "",
             pats: vec![self.into(), rhs.into()],
+            generate: None,
         }
     }
 }
@@ -218,47 +245,52 @@ impl BitOr for OperandPat {
 #[test]
 fn xxx() {
     let mut arena: Arena<Node> = Arena::new();
-    let reg = arena.alloc(Node::Operand(OperandNode::Reg));
-    let imm1 = arena.alloc(Node::Operand(OperandNode::Immediate(ImmediateKind::Int32(
-        2,
-    ))));
-    let imm2 = arena.alloc(Node::Operand(OperandNode::Immediate(ImmediateKind::Int32(
-        5,
-    ))));
-    let add1 = arena.alloc(Node::IR(IRNode {
-        opcode: IROpcode::Add,
-        args: vec![reg, imm1],
-        ty: Type::i32,
-        mvty: MVType::i32,
-        next: None,
-        chain: None,
-    }));
-    let add2 = arena.alloc(Node::IR(IRNode {
-        opcode: IROpcode::Add,
-        args: vec![add1, imm2],
-        ty: Type::i32,
-        mvty: MVType::i32,
-        next: None,
-        chain: None,
-    }));
-    let node = add2;
+    let mut regs = RegistersInfo::new();
+
+    // let reg = arena.alloc(Node::Operand(OperandNode::Reg(regs.new_virt_reg(RC::GR32))));
+    let imm1 = arena.alloc(Node::Operand(OperandNode::Imm(ImmediateKind::Int32(2))));
+    let imm2 = arena.alloc(Node::Operand(OperandNode::Imm(ImmediateKind::Int32(5))));
+    let node = arena.alloc(
+        IRNode::new(IROpcode::Sub)
+            .args(vec![imm1, imm2])
+            .ty(Type::i32)
+            .into(),
+    );
+    // let add1 = arena.alloc(Node::IR(IRNode {
+    //     opcode: IROpcode::Add,
+    //     args: vec![reg, imm1],
+    //     ty: Type::i32,
+    //     mvty: MVType::i32,
+    //     next: None,
+    //     chain: None,
+    // }));
+    // let add2 = arena.alloc(Node::IR(IRNode {
+    //     opcode: IROpcode::Add,
+    //     args: vec![add1, imm2],
+    //     ty: Type::i32,
+    //     mvty: MVType::i32,
+    //     next: None,
+    //     chain: None,
+    // }));
+    // let node = add2;
 
     // ((X + C) + (3|5)) => (X + (C+3|C+5))
     let pat: Pat = ir(IROpcode::Add)
         .args(vec![
             ir(IROpcode::Add)
                 .args(vec![
-                    not().any_i32_immediate().named("c").into(),
-                    any_i32_immediate().named("d").into(),
+                    reg_class(RC::GR32).named("c").into(),
+                    // not().any_i32_imm().named("c").into(),
+                    any_i32_imm().named("d").into(),
                 ])
                 .into(),
-            (i32_immediate(3) | i32_immediate(5)).named("e").into(),
+            (i32_imm(3) | i32_imm(5)).named("e").into(),
         ])
-        .generate(|m, a| {
+        .generate(|m, c| {
             let lhs = m["c"];
-            let rhs = a[m["d"]].as_i32() + a[m["e"]].as_i32();
-            let rhs = a.alloc(rhs.into());
-            a.alloc(
+            let rhs = c.arena[m["d"]].as_i32() + c.arena[m["e"]].as_i32();
+            let rhs = c.arena.alloc(rhs.into());
+            c.arena.alloc(
                 IRNode::new(IROpcode::Add)
                     .args(vec![lhs, rhs])
                     .ty(Type::i32)
@@ -267,28 +299,38 @@ fn xxx() {
         })
         .into();
 
-    // (C + X) => (X + C)
-    // let _: Pat = ir(IROpcode::Add)
-    //     .named("a")
-    //     .args(vec![
-    //         any_i32_immediate().into(),
-    //         not().any_i32_immediate().into(),
-    //     ])
-    //     .generate(|m, a| {
-    //         a.get_mut(m["a"]).unwrap().as_ir_mut().args.swap(0, 1);
-    //         m["a"]
-    //     })
-    //     .into();
+    let p: Pat = (ir(IROpcode::Add)
+        .args(vec![any_i32_imm().named("i").into(), any_i32_imm().into()])
+        | ir(IROpcode::Sub).args(vec![any_i32_imm().named("i").into(), any_i32_imm().into()]))
+    .named("x")
+    .generate(|m, c| {
+        let id = m["x"];
+        match c.arena[id].as_ir().opcode {
+            IROpcode::Add => m["i"],
+            IROpcode::Sub => m["i"],
+            _ => unreachable!(),
+        }
+    })
+    .into();
 
     let pats = vec![
         pat,
-        i32_immediate(7)
+        p,
+        i32_imm(7)
             .named("E")
-            .generate(|m, a| a.alloc(OperandNode::i32(11).into()))
+            .generate(|_, c| c.arena.alloc(OperandNode::i32(11).into()))
             .into(),
     ];
 
-    let new_node = inst_select(&mut ReplacedNodeMap::default(), &mut arena, node, &pats);
+    let new_node = inst_select(
+        &mut ReplacedNodeMap::default(),
+        &mut MatchContext {
+            arena: &mut arena,
+            regs: &regs,
+        },
+        node,
+        &pats,
+    );
 
     println!("{:#?}", arena);
     println!("{:?}: {:?}", new_node, arena[new_node]);
@@ -317,7 +359,7 @@ type ReplacedNodeMap = FxHashMap<NodeId, NodeId>;
 
 fn inst_select(
     replaced: &mut ReplacedNodeMap,
-    arena: &mut Arena<Node>,
+    ctx: &mut MatchContext,
     id: NodeId,
     pats: &[Pat],
 ) -> NodeId {
@@ -327,39 +369,50 @@ fn inst_select(
 
     let mut map = NameMap::default();
     for pat in pats {
-        if let Some(gen) = try_match(&arena, id, &pat, &mut map) {
+        if let Some(gen) = try_match(ctx, id, &pat, &mut map) {
             for (_, named_id) in &mut map {
+                // If current node (`id`) is named, `inst_select` infinitely recurses.
+                // To avoid it, do not `inst_select` current node.
                 if named_id == &id {
                     continue;
                 }
-                *named_id = inst_select(replaced, arena, *named_id, pats);
+                *named_id = inst_select(replaced, ctx, *named_id, pats);
             }
-            let new_id = gen(&map, arena);
+            let new_id = gen(&map, ctx);
             replaced.insert(id, new_id);
-            return inst_select(replaced, arena, new_id, pats);
+            return inst_select(replaced, ctx, new_id, pats);
         }
     }
 
-    // Operand selection
-    let args_id = match &arena[id] {
+    operand_select(replaced, ctx, id, pats);
+
+    id
+}
+
+fn operand_select(
+    replaced: &mut ReplacedNodeMap,
+    ctx: &mut MatchContext,
+    inst_id: NodeId,
+    pats: &[Pat],
+) {
+    let args_id = match &ctx.arena[inst_id] {
         Node::IR(ir) => ir.args.clone(),
         Node::MI(mi) => mi.args.clone(),
         Node::Operand(_) => vec![],
     };
     let mut replaced_args = ReplacedNodeMap::default();
     for id in args_id {
-        let new_id = inst_select(replaced, arena, id, pats);
+        let new_id = inst_select(replaced, ctx, id, pats);
         replaced_args.insert(id, new_id);
     }
     // Actually replace args
-    for id in arena[id].args_mut() {
+    for id in ctx.arena[inst_id].args_mut() {
         *id = replaced_args[id];
     }
-    id
 }
 
-fn try_match(arena: &Arena<Node>, id: NodeId, pat: &Pat, m: &mut NameMap) -> Option<Box<GenFn>> {
-    if !matches(arena, id, pat, m) {
+fn try_match(ctx: &mut MatchContext, id: NodeId, pat: &Pat, m: &mut NameMap) -> Option<Box<GenFn>> {
+    if !matches(ctx, id, pat, m) {
         return None;
     }
 
@@ -369,22 +422,19 @@ fn try_match(arena: &Arena<Node>, id: NodeId, pat: &Pat, m: &mut NameMap) -> Opt
         Pat::IR(pat) => return pat.generate.clone(),
         Pat::MI => {}
         Pat::Operand(pat) => return pat.generate.clone(),
-        Pat::Compound(_) => todo!(),
+        Pat::Compound(pat) => return pat.generate.clone(),
         Pat::Invalid => panic!(),
     }
 
     None
-
-    // arena[id]
-    // None
 }
 
 pub type NameMap = FxHashMap<&'static str, NodeId>;
 
-fn matches(arena: &Arena<Node>, id: NodeId, pat: &Pat, m: &mut NameMap) -> bool {
+fn matches(ctx: &MatchContext, id: NodeId, pat: &Pat, m: &mut NameMap) -> bool {
     match pat {
         Pat::IR(pat) => {
-            let n = match &arena[id] {
+            let n = match &ctx.arena[id] {
                 Node::IR(ir) => ir,
                 _ => return false,
             };
@@ -393,7 +443,7 @@ fn matches(arena: &Arena<Node>, id: NodeId, pat: &Pat, m: &mut NameMap) -> bool 
                 .operands
                 .iter()
                 .zip(n.args.iter())
-                .all(|(pat, &id)| matches(arena, id, pat, m));
+                .all(|(pat, &id)| matches(ctx, id, pat, m));
             let matches_ = same_opcode && same_operands;
             if matches_ && !pat.name.is_empty() {
                 m.insert(pat.name, id);
@@ -402,19 +452,21 @@ fn matches(arena: &Arena<Node>, id: NodeId, pat: &Pat, m: &mut NameMap) -> bool 
         }
         Pat::MI => false,
         Pat::Operand(op) => {
-            let n = match &arena[id] {
+            let n = match &ctx.arena[id] {
                 Node::Operand(op) => op,
                 _ => return false,
             };
-            let matches_ = match op.kind {
-                OperandKind::Immediate(Immediate::AnyInt32) => {
-                    matches!(n, &OperandNode::Immediate(ImmediateKind::Int32(_)))
+            let matches_ = match &op.kind {
+                OperandKind::Imm(Immediate::AnyInt32) => {
+                    matches!(n, &OperandNode::Imm(ImmediateKind::Int32(_)))
                 }
-                OperandKind::Immediate(Immediate::Int32(i)) => {
-                    matches!(n, &OperandNode::Immediate(ImmediateKind::Int32(x)) if x == i)
+                OperandKind::Imm(Immediate::Int32(i)) => {
+                    matches!(n, &OperandNode::Imm(ImmediateKind::Int32(x)) if x == *i)
                 }
-                OperandKind::Immediate(Immediate::Any) => matches!(n, &OperandNode::Immediate(_)),
-                OperandKind::Reg => n == &OperandNode::Reg,
+                OperandKind::Imm(Immediate::Any) => matches!(n, &OperandNode::Imm(_)),
+                OperandKind::Reg(reg) => matches!(reg, Register::Class(reg_class)
+                                            if matches!(n, OperandNode::Reg(id)
+                                                if ctx.regs.arena_ref()[*id].reg_class == *reg_class)),
                 OperandKind::Invalid => panic!(),
             };
             let matches_ = if op.not { !matches_ } else { matches_ };
@@ -424,7 +476,7 @@ fn matches(arena: &Arena<Node>, id: NodeId, pat: &Pat, m: &mut NameMap) -> bool 
             matches_
         }
         Pat::Compound(pat) => {
-            let matches_ = pat.pats.iter().any(|pat| matches(arena, id, pat, m));
+            let matches_ = pat.pats.iter().any(|pat| matches(ctx, id, pat, m));
             if matches_ && !pat.name.is_empty() {
                 m.insert(pat.name, id);
             }
