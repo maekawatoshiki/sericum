@@ -1,14 +1,13 @@
-use crate::codegen::arch::machine::register::rc2ty;
+use crate::codegen::arch::machine::register::{rc2ty, ty2rc};
 use crate::codegen::common::new_dag::basic_block::{DAGBasicBlock, DAGBasicBlockId};
 use crate::codegen::common::{
-    dag::{
-        function::DAGFunction,
-        module::DAGModule,
-        node::{AddressKind, IRNode, IROpcode, ImmediateKind, MINode, Node, NodeId, OperandNode},
-    },
+    dag::{function::DAGFunction, module::DAGModule},
     machine::{
         frame_object::{FrameIndexInfo, FrameIndexKind, LocalVariables},
         register::RegistersInfo,
+    },
+    new_dag::node::{
+        AddressKind, IRNode, IROpcode, ImmediateKind, MINode, Node, NodeId, OperandNode,
     },
 };
 use crate::ir::{
@@ -91,7 +90,7 @@ fn convert_function_to_dag_function<'a>(mut ctx: FunctionConversionContext<'a>) 
     for (i, &id) in ctx.func.basic_blocks.order.iter().enumerate() {
         let block = &ctx.func.basic_blocks.arena[id];
         let is_entry = i == 0;
-        convert_block_to_dag_block(BlockConversionContext::new(
+        let entry = convert_block_to_dag_block(BlockConversionContext::new(
             ctx.module,
             ctx.func,
             &mut ctx.node_arena,
@@ -104,6 +103,7 @@ fn convert_function_to_dag_function<'a>(mut ctx: FunctionConversionContext<'a>) 
             block,
             id,
         ));
+        block_arena[block_map[&id]].entry = Some(entry);
     }
 
     todo!()
@@ -115,6 +115,7 @@ struct BlockConversionContext<'a> {
     node_arena: &'a mut Arena<Node>,
     is_entry: bool,
     last_chained_node: NodeId,
+    entry: NodeId,
     local_vars: &'a mut LocalVariables,
     node_map: &'a mut FxHashMap<InstructionId, NodeId>,
     arg_regs: &'a mut FxHashMap<usize, NodeId>,
@@ -124,7 +125,7 @@ struct BlockConversionContext<'a> {
     block_id: BasicBlockId,
 }
 
-fn convert_block_to_dag_block<'a>(mut ctx: BlockConversionContext<'a>) {
+fn convert_block_to_dag_block<'a>(mut ctx: BlockConversionContext<'a>) -> NodeId {
     if ctx.is_entry {
         // self.copy_reg_args();
     }
@@ -225,23 +226,93 @@ fn convert_block_to_dag_block<'a>(mut ctx: BlockConversionContext<'a>) {
                 )
             }
             Opcode::Br => {
-                // let block = ctx.node(ctx.block_map[&inst.operand.blocks()[0]].into());
-                todo!()
+                let block = ctx.node(ctx.block_map[&inst.operand.blocks()[0]].into());
+                ctx.node(IRNode::new(IROpcode::Br).args(vec![block]).into())
             }
-            _ => todo!(),
+            Opcode::CondBr => {
+                let (arg, then_, else_) = (
+                    ctx.node_from_value(&inst.operand.args()[0]),
+                    ctx.node(ctx.block_map[&inst.operand.blocks()[0]].into()),
+                    ctx.node(ctx.block_map[&inst.operand.blocks()[1]].into()),
+                );
+                let brcond = ctx.node(IRNode::new(IROpcode::BrCond).args(vec![arg, then_]).into());
+                ctx.make_chain(brcond);
+                let br = ctx.node(IRNode::new(IROpcode::Br).args(vec![else_]).into());
+                br
+            }
+            Opcode::ICmp | Opcode::FCmp => {
+                let c = if inst.opcode == Opcode::ICmp {
+                    ctx.node(inst.operand.int_cmp()[0].into())
+                } else {
+                    ctx.node(inst.operand.float_cmp()[0].into())
+                };
+                let (lhs, rhs) = (
+                    ctx.node_from_value(&inst.operand.args()[0]),
+                    ctx.node_from_value(&inst.operand.args()[1]),
+                );
+                ctx.node_(
+                    id,
+                    IRNode::new(IROpcode::Setcc)
+                        .args(vec![c, lhs, rhs])
+                        .ty(inst.ty)
+                        .into(),
+                )
+            }
+            Opcode::Phi => {
+                let mut args = vec![];
+                for (block, val) in inst.operand.blocks().iter().zip(inst.operand.args().iter()) {
+                    let id = ctx.node_from_value(val);
+                    args.push(match &ctx.node_arena[id] {
+                        Node::IR(IRNode {
+                            opcode: IROpcode::CopyFromReg,
+                            args,
+                            ..
+                        }) => args[0],
+                        _ => id,
+                    });
+                    args.push(ctx.node(ctx.block_map[block].into()));
+                }
+                ctx.node_(id, IRNode::new(IROpcode::Phi).args(args).ty(inst.ty).into())
+            }
+            Opcode::Ret => {
+                let arg = ctx.node_from_value(&inst.operand.args()[0]);
+                ctx.node(IRNode::new(IROpcode::Ret).args(vec![arg]).into())
+            }
         };
 
-        let does_not_live_out = matches!(
+        let may_live_out = !matches!(
             inst.opcode,
             Opcode::Alloca | Opcode::Store | Opcode::Br | Opcode::CondBr | Opcode::Ret
         );
-        // let does_not_makes_chain = matches!(
-        //     inst.opcode,
-        //     Opcode::Alloca | Opcode::Br | Opcode::CondBr | Opcode::Ret
-        // );
+        let must_make_chain = matches!(
+            inst.opcode,
+            Opcode::Load | Opcode::Store | Opcode::Call | Opcode::Br | Opcode::CondBr | Opcode::Ret
+        );
+        let mut chain_made = false;
+
+        if may_live_out {
+            let do_live_out = ctx.func.basic_blocks.liveness[&ctx.block_id]
+                .live_out
+                .contains(&id);
+            if do_live_out {
+                let copied = ctx.make_chain_with_copying(node);
+                chain_made = true;
+                ctx.node_map.insert(id, node);
+            } else {
+                if must_make_chain {
+                    ctx.make_chain(node);
+                    chain_made = true;
+                }
+                ctx.node_map.insert(id, node);
+            }
+        }
+
+        if must_make_chain && !chain_made {
+            ctx.make_chain(node)
+        }
     }
 
-    todo!()
+    ctx.entry
 }
 
 impl<'a> BlockConversionContext<'a> {
@@ -265,6 +336,7 @@ impl<'a> BlockConversionContext<'a> {
             node_arena,
             is_entry,
             last_chained_node,
+            entry: last_chained_node,
             local_vars,
             node_map,
             arg_regs,
@@ -413,6 +485,14 @@ impl<'a> BlockConversionContext<'a> {
                     )
                 }
             };
+
+            let ptr_ty = self.func.types.new_pointer_ty(ty);
+            base = self.node(
+                IRNode::new(IROpcode::Add)
+                    .args(vec![base, idx])
+                    .ty(ptr_ty)
+                    .into(),
+            )
         }
 
         base
@@ -441,5 +521,32 @@ impl<'a> BlockConversionContext<'a> {
             Node::Operand(_) => None,
             Node::None => None,
         }
+    }
+
+    fn make_chain(&mut self, id: NodeId) {
+        let last_chained_node = &mut self.last_chained_node;
+        *match &mut self.node_arena[id] {
+            Node::IR(IRNode { chain, .. }) => chain,
+            Node::MI(MINode { chain, .. }) => chain,
+            _ => panic!(),
+        } = Some(*last_chained_node);
+        *last_chained_node = id;
+    }
+
+    fn make_chain_with_copying(&mut self, node: NodeId) -> NodeId {
+        let reg: Node = self
+            .regs
+            .new_virt_reg(ty2rc(&self.node_ty(node).unwrap()).unwrap())
+            .into();
+        let old_node = ::std::mem::replace(&mut self.node_arena[node], reg.clone());
+        let old_node = self.node(old_node);
+        let reg = self.node(reg);
+        let copy = self.node(
+            IRNode::new(IROpcode::CopyToReg)
+                .args(vec![reg, old_node])
+                .into(),
+        );
+        self.make_chain(copy);
+        node
     }
 }

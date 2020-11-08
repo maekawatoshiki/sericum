@@ -1,4 +1,4 @@
-use crate::codegen::common::dag::node::NodeId;
+use crate::codegen::common::new_dag::node::NodeId;
 use crate::ir::types::Types;
 use id_arena::*;
 use rustc_hash::FxHashSet;
