@@ -1,22 +1,21 @@
-use super::{function::DAGFunction, node::*};
+use super::node::*;
 use crate::codegen::arch::machine::register::RegisterClassKind as RC;
 use crate::codegen::common::machine::register::RegistersInfo;
-use crate::codegen::common::types::MVType;
 use crate::ir::types::Type;
-use id_arena::{Arena, Id};
+use id_arena::Arena;
 use rustc_hash::FxHashMap;
 use std::ops::BitOr;
 
-pub struct InstPatternMatcherOnFunction<'a> {
-    func: &'a mut DAGFunction,
-}
+pub type GenFn = fn(&FxHashMap<&'static str, NodeId>, &mut MatchContext) -> NodeId;
+pub type ReplacedNodeMap = FxHashMap<NodeId, NodeId>;
+pub type NameMap = FxHashMap<&'static str, NodeId>;
 
-struct MatchContext<'a> {
+pub struct MatchContext<'a> {
     arena: &'a mut Arena<Node>,
     regs: &'a RegistersInfo,
 }
 
-enum Pat {
+pub enum Pat {
     IR(IRPat),
     MI,
     Operand(OperandPat),
@@ -24,9 +23,7 @@ enum Pat {
     Invalid,
 }
 
-type GenFn = fn(&FxHashMap<&'static str, NodeId>, &mut MatchContext) -> NodeId;
-
-struct IRPat {
+pub struct IRPat {
     pub name: &'static str,
     pub opcode: Option<IROpcode>,
     pub operands: Vec<Pat>,
@@ -34,39 +31,39 @@ struct IRPat {
     pub generate: Option<Box<GenFn>>,
 }
 
-struct MIPat {}
+pub struct MIPat {}
 
-struct OperandPat {
+pub struct OperandPat {
     pub name: &'static str,
     pub kind: OperandKind,
     pub not: bool,
     pub generate: Option<Box<GenFn>>,
 }
 
-struct CompoundPat {
+pub struct CompoundPat {
     pub name: &'static str,
     pub pats: Vec<Pat>,
     pub generate: Option<Box<GenFn>>,
 }
 
-enum OperandKind {
+pub enum OperandKind {
     Imm(Immediate),
     Reg(Register),
     Invalid,
 }
 
 #[derive(PartialEq, Eq)]
-enum Immediate {
+pub enum Immediate {
     AnyInt32,
     Int32(i32),
     Any,
 }
 
-enum Register {
+pub enum Register {
     Class(RC),
 }
 
-const fn ir_node() -> IRPat {
+pub const fn ir_node() -> IRPat {
     IRPat {
         name: "",
         opcode: None,
@@ -76,7 +73,7 @@ const fn ir_node() -> IRPat {
     }
 }
 
-const fn ir(opcode: IROpcode) -> IRPat {
+pub const fn ir(opcode: IROpcode) -> IRPat {
     IRPat {
         name: "",
         opcode: Some(opcode),
@@ -86,34 +83,34 @@ const fn ir(opcode: IROpcode) -> IRPat {
     }
 }
 
-const fn mi_node() -> MIPat {
+pub const fn mi_node() -> MIPat {
     MIPat {}
 }
 
 impl IRPat {
-    fn named(mut self, name: &'static str) -> Self {
+    pub fn named(mut self, name: &'static str) -> Self {
         self.name = name;
         self
     }
 
-    fn opcode(mut self, opcode: IROpcode) -> Self {
+    pub fn opcode(mut self, opcode: IROpcode) -> Self {
         self.opcode = Some(opcode);
         self
     }
 
-    fn args(mut self, operands: Vec<Pat>) -> Self {
+    pub fn args(mut self, operands: Vec<Pat>) -> Self {
         self.operands = operands;
         self
     }
 
-    fn generate(mut self, f: GenFn) -> Self {
+    pub fn generate(mut self, f: GenFn) -> Self {
         self.generate = Some(Box::new(f));
         self
     }
 }
 
 impl OperandPat {
-    fn named(mut self, name: &'static str) -> Self {
+    pub fn named(mut self, name: &'static str) -> Self {
         self.name = name;
         self
     }
@@ -128,25 +125,25 @@ impl OperandPat {
         self
     }
 
-    fn generate(mut self, f: GenFn) -> Self {
+    pub fn generate(mut self, f: GenFn) -> Self {
         self.generate = Some(Box::new(f));
         self
     }
 }
 
 impl CompoundPat {
-    fn named(mut self, name: &'static str) -> Self {
+    pub fn named(mut self, name: &'static str) -> Self {
         self.name = name;
         self
     }
 
-    fn generate(mut self, f: GenFn) -> Self {
+    pub fn generate(mut self, f: GenFn) -> Self {
         self.generate = Some(Box::new(f));
         self
     }
 }
 
-const fn not() -> OperandPat {
+pub const fn not() -> OperandPat {
     OperandPat {
         name: "",
         kind: OperandKind::Invalid,
@@ -155,7 +152,7 @@ const fn not() -> OperandPat {
     }
 }
 
-const fn imm() -> OperandPat {
+pub const fn imm() -> OperandPat {
     OperandPat {
         name: "",
         kind: OperandKind::Imm(Immediate::Any),
@@ -164,7 +161,7 @@ const fn imm() -> OperandPat {
     }
 }
 
-const fn i32_imm(i: i32) -> OperandPat {
+pub const fn i32_imm(i: i32) -> OperandPat {
     OperandPat {
         name: "",
         kind: OperandKind::Imm(Immediate::Int32(i)),
@@ -173,7 +170,7 @@ const fn i32_imm(i: i32) -> OperandPat {
     }
 }
 
-const fn any_i32_imm() -> OperandPat {
+pub const fn any_i32_imm() -> OperandPat {
     OperandPat {
         name: "",
         kind: OperandKind::Imm(Immediate::AnyInt32),
@@ -182,7 +179,7 @@ const fn any_i32_imm() -> OperandPat {
     }
 }
 
-const fn reg_class(rc: RC) -> OperandPat {
+pub const fn reg_class(rc: RC) -> OperandPat {
     OperandPat {
         name: "",
         kind: OperandKind::Reg(Register::Class(rc)),
@@ -245,7 +242,7 @@ impl BitOr for OperandPat {
 #[test]
 fn xxx() {
     let mut arena: Arena<Node> = Arena::new();
-    let mut regs = RegistersInfo::new();
+    let regs = RegistersInfo::new();
 
     // let reg = arena.alloc(Node::Operand(OperandNode::Reg(regs.new_virt_reg(RC::GR32))));
     let imm1 = arena.alloc(Node::Operand(OperandNode::Imm(ImmediateKind::Int32(2))));
@@ -347,17 +344,7 @@ fn xxx() {
     // panic!()
 }
 
-impl<'a> InstPatternMatcherOnFunction<'a> {
-    pub fn new(func: &'a mut DAGFunction) -> Self {
-        Self { func }
-    }
-
-    pub fn try_match(&self, list: Vec<i32>) -> () {}
-}
-
-type ReplacedNodeMap = FxHashMap<NodeId, NodeId>;
-
-fn inst_select(
+pub fn inst_select(
     replaced: &mut ReplacedNodeMap,
     ctx: &mut MatchContext,
     id: NodeId,
@@ -428,8 +415,6 @@ fn try_match(ctx: &mut MatchContext, id: NodeId, pat: &Pat, m: &mut NameMap) -> 
 
     None
 }
-
-pub type NameMap = FxHashMap<&'static str, NodeId>;
 
 fn matches(ctx: &MatchContext, id: NodeId, pat: &Pat, m: &mut NameMap) -> bool {
     match pat {
