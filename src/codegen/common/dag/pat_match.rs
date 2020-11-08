@@ -386,6 +386,7 @@ fn operand_select(
         Node::IR(ir) => ir.args.clone(),
         Node::MI(mi) => mi.args.clone(),
         Node::Operand(_) => vec![],
+        Node::None => vec![],
     };
     let mut replaced_args = ReplacedNodeMap::default();
     for id in args_id {

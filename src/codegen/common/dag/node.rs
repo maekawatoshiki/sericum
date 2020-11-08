@@ -23,6 +23,7 @@ pub enum Node {
     IR(IRNode),
     MI(MINode),
     Operand(OperandNode),
+    None,
 }
 
 #[derive(Debug)]
@@ -53,13 +54,6 @@ pub enum OperandNode {
     Mem(MemNodeKind),
     CC(CondKind),
 }
-// CondKind(CondKind),
-// FrameIndex(FrameIndexInfo), // TODO
-// Constant(ConstantKind),
-// Address(AddressKind),
-// BasicBlock(DAGBasicBlockId),
-// Register(RegisterId),
-// Mem(MemNodeKind),
 
 #[derive(Debug, Clone, PartialEq, Copy)]
 pub enum ImmediateKind {
@@ -91,16 +85,17 @@ impl Node {
         }
     }
 
+    pub fn as_i32(&self) -> i32 {
+        self.as_operand().as_imm().as_i32()
+    }
+
     pub fn args_mut(&mut self) -> &mut [NodeId] {
         match self {
             Self::IR(ir) => &mut ir.args,
             Self::MI(mi) => &mut mi.args,
             Self::Operand(_) => &mut [],
+            Self::None => &mut [],
         }
-    }
-
-    pub fn as_i32(&self) -> i32 {
-        self.as_operand().as_imm().as_i32()
     }
 }
 
@@ -129,8 +124,16 @@ impl IRNode {
 }
 
 impl OperandNode {
-    pub fn i32(i: i32) -> OperandNode {
+    pub fn i32(i: i32) -> Self {
         Self::Imm(ImmediateKind::Int32(i))
+    }
+
+    pub fn imm(imm: ImmediateKind) -> Self {
+        Self::Imm(imm)
+    }
+
+    pub fn slot(slot: FrameIndexInfo) -> Self {
+        Self::Slot(slot)
     }
 
     pub fn as_imm(&self) -> &ImmediateKind {
@@ -165,6 +168,24 @@ impl Into<Node> for IRNode {
 impl Into<Node> for OperandNode {
     fn into(self) -> Node {
         Node::Operand(self)
+    }
+}
+
+impl Into<Node> for ImmediateKind {
+    fn into(self) -> Node {
+        Node::Operand(OperandNode::Imm(self))
+    }
+}
+
+impl Into<Node> for AddressKind {
+    fn into(self) -> Node {
+        Node::Operand(OperandNode::Addr(self))
+    }
+}
+
+impl Into<Node> for FrameIndexInfo {
+    fn into(self) -> Node {
+        Node::Operand(OperandNode::slot(self))
     }
 }
 
