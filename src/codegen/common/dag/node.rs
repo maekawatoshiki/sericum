@@ -183,6 +183,8 @@ impl Into<Node> for AddressKind {
     }
 }
 
+// impl Into<Node> for DAGBasicBlockId
+
 impl Into<Node> for FrameIndexInfo {
     fn into(self) -> Node {
         Node::Operand(OperandNode::slot(self))

@@ -100,6 +100,7 @@ fn convert_function_to_dag_function<'a>(mut ctx: FunctionConversionContext<'a>) 
             &mut ctx.node_map,
             &mut ctx.arg_regs,
             &mut ctx.regs,
+            &block_map,
             block,
             id,
         ));
@@ -118,6 +119,7 @@ struct BlockConversionContext<'a> {
     node_map: &'a mut FxHashMap<InstructionId, NodeId>,
     arg_regs: &'a mut FxHashMap<usize, NodeId>,
     regs: &'a mut RegistersInfo,
+    block_map: &'a FxHashMap<BasicBlockId, DAGBasicBlockId>,
     block: &'a BasicBlock,
     block_id: BasicBlockId,
 }
@@ -161,8 +163,71 @@ fn convert_block_to_dag_block<'a>(mut ctx: BlockConversionContext<'a>) {
                 ctx.node_(id, IRNode::new(IROpcode::Store).args(vec![dst, src]).into())
             }
             Opcode::GetElementPtr => ctx.gep_node_from_values(inst.operand.args()),
-            // Opcode::Call => {
-            // }
+            Opcode::Call => {
+                let mut args: Vec<NodeId> = inst
+                    .operand
+                    .args()
+                    .iter()
+                    .map(|arg| ctx.node_from_value(arg))
+                    .collect();
+                ctx.node_(
+                    id,
+                    IRNode::new(IROpcode::Call).args(args).ty(inst.ty).into(),
+                )
+            }
+            Opcode::Add | Opcode::Sub | Opcode::Mul | Opcode::Div | Opcode::Rem | Opcode::Shl => {
+                let (lhs, rhs) = (
+                    ctx.node_from_value(&inst.operand.args()[0]),
+                    ctx.node_from_value(&inst.operand.args()[1]),
+                );
+                ctx.node_(
+                    id,
+                    IRNode::new(match inst.opcode {
+                        Opcode::Add => IROpcode::Add,
+                        Opcode::Sub => IROpcode::Sub,
+                        Opcode::Mul => IROpcode::Mul,
+                        Opcode::Div => IROpcode::Div,
+                        Opcode::Rem => IROpcode::Rem,
+                        Opcode::Shl => IROpcode::Shl,
+                        _ => unreachable!(),
+                    })
+                    .args(vec![lhs, rhs])
+                    .ty(inst.ty)
+                    .into(),
+                )
+            }
+            Opcode::SIToFP | Opcode::FPToSI => {
+                let arg = ctx.node_from_value(&inst.operand.args()[0]);
+                ctx.node_(
+                    id,
+                    IRNode::new(match inst.opcode {
+                        Opcode::SIToFP => IROpcode::SIToFP,
+                        Opcode::FPToSI => IROpcode::FPToSI,
+                        _ => unreachable!(),
+                    })
+                    .args(vec![arg])
+                    .ty(inst.ty)
+                    .into(),
+                )
+            }
+            Opcode::Sext | Opcode::Bitcast => {
+                let arg = ctx.node_from_value(&inst.operand.args()[0]);
+                ctx.node_(
+                    id,
+                    IRNode::new(match inst.opcode {
+                        Opcode::Sext => IROpcode::Sext,
+                        Opcode::Bitcast => IROpcode::Bitcast,
+                        _ => unreachable!(),
+                    })
+                    .args(vec![arg])
+                    .ty(inst.ty)
+                    .into(),
+                )
+            }
+            Opcode::Br => {
+                // let block = ctx.node(ctx.block_map[&inst.operand.blocks()[0]].into());
+                todo!()
+            }
             _ => todo!(),
         };
 
@@ -189,6 +254,7 @@ impl<'a> BlockConversionContext<'a> {
         node_map: &'a mut FxHashMap<InstructionId, NodeId>,
         arg_regs: &'a mut FxHashMap<usize, NodeId>,
         regs: &'a mut RegistersInfo,
+        block_map: &'a FxHashMap<BasicBlockId, DAGBasicBlockId>,
         block: &'a BasicBlock,
         block_id: BasicBlockId,
     ) -> Self {
@@ -203,6 +269,7 @@ impl<'a> BlockConversionContext<'a> {
             node_map,
             arg_regs,
             regs,
+            block_map,
             block,
             block_id,
         }
