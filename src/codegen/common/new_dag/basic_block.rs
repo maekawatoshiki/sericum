@@ -1,7 +1,7 @@
-use crate::codegen::common::new_dag::node::NodeId;
+use crate::codegen::common::new_dag::node::{Node, NodeId};
 use crate::ir::types::Types;
 use id_arena::*;
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxHashMap, FxHashSet};
 use std::fmt;
 
 pub type DAGBasicBlockId = Id<DAGBasicBlock>;
@@ -39,7 +39,13 @@ impl DAGBasicBlock {
         self.root = Some(root);
     }
 
-    pub fn debug(&self, f: &mut fmt::Formatter<'_>, _tys: &Types, bb_idx: usize) -> fmt::Result {
+    pub fn debug(
+        &self,
+        f: &mut fmt::Formatter<'_>,
+        arena: &Arena<Node>,
+        tys: &Types,
+        bb_idx: usize,
+    ) -> fmt::Result {
         writeln!(
             f,
             "BB({}); pred: {{{}}}, succ: {{{}}});",
@@ -54,9 +60,8 @@ impl DAGBasicBlock {
                 .trim_matches(','),
         )?;
 
-        if let Some(_entry) = self.entry {
-            todo!()
-            // entry.debug(f, tys, &mut FxHashMap::default(), 0, 2)?;
+        if let Some(entry) = self.entry {
+            arena[entry].debug(f, arena, tys, &mut FxHashMap::default(), 0, 2)?;
         }
 
         fmt::Result::Ok(())

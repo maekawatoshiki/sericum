@@ -1,8 +1,8 @@
 use crate::codegen::{
     arch::{
-        dag::node::MemNodeKind,
+        dag::node::MemKind,
         frame_object::FrameIndexInfo,
-        machine::{inst::MachineOpcode, register::*},
+        machine::{inst::MachineOpcode, inst_def::TargetOpcode, register::*},
     },
     common::{new_dag::basic_block::DAGBasicBlockId, types::MVType},
 };
@@ -49,7 +49,7 @@ pub enum OperandNode {
     Addr(AddressKind),
     Slot(FrameIndexInfo), // TODO: FrameIndex will be named Slot
     Block(DAGBasicBlockId),
-    Mem(MemNodeKind),
+    Mem(MemKind),
     CC(CondKind),
 }
 
@@ -121,6 +121,22 @@ impl IRNode {
     }
 }
 
+impl MINode {
+    pub fn new(opcode: MachineOpcode) -> Self {
+        Self {
+            opcode,
+            args: vec![],
+            next: None,
+            chain: None,
+        }
+    }
+
+    pub fn args(mut self, args: Vec<NodeId>) -> Self {
+        self.args = args;
+        self
+    }
+}
+
 impl OperandNode {
     pub fn i32(i: i32) -> Self {
         Self::Imm(ImmediateKind::Int32(i))
@@ -148,66 +164,6 @@ impl ImmediateKind {
             Self::Int32(x) => *x,
             _ => panic!(),
         }
-    }
-}
-
-impl Into<Node> for i32 {
-    fn into(self) -> Node {
-        Node::Operand(OperandNode::Imm(ImmediateKind::Int32(self)))
-    }
-}
-
-impl Into<Node> for IRNode {
-    fn into(self) -> Node {
-        Node::IR(self)
-    }
-}
-
-impl Into<Node> for OperandNode {
-    fn into(self) -> Node {
-        Node::Operand(self)
-    }
-}
-
-impl Into<Node> for ImmediateKind {
-    fn into(self) -> Node {
-        Node::Operand(OperandNode::Imm(self))
-    }
-}
-
-impl Into<Node> for AddressKind {
-    fn into(self) -> Node {
-        Node::Operand(OperandNode::Addr(self))
-    }
-}
-
-impl Into<Node> for DAGBasicBlockId {
-    fn into(self) -> Node {
-        Node::Operand(OperandNode::Block(self))
-    }
-}
-
-impl Into<Node> for FrameIndexInfo {
-    fn into(self) -> Node {
-        Node::Operand(OperandNode::slot(self))
-    }
-}
-
-impl Into<Node> for ICmpKind {
-    fn into(self) -> Node {
-        Node::Operand(OperandNode::CC(self.into()))
-    }
-}
-
-impl Into<Node> for FCmpKind {
-    fn into(self) -> Node {
-        Node::Operand(OperandNode::CC(self.into()))
-    }
-}
-
-impl Into<Node> for RegisterId {
-    fn into(self) -> Node {
-        Node::Operand(OperandNode::Reg(self))
     }
 }
 
@@ -311,6 +267,190 @@ impl CondKind {
             Self::ULe => Self::UGe,
             Self::ULt => Self::UGt,
             e => e,
+        }
+    }
+}
+
+impl Into<Node> for i32 {
+    fn into(self) -> Node {
+        Node::Operand(OperandNode::Imm(ImmediateKind::Int32(self)))
+    }
+}
+
+impl Into<Node> for IRNode {
+    fn into(self) -> Node {
+        Node::IR(self)
+    }
+}
+
+impl Into<Node> for MINode {
+    fn into(self) -> Node {
+        Node::MI(self)
+    }
+}
+
+impl Into<Node> for OperandNode {
+    fn into(self) -> Node {
+        Node::Operand(self)
+    }
+}
+
+impl Into<Node> for ImmediateKind {
+    fn into(self) -> Node {
+        Node::Operand(OperandNode::Imm(self))
+    }
+}
+
+impl Into<Node> for AddressKind {
+    fn into(self) -> Node {
+        Node::Operand(OperandNode::Addr(self))
+    }
+}
+
+impl Into<Node> for DAGBasicBlockId {
+    fn into(self) -> Node {
+        Node::Operand(OperandNode::Block(self))
+    }
+}
+
+impl Into<Node> for FrameIndexInfo {
+    fn into(self) -> Node {
+        Node::Operand(OperandNode::slot(self))
+    }
+}
+
+impl Into<Node> for ICmpKind {
+    fn into(self) -> Node {
+        Node::Operand(OperandNode::CC(self.into()))
+    }
+}
+
+impl Into<Node> for FCmpKind {
+    fn into(self) -> Node {
+        Node::Operand(OperandNode::CC(self.into()))
+    }
+}
+
+impl Into<Node> for RegisterId {
+    fn into(self) -> Node {
+        Node::Operand(OperandNode::Reg(self))
+    }
+}
+
+use rustc_hash::FxHashMap;
+use std::fmt;
+
+impl Node {
+    pub fn args(&self) -> &[NodeId] {
+        match self {
+            Self::IR(IRNode { args, .. }) => args,
+            Self::MI(MINode { args, .. }) => args,
+            Self::Operand(_) | Self::None => &[],
+        }
+    }
+
+    pub fn next(&self) -> Option<NodeId> {
+        match self {
+            Self::IR(IRNode { next, .. }) | Self::MI(MINode { next, .. }) => *next,
+            _ => None,
+        }
+    }
+
+    pub fn next_mut(&mut self) -> &mut Option<NodeId> {
+        match self {
+            Self::IR(IRNode { next, .. }) | Self::MI(MINode { next, .. }) => next,
+            _ => panic!(),
+        }
+    }
+
+    pub fn debug(
+        &self,
+        f: &mut fmt::Formatter<'_>,
+        arena: &Arena<Node>,
+        tys: &Types,
+        s: &mut FxHashMap<NodeId, (usize, bool)>,
+        self_id: usize, // 0 is entry
+        indent: usize,
+    ) -> fmt::Result {
+        #[rustfmt::skip]
+        macro_rules! id4op { ($op:expr) => {{
+            let l=s.len()+1; s.entry($op).or_insert((l, false))
+        }}}
+        write!(f, "{}", " ".repeat(indent))?;
+        write!(
+            f,
+            "id{}({}) = ",
+            self_id,
+            match self {
+                Self::IR(IRNode { ty, .. }) => tys.to_string(*ty),
+                _ => "".to_string(),
+            }
+        )?;
+        match self {
+            Self::IR(IRNode { opcode, .. }) => write!(f, "{:?}", opcode)?,
+            Self::MI(MINode { opcode, .. }) => write!(f, "{:?}", opcode)?,
+            Self::Operand(_) => panic!(),
+            Self::None => panic!(),
+        };
+        for (i, id) in self.args().iter().enumerate() {
+            let op = &arena[*id];
+            if i > 0 {
+                write!(f, ",")?
+            }
+            if matches!(op, Node::None) {
+                write!(f, " None")?;
+                continue;
+            }
+            match op {
+                Node::Operand(op) => {
+                    write!(f, " ")?;
+                    op.debug(f, tys)?;
+                }
+                _ => write!(f, " id{}", id4op!(*id).0)?,
+            }
+            // write!(f, ".{}", tys.to_string(op.ty))?;
+        }
+        write!(f, "\n")?;
+        for &op in self.args() {
+            match &arena[op] {
+                Self::Operand(_) | Self::None => {
+                    continue;
+                }
+                node => {
+                    let id = id4op!(op).0;
+                    if !s[&op].1 {
+                        s.get_mut(&op).unwrap().1 = true;
+                        node.debug(f, arena, tys, s, id, indent + 2)?;
+                    }
+                }
+            }
+        }
+        if let Self::IR(IRNode {
+            next: Some(next), ..
+        })
+        | Self::MI(MINode {
+            next: Some(next), ..
+        }) = self
+        {
+            let id = id4op!(*next).0;
+            s.get_mut(next).unwrap().1 = true;
+            arena[*next].debug(f, arena, tys, s, id, indent)?;
+        }
+
+        Ok(())
+    }
+}
+
+impl OperandNode {
+    pub fn debug(&self, f: &mut fmt::Formatter<'_>, tys: &Types) -> fmt::Result {
+        match self {
+            Self::Addr(a) => write!(f, "Addr({:?})", a),
+            Self::Block(b) => write!(f, "BB#{}", b.index()),
+            Self::CC(c) => write!(f, "Cond({:?})", c),
+            Self::Imm(c) => write!(f, "{:?}", c),
+            Self::Slot(fi) => write!(f, "FI<{}, {:?}>", tys.to_string(fi.ty), fi.idx),
+            Self::Reg(r) => write!(f, "Reg({:?})", r),
+            Self::Mem(mem) => write!(f, "{:?}", mem),
         }
     }
 }

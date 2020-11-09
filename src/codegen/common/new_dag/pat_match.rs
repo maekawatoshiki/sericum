@@ -1,6 +1,6 @@
 use super::node::*;
 use crate::codegen::arch::machine::register::RegisterClassKind as RC;
-use crate::codegen::common::machine::register::RegistersInfo;
+use crate::codegen::common::{machine::register::RegistersInfo, types::MVType};
 use crate::ir::types::Type;
 use id_arena::Arena;
 use rustc_hash::FxHashMap;
@@ -11,8 +11,8 @@ pub type ReplacedNodeMap = FxHashMap<NodeId, NodeId>;
 pub type NameMap = FxHashMap<&'static str, NodeId>;
 
 pub struct MatchContext<'a> {
-    arena: &'a mut Arena<Node>,
-    regs: &'a RegistersInfo,
+    pub arena: &'a mut Arena<Node>,
+    pub regs: &'a RegistersInfo,
 }
 
 pub enum Pat {
@@ -48,6 +48,7 @@ pub struct CompoundPat {
 
 pub enum OperandKind {
     Imm(Immediate),
+    Slot(Slot),
     Reg(Register),
     Invalid,
 }
@@ -56,6 +57,11 @@ pub enum OperandKind {
 pub enum Immediate {
     AnyInt32,
     Int32(i32),
+    Any,
+}
+
+pub enum Slot {
+    Type(MVType),
     Any,
 }
 
@@ -174,6 +180,24 @@ pub const fn any_i32_imm() -> OperandPat {
     OperandPat {
         name: "",
         kind: OperandKind::Imm(Immediate::AnyInt32),
+        not: false,
+        generate: None,
+    }
+}
+
+pub const fn any_slot() -> OperandPat {
+    OperandPat {
+        name: "",
+        kind: OperandKind::Slot(Slot::Any),
+        not: false,
+        generate: None,
+    }
+}
+
+pub const fn slot(ty: MVType) -> OperandPat {
+    OperandPat {
+        name: "",
+        kind: OperandKind::Slot(Slot::Type(ty)),
         not: false,
         generate: None,
     }
@@ -354,6 +378,8 @@ pub fn inst_select(
         return *replaced;
     }
 
+    println!("{:?}", ctx.arena[id]);
+
     let mut map = NameMap::default();
     for pat in pats {
         if let Some(gen) = try_match(ctx, id, &pat, &mut map) {
@@ -408,13 +434,11 @@ fn try_match(ctx: &mut MatchContext, id: NodeId, pat: &Pat, m: &mut NameMap) -> 
 
     match pat {
         Pat::IR(pat) => return pat.generate.clone(),
-        Pat::MI => {}
+        Pat::MI => panic!(),
         Pat::Operand(pat) => return pat.generate.clone(),
         Pat::Compound(pat) => return pat.generate.clone(),
         Pat::Invalid => panic!(),
     }
-
-    None
 }
 
 fn matches(ctx: &MatchContext, id: NodeId, pat: &Pat, m: &mut NameMap) -> bool {
@@ -453,6 +477,10 @@ fn matches(ctx: &MatchContext, id: NodeId, pat: &Pat, m: &mut NameMap) -> bool {
                 OperandKind::Reg(reg) => matches!(reg, Register::Class(reg_class)
                                             if matches!(n, OperandNode::Reg(id)
                                                 if ctx.regs.arena_ref()[*id].reg_class == *reg_class)),
+                OperandKind::Slot(Slot::Any) => matches!(n, &OperandNode::Slot(_)),
+                OperandKind::Slot(Slot::Type(ty)) => {
+                    matches!(n, &OperandNode::Slot(slot) if ty == &slot.ty.into())
+                }
                 OperandKind::Invalid => panic!(),
             };
             let matches_ = if op.not { !matches_ } else { matches_ };

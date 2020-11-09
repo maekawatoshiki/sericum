@@ -95,11 +95,16 @@ pub fn standard_conversion_into_machine_module(mut module: Module) -> MachineMod
     ir::inst_combine::InstructionCombine::new().run_on_module(&mut module);
     ir::codegen_prepare::CodegenPrepare::new().run_on_module(&mut module);
 
-    let module = crate::codegen::common::new_dag::convert::convert_module_to_dag_module(module);
+    println!("{:?}", module);
 
-    let mut machine_module = crate::codegen::common::new_dag::mc_convert::convert_module(module);
+    let mut module = crate::codegen::common::new_dag::convert::convert_module_to_dag_module(module);
+    crate::codegen::arch::new_dag::isel::run(&mut module);
 
-    println!("{:?}", machine_module);
+    println!("DAG:\n{:?}", module);
+
+    let mut module = crate::codegen::common::new_dag::mc_convert::convert_module(module);
+
+    println!("{:?}", module);
 
     // let mut dag_module = convert::convert_to_dag_module(module);
     //
@@ -120,7 +125,7 @@ pub fn standard_conversion_into_machine_module(mut module: Module) -> MachineMod
     pass_mgr.add_pass(machine::replace_copy::ReplaceCopyWithProperMInst::new());
     pass_mgr.add_pass(machine::replace_data::ReplaceConstFPWithMemoryRef::new());
     pass_mgr.add_pass(eliminate_fi::EliminateFrameIndex::new());
-    pass_mgr.run_on_module(&mut machine_module);
+    pass_mgr.run_on_module(&mut module);
 
-    machine_module
+    module
 }

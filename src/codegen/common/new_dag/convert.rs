@@ -298,6 +298,8 @@ fn convert_block_to_dag_block<'a>(mut ctx: BlockConversionContext<'a>) -> NodeId
             }
         };
 
+        ctx.node_map.insert(id, node);
+
         let may_live_out = !matches!(
             inst.opcode,
             Opcode::Alloca | Opcode::Store | Opcode::Br | Opcode::CondBr | Opcode::Ret
@@ -314,8 +316,8 @@ fn convert_block_to_dag_block<'a>(mut ctx: BlockConversionContext<'a>) -> NodeId
                 .contains(&id);
             if do_live_out {
                 let copied = ctx.make_chain_with_copying(node);
-                chain_made = true;
                 ctx.node_map.insert(id, copied);
+                chain_made = true;
             } else {
                 if must_make_chain {
                     ctx.make_chain(node);
@@ -326,8 +328,7 @@ fn convert_block_to_dag_block<'a>(mut ctx: BlockConversionContext<'a>) -> NodeId
         }
 
         if must_make_chain && !chain_made {
-            println!("ret");
-            ctx.make_chain(node)
+            ctx.make_chain(node);
         }
     }
 
