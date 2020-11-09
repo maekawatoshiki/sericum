@@ -32,7 +32,7 @@ impl Into<DAGModule> for Module {
     }
 }
 
-fn convert_module_to_dag_module(mut module: Module) -> DAGModule {
+pub fn convert_module_to_dag_module(mut module: Module) -> DAGModule {
     IRLivenessAnalyzer::new(&mut module).analyze();
 
     let mut functions: Arena<DAGFunction> = Arena::new();
@@ -326,6 +326,7 @@ fn convert_block_to_dag_block<'a>(mut ctx: BlockConversionContext<'a>) -> NodeId
         }
 
         if must_make_chain && !chain_made {
+            println!("ret");
             ctx.make_chain(node)
         }
     }
@@ -548,13 +549,12 @@ impl<'a> BlockConversionContext<'a> {
     }
 
     fn make_chain(&mut self, id: NodeId) {
-        let last_chained_node = &mut self.last_chained_node;
-        *match &mut self.node_arena[id] {
-            Node::IR(IRNode { chain, .. }) => chain,
-            Node::MI(MINode { chain, .. }) => chain,
+        *match &mut self.node_arena[self.last_chained_node] {
+            Node::IR(IRNode { next, .. }) => next,
+            Node::MI(MINode { next, .. }) => next,
             _ => panic!(),
-        } = Some(*last_chained_node);
-        *last_chained_node = id;
+        } = Some(id);
+        self.last_chained_node = id;
     }
 
     fn make_chain_with_copying(&mut self, node: NodeId) -> NodeId {

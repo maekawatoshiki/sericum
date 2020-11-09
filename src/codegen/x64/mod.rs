@@ -3,6 +3,7 @@ pub mod dag;
 pub mod exec;
 pub mod frame_object;
 pub mod machine;
+pub mod new_dag;
 
 use crate::{
     codegen::common::{
@@ -94,15 +95,21 @@ pub fn standard_conversion_into_machine_module(mut module: Module) -> MachineMod
     ir::inst_combine::InstructionCombine::new().run_on_module(&mut module);
     ir::codegen_prepare::CodegenPrepare::new().run_on_module(&mut module);
 
-    let mut dag_module = convert::convert_to_dag_module(module);
+    let module = crate::codegen::common::new_dag::convert::convert_module_to_dag_module(module);
 
-    let mut pass_mgr = ModulePassManager::new();
-    pass_mgr.add_pass(combine::Combine::new());
-    pass_mgr.add_pass(dag::legalize::Legalize::new());
-    pass_mgr.add_pass(dag::isel::MISelector::new());
-    pass_mgr.run_on_module(&mut dag_module);
+    let mut machine_module = crate::codegen::common::new_dag::mc_convert::convert_module(module);
 
-    let mut machine_module = dag::mc_convert::convert_module(dag_module);
+    println!("{:?}", machine_module);
+
+    // let mut dag_module = convert::convert_to_dag_module(module);
+    //
+    // let mut pass_mgr = ModulePassManager::new();
+    // pass_mgr.add_pass(combine::Combine::new());
+    // pass_mgr.add_pass(dag::legalize::Legalize::new());
+    // pass_mgr.add_pass(dag::isel::MISelector::new());
+    // pass_mgr.run_on_module(&mut dag_module);
+    //
+    // let mut machine_module = dag::mc_convert::convert_module(dag_module);
 
     let mut pass_mgr = ModulePassManager::new();
     pass_mgr.add_pass(phi_elimination::PhiElimination::new());

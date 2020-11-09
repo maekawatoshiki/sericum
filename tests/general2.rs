@@ -69,6 +69,30 @@ mod x86_64 {
     }
 
     #[test]
+    fn just_return() {
+        let mut m = Module::new("sericum");
+
+        let _func = sericum_ir!(m; define [i32] test [] {
+        entry:
+            ret (i32 42);
+        });
+
+        println!("{:?}", m);
+
+        compile_and_run(
+            "
+        #include <assert.h>
+        int test();
+        int main() {
+            assert(test() == 42);
+            return 0;
+        }
+            ",
+            m,
+        );
+    }
+
+    #[test]
     fn test_string() {
         let mut m = Module::new("sericum");
         let s = m.create_string("hello".to_string());
