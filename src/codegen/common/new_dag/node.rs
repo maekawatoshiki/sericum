@@ -7,10 +7,8 @@ use crate::codegen::{
     common::{new_dag::basic_block::DAGBasicBlockId, types::MVType},
 };
 use crate::ir::{constant_pool, global_val::GlobalVariableId, opcode::*, types::*};
-use crate::util::allocator::*;
 use id_arena::*;
-use rustc_hash::FxHashMap;
-use std::fmt;
+// use std::fmt;
 
 //////////
 

@@ -39,7 +39,7 @@ impl DAGBasicBlock {
         self.root = Some(root);
     }
 
-    pub fn debug(&self, f: &mut fmt::Formatter<'_>, tys: &Types, bb_idx: usize) -> fmt::Result {
+    pub fn debug(&self, f: &mut fmt::Formatter<'_>, _tys: &Types, bb_idx: usize) -> fmt::Result {
         writeln!(
             f,
             "BB({}); pred: {{{}}}, succ: {{{}}});",
@@ -54,7 +54,7 @@ impl DAGBasicBlock {
                 .trim_matches(','),
         )?;
 
-        if let Some(entry) = self.entry {
+        if let Some(_entry) = self.entry {
             todo!()
             // entry.debug(f, tys, &mut FxHashMap::default(), 0, 2)?;
         }

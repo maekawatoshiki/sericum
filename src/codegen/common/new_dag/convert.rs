@@ -1,13 +1,14 @@
 use crate::codegen::arch::machine::register::{rc2ty, ty2rc};
-use crate::codegen::common::new_dag::basic_block::{DAGBasicBlock, DAGBasicBlockId};
 use crate::codegen::common::{
-    dag::{function::DAGFunction, module::DAGModule},
     machine::{
         frame_object::{FrameIndexInfo, FrameIndexKind, LocalVariables},
         register::RegistersInfo,
     },
-    new_dag::node::{
-        AddressKind, IRNode, IROpcode, ImmediateKind, MINode, Node, NodeId, OperandNode,
+    new_dag::{
+        basic_block::{DAGBasicBlock, DAGBasicBlockId},
+        function::DAGFunction,
+        module::DAGModule,
+        node::{AddressKind, IRNode, IROpcode, ImmediateKind, MINode, Node, NodeId, OperandNode},
     },
 };
 use crate::ir::{
@@ -37,7 +38,7 @@ fn convert_module_to_dag_module(mut module: Module) -> DAGModule {
     let mut functions: Arena<DAGFunction> = Arena::new();
 
     for (_, func) in &module.functions {
-        convert_function_to_dag_function(FunctionConversionContext {
+        let f = convert_function_to_dag_function(FunctionConversionContext {
             module: &module,
             func,
             node_arena: Arena::new(),
@@ -46,9 +47,16 @@ fn convert_module_to_dag_module(mut module: Module) -> DAGModule {
             arg_regs: FxHashMap::default(),
             regs: RegistersInfo::new(),
         });
+        functions.alloc(f);
     }
 
-    todo!()
+    DAGModule {
+        name: module.name,
+        functions,
+        types: module.types,
+        global_vars: module.global_vars,
+        const_pool: module.const_pool,
+    }
 }
 
 struct FunctionConversionContext<'a> {
@@ -106,7 +114,17 @@ fn convert_function_to_dag_function<'a>(mut ctx: FunctionConversionContext<'a>) 
         block_arena[block_map[&id]].entry = Some(entry);
     }
 
-    todo!()
+    DAGFunction {
+        name: ctx.func.name.clone(),
+        ty: ctx.func.ty,
+        dag_basic_blocks: block_order,
+        dag_basic_block_arena: block_arena,
+        node_arena: ctx.node_arena,
+        local_vars: ctx.local_vars,
+        regs: ctx.regs,
+        is_internal: ctx.func.is_internal,
+        types: ctx.func.types.clone(),
+    }
 }
 
 struct BlockConversionContext<'a> {
@@ -165,7 +183,7 @@ fn convert_block_to_dag_block<'a>(mut ctx: BlockConversionContext<'a>) -> NodeId
             }
             Opcode::GetElementPtr => ctx.gep_node_from_values(inst.operand.args()),
             Opcode::Call => {
-                let mut args: Vec<NodeId> = inst
+                let args: Vec<NodeId> = inst
                     .operand
                     .args()
                     .iter()
@@ -297,7 +315,7 @@ fn convert_block_to_dag_block<'a>(mut ctx: BlockConversionContext<'a>) -> NodeId
             if do_live_out {
                 let copied = ctx.make_chain_with_copying(node);
                 chain_made = true;
-                ctx.node_map.insert(id, node);
+                ctx.node_map.insert(id, copied);
             } else {
                 if must_make_chain {
                     ctx.make_chain(node);
@@ -440,7 +458,7 @@ impl<'a> BlockConversionContext<'a> {
         let mut ty = vals[0].get_type();
 
         for idx in &vals[1..] {
-            let size = match ty {
+            let (is_struct, size) = match ty {
                 Type::Struct(id) => {
                     let off = *self
                         .func
@@ -450,16 +468,22 @@ impl<'a> BlockConversionContext<'a> {
                         .get_elem_offset(idx.as_imm().as_int32() as usize)
                         .unwrap();
                     ty = self.func.types.get_element_ty(ty, Some(idx)).unwrap();
-                    off as i32
+                    (true, off as i32)
                 }
                 _ => {
                     ty = self.func.types.get_element_ty(ty, Some(idx)).unwrap();
-                    ty.size_in_byte(&self.func.types) as i32
+                    (false, ty.size_in_byte(&self.func.types) as i32)
                 }
             };
             let idx = self.node_from_value(idx);
             let idx = match &self.node_arena[idx] {
-                Node::Operand(OperandNode::Imm(ImmediateKind::Int32(i))) => self.node(size.into()),
+                Node::Operand(OperandNode::Imm(ImmediateKind::Int32(_))) if is_struct => {
+                    self.node(size.into())
+                }
+                Node::Operand(OperandNode::Imm(ImmediateKind::Int32(i))) => {
+                    let i = *i; // to disable warning TODO
+                    self.node((i * size).into())
+                }
                 Node::IR(IRNode {
                     opcode: IROpcode::FIAddr,
                     args,
