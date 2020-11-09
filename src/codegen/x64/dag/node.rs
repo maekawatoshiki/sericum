@@ -23,7 +23,7 @@ pub enum MemKind {
     // BaseFiAlignOffOff,
     // BaseAlignOff,
     // BaseOff,
-    // Base,
+    Base(NodeId),
     // Address,
     // AddressOff,
     // AddressAlignOff,

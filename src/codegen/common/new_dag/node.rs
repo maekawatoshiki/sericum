@@ -338,6 +338,12 @@ impl Into<Node> for FCmpKind {
     }
 }
 
+impl Into<Node> for MemKind {
+    fn into(self) -> Node {
+        Node::Operand(OperandNode::Mem(self))
+    }
+}
+
 impl Into<Node> for RegisterId {
     fn into(self) -> Node {
         Node::Operand(OperandNode::Reg(self))

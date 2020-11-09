@@ -84,6 +84,10 @@ impl TargetInstDef {
         self.imp_use = imp_use;
         self
     }
+
+    pub fn def_reg_class(&self) -> RegisterClassKind {
+        self.defs[0].as_reg_class()
+    }
 }
 
 impl TargetRegister {

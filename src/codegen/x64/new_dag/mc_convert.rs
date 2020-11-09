@@ -47,11 +47,28 @@ impl<'a> ScheduleContext<'a> {
                 self.append_inst(inst)
             }
             Node::IR(IRNode {
+                opcode: IROpcode::CopyToReg,
+                args,
+                ..
+            }) => {
+                let src = self.normal_arg(args[1]);
+                let dst = match &self.func.node_arena[args[0]] {
+                    Node::Operand(OperandNode::Reg(r)) => RegisterOperand::new(*r),
+                    _ => unreachable!(),
+                };
+                self.append_inst(MachineInst::new_with_def_reg(
+                    MachineOpcode::Copy,
+                    vec![src],
+                    vec![dst],
+                    self.block_id,
+                ))
+            }
+            Node::IR(IRNode {
                 opcode: IROpcode::Ret,
                 args,
                 ..
             }) => self.convert_ret(args[0]),
-            _ => todo!(),
+            e => todo!("{:?}", e),
         };
         inst_id
     }

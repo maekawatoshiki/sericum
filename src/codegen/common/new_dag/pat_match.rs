@@ -1,5 +1,5 @@
 use super::node::*;
-use crate::codegen::arch::machine::register::RegisterClassKind as RC;
+use crate::codegen::arch::machine::register::{ty2rc, RegisterClassKind as RC};
 use crate::codegen::common::{machine::register::RegistersInfo, types::MVType};
 use crate::ir::types::Type;
 use id_arena::Arena;
@@ -27,7 +27,7 @@ pub struct IRPat {
     pub name: &'static str,
     pub opcode: Option<IROpcode>,
     pub operands: Vec<Pat>,
-    pub ty: Type,
+    pub ty: Option<Type>,
     pub generate: Option<Box<GenFn>>,
 }
 
@@ -56,6 +56,7 @@ pub enum OperandKind {
 #[derive(PartialEq, Eq)]
 pub enum Immediate {
     AnyInt32,
+    AnyInt64,
     Int32(i32),
     Any,
 }
@@ -67,6 +68,7 @@ pub enum Slot {
 
 pub enum Register {
     Class(RC),
+    Any,
 }
 
 pub const fn ir_node() -> IRPat {
@@ -74,7 +76,7 @@ pub const fn ir_node() -> IRPat {
         name: "",
         opcode: None,
         operands: vec![],
-        ty: Type::Void,
+        ty: None,
         generate: None,
     }
 }
@@ -84,7 +86,7 @@ pub const fn ir(opcode: IROpcode) -> IRPat {
         name: "",
         opcode: Some(opcode),
         operands: vec![],
-        ty: Type::Void,
+        ty: None,
         generate: None,
     }
 }
@@ -96,6 +98,11 @@ pub const fn mi_node() -> MIPat {
 impl IRPat {
     pub fn named(mut self, name: &'static str) -> Self {
         self.name = name;
+        self
+    }
+
+    pub fn ty(mut self, ty: Type) -> Self {
+        self.ty = Some(ty);
         self
     }
 
@@ -185,6 +192,15 @@ pub const fn any_i32_imm() -> OperandPat {
     }
 }
 
+pub const fn any_i64_imm() -> OperandPat {
+    OperandPat {
+        name: "",
+        kind: OperandKind::Imm(Immediate::AnyInt64),
+        not: false,
+        generate: None,
+    }
+}
+
 pub const fn any_slot() -> OperandPat {
     OperandPat {
         name: "",
@@ -207,6 +223,15 @@ pub const fn reg_class(rc: RC) -> OperandPat {
     OperandPat {
         name: "",
         kind: OperandKind::Reg(Register::Class(rc)),
+        not: false,
+        generate: None,
+    }
+}
+
+pub const fn any_reg() -> OperandPat {
+    OperandPat {
+        name: "",
+        kind: OperandKind::Reg(Register::Any),
         not: false,
         generate: None,
     }
@@ -454,7 +479,8 @@ fn matches(ctx: &MatchContext, id: NodeId, pat: &Pat, m: &mut NameMap) -> bool {
                 .iter()
                 .zip(n.args.iter())
                 .all(|(pat, &id)| matches(ctx, id, pat, m));
-            let matches_ = same_opcode && same_operands;
+            let same_ty = pat.ty.map_or(true, |ty| n.ty == ty);
+            let matches_ = same_opcode && same_operands && same_ty;
             if matches_ && !pat.name.is_empty() {
                 m.insert(pat.name, id);
             }
@@ -462,28 +488,52 @@ fn matches(ctx: &MatchContext, id: NodeId, pat: &Pat, m: &mut NameMap) -> bool {
         }
         Pat::MI => false,
         Pat::Operand(op) => {
-            let n = match &ctx.arena[id] {
-                Node::Operand(op) => op,
-                _ => return false,
+            let matches_ = match &ctx.arena[id] {
+                Node::Operand(n) => {
+                    let matches_ = match &op.kind {
+                        OperandKind::Imm(Immediate::AnyInt32) => {
+                            matches!(n, &OperandNode::Imm(ImmediateKind::Int32(_)))
+                        }
+                        OperandKind::Imm(Immediate::AnyInt64) => {
+                            matches!(n, &OperandNode::Imm(ImmediateKind::Int64(_)))
+                        }
+                        OperandKind::Imm(Immediate::Int32(i)) => {
+                            matches!(n, &OperandNode::Imm(ImmediateKind::Int32(x)) if x == *i)
+                        }
+                        OperandKind::Imm(Immediate::Any) => matches!(n, &OperandNode::Imm(_)),
+                        OperandKind::Reg(Register::Class(reg_class)) => {
+                            matches!(n, OperandNode::Reg(id)
+                                                if ctx.regs.arena_ref()[*id].reg_class == *reg_class)
+                        }
+                        OperandKind::Reg(Register::Any) => matches!(n, OperandNode::Reg(_)),
+                        OperandKind::Slot(Slot::Any) => matches!(n, &OperandNode::Slot(_)),
+                        OperandKind::Slot(Slot::Type(ty)) => {
+                            matches!(n, &OperandNode::Slot(slot) if ty == &slot.ty.into())
+                        }
+                        OperandKind::Invalid => panic!(),
+                    };
+                    if op.not {
+                        !matches_
+                    } else {
+                        matches_
+                    }
+                }
+                Node::IR(IRNode { ty, .. }) => match &op.kind {
+                    OperandKind::Reg(Register::Class(reg_class))
+                        if ty2rc(ty).unwrap() == *reg_class =>
+                    {
+                        true
+                    }
+                    OperandKind::Reg(Register::Any) if !matches!(ty, Type::Void) => true,
+                    _ => false,
+                },
+                Node::MI(MINode { reg_class: rc, .. }) => match &op.kind {
+                    OperandKind::Reg(Register::Class(reg_class)) if rc == &Some(*reg_class) => true,
+                    OperandKind::Reg(Register::Any) if rc.is_some() => true,
+                    _ => false,
+                },
+                Node::None => false,
             };
-            let matches_ = match &op.kind {
-                OperandKind::Imm(Immediate::AnyInt32) => {
-                    matches!(n, &OperandNode::Imm(ImmediateKind::Int32(_)))
-                }
-                OperandKind::Imm(Immediate::Int32(i)) => {
-                    matches!(n, &OperandNode::Imm(ImmediateKind::Int32(x)) if x == *i)
-                }
-                OperandKind::Imm(Immediate::Any) => matches!(n, &OperandNode::Imm(_)),
-                OperandKind::Reg(reg) => matches!(reg, Register::Class(reg_class)
-                                            if matches!(n, OperandNode::Reg(id)
-                                                if ctx.regs.arena_ref()[*id].reg_class == *reg_class)),
-                OperandKind::Slot(Slot::Any) => matches!(n, &OperandNode::Slot(_)),
-                OperandKind::Slot(Slot::Type(ty)) => {
-                    matches!(n, &OperandNode::Slot(slot) if ty == &slot.ty.into())
-                }
-                OperandKind::Invalid => panic!(),
-            };
-            let matches_ = if op.not { !matches_ } else { matches_ };
             if matches_ && !op.name.is_empty() {
                 m.insert(op.name, id);
             }

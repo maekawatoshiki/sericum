@@ -1,4 +1,7 @@
-use crate::codegen::arch::machine::register::{rc2ty, ty2rc};
+use crate::codegen::arch::{
+    machine::register::{rc2ty, ty2rc},
+    new_dag::convert::copy_reg_args,
+};
 use crate::codegen::common::{
     machine::{
         frame_object::{FrameIndexInfo, FrameIndexKind, LocalVariables},
@@ -127,17 +130,17 @@ fn convert_function_to_dag_function<'a>(mut ctx: FunctionConversionContext<'a>) 
     }
 }
 
-struct BlockConversionContext<'a> {
+pub struct BlockConversionContext<'a> {
     module: &'a Module,
-    func: &'a Function,
+    pub func: &'a Function,
     node_arena: &'a mut Arena<Node>,
     is_entry: bool,
     last_chained_node: NodeId,
     entry: NodeId,
     local_vars: &'a mut LocalVariables,
     node_map: &'a mut FxHashMap<InstructionId, NodeId>,
-    arg_regs: &'a mut FxHashMap<usize, NodeId>,
-    regs: &'a mut RegistersInfo,
+    pub arg_regs: &'a mut FxHashMap<usize, NodeId>,
+    pub regs: &'a mut RegistersInfo,
     block_map: &'a FxHashMap<BasicBlockId, DAGBasicBlockId>,
     block: &'a BasicBlock,
     block_id: BasicBlockId,
@@ -145,7 +148,7 @@ struct BlockConversionContext<'a> {
 
 fn convert_block_to_dag_block<'a>(mut ctx: BlockConversionContext<'a>) -> NodeId {
     if ctx.is_entry {
-        // self.copy_reg_args();
+        copy_reg_args(&mut ctx);
     }
 
     for &id in &*ctx.block.iseq_ref() {
@@ -549,7 +552,7 @@ impl<'a> BlockConversionContext<'a> {
         }
     }
 
-    fn make_chain(&mut self, id: NodeId) {
+    pub fn make_chain(&mut self, id: NodeId) {
         *match &mut self.node_arena[self.last_chained_node] {
             Node::IR(IRNode { next, .. }) => next,
             Node::MI(MINode { next, .. }) => next,
