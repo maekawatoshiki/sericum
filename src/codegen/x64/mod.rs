@@ -6,9 +6,8 @@ pub mod machine;
 pub mod new_dag;
 
 use crate::{
-    codegen::common::{
-        dag::{combine, convert},
-        machine::{branch_folding, eliminate_fi, module::MachineModule, phi_elimination},
+    codegen::common::machine::{
+        branch_folding, eliminate_fi, module::MachineModule, phi_elimination,
     },
     ir,
     ir::module::Module,

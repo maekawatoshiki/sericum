@@ -2,7 +2,7 @@ use crate::codegen::{
     arch::{
         dag::node::MemKind,
         frame_object::FrameIndexInfo,
-        machine::{inst::MachineOpcode, inst_def::TargetOpcode, register::*},
+        machine::{inst::MachineOpcode, register::*},
     },
     common::{new_dag::basic_block::DAGBasicBlockId, types::MVType},
 };

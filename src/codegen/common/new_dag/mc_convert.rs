@@ -1,14 +1,12 @@
-// TODO: dirty code
-
 use super::node::*;
-use crate::codegen::arch::machine::register::*;
+// use crate::codegen::arch::machine::register::*;
 // use crate::codegen::arch::new_dag::mc_convert::
 use crate::codegen::common::machine::inst::*;
 use crate::codegen::common::{
     machine::{basic_block::*, const_data::ConstDataArena, function::*, module::*},
-    new_dag::{basic_block::*, function::*, module::*, node::*},
+    new_dag::{basic_block::*, function::*, module::*},
 };
-use crate::ir::types::*;
+// use crate::ir::types::*;
 use id_arena::*;
 use rustc_hash::FxHashMap;
 use std::cell::RefCell;
@@ -80,8 +78,6 @@ pub fn convert_function(func: DAGFunction) -> MachineFunction {
         }
         .convert(entry);
 
-        println!("!! {:?}", iseq);
-
         basic_blocks.arena[bb_id].iseq = RefCell::new(iseq);
     }
 
@@ -132,16 +128,8 @@ impl<'a> ScheduleContext<'a> {
         };
         self.node2reg.insert(node, reg);
 
-        match &self.func.node_arena[node] {
-            Node::IR(IRNode {
-                next: Some(next), ..
-            })
-            | Node::MI(MINode {
-                next: Some(next), ..
-            }) => {
-                self.convert(*next);
-            }
-            _ => {}
+        if let Some(next) = self.func.node_arena[node].next() {
+            self.convert(next);
         }
 
         reg
@@ -153,41 +141,3 @@ impl<'a> ScheduleContext<'a> {
         inst_id
     }
 }
-
-// impl<'a> ScheduleByBlock<'a> {
-//     pub fn convert(&mut self, node: NodeId) -> Option<RegisterOperand> {
-//         if let Some(reg) = self.node2reg.get(&node) {
-//             return *reg;
-//         }
-//
-//         let reg = match node.kind {
-//             NodeKind::IR(IRNodeKind::Entry) => None,
-//             NodeKind::IR(IRNodeKind::Root) => None,
-//             NodeKind::IR(IRNodeKind::RegClass) => {
-//                 let val = self.normal_operand(node.operand[0]);
-//                 Some(val.as_register().sub_super(ty2rc(&node.ty)))
-//             }
-//             _ => {
-//                 let inst_id = self.convert_node_to_inst(node);
-//                 self.inst_arena[inst_id].get_def_reg()
-//             }
-//         };
-//         self.node2reg.insert(node, reg);
-//
-//         if let Some(next) = node.next {
-//             self.convert(next);
-//         }
-//
-//         reg
-//     }
-//
-//     pub fn get_machine_bb(&self, dag_bb_id: DAGBasicBlockId) -> MachineBasicBlockId {
-//         *self.bb_map.get(&dag_bb_id).unwrap()
-//     }
-//
-//     pub fn append_inst(&mut self, inst: MachineInst) -> MachineInstId {
-//         let inst_id = self.inst_arena.alloc(&self.cur_func.regs_info, inst);
-//         self.iseq.push(inst_id);
-//         inst_id
-//     }
-// }

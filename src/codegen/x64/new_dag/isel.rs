@@ -4,10 +4,8 @@ use crate::codegen::common::{
     new_dag::{
         function::DAGFunction,
         module::DAGModule,
-        node::{IRNode, IROpcode, MINode, Node, NodeId, OperandNode},
-        pat_match::{
-            any_i32_imm, any_slot, inst_select, ir, not, slot, MatchContext, Pat, ReplacedNodeMap,
-        },
+        node::{IROpcode, MINode, NodeId, OperandNode},
+        pat_match::{any_i32_imm, inst_select, ir, slot, MatchContext, Pat, ReplacedNodeMap},
     },
     types::MVType,
 };
