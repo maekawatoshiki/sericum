@@ -38,6 +38,7 @@ pub struct IRNode {
 pub struct MINode {
     pub opcode: MachineOpcode,
     pub args: Vec<NodeId>,
+    pub reg_class: Option<RegisterClassKind>,
     pub next: Option<NodeId>,
     pub chain: Option<NodeId>,
 }
@@ -126,6 +127,7 @@ impl MINode {
         Self {
             opcode,
             args: vec![],
+            reg_class: None,
             next: None,
             chain: None,
         }
@@ -133,6 +135,11 @@ impl MINode {
 
     pub fn args(mut self, args: Vec<NodeId>) -> Self {
         self.args = args;
+        self
+    }
+
+    pub fn reg_class(mut self, rc: RegisterClassKind) -> Self {
+        self.reg_class = Some(rc);
         self
     }
 }

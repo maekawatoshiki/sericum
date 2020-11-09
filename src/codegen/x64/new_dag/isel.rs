@@ -1,4 +1,4 @@
-use crate::codegen::arch::machine::register::GR64;
+use crate::codegen::arch::machine::register::{RegisterClassKind, GR64};
 use crate::codegen::arch::{dag::node::MemKind, machine::inst::MachineOpcode};
 use crate::codegen::common::{
     new_dag::{
@@ -22,7 +22,7 @@ pub fn run(module: &mut DAGModule) {
 }
 
 fn run_on_function(func: &mut DAGFunction) {
-    let pat: Pat = ir(IROpcode::Store)
+    let store: Pat = ir(IROpcode::Store)
         .args(vec![
             ir(IROpcode::FIAddr)
                 .args(vec![slot(MVType::i32).named("dst").into()])
@@ -41,7 +41,25 @@ fn run_on_function(func: &mut DAGFunction) {
             )
         })
         .into();
-    let pats = vec![pat];
+    let load: Pat = ir(IROpcode::Load)
+        .args(vec![ir(IROpcode::FIAddr)
+            .args(vec![slot(MVType::i32).named("src").into()])
+            .into()])
+        .generate(|m, c| {
+            let rbp = c.arena.alloc(c.regs.get_phys_reg(GR64::RBP).into());
+            let mem = c
+                .arena
+                .alloc(OperandNode::Mem(MemKind::BaseFi(rbp, m["src"])).into());
+            c.arena.alloc(
+                MINode::new(MachineOpcode::MOVrm32)
+                    .args(vec![mem])
+                    .reg_class(RegisterClassKind::GR32)
+                    // .ty(Type::i32)
+                    .into(),
+            )
+        })
+        .into();
+    let pats = vec![store, load];
     let mut replaced = ReplacedNodeMap::default();
     for &id in &func.dag_basic_blocks {
         let block = &func.dag_basic_block_arena[id];

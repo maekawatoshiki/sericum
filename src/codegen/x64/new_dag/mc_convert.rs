@@ -1,4 +1,5 @@
 // use super::{node, node::*};
+use crate::codegen::arch::dag::node::MemKind;
 use crate::codegen::arch::frame_object::FrameIndexInfo;
 use crate::codegen::arch::machine::abi::SystemV;
 use crate::codegen::arch::machine::inst::*;
@@ -8,7 +9,7 @@ use crate::codegen::common::machine::inst_def::DefOrUseReg;
 use crate::codegen::common::machine::{inst, inst::*, register::*};
 pub use crate::codegen::common::new_dag::mc_convert::ScheduleContext;
 use crate::codegen::common::new_dag::node::{
-    IRNode, IROpcode, ImmediateKind, Node, NodeId, OperandNode,
+    IRNode, IROpcode, ImmediateKind, MINode, Node, NodeId, OperandNode,
 };
 use crate::ir::types::*;
 use crate::util::allocator::*;
@@ -20,6 +21,32 @@ impl<'a> ScheduleContext<'a> {
         }
 
         let inst_id = match &self.func.node_arena[id] {
+            Node::MI(MINode {
+                opcode,
+                args,
+                reg_class,
+                ..
+            }) => {
+                fn reg(inst: &MachineInst, x: &DefOrUseReg) -> RegisterOperand {
+                    match x {
+                        DefOrUseReg::Def(i) => inst.def[*i],
+                        DefOrUseReg::Use(i) => *inst.operand[*i].as_register(),
+                    }
+                }
+                let inst_def = opcode.inst_def().unwrap();
+                let operands = args.iter().map(|op| self.normal_arg(*op)).collect();
+                let mut inst = MachineInst::new(
+                    &self.func.regs,
+                    *opcode,
+                    operands,
+                    *reg_class,
+                    self.block_id,
+                );
+                for (def_, use_) in &inst_def.tie {
+                    inst.tie_regs(reg(&inst, def_), reg(&inst, use_));
+                }
+                self.append_inst(inst)
+            }
             Node::IR(IRNode {
                 opcode: IROpcode::Ret,
                 args,
@@ -31,6 +58,24 @@ impl<'a> ScheduleContext<'a> {
     }
 
     fn convert_ret(&mut self, arg: NodeId) -> MachineInstId {
+        pub fn mov_rx(rc: RegisterClassKind, x: &MachineOperand) -> Option<MachineOpcode> {
+            let mov8rx = [MachineOpcode::MOVrr8, MachineOpcode::MOVri8];
+            let mov32rx = [MachineOpcode::MOVrr32, MachineOpcode::MOVri32];
+            let mov64rx = [MachineOpcode::MOVrr64, MachineOpcode::MOVri64];
+            let movsdrx = [MachineOpcode::MOVSDrr, MachineOpcode::MOVSDrm64];
+            let idx = match x {
+                MachineOperand::Register(_) => 0,
+                MachineOperand::Constant(_) => 1,
+                _ => return None,
+            };
+            match rc {
+                RegisterClassKind::GR8 => Some(mov8rx[idx]),
+                RegisterClassKind::GR32 => Some(mov32rx[idx]),
+                RegisterClassKind::GR64 => Some(mov64rx[idx]),
+                RegisterClassKind::XMM => Some(movsdrx[idx]),
+            }
+        }
+
         let arg = self.normal_arg(arg);
 
         match &arg {
@@ -41,7 +86,21 @@ impl<'a> ScheduleContext<'a> {
                     )]);
                 self.append_inst(mov);
             }
-            _ => todo!(),
+            MachineOperand::Register(_) => {
+                let mov = mov_rx(
+                    ty2rc(
+                        &self
+                            .func
+                            .types
+                            .compound_ty(self.func.ty)
+                            .as_function()
+                            .ret_ty,
+                    )
+                    .unwrap(),
+                    &arg,
+                );
+            }
+            e => todo!("{:?}", e),
         }
 
         self.append_inst(MachineInst::new_simple(
@@ -56,7 +115,18 @@ impl<'a> ScheduleContext<'a> {
             Node::Operand(OperandNode::Imm(ImmediateKind::Int32(i))) => {
                 MachineOperand::Constant(MachineConstant::Int32(*i))
             }
-            _ => todo!(),
+            Node::Operand(OperandNode::Slot(slot)) => MachineOperand::FrameIndex(*slot),
+            Node::Operand(OperandNode::Mem(MemKind::BaseFi(base, slot))) => {
+                MachineOperand::Mem(MachineMemOperand::BaseFi(
+                    *self.normal_arg(*base).as_register(),
+                    *self.normal_arg(*slot).as_frame_index(),
+                ))
+            }
+            Node::Operand(OperandNode::Reg(r)) => {
+                MachineOperand::Register(RegisterOperand::new(*r))
+            }
+            Node::IR(_) | Node::MI(_) => MachineOperand::Register(self.convert(arg).unwrap()),
+            e => todo!("{:?}", e),
         }
     }
 }
