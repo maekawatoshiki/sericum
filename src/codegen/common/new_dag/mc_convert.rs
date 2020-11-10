@@ -6,12 +6,15 @@ use crate::codegen::common::{
     machine::{basic_block::*, const_data::ConstDataArena, function::*, module::*},
     new_dag::{basic_block::*, function::*, module::*},
 };
-// use crate::ir::types::*;
+use crate::ir::types::*;
 use id_arena::*;
 use rustc_hash::FxHashMap;
 use std::cell::RefCell;
 
+pub type FuncTyMap = FxHashMap<String, Type>;
+
 pub struct ScheduleContext<'a> {
+    pub func_map: &'a FuncTyMap,
     pub func: &'a DAGFunction,
     pub inst_arena: &'a mut InstructionArena,
     pub node2reg: FxHashMap<NodeId, Option<RegisterOperand>>,
@@ -23,9 +26,13 @@ pub struct ScheduleContext<'a> {
 
 pub fn convert_module(module: DAGModule) -> MachineModule {
     let mut functions = Arena::new();
+    let mut func_map = FuncTyMap::default();
+    for (_, func) in &module.functions {
+        func_map.insert(func.name.to_string(), func.ty);
+    }
     for (_, func) in module.functions {
         // TODO: refine code
-        let id = functions.alloc(convert_function(func));
+        let id = functions.alloc(convert_function(&func_map, func));
         functions[id].id = Some(id);
     }
     MachineModule::new(
@@ -37,7 +44,7 @@ pub fn convert_module(module: DAGModule) -> MachineModule {
     )
 }
 
-pub fn convert_function(func: DAGFunction) -> MachineFunction {
+pub fn convert_function(func_map: &FuncTyMap, func: DAGFunction) -> MachineFunction {
     let mut bb_map = FxHashMap::default();
     let mut basic_blocks = MachineBasicBlocks::new();
 
@@ -68,6 +75,7 @@ pub fn convert_function(func: DAGFunction) -> MachineFunction {
         };
 
         ScheduleContext {
+            func_map,
             func: &func,
             inst_arena: &mut inst_arena,
             node2reg: FxHashMap::default(),

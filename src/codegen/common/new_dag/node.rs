@@ -77,6 +77,13 @@ impl Node {
         }
     }
 
+    pub fn as_mi(&self) -> &MINode {
+        match self {
+            Node::MI(x) => x,
+            _ => panic!(),
+        }
+    }
+
     pub fn as_operand(&self) -> &OperandNode {
         match self {
             Node::Operand(x) => x,
@@ -163,12 +170,28 @@ impl OperandNode {
             _ => panic!(),
         }
     }
+
+    pub fn as_addr(&self) -> &AddressKind {
+        match self {
+            Self::Addr(x) => x,
+            _ => panic!(),
+        }
+    }
 }
 
 impl ImmediateKind {
     pub fn as_i32(&self) -> i32 {
         match self {
             Self::Int32(x) => *x,
+            _ => panic!(),
+        }
+    }
+}
+
+impl AddressKind {
+    pub fn as_func_name(&self) -> &String {
+        match self {
+            Self::FunctionName(name) => name,
             _ => panic!(),
         }
     }

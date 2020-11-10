@@ -50,6 +50,7 @@ pub enum OperandKind {
     Imm(Immediate),
     Slot(Slot),
     Reg(Register),
+    Block(Block),
     Invalid,
 }
 
@@ -68,6 +69,10 @@ pub enum Slot {
 
 pub enum Register {
     Class(RC),
+    Any,
+}
+
+pub enum Block {
     Any,
 }
 
@@ -232,6 +237,15 @@ pub const fn any_reg() -> OperandPat {
     OperandPat {
         name: "",
         kind: OperandKind::Reg(Register::Any),
+        not: false,
+        generate: None,
+    }
+}
+
+pub const fn any_block() -> OperandPat {
+    OperandPat {
+        name: "",
+        kind: OperandKind::Block(Block::Any),
         not: false,
         generate: None,
     }
@@ -556,6 +570,7 @@ fn matches(ctx: &MatchContext, id: NodeId, pat: &Pat, m: &mut NameMap) -> bool {
                         OperandKind::Slot(Slot::Type(ty)) => {
                             matches!(n, &OperandNode::Slot(slot) if ty == &slot.ty.into())
                         }
+                        OperandKind::Block(_) => matches!(n, &OperandNode::Block(_)),
                         OperandKind::Invalid => panic!(),
                     };
                     if op.not {

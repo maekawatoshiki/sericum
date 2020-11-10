@@ -6,8 +6,8 @@ use crate::codegen::common::{
         module::DAGModule,
         node::{IROpcode, MINode, NodeId, OperandNode},
         pat_match::{
-            any_i32_imm, any_i64_imm, any_slot, inst_select, ir, reg_class, slot, MatchContext,
-            Pat, ReplacedNodeMap,
+            any_block, any_i32_imm, any_slot, inst_select, ir, reg_class, slot, MatchContext, Pat,
+            ReplacedNodeMap,
         },
     },
     types::MVType,
@@ -80,7 +80,6 @@ fn run_on_function(func: &mut DAGFunction) {
         })
         .into();
 
-    // let bin: Pat = ir(IROpcode::Add).args(vec![any_reg().into(),
     #[rustfmt::skip]
     let bin: Pat = {
         let add32 = ir(IROpcode::Add).named("bin").ty(Type::i32).args(vec![                 reg_class(RC::GR32) .named("lhs").into(), (reg_class(RC::GR32) | any_i32_imm()).named("rhs").into()]);
@@ -119,7 +118,15 @@ fn run_on_function(func: &mut DAGFunction) {
         }).into()
     };
 
-    let pats = vec![store, load, bin];
+    let br: Pat = ir(IROpcode::Br)
+        .args(vec![any_block().named("dst").into()])
+        .generate(|m, c| {
+            c.arena
+                .alloc(MINode::new(MachineOpcode::JMP).args(vec![m["dst"]]).into())
+        })
+        .into();
+
+    let pats = vec![store, load, bin, br];
 
     let mut replaced = ReplacedNodeMap::default();
     for &id in &func.dag_basic_blocks {
