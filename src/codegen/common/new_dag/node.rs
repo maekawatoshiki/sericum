@@ -396,6 +396,10 @@ impl Node {
             self_id,
             match self {
                 Self::IR(IRNode { ty, .. }) => tys.to_string(*ty),
+                Self::MI(MINode {
+                    reg_class: Some(rc),
+                    ..
+                }) => format!("{:?}", rc),
                 _ => "".to_string(),
             }
         )?;

@@ -11,6 +11,7 @@ pub use crate::codegen::common::new_dag::mc_convert::ScheduleContext;
 use crate::codegen::common::new_dag::node::{
     IRNode, IROpcode, ImmediateKind, MINode, Node, NodeId, OperandNode,
 };
+use crate::codegen::common::types::MVType;
 // use crate::ir::types::*;
 
 impl<'a> ScheduleContext<'a> {
@@ -63,6 +64,67 @@ impl<'a> ScheduleContext<'a> {
                     self.block_id,
                 ))
             }
+            Node::IR(IRNode {
+                opcode: IROpcode::Div,
+                args,
+                mvty,
+                ..
+            }) => {
+                let regs = match mvty {
+                    MVType::i8 => to_phys!(GR32::EAX, GR32::EDX),
+                    MVType::i32 => to_phys!(GR32::EAX, GR32::EDX),
+                    _ => todo!(),
+                };
+                let (eax, edx) = (
+                    RegisterOperand::new(self.func.regs.get_phys_reg(regs[0])),
+                    RegisterOperand::new(self.func.regs.get_phys_reg(regs[0])),
+                );
+                let (mut lhs, mut rhs) = (self.normal_arg(args[0]), self.normal_arg(args[1]));
+                if mvty == &MVType::i8 {
+                    if let MachineOperand::Register(r) = &mut lhs {
+                        *r = r.sub_super(Some(RegisterClassKind::GR32))
+                    }
+                    if let MachineOperand::Register(r) = &mut rhs {
+                        *r = r.sub_super(Some(RegisterClassKind::GR32))
+                    }
+                }
+                self.append_inst(
+                    MachineInst::new_simple(
+                        mov_rx(regs[0].reg_class(), &lhs).unwrap(),
+                        vec![lhs],
+                        self.block_id,
+                    )
+                    .with_def(vec![eax]),
+                );
+                self.append_inst(
+                    MachineInst::new_simple(MachineOpcode::CDQ, vec![], self.block_id)
+                        .with_imp_defs(vec![eax, edx])
+                        .with_imp_use(eax),
+                );
+                let mov = MachineInst::new(
+                    &self.func.regs,
+                    mov_rx(regs[0].reg_class(), &rhs).unwrap(),
+                    vec![rhs],
+                    Some(regs[0].reg_class()),
+                    self.block_id,
+                );
+                let rhs = MachineOperand::Register(mov.def[0]);
+                self.append_inst(mov);
+                self.append_inst(
+                    MachineInst::new_simple(MachineOpcode::IDIV, vec![rhs], self.block_id)
+                        .with_imp_defs(vec![eax, edx])
+                        .with_imp_uses(vec![eax, edx]),
+                );
+                let copy = MachineInst::new(
+                    &self.func.regs,
+                    MachineOpcode::Copy,
+                    vec![MachineOperand::Register(eax)],
+                    Some(regs[0].reg_class()),
+                    self.block_id,
+                );
+                self.append_inst(copy)
+            }
+
             Node::IR(IRNode {
                 opcode: IROpcode::Ret,
                 args,

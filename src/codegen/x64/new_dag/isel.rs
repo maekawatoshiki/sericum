@@ -83,12 +83,21 @@ fn run_on_function(func: &mut DAGFunction) {
     // let bin: Pat = ir(IROpcode::Add).args(vec![any_reg().into(),
     #[rustfmt::skip]
     let bin: Pat = {
-        let add32 = ir(IROpcode::Add).named("bin").ty(Type::i32).args(vec![reg_class(RC::GR32).named("lhs").into(), (reg_class(RC::GR32) | any_i32_imm()).named("rhs").into()]);
-        let add64 = ir(IROpcode::Add).named("bin").ty(Type::i64).args(vec![reg_class(RC::GR64).named("lhs").into(), (reg_class(RC::GR64) | any_i32_imm()).named("rhs").into()]);
-        let sub32 = ir(IROpcode::Sub).named("bin").ty(Type::i32).args(vec![reg_class(RC::GR32).named("lhs").into(), (reg_class(RC::GR32) | any_i32_imm()).named("rhs").into()]);
-        let sub64 = ir(IROpcode::Sub).named("bin").ty(Type::i64).args(vec![reg_class(RC::GR64).named("lhs").into(), (reg_class(RC::GR64) | any_i32_imm()).named("rhs").into()]);
-        ((add32 | add64) | (sub32 | sub64)).generate(|m, c| {
+        let add32 = ir(IROpcode::Add).named("bin").ty(Type::i32).args(vec![                 reg_class(RC::GR32) .named("lhs").into(), (reg_class(RC::GR32) | any_i32_imm()).named("rhs").into()]);
+        let add64 = ir(IROpcode::Add).named("bin").ty(Type::i64).args(vec![                 reg_class(RC::GR64) .named("lhs").into(), (reg_class(RC::GR64) | any_i32_imm()).named("rhs").into()]);
+        let sub32 = ir(IROpcode::Sub).named("bin").ty(Type::i32).args(vec![(any_i32_imm() | reg_class(RC::GR32)).named("lhs").into(), (reg_class(RC::GR32) | any_i32_imm()).named("rhs").into()]);
+        let sub64 = ir(IROpcode::Sub).named("bin").ty(Type::i64).args(vec![                 reg_class(RC::GR64) .named("lhs").into(), (reg_class(RC::GR64) | any_i32_imm()).named("rhs").into()]);
+        let mul32 = ir(IROpcode::Mul).named("bin").ty(Type::i32).args(vec![                 reg_class(RC::GR32) .named("lhs").into(), (reg_class(RC::GR32) | any_i32_imm()).named("rhs").into()]);
+        let mul64 = ir(IROpcode::Mul).named("bin").ty(Type::i64).args(vec![                 reg_class(RC::GR64) .named("lhs").into(),                        any_i32_imm() .named("rhs").into()]);
+                // GR32 a {
+                //     GR32  b => (mi.IMULrr32  a, b)
+                //     imm32 b => (mi.IMULrri32 a, b) }
+                // GR64 a {
+                //     imm32 b => (mi.IMULrr64i32 a, b) }
+        ((add32 | add64) | (sub32 | sub64) | (mul32 | mul64)).generate(|m, c| {
             let ty = c.arena[m["bin"]].as_ir().mvty;
+            let lhs = if matches!(c.arena[m["lhs"]].as_operand(), OperandNode::Imm(_)) {
+                c.arena.alloc(MINode::new(MachineOpcode::MOVri32).args(vec![m["lhs"]]).into()) } else { m["lhs"] };
             let rhs = c.arena[m["rhs"]].as_operand();
             let opcode = match c.arena[m["bin"]].as_ir().opcode {
                 IROpcode::Add if matches!(ty, MVType::i32) && matches!(rhs, OperandNode::Imm(_)) => MachineOpcode::ADDri32,
@@ -99,10 +108,13 @@ fn run_on_function(func: &mut DAGFunction) {
                 IROpcode::Sub if matches!(ty, MVType::i32) && matches!(rhs, OperandNode::Reg(_)) => MachineOpcode::SUBrr32,
                 IROpcode::Sub if matches!(ty, MVType::i64) && matches!(rhs, OperandNode::Imm(_)) => MachineOpcode::SUBr64i32,
                 // IROpcode::Sub if matches!(ty, MVType::i64) && matches!(op, OperandNode::Reg(_)) => MachineOpcode::SUBrr64,
+                IROpcode::Mul if matches!(ty, MVType::i32) && matches!(rhs, OperandNode::Imm(_)) => MachineOpcode::IMULrri32,
+                IROpcode::Mul if matches!(ty, MVType::i32) && matches!(rhs, OperandNode::Reg(_)) => MachineOpcode::IMULrr32,
+                IROpcode::Mul if matches!(ty, MVType::i64) && matches!(rhs, OperandNode::Imm(_)) => MachineOpcode::IMULrr64i32,
                 _ => panic!() 
             };
             c.arena.alloc(MINode::new(opcode).args(vec![
-                m["lhs"], m["rhs"]
+                lhs, m["rhs"]
             ]).reg_class(opcode.inst_def().unwrap().def_reg_class()).into())
         }).into()
     };
