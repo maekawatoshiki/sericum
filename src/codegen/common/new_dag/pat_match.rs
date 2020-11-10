@@ -249,9 +249,40 @@ impl Into<Pat> for OperandPat {
     }
 }
 
+impl Into<CompoundPat> for OperandPat {
+    fn into(self) -> CompoundPat {
+        CompoundPat {
+            name: "",
+            pats: vec![self.into()],
+            generate: None,
+        }
+    }
+}
+
+impl Into<CompoundPat> for IRPat {
+    fn into(self) -> CompoundPat {
+        CompoundPat {
+            name: "",
+            pats: vec![self.into()],
+            generate: None,
+        }
+    }
+}
+
 impl Into<Pat> for CompoundPat {
     fn into(self) -> Pat {
         Pat::Compound(self)
+    }
+}
+
+impl Into<Pat> for RC {
+    fn into(self) -> Pat {
+        Pat::Operand(OperandPat {
+            name: "",
+            kind: OperandKind::Reg(Register::Class(self)),
+            not: false,
+            generate: None,
+        })
     }
 }
 
@@ -274,6 +305,21 @@ impl BitOr for OperandPat {
         CompoundPat {
             name: "",
             pats: vec![self.into(), rhs.into()],
+            generate: None,
+        }
+    }
+}
+
+impl BitOr for CompoundPat {
+    type Output = CompoundPat;
+
+    fn bitor(self, rhs: Self) -> Self::Output {
+        CompoundPat {
+            name: "",
+            pats: vec![self.pats, rhs.pats]
+                .into_iter()
+                .flatten()
+                .collect::<Vec<Pat>>(),
             generate: None,
         }
     }

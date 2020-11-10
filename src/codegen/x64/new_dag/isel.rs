@@ -83,25 +83,29 @@ fn run_on_function(func: &mut DAGFunction) {
     // let bin: Pat = ir(IROpcode::Add).args(vec![any_reg().into(),
     #[rustfmt::skip]
     let bin: Pat = {
-        let addi32 = ir(IROpcode::Add).named("bin").ty(Type::i32).args(vec![reg_class(RC::GR32).named("lhs").into(), (reg_class(RC::GR32) | any_i32_imm()).named("rhs").into()]);
-        let addi64 = ir(IROpcode::Add).named("bin").ty(Type::i64).args(vec![reg_class(RC::GR64).named("lhs").into(), (reg_class(RC::GR64) | any_i64_imm()).named("rhs").into()]);
-        (addi32 | addi64).generate(|m, c| {
+        let add32 = ir(IROpcode::Add).named("bin").ty(Type::i32).args(vec![reg_class(RC::GR32).named("lhs").into(), (reg_class(RC::GR32) | any_i32_imm()).named("rhs").into()]);
+        let add64 = ir(IROpcode::Add).named("bin").ty(Type::i64).args(vec![reg_class(RC::GR64).named("lhs").into(), (reg_class(RC::GR64) | any_i32_imm()).named("rhs").into()]);
+        let sub32 = ir(IROpcode::Sub).named("bin").ty(Type::i32).args(vec![reg_class(RC::GR32).named("lhs").into(), (reg_class(RC::GR32) | any_i32_imm()).named("rhs").into()]);
+        let sub64 = ir(IROpcode::Sub).named("bin").ty(Type::i64).args(vec![reg_class(RC::GR64).named("lhs").into(), (reg_class(RC::GR64) | any_i32_imm()).named("rhs").into()]);
+        ((add32 | add64) | (sub32 | sub64)).generate(|m, c| {
             let ty = c.arena[m["bin"]].as_ir().mvty;
-            let op = c.arena[m["rhs"]].as_operand();
+            let rhs = c.arena[m["rhs"]].as_operand();
             let opcode = match c.arena[m["bin"]].as_ir().opcode {
-                IROpcode::Add if matches!(ty, MVType::i32) && matches!(op, OperandNode::Imm(_)) => MachineOpcode::ADDri32,
-                IROpcode::Add if matches!(ty, MVType::i32) && matches!(op, OperandNode::Reg(_)) => MachineOpcode::ADDrr32,
-                IROpcode::Add if matches!(ty, MVType::i64) && matches!(op, OperandNode::Imm(_)) => MachineOpcode::ADDr64i32,
-                IROpcode::Add if matches!(ty, MVType::i64) && matches!(op, OperandNode::Reg(_)) => MachineOpcode::ADDr64i32,
+                IROpcode::Add if matches!(ty, MVType::i32) && matches!(rhs, OperandNode::Imm(_)) => MachineOpcode::ADDri32,
+                IROpcode::Add if matches!(ty, MVType::i32) && matches!(rhs, OperandNode::Reg(_)) => MachineOpcode::ADDrr32,
+                IROpcode::Add if matches!(ty, MVType::i64) && matches!(rhs, OperandNode::Imm(_)) => MachineOpcode::ADDr64i32,
+                IROpcode::Add if matches!(ty, MVType::i64) && matches!(rhs, OperandNode::Reg(_)) => MachineOpcode::ADDrr64,
+                IROpcode::Sub if matches!(ty, MVType::i32) && matches!(rhs, OperandNode::Imm(_)) => MachineOpcode::SUBri32,
+                IROpcode::Sub if matches!(ty, MVType::i32) && matches!(rhs, OperandNode::Reg(_)) => MachineOpcode::SUBrr32,
+                IROpcode::Sub if matches!(ty, MVType::i64) && matches!(rhs, OperandNode::Imm(_)) => MachineOpcode::SUBr64i32,
+                // IROpcode::Sub if matches!(ty, MVType::i64) && matches!(op, OperandNode::Reg(_)) => MachineOpcode::SUBrr64,
                 _ => panic!() 
             };
             c.arena.alloc(MINode::new(opcode).args(vec![
-                m["lhs"],
-                m["rhs"]
+                m["lhs"], m["rhs"]
             ]).reg_class(opcode.inst_def().unwrap().def_reg_class()).into())
         }).into()
     };
-    // let bin: Pat = addi32.
 
     let pats = vec![store, load, bin];
 
