@@ -1,6 +1,6 @@
 // use super::{node, node::*};
 use crate::codegen::arch::dag::node::MemKind;
-// use crate::codegen::arch::frame_object::FrameIndexInfo;
+use crate::codegen::arch::frame_object::FrameIndexInfo;
 use crate::codegen::arch::machine::abi::SystemV;
 use crate::codegen::arch::machine::inst::*;
 use crate::codegen::arch::machine::register::*;
@@ -184,8 +184,8 @@ impl<'a> ScheduleContext<'a> {
                     MachineOperand::Mem(MachineMemOperand::BaseFi(_, fi)) => fi,
                     _ => panic!(),
                 };
-                todo!();
-                // arg_regs.append(&mut self.pass_struct_byval(&mut arg_regs_order, &mut off, ty, fi));
+                // todo!();
+                arg_regs.append(&mut self.pass_struct_byval(&mut arg_regs_order, &mut off, ty, fi));
                 continue;
             }
 
@@ -210,20 +210,19 @@ impl<'a> ScheduleContext<'a> {
                 }
                 None => {
                     // Put the exceeded value onto the stack
-                    todo!()
-                    // let inst = MachineInst::new_simple(
-                    //     mov_mx(&self.func.regs, &arg).unwrap(),
-                    //     vec![
-                    //         MachineOperand::Mem(MachineMemOperand::BaseOff(
-                    //             RegisterOperand::new(self.func.regs.get_phys_reg(GR64::RSP)),
-                    //             off,
-                    //         )),
-                    //         arg,
-                    //     ],
-                    //     self.block_id,
-                    // );
-                    // off += 8;
-                    // inst
+                    let inst = MachineInst::new_simple(
+                        mov_mx(&self.func.regs, &arg).unwrap(),
+                        vec![
+                            MachineOperand::Mem(MachineMemOperand::BaseOff(
+                                RegisterOperand::new(self.func.regs.get_phys_reg(GR64::RSP)),
+                                off,
+                            )),
+                            arg,
+                        ],
+                        self.block_id,
+                    );
+                    off += 8;
+                    inst
                 }
             };
 
@@ -282,6 +281,99 @@ impl<'a> ScheduleContext<'a> {
             self.block_id,
         );
         self.append_inst(copy)
+    }
+
+    fn pass_struct_byval<ABI>(
+        &mut self,
+        arg_regs_order: &mut ArgumentRegisterOrder<ABI>,
+        off: &mut i32,
+        ty: Type,
+        fi: FrameIndexInfo,
+    ) -> Vec<RegisterOperand>
+    where
+        ABI: CallingConv,
+    {
+        let mut arg_regs = vec![];
+        let struct_ty = self.func.types.get_element_ty(ty, None).unwrap();
+        let base = &self.func.types.base.borrow();
+        let struct_ty = base.as_struct_ty(struct_ty).unwrap();
+        let sz = struct_ty.size();
+        let mov8 = sz / 8;
+        let mov4 = (sz - 8 * mov8) / 4;
+        let rbp = RegisterOperand::new(self.func.regs.get_phys_reg(GR64::RBP));
+        assert!((sz - 8 * mov8) % 4 == 0);
+        let regs_classes = SystemV::reg_classes_used_for_passing_byval(struct_ty);
+
+        if sz <= 16 && arg_regs_order.regs_available_for(&regs_classes) {
+            let mut off = 0;
+            for &rc in &regs_classes {
+                let r = RegisterOperand::new(
+                    self.func
+                        .regs
+                        .get_phys_reg(arg_regs_order.next(rc).unwrap()),
+                );
+                arg_regs.push(r);
+
+                let mem = MachineOperand::Mem(if off == 0 {
+                    MachineMemOperand::BaseFi(rbp, fi.clone())
+                } else {
+                    MachineMemOperand::BaseFiOff(rbp, fi.clone(), off as i32)
+                });
+
+                let mov = MachineInst::new_simple(
+                    match rc {
+                        RegisterClassKind::GR32 => MachineOpcode::MOVrm32,
+                        RegisterClassKind::GR64 => MachineOpcode::MOVrm64,
+                        RegisterClassKind::XMM => MachineOpcode::MOVSDrm,
+                        RegisterClassKind::GR8 => unimplemented!(),
+                    },
+                    vec![mem],
+                    self.block_id,
+                )
+                .with_def(vec![r]);
+                self.append_inst(mov);
+                off += match rc {
+                    RegisterClassKind::XMM => 8,
+                    _ => rc.size_in_byte(),
+                };
+            }
+            return arg_regs;
+        }
+
+        let mut offset = 0;
+        for (c, s, rc, op) in vec![
+            (mov8, 8, RegisterClassKind::GR64, MachineOpcode::MOVrm64),
+            (mov4, 4, RegisterClassKind::GR32, MachineOpcode::MOVrm32),
+        ]
+        .into_iter()
+        {
+            for _ in 0..c {
+                let r = RegisterOperand::new(self.func.regs.new_virt_reg(rc));
+                let mem = if offset == 0 {
+                    MachineOperand::Mem(MachineMemOperand::BaseFi(rbp, fi.clone()))
+                } else {
+                    MachineOperand::Mem(MachineMemOperand::BaseFiOff(rbp, fi.clone(), offset))
+                };
+                let mov = MachineInst::new_simple(op, vec![mem], self.block_id).with_def(vec![r]);
+                self.append_inst(mov);
+                let mov = MachineInst::new_simple(
+                    MachineOpcode::MOVmr64,
+                    vec![
+                        MachineOperand::Mem(MachineMemOperand::BaseOff(
+                            RegisterOperand::new(self.func.regs.get_phys_reg(GR64::RSP)),
+                            *off + offset as i32,
+                        )),
+                        MachineOperand::Register(r),
+                    ],
+                    self.block_id,
+                );
+                self.append_inst(mov);
+                offset += s;
+            }
+        }
+        *off += sz as i32;
+
+        vec![]
     }
 
     fn convert_ret(&mut self, arg: NodeId) -> MachineInstId {
@@ -347,5 +439,39 @@ pub fn mov_rx(rc: RegisterClassKind, arg: &MachineOperand) -> Option<MachineOpco
         RegisterClassKind::GR32 => Some(mov32rx[idx]),
         RegisterClassKind::GR64 => Some(mov64rx[idx]),
         RegisterClassKind::XMM => Some(movsdrx[idx]),
+    }
+}
+
+pub fn mov_mx(regs: &RegistersInfo, arg: &MachineOperand) -> Option<MachineOpcode> {
+    // TODO: We'd better use another way to determine if arg is floating-point value or not
+    if arg.get_type(regs).unwrap() == Type::f64 {
+        return match arg {
+            MachineOperand::Register(_) => Some(MachineOpcode::MOVSDmr),
+            _ => None,
+        };
+    }
+
+    let mov32mx = [MachineOpcode::MOVmr32, MachineOpcode::MOVmi32];
+    let mov64mx = [MachineOpcode::MOVmr64, MachineOpcode::MOVmi64];
+    // let mov64rx = [
+    //     MachineOpcode::MOVrr64,
+    //     MachineOpcode::MOVri64,
+    //     MachineOpcode::MOVrm64,
+    // ];
+    let (bit, n) = match arg {
+        MachineOperand::Register(r) => {
+            if let Some(sub_super) = r.sub_super {
+                (sub_super.size_in_bits(), 0)
+            } else {
+                (regs.arena_ref()[r.id].reg_class.size_in_bits(), 0)
+            }
+        }
+        MachineOperand::Constant(c) => (c.size_in_bits(), 1),
+        _ => return None, // TODO: Support Address?
+    };
+    match bit {
+        32 => Some(mov32mx[n]),
+        64 => Some(mov64mx[n]),
+        _ => None,
     }
 }
