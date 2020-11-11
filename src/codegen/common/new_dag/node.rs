@@ -177,6 +177,20 @@ impl OperandNode {
             _ => panic!(),
         }
     }
+
+    pub fn as_cc(&self) -> &CondKind {
+        match self {
+            Self::CC(x) => x,
+            _ => panic!(),
+        }
+    }
+
+    pub fn as_block(&self) -> &DAGBasicBlockId {
+        match self {
+            Self::Block(x) => x,
+            _ => panic!(),
+        }
+    }
 }
 
 impl ImmediateKind {

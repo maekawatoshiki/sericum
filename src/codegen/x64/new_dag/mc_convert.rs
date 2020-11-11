@@ -10,7 +10,7 @@ use crate::codegen::common::machine::inst_def::DefOrUseReg;
 pub use crate::codegen::common::new_dag::mc_convert::ScheduleContext;
 use crate::codegen::common::new_dag::{
     node,
-    node::{IRNode, IROpcode, ImmediateKind, MINode, Node, NodeId, OperandNode},
+    node::{CondKind, IRNode, IROpcode, ImmediateKind, MINode, Node, NodeId, OperandNode},
 };
 use crate::codegen::common::types::MVType;
 use crate::ir::types::Type;
@@ -65,6 +65,43 @@ impl<'a> ScheduleContext<'a> {
                     self.block_id,
                 ))
             }
+            Node::IR(IRNode {
+                opcode: IROpcode::Brcc,
+                args,
+                ..
+            }) => {
+                let lhs = self.normal_arg(args[1]);
+                let rhs = self.normal_arg(args[2]);
+
+                self.append_inst(MachineInst::new_simple(
+                    if lhs.is_register() && rhs.is_constant() {
+                        MachineOpcode::CMPri
+                    } else if lhs.is_register() && rhs.is_register() {
+                        MachineOpcode::CMPrr
+                    } else {
+                        unreachable!()
+                    },
+                    vec![lhs, rhs],
+                    self.block_id,
+                ));
+
+                self.append_inst(MachineInst::new_simple(
+                    match self.func.node_arena[args[0]].as_operand().as_cc() {
+                        CondKind::Eq => MachineOpcode::JE,
+                        CondKind::Ne => MachineOpcode::JNE,
+                        CondKind::Le => MachineOpcode::JLE,
+                        CondKind::Lt => MachineOpcode::JL,
+                        CondKind::Ge => MachineOpcode::JGE,
+                        CondKind::Gt => MachineOpcode::JG,
+                        _ => unreachable!(),
+                    },
+                    vec![MachineOperand::Branch(
+                        self.bb_map[self.func.node_arena[args[3]].as_operand().as_block()],
+                    )],
+                    self.block_id,
+                ))
+            }
+            // TODO: Functionize
             Node::IR(IRNode {
                 opcode: IROpcode::Div,
                 args,
@@ -184,7 +221,6 @@ impl<'a> ScheduleContext<'a> {
                     MachineOperand::Mem(MachineMemOperand::BaseFi(_, fi)) => fi,
                     _ => panic!(),
                 };
-                // todo!();
                 arg_regs.append(&mut self.pass_struct_byval(&mut arg_regs_order, &mut off, ty, fi));
                 continue;
             }
@@ -418,6 +454,7 @@ impl<'a> ScheduleContext<'a> {
                     name.clone(),
                 )))
             }
+            Node::Operand(OperandNode::Block(id)) => MachineOperand::Branch(self.bb_map[id]),
             Node::IR(_) | Node::MI(_) => MachineOperand::Register(self.convert(arg).unwrap()),
             e => todo!("{:?}", e),
         }

@@ -15,6 +15,7 @@ pub struct MatchContext<'a> {
     pub regs: &'a RegistersInfo,
 }
 
+#[derive(Clone)]
 pub enum Pat {
     IR(IRPat),
     MI,
@@ -23,6 +24,7 @@ pub enum Pat {
     Invalid,
 }
 
+#[derive(Clone)]
 pub struct IRPat {
     pub name: &'static str,
     pub opcode: Option<IROpcode>,
@@ -31,8 +33,10 @@ pub struct IRPat {
     pub generate: Option<Box<GenFn>>,
 }
 
+#[derive(Clone)]
 pub struct MIPat {}
 
+#[derive(Clone)]
 pub struct OperandPat {
     pub name: &'static str,
     pub kind: OperandKind,
@@ -40,21 +44,25 @@ pub struct OperandPat {
     pub generate: Option<Box<GenFn>>,
 }
 
+#[derive(Clone)]
 pub struct CompoundPat {
     pub name: &'static str,
     pub pats: Vec<Pat>,
     pub generate: Option<Box<GenFn>>,
 }
 
+#[derive(Clone)]
 pub enum OperandKind {
+    Any,
     Imm(Immediate),
     Slot(Slot),
     Reg(Register),
     Block(Block),
+    CC(Condition),
     Invalid,
 }
 
-#[derive(PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub enum Immediate {
     AnyInt32,
     AnyInt64,
@@ -62,17 +70,25 @@ pub enum Immediate {
     Any,
 }
 
+#[derive(Clone)]
 pub enum Slot {
     Type(MVType),
     Any,
 }
 
+#[derive(Clone)]
 pub enum Register {
     Class(RC),
     Any,
 }
 
+#[derive(Clone)]
 pub enum Block {
+    Any,
+}
+
+#[derive(Clone)]
+pub enum Condition {
     Any,
 }
 
@@ -133,7 +149,7 @@ impl OperandPat {
         self
     }
 
-    pub fn imm(mut self) -> Self {
+    pub fn any_imm(mut self) -> Self {
         self.kind = OperandKind::Imm(Immediate::Any);
         self
     }
@@ -170,7 +186,25 @@ pub const fn not() -> OperandPat {
     }
 }
 
-pub const fn imm() -> OperandPat {
+pub const fn any() -> OperandPat {
+    OperandPat {
+        name: "",
+        kind: OperandKind::Any,
+        not: false,
+        generate: None,
+    }
+}
+
+pub const fn any_cc() -> OperandPat {
+    OperandPat {
+        name: "",
+        kind: OperandKind::CC(Condition::Any),
+        not: false,
+        generate: None,
+    }
+}
+
+pub const fn any_imm() -> OperandPat {
     OperandPat {
         name: "",
         kind: OperandKind::Imm(Immediate::Any),
@@ -551,6 +585,7 @@ fn matches(ctx: &MatchContext, id: NodeId, pat: &Pat, m: &mut NameMap) -> bool {
             let matches_ = match &ctx.arena[id] {
                 Node::Operand(n) => {
                     let matches_ = match &op.kind {
+                        OperandKind::Any => true,
                         OperandKind::Imm(Immediate::AnyInt32) => {
                             matches!(n, &OperandNode::Imm(ImmediateKind::Int32(_)))
                         }
@@ -571,6 +606,7 @@ fn matches(ctx: &MatchContext, id: NodeId, pat: &Pat, m: &mut NameMap) -> bool {
                             matches!(n, &OperandNode::Slot(slot) if ty == &slot.ty.into())
                         }
                         OperandKind::Block(_) => matches!(n, &OperandNode::Block(_)),
+                        OperandKind::CC(Condition::Any) => matches!(n, &OperandNode::CC(_)),
                         OperandKind::Invalid => panic!(),
                     };
                     if op.not {
