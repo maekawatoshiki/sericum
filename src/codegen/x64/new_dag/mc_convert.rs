@@ -169,6 +169,28 @@ impl<'a> ScheduleContext<'a> {
                 ..
             }) => self.convert_call(*ty, args),
             Node::IR(IRNode {
+                opcode: IROpcode::Phi,
+                args,
+                ty,
+                ..
+            }) => {
+                let mut operands = vec![];
+                for i in (0..args.len()).step_by(2) {
+                    let val = args[i];
+                    let block = args[i + 1];
+                    operands.push(self.normal_arg(val));
+                    operands.push(self.normal_arg(block));
+                }
+                let phi_inst = MachineInst::new(
+                    &self.func.regs,
+                    MachineOpcode::Phi,
+                    operands,
+                    ty2rc(ty),
+                    self.block_id,
+                );
+                self.append_inst(phi_inst)
+            }
+            Node::IR(IRNode {
                 opcode: IROpcode::Ret,
                 args,
                 ..
