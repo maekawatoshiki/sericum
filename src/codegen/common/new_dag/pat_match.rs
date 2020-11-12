@@ -64,6 +64,7 @@ pub enum OperandKind {
 
 #[derive(Clone, PartialEq, Eq)]
 pub enum Immediate {
+    AnyInt8,
     AnyInt32,
     AnyInt64,
     Int32(i32),
@@ -217,6 +218,15 @@ pub const fn i32_imm(i: i32) -> OperandPat {
     OperandPat {
         name: "",
         kind: OperandKind::Imm(Immediate::Int32(i)),
+        not: false,
+        generate: None,
+    }
+}
+
+pub const fn any_i8_imm() -> OperandPat {
+    OperandPat {
+        name: "",
+        kind: OperandKind::Imm(Immediate::AnyInt8),
         not: false,
         generate: None,
     }
@@ -545,47 +555,64 @@ fn operand_select(
 }
 
 fn try_match(ctx: &mut MatchContext, id: NodeId, pat: &Pat, m: &mut NameMap) -> Option<Box<GenFn>> {
-    if !matches(ctx, id, pat, m) {
+    if let Some(f) = matches(ctx, id, pat, m) {
+        return f;
+    } else {
         return None;
     }
 
-    println!("{:?}", m);
-
-    match pat {
-        Pat::IR(pat) => return pat.generate.clone(),
-        Pat::MI => panic!(),
-        Pat::Operand(pat) => return pat.generate.clone(),
-        Pat::Compound(pat) => return pat.generate.clone(),
-        Pat::Invalid => panic!(),
-    }
+    // if !matches(ctx, id, pat, m) {
+    //     return None;
+    // }
+    //
+    // println!("{:?}", m);
+    //
+    // match pat {
+    //     Pat::IR(pat) => return pat.generate.clone(),
+    //     Pat::MI => panic!(),
+    //     Pat::Operand(pat) => return pat.generate.clone(),
+    //     Pat::Compound(pat) => return pat.generate.clone(),
+    //     Pat::Invalid => panic!(),
+    // }
 }
 
-fn matches(ctx: &MatchContext, id: NodeId, pat: &Pat, m: &mut NameMap) -> bool {
+fn matches(
+    ctx: &MatchContext,
+    id: NodeId,
+    pat: &Pat,
+    m: &mut NameMap,
+) -> Option<Option<Box<GenFn>>> {
     match pat {
         Pat::IR(pat) => {
             let n = match &ctx.arena[id] {
                 Node::IR(ir) => ir,
-                _ => return false,
+                _ => return None,
             };
             let same_opcode = Some(n.opcode) == pat.opcode;
             let same_operands = pat
                 .operands
                 .iter()
                 .zip(n.args.iter())
-                .all(|(pat, &id)| matches(ctx, id, pat, m));
+                .all(|(pat, &id)| matches(ctx, id, pat, m).is_some());
             let same_ty = pat.ty.map_or(true, |ty| n.ty == ty);
-            let matches_ = same_opcode && same_operands && same_ty;
-            if matches_ && !pat.name.is_empty() {
-                m.insert(pat.name, id);
+            if same_opcode && same_operands && same_ty {
+                if !pat.name.is_empty() {
+                    m.insert(pat.name, id);
+                }
+                Some(pat.generate.clone())
+            } else {
+                None
             }
-            matches_
         }
-        Pat::MI => false,
+        Pat::MI => None,
         Pat::Operand(op) => {
             let matches_ = match &ctx.arena[id] {
                 Node::Operand(n) => {
                     let matches_ = match &op.kind {
                         OperandKind::Any => true,
+                        OperandKind::Imm(Immediate::AnyInt8) => {
+                            matches!(n, &OperandNode::Imm(ImmediateKind::Int8(_)))
+                        }
                         OperandKind::Imm(Immediate::AnyInt32) => {
                             matches!(n, &OperandNode::Imm(ImmediateKind::Int32(_)))
                         }
@@ -609,39 +636,47 @@ fn matches(ctx: &MatchContext, id: NodeId, pat: &Pat, m: &mut NameMap) -> bool {
                         OperandKind::CC(Condition::Any) => matches!(n, &OperandNode::CC(_)),
                         OperandKind::Invalid => panic!(),
                     };
-                    if op.not {
-                        !matches_
+                    if if op.not { !matches_ } else { matches_ } {
+                        Some(op.generate.clone())
                     } else {
-                        matches_
+                        None
                     }
                 }
                 Node::IR(IRNode { ty, .. }) => match &op.kind {
                     OperandKind::Reg(Register::Class(reg_class))
                         if ty2rc(ty).unwrap() == *reg_class =>
                     {
-                        true
+                        Some(op.generate.clone())
                     }
-                    OperandKind::Reg(Register::Any) if !matches!(ty, Type::Void) => true,
-                    _ => false,
+                    OperandKind::Reg(Register::Any) if !matches!(ty, Type::Void) => {
+                        Some(op.generate.clone())
+                    }
+                    _ => None,
                 },
                 Node::MI(MINode { reg_class: rc, .. }) => match &op.kind {
-                    OperandKind::Reg(Register::Class(reg_class)) if rc == &Some(*reg_class) => true,
-                    OperandKind::Reg(Register::Any) if rc.is_some() => true,
-                    _ => false,
+                    OperandKind::Reg(Register::Class(reg_class)) if rc == &Some(*reg_class) => {
+                        Some(op.generate.clone())
+                    }
+                    OperandKind::Reg(Register::Any) if rc.is_some() => Some(op.generate.clone()),
+                    _ => None,
                 },
-                Node::None => false,
+                Node::None => None,
             };
-            if matches_ && !op.name.is_empty() {
+            if matches_.is_some() && !op.name.is_empty() {
                 m.insert(op.name, id);
             }
             matches_
         }
         Pat::Compound(pat) => {
-            let matches_ = pat.pats.iter().any(|pat| matches(ctx, id, pat, m));
-            if matches_ && !pat.name.is_empty() {
+            let matches_ = pat.pats.iter().find_map(|pat| matches(ctx, id, pat, m));
+            if matches_.is_some() && !pat.name.is_empty() {
                 m.insert(pat.name, id);
             }
-            matches_
+            if matches!(matches_, Some(None)) {
+                Some(pat.generate.clone())
+            } else {
+                matches_
+            }
         }
         Pat::Invalid => panic!(),
     }

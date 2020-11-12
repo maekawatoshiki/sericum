@@ -435,19 +435,22 @@ impl<'a> ScheduleContext<'a> {
     }
 
     fn convert_ret(&mut self, arg: NodeId) -> MachineInstId {
-        let arg = self.normal_arg(arg);
         let ret_ty = self
             .func
             .types
             .compound_ty(self.func.ty)
             .as_function()
             .ret_ty;
-        let rc = ty2rc(&ret_ty).unwrap();
-        let opcode = mov_rx(rc, &arg).unwrap();
-        let mov = MachineInst::new_simple(opcode, vec![arg], self.block_id).with_def(vec![
-            RegisterOperand::new(self.func.regs.get_phys_reg(rc.return_value_register())),
-        ]);
-        self.append_inst(mov);
+
+        if ret_ty != Type::Void {
+            let arg = self.normal_arg(arg);
+            let rc = ty2rc(&ret_ty).unwrap();
+            let opcode = mov_rx(rc, &arg).unwrap();
+            let mov = MachineInst::new_simple(opcode, vec![arg], self.block_id).with_def(vec![
+                RegisterOperand::new(self.func.regs.get_phys_reg(rc.return_value_register())),
+            ]);
+            self.append_inst(mov);
+        }
 
         self.append_inst(MachineInst::new_simple(
             MachineOpcode::RET,
@@ -458,10 +461,16 @@ impl<'a> ScheduleContext<'a> {
 
     pub fn normal_arg(&mut self, arg: NodeId) -> MachineOperand {
         match &self.func.node_arena[arg] {
+            Node::Operand(OperandNode::Imm(ImmediateKind::Int8(i))) => {
+                MachineOperand::Constant(MachineConstant::Int8(*i))
+            }
             Node::Operand(OperandNode::Imm(ImmediateKind::Int32(i))) => {
                 MachineOperand::Constant(MachineConstant::Int32(*i))
             }
             Node::Operand(OperandNode::Slot(slot)) => MachineOperand::FrameIndex(*slot),
+            Node::Operand(OperandNode::Mem(MemKind::Base(base))) => MachineOperand::Mem(
+                MachineMemOperand::Base(*self.normal_arg(*base).as_register()),
+            ),
             Node::Operand(OperandNode::Mem(MemKind::BaseFi(base, slot))) => {
                 MachineOperand::Mem(MachineMemOperand::BaseFi(
                     *self.normal_arg(*base).as_register(),
@@ -478,6 +487,7 @@ impl<'a> ScheduleContext<'a> {
             }
             Node::Operand(OperandNode::Block(id)) => MachineOperand::Branch(self.bb_map[id]),
             Node::IR(_) | Node::MI(_) => MachineOperand::Register(self.convert(arg).unwrap()),
+            Node::None => MachineOperand::None,
             e => todo!("{:?}", e),
         }
     }

@@ -1,13 +1,13 @@
 use crate::codegen::arch::machine::register::{RegisterClassKind as RC, GR64};
-use crate::codegen::arch::{dag::node::MemKind, machine::inst::MachineOpcode};
+use crate::codegen::arch::{dag::node::MemKind, machine::inst::MachineOpcode as MO};
 use crate::codegen::common::{
     new_dag::{
         function::DAGFunction,
         module::DAGModule,
-        node::{IROpcode, MINode, NodeId, OperandNode},
+        node::{IROpcode, MINode, Node, NodeId, OperandNode},
         pat_match::{
-            any_block, any_i32_imm, any_slot, inst_select, ir, reg_class, slot, MatchContext, Pat,
-            ReplacedNodeMap,
+            any_block, any_i32_imm, any_i8_imm, any_slot, inst_select, ir, reg_class, slot,
+            MatchContext, Pat, ReplacedNodeMap,
         },
     },
     types::MVType,
@@ -24,25 +24,23 @@ pub fn run(module: &mut DAGModule) {
 }
 
 fn run_on_function(func: &mut DAGFunction) {
-    let store: Pat = ir(IROpcode::Store)
-        .args(vec![
-            ir(IROpcode::FIAddr)
-                .args(vec![slot(MVType::i32).named("dst").into()])
-                .into(),
-            any_i32_imm().named("src").into(),
-        ])
-        .generate(|m, c| {
-            let rbp = c.arena.alloc(c.regs.get_phys_reg(GR64::RBP).into());
-            let mem = c
-                .arena
-                .alloc(OperandNode::Mem(MemKind::BaseFi(rbp, m["dst"])).into());
-            c.arena.alloc(
-                MINode::new(MachineOpcode::MOVmi32)
-                    .args(vec![mem, m["src"]])
-                    .into(),
-            )
-        })
-        .into();
+    #[rustfmt::skip]
+    let store: Pat = (
+                        ir(IROpcode::Store).args(vec![ir(IROpcode::FIAddr).args(vec![slot(MVType::i32).named("dst").into()]).into(), any_i32_imm().named("src").into()])
+                                           .generate(|m, c| {
+                                                let rbp = c.arena.alloc(c.regs.get_phys_reg(GR64::RBP).into());
+                                                let mem = c.arena.alloc(OperandNode::Mem(MemKind::BaseFi(rbp, m["dst"])).into());
+                                                c.arena.alloc(MINode::new(MO::MOVmi32).args(vec![mem, m["src"]]).into()) })
+                      | ir(IROpcode::Store).args(vec![ir(IROpcode::FIAddr).args(vec![slot(MVType::i64).named("dst").into()]).into(), reg_class(RC::GR64).named("src").into()])
+                                           .generate(|m, c| {
+                                                let rbp = c.arena.alloc(c.regs.get_phys_reg(GR64::RBP).into());
+                                                let mem = c.arena.alloc(OperandNode::Mem(MemKind::BaseFi(rbp, m["dst"])).into());
+                                                c.arena.alloc(MINode::new(MO::MOVmr64).args(vec![mem, m["src"]]).into()) })
+                      | ir(IROpcode::Store).args(vec![reg_class(RC::GR64).named("dst").into(), any_i32_imm().named("src").into()])
+                                           .generate(|m, c| {
+                                                let mem = c.arena.alloc(OperandNode::Mem(MemKind::Base(m["dst"])).into());
+                                                c.arena.alloc(MINode::new(MO::MOVmi32).args(vec![mem, m["src"]]).into()) }).into()
+                    ).into();
 
     // TODO: Support GlobalAddr
     let load: Pat = ir(IROpcode::Load)
@@ -64,11 +62,11 @@ fn run_on_function(func: &mut DAGFunction) {
             );
             let opcode = match c.arena[m["load"]].as_ir().mvty {
                 MVType::Void | MVType::Invalid => panic!(),
-                MVType::i1 | MVType::i8 => MachineOpcode::MOVrm8,
+                MVType::i1 | MVType::i8 => MO::MOVrm8,
                 MVType::i16 => panic!(),
-                MVType::i32 => MachineOpcode::MOVrm32,
-                MVType::i64 => MachineOpcode::MOVrm64,
-                MVType::f64 => MachineOpcode::MOVSDrm,
+                MVType::i32 => MO::MOVrm32,
+                MVType::i64 => MO::MOVrm64,
+                MVType::f64 => MO::MOVSDrm,
                 MVType::f32 => panic!(),
             };
             c.arena.alloc(
@@ -88,28 +86,31 @@ fn run_on_function(func: &mut DAGFunction) {
         let sub64 = ir(IROpcode::Sub).named("bin").ty(Type::i64).args(vec![                 reg_class(RC::GR64) .named("lhs").into(), (reg_class(RC::GR64) | any_i32_imm()).named("rhs").into()]);
         let mul32 = ir(IROpcode::Mul).named("bin").ty(Type::i32).args(vec![                 reg_class(RC::GR32) .named("lhs").into(), (reg_class(RC::GR32) | any_i32_imm()).named("rhs").into()]);
         let mul64 = ir(IROpcode::Mul).named("bin").ty(Type::i64).args(vec![                 reg_class(RC::GR64) .named("lhs").into(),                        any_i32_imm() .named("rhs").into()]);
+        let shl32 = ir(IROpcode::Shl).named("bin").ty(Type::i32).args(vec![                 reg_class(RC::GR32) .named("lhs").into(),                        any_i8_imm()  .named("rhs").into()]);
+        let shl64 = ir(IROpcode::Shl).named("bin").ty(Type::i64).args(vec![                 reg_class(RC::GR64) .named("lhs").into(),                        any_i8_imm()  .named("rhs").into()]);
                 // GR32 a {
                 //     GR32  b => (mi.IMULrr32  a, b)
                 //     imm32 b => (mi.IMULrri32 a, b) }
                 // GR64 a {
                 //     imm32 b => (mi.IMULrr64i32 a, b) }
-        ((add32 | add64) | (sub32 | sub64) | (mul32 | mul64)).generate(|m, c| {
+        ((add32 | add64) | (sub32 | sub64) | (mul32 | mul64) | (shl32 | shl64)).generate(|m, c| {
             let ty = c.arena[m["bin"]].as_ir().mvty;
-            let lhs = if matches!(c.arena[m["lhs"]].as_operand(), OperandNode::Imm(_)) {
-                c.arena.alloc(MINode::new(MachineOpcode::MOVri32).args(vec![m["lhs"]]).into()) } else { m["lhs"] };
-            let rhs = c.arena[m["rhs"]].as_operand();
+            let lhs = if matches!(c.arena[m["lhs"]], Node::Operand(OperandNode::Imm(_))) {
+                c.arena.alloc(MINode::new(MO::MOVri32).args(vec![m["lhs"]]).into()) } else { m["lhs"] };
+            let rhs = &c.arena[m["rhs"]];
             let opcode = match c.arena[m["bin"]].as_ir().opcode {
-                IROpcode::Add if matches!(ty, MVType::i32) && matches!(rhs, OperandNode::Imm(_)) => MachineOpcode::ADDri32,
-                IROpcode::Add if matches!(ty, MVType::i32) && matches!(rhs, OperandNode::Reg(_)) => MachineOpcode::ADDrr32,
-                IROpcode::Add if matches!(ty, MVType::i64) && matches!(rhs, OperandNode::Imm(_)) => MachineOpcode::ADDr64i32,
-                IROpcode::Add if matches!(ty, MVType::i64) && matches!(rhs, OperandNode::Reg(_)) => MachineOpcode::ADDrr64,
-                IROpcode::Sub if matches!(ty, MVType::i32) && matches!(rhs, OperandNode::Imm(_)) => MachineOpcode::SUBri32,
-                IROpcode::Sub if matches!(ty, MVType::i32) && matches!(rhs, OperandNode::Reg(_)) => MachineOpcode::SUBrr32,
-                IROpcode::Sub if matches!(ty, MVType::i64) && matches!(rhs, OperandNode::Imm(_)) => MachineOpcode::SUBr64i32,
-                // IROpcode::Sub if matches!(ty, MVType::i64) && matches!(op, OperandNode::Reg(_)) => MachineOpcode::SUBrr64,
-                IROpcode::Mul if matches!(ty, MVType::i32) && matches!(rhs, OperandNode::Imm(_)) => MachineOpcode::IMULrri32,
-                IROpcode::Mul if matches!(ty, MVType::i32) && matches!(rhs, OperandNode::Reg(_)) => MachineOpcode::IMULrr32,
-                IROpcode::Mul if matches!(ty, MVType::i64) && matches!(rhs, OperandNode::Imm(_)) => MachineOpcode::IMULrr64i32,
+                IROpcode::Add if matches!(ty, MVType::i32) && matches!(rhs, Node::Operand(OperandNode::Imm(_))) => MO::ADDri32,
+                IROpcode::Add if matches!(ty, MVType::i32)                                                      => MO::ADDrr32,
+                IROpcode::Add if matches!(ty, MVType::i64) && matches!(rhs, Node::Operand(OperandNode::Imm(_))) => MO::ADDr64i32,
+                IROpcode::Add if matches!(ty, MVType::i64)                                                      => MO::ADDrr64,
+                IROpcode::Sub if matches!(ty, MVType::i32) && matches!(rhs, Node::Operand(OperandNode::Imm(_))) => MO::SUBri32,
+                IROpcode::Sub if matches!(ty, MVType::i32)                                                      => MO::SUBrr32,
+                IROpcode::Sub if matches!(ty, MVType::i64) && matches!(rhs, Node::Operand(OperandNode::Imm(_))) => MO::SUBr64i32,
+                IROpcode::Mul if matches!(ty, MVType::i32) && matches!(rhs, Node::Operand(OperandNode::Imm(_))) => MO::IMULrri32,
+                IROpcode::Mul if matches!(ty, MVType::i32)                                                      => MO::IMULrr32,
+                IROpcode::Mul if matches!(ty, MVType::i64) && matches!(rhs, Node::Operand(OperandNode::Imm(_))) => MO::IMULrr64i32,
+                IROpcode::Shl if matches!(ty, MVType::i32)                                                      => MO::SHLr32i8,
+                IROpcode::Shl if matches!(ty, MVType::i64)                                                      => MO::SHLr64i8,
                 _ => panic!() 
             };
             c.arena.alloc(MINode::new(opcode).args(vec![
@@ -122,11 +123,19 @@ fn run_on_function(func: &mut DAGFunction) {
         .args(vec![any_block().named("dst").into()])
         .generate(|m, c| {
             c.arena
-                .alloc(MINode::new(MachineOpcode::JMP).args(vec![m["dst"]]).into())
+                .alloc(MINode::new(MO::JMP).args(vec![m["dst"]]).into())
         })
         .into();
 
-    let pats = vec![store, load, bin, br];
+    // (ir.FIAddr a) { mem a => (mi.LEAr64m [BaseFi %rbp, a]) }
+    #[rustfmt::skip]
+    let fiaddr: Pat = ir(IROpcode::FIAddr).args(vec![any_slot().named("slot").into()])
+                                          .generate(|m, c| {
+                                              let rbp = c.arena.alloc(c.regs.get_phys_reg(GR64::RBP).into());
+                                              let mem = c.arena.alloc(OperandNode::Mem(MemKind::BaseFi(rbp, m["slot"])).into());
+                                              c.arena.alloc(MINode::new(MO::LEAr64m).args(vec![mem]).reg_class(RC::GR64).into()) }).into();
+
+    let pats = vec![store, load, bin, br, fiaddr];
 
     let mut replaced = ReplacedNodeMap::default();
     for &id in &func.dag_basic_blocks {
