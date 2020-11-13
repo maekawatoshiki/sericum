@@ -69,6 +69,7 @@ pub enum Immediate {
     AnyInt64,
     Int32(i32),
     Any,
+    Null,
 }
 
 #[derive(Clone)]
@@ -200,6 +201,15 @@ pub const fn any_cc() -> OperandPat {
     OperandPat {
         name: "",
         kind: OperandKind::CC(Condition::Any),
+        not: false,
+        generate: None,
+    }
+}
+
+pub const fn null_imm() -> OperandPat {
+    OperandPat {
+        name: "",
+        kind: OperandKind::Imm(Immediate::Null),
         not: false,
         generate: None,
     }
@@ -507,7 +517,7 @@ pub fn inst_select(
         return *replaced;
     }
 
-    println!("{:?}", ctx.arena[id]);
+    println!("{:?} = {:?}", id, ctx.arena[id]);
 
     let mut map = NameMap::default();
     for pat in pats {
@@ -537,12 +547,7 @@ fn operand_select(
     inst_id: NodeId,
     pats: &[Pat],
 ) {
-    let args_id = match &ctx.arena[inst_id] {
-        Node::IR(ir) => ir.args.clone(),
-        Node::MI(mi) => mi.args.clone(),
-        Node::Operand(_) => vec![],
-        Node::None => vec![],
-    };
+    let args_id: Vec<NodeId> = ctx.arena[inst_id].args().into_iter().map(|x| *x).collect();
     let mut replaced_args = ReplacedNodeMap::default();
     for id in args_id {
         let new_id = inst_select(replaced, ctx, id, pats);
@@ -557,23 +562,8 @@ fn operand_select(
 fn try_match(ctx: &mut MatchContext, id: NodeId, pat: &Pat, m: &mut NameMap) -> Option<Box<GenFn>> {
     if let Some(f) = matches(ctx, id, pat, m) {
         return f;
-    } else {
-        return None;
     }
-
-    // if !matches(ctx, id, pat, m) {
-    //     return None;
-    // }
-    //
-    // println!("{:?}", m);
-    //
-    // match pat {
-    //     Pat::IR(pat) => return pat.generate.clone(),
-    //     Pat::MI => panic!(),
-    //     Pat::Operand(pat) => return pat.generate.clone(),
-    //     Pat::Compound(pat) => return pat.generate.clone(),
-    //     Pat::Invalid => panic!(),
-    // }
+    return None;
 }
 
 fn matches(
@@ -604,12 +594,15 @@ fn matches(
                 None
             }
         }
-        Pat::MI => None,
+        Pat::MI => todo!(), // Some(None),
         Pat::Operand(op) => {
             let matches_ = match &ctx.arena[id] {
                 Node::Operand(n) => {
                     let matches_ = match &op.kind {
                         OperandKind::Any => true,
+                        OperandKind::Imm(Immediate::Null) => {
+                            matches!(n, &OperandNode::Imm(i) if i.is_null())
+                        }
                         OperandKind::Imm(Immediate::AnyInt8) => {
                             matches!(n, &OperandNode::Imm(ImmediateKind::Int8(_)))
                         }
@@ -643,6 +636,7 @@ fn matches(
                     }
                 }
                 Node::IR(IRNode { ty, .. }) => match &op.kind {
+                    OperandKind::Any => Some(op.generate.clone()),
                     OperandKind::Reg(Register::Class(reg_class))
                         if ty2rc(ty).unwrap() == *reg_class =>
                     {
@@ -651,14 +645,25 @@ fn matches(
                     OperandKind::Reg(Register::Any) if !matches!(ty, Type::Void) => {
                         Some(op.generate.clone())
                     }
-                    _ => None,
+                    OperandKind::Imm(_)
+                    | OperandKind::Reg(_)
+                    | OperandKind::Block(_)
+                    | OperandKind::CC(_)
+                    | OperandKind::Slot(_) => None,
+                    OperandKind::Invalid => panic!(),
                 },
                 Node::MI(MINode { reg_class: rc, .. }) => match &op.kind {
+                    OperandKind::Any => Some(op.generate.clone()),
                     OperandKind::Reg(Register::Class(reg_class)) if rc == &Some(*reg_class) => {
                         Some(op.generate.clone())
                     }
                     OperandKind::Reg(Register::Any) if rc.is_some() => Some(op.generate.clone()),
-                    _ => None,
+                    OperandKind::Imm(_)
+                    | OperandKind::Reg(_)
+                    | OperandKind::Block(_)
+                    | OperandKind::CC(_)
+                    | OperandKind::Slot(_) => None,
+                    OperandKind::Invalid => panic!(),
                 },
                 Node::None => None,
             };

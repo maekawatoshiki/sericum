@@ -5,8 +5,8 @@ use crate::codegen::common::new_dag::{
     module::DAGModule,
     node::{IRNode, IROpcode, MINode, NodeId, OperandNode},
     pat_match::{
-        any_block, any_cc, any_imm, any_reg, inst_select, ir, reg_class, slot, MatchContext, Pat,
-        ReplacedNodeMap,
+        any, any_block, any_cc, any_imm, any_reg, inst_select, ir, null_imm, reg_class, slot,
+        MatchContext, Pat, ReplacedNodeMap,
     },
 };
 // use crate::ir::types::Type;
@@ -46,7 +46,23 @@ fn run_on_function(func: &mut DAGFunction) {
         })
         .into();
 
-    let pats = vec![brcond];
+    let add: Pat = (
+        // (IMM + any) -> (any + IMM)
+        ir(IROpcode::Add)
+        .named("n")
+        .args(vec![any_imm().into(), any().into()])
+        .generate(|m, c| {
+            c.arena[m["n"]].as_ir_mut().args.swap(0, 1);
+            m["n"]
+        })
+        // (A + 0) -> A
+        | ir(IROpcode::Add)
+            .args(vec![any().named("l").into(), null_imm().into()])
+            .generate(|m, _| m["l"])
+    )
+    .into();
+
+    let pats = vec![brcond, add];
 
     let mut replaced = ReplacedNodeMap::default();
     for &id in &func.dag_basic_blocks {

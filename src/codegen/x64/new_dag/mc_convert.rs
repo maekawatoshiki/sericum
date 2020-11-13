@@ -471,10 +471,16 @@ impl<'a> ScheduleContext<'a> {
             Node::Operand(OperandNode::Mem(MemKind::Base(base))) => MachineOperand::Mem(
                 MachineMemOperand::Base(*self.normal_arg(*base).as_register()),
             ),
-            Node::Operand(OperandNode::Mem(MemKind::BaseFi(base, slot))) => {
+            Node::Operand(OperandNode::Mem(MemKind::BaseOff(args))) => {
+                MachineOperand::Mem(MachineMemOperand::BaseOff(
+                    *self.normal_arg(args[0]).as_register(),
+                    self.normal_arg(args[1]).as_constant().as_i32(),
+                ))
+            }
+            Node::Operand(OperandNode::Mem(MemKind::BaseFi(args))) => {
                 MachineOperand::Mem(MachineMemOperand::BaseFi(
-                    *self.normal_arg(*base).as_register(),
-                    *self.normal_arg(*slot).as_frame_index(),
+                    *self.normal_arg(args[0]).as_register(),
+                    *self.normal_arg(args[1]).as_frame_index(),
                 ))
             }
             Node::Operand(OperandNode::Reg(r)) => {

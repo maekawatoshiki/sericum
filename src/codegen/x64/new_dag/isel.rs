@@ -29,12 +29,12 @@ fn run_on_function(func: &mut DAGFunction) {
                         ir(IROpcode::Store).args(vec![ir(IROpcode::FIAddr).args(vec![slot(MVType::i32).named("dst").into()]).into(), any_i32_imm().named("src").into()])
                                            .generate(|m, c| {
                                                 let rbp = c.arena.alloc(c.regs.get_phys_reg(GR64::RBP).into());
-                                                let mem = c.arena.alloc(OperandNode::Mem(MemKind::BaseFi(rbp, m["dst"])).into());
+                                                let mem = c.arena.alloc(OperandNode::Mem(MemKind::BaseFi(vec![rbp, m["dst"]])).into());
                                                 c.arena.alloc(MINode::new(MO::MOVmi32).args(vec![mem, m["src"]]).into()) })
                       | ir(IROpcode::Store).args(vec![ir(IROpcode::FIAddr).args(vec![slot(MVType::i64).named("dst").into()]).into(), reg_class(RC::GR64).named("src").into()])
                                            .generate(|m, c| {
                                                 let rbp = c.arena.alloc(c.regs.get_phys_reg(GR64::RBP).into());
-                                                let mem = c.arena.alloc(OperandNode::Mem(MemKind::BaseFi(rbp, m["dst"])).into());
+                                                let mem = c.arena.alloc(OperandNode::Mem(MemKind::BaseFi(vec![rbp, m["dst"]])).into());
                                                 c.arena.alloc(MINode::new(MO::MOVmr64).args(vec![mem, m["src"]]).into()) })
                       | ir(IROpcode::Store).args(vec![reg_class(RC::GR64).named("dst").into(), any_i32_imm().named("src").into()])
                                            .generate(|m, c| {
@@ -48,13 +48,12 @@ fn run_on_function(func: &mut DAGFunction) {
         .args(vec![ir(IROpcode::FIAddr)
             .args(vec![(reg_class(RC::GR64) | any_slot()).named("src").into()])
             .into()])
-        .ty(Type::i32)
         .generate(|m, c| {
             let rbp = c.arena.alloc(c.regs.get_phys_reg(GR64::RBP).into());
             let src = m["src"];
             let mem = c.arena.alloc(
                 match c.arena[src].as_operand() {
-                    OperandNode::Slot(_) => MemKind::BaseFi(rbp, src),
+                    OperandNode::Slot(_) => MemKind::BaseFi(vec![rbp, src]),
                     OperandNode::Reg(_) => MemKind::Base(src),
                     _ => unreachable!(),
                 }
@@ -132,7 +131,7 @@ fn run_on_function(func: &mut DAGFunction) {
     let fiaddr: Pat = ir(IROpcode::FIAddr).args(vec![any_slot().named("slot").into()])
                                           .generate(|m, c| {
                                               let rbp = c.arena.alloc(c.regs.get_phys_reg(GR64::RBP).into());
-                                              let mem = c.arena.alloc(OperandNode::Mem(MemKind::BaseFi(rbp, m["slot"])).into());
+                                              let mem = c.arena.alloc(OperandNode::Mem(MemKind::BaseFi(vec![rbp, m["slot"]])).into());
                                               c.arena.alloc(MINode::new(MO::LEAr64m).args(vec![mem]).reg_class(RC::GR64).into()) }).into();
 
     let pats = vec![store, load, bin, br, fiaddr];

@@ -62,49 +62,6 @@ pub enum ImmediateKind {
     F64(f64),
 }
 
-impl Node {
-    pub fn as_ir(&self) -> &IRNode {
-        match self {
-            Node::IR(x) => x,
-            _ => panic!(),
-        }
-    }
-
-    pub fn as_ir_mut(&mut self) -> &mut IRNode {
-        match self {
-            Node::IR(x) => x,
-            _ => panic!(),
-        }
-    }
-
-    pub fn as_mi(&self) -> &MINode {
-        match self {
-            Node::MI(x) => x,
-            _ => panic!(),
-        }
-    }
-
-    pub fn as_operand(&self) -> &OperandNode {
-        match self {
-            Node::Operand(x) => x,
-            _ => panic!(),
-        }
-    }
-
-    pub fn as_i32(&self) -> i32 {
-        self.as_operand().as_imm().as_i32()
-    }
-
-    pub fn args_mut(&mut self) -> &mut [NodeId] {
-        match self {
-            Self::IR(ir) => &mut ir.args,
-            Self::MI(mi) => &mut mi.args,
-            Self::Operand(_) => &mut [],
-            Self::None => &mut [],
-        }
-    }
-}
-
 impl IRNode {
     pub fn new(opcode: IROpcode) -> Self {
         Self {
@@ -199,6 +156,11 @@ impl ImmediateKind {
             Self::Int32(x) => *x,
             _ => panic!(),
         }
+    }
+
+    pub fn is_null(&self) -> bool {
+        matches!(self, Self::Int8(0) | Self::Int32(0) | Self::Int64(0))
+            || matches!(self, Self::F64(f) if *f == 0.0)
     }
 }
 
@@ -391,11 +353,55 @@ use rustc_hash::FxHashMap;
 use std::fmt;
 
 impl Node {
+    pub fn as_ir(&self) -> &IRNode {
+        match self {
+            Node::IR(x) => x,
+            _ => panic!(),
+        }
+    }
+
+    pub fn as_ir_mut(&mut self) -> &mut IRNode {
+        match self {
+            Node::IR(x) => x,
+            _ => panic!(),
+        }
+    }
+
+    pub fn as_mi(&self) -> &MINode {
+        match self {
+            Node::MI(x) => x,
+            _ => panic!(),
+        }
+    }
+
+    pub fn as_operand(&self) -> &OperandNode {
+        match self {
+            Node::Operand(x) => x,
+            _ => panic!(),
+        }
+    }
+
+    pub fn as_i32(&self) -> i32 {
+        self.as_operand().as_imm().as_i32()
+    }
+
     pub fn args(&self) -> &[NodeId] {
         match self {
-            Self::IR(IRNode { args, .. }) => args,
-            Self::MI(MINode { args, .. }) => args,
-            Self::Operand(_) | Self::None => &[],
+            Self::IR(ir) => &ir.args,
+            Self::MI(mi) => &mi.args,
+            Self::Operand(OperandNode::Mem(m)) => m.args(),
+            Self::Operand(_) => &[],
+            Self::None => &[],
+        }
+    }
+
+    pub fn args_mut(&mut self) -> &mut [NodeId] {
+        match self {
+            Self::IR(ir) => &mut ir.args,
+            Self::MI(mi) => &mut mi.args,
+            Self::Operand(OperandNode::Mem(m)) => m.args_mut(),
+            Self::Operand(_) => &mut [],
+            Self::None => &mut [],
         }
     }
 
