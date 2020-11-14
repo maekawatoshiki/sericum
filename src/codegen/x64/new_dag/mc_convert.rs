@@ -200,6 +200,8 @@ impl<'a> ScheduleContext<'a> {
         inst_id
     }
 
+    // fn convert_div(&mut self, operands: &[NodeId]) -> MachineInstId {}
+
     fn convert_call(&mut self, ret_ty: Type, operands: &[NodeId]) -> MachineInstId {
         let mut arg_regs = vec![RegisterOperand::new(self.func.regs.get_phys_reg(GR64::RSP))]; // call uses RSP
         let mut off = 0i32;

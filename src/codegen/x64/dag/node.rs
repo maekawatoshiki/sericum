@@ -1,5 +1,6 @@
 pub use crate::codegen::common::dag::node::*;
 use crate::codegen::common::new_dag::{node, node::NodeId};
+use std::fmt;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum MemNodeKind {
@@ -15,7 +16,7 @@ pub enum MemNodeKind {
     AddressAlignOff,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Clone, PartialEq)]
 pub enum MemKind {
     // BaseFi(NodeId, NodeId),
     BaseFi(Vec<NodeId>),
@@ -54,5 +55,22 @@ impl MemKind {
             Self::BaseAlignOff(args) => args,
             Self::Base(arg) => ::core::slice::from_mut(arg),
         }
+    }
+}
+
+impl fmt::Debug for MemKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Self::BaseFi(_) => "BaseFi",
+                Self::BaseFiOff(_) => "BaseFiOff",
+                Self::BaseFiAlignOff(_) => "BaseFiAlignOff",
+                Self::BaseAlignOff(_) => "BaseAlignOff",
+                Self::BaseOff(_) => "BaseOff",
+                Self::Base(_) => "Base",
+            }
+        )
     }
 }

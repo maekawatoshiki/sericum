@@ -452,7 +452,6 @@ impl Node {
             Self::Operand(_) => panic!(),
             Self::None => panic!(),
         };
-        let mut margs: Vec<NodeId> = vec![];
         for (i, id) in self.args().iter().enumerate() {
             let op = &arena[*id];
             if i > 0 {
@@ -463,38 +462,30 @@ impl Node {
                 continue;
             }
             match op {
-                Node::Operand(OperandNode::Mem(mem)) => {
-                    write!(f, " {:?}", mem)?;
-                    margs.extend(mem.args());
-                    for a in mem.args() {
-                        write!(f, " id{}", id4op!(*a).0)?;
-                    }
-                }
                 Node::Operand(op) => {
                     write!(f, " ")?;
-                    op.debug(f, tys)?;
+                    op.debug(f, arena, s, tys)?;
                 }
                 _ => write!(f, " id{}", id4op!(*id).0)?,
             }
-            // write!(f, ".{}", tys.to_string(op.ty))?;
         }
         write!(f, "\n")?;
-        for op in margs {
-            match &arena[op] {
-                Self::Operand(_) | Self::None => {
-                    continue;
-                }
-                node => {
-                    let id = id4op!(op).0;
-                    // if !s[&op].1 {
-                    s.get_mut(&op).unwrap().1 = true;
-                    node.debug(f, arena, tys, s, id, indent + 2)?;
-                    // }
-                }
-            }
-        }
         for &op in self.args() {
             match &arena[op] {
+                Self::Operand(OperandNode::Mem(mem)) => {
+                    for &arg in mem.args() {
+                        match &arena[arg] {
+                            Self::Operand(_) | Self::None => continue,
+                            node => {
+                                let id = id4op!(arg).0;
+                                if !s[&arg].1 {
+                                    s.get_mut(&arg).unwrap().1 = true;
+                                    node.debug(f, arena, tys, s, id, indent + 2)?;
+                                }
+                            }
+                        };
+                    }
+                }
                 Self::Operand(_) | Self::None => {
                     continue;
                 }
@@ -524,7 +515,15 @@ impl Node {
 }
 
 impl OperandNode {
-    pub fn debug(&self, f: &mut fmt::Formatter<'_>, tys: &Types) -> fmt::Result {
+    pub fn debug(
+        &self,
+        f: &mut fmt::Formatter<'_>,
+        arena: &Arena<Node>,
+        s: &mut FxHashMap<NodeId, (usize, bool)>,
+        tys: &Types,
+    ) -> fmt::Result {
+        #[rustfmt::skip]
+        macro_rules! id4op { ($op:expr) => {{ let l=s.len()+1; s.entry($op).or_insert((l, false)) }}}
         match self {
             Self::Addr(a) => write!(f, "Addr({:?})", a),
             Self::Block(b) => write!(f, "BB#{}", b.index()),
@@ -532,7 +531,20 @@ impl OperandNode {
             Self::Imm(c) => write!(f, "{:?}", c),
             Self::Slot(fi) => write!(f, "FI<{}, {:?}>", tys.to_string(fi.ty), fi.idx),
             Self::Reg(r) => write!(f, "Reg({:?})", r),
-            Self::Mem(mem) => write!(f, "{:?}", mem),
+            Self::Mem(mem) => {
+                write!(f, "{:?}(", mem)?;
+                let args = mem.args();
+                for (i, &a) in args.iter().enumerate() {
+                    match &arena[a] {
+                        Node::Operand(op) => op.debug(f, arena, s, tys)?,
+                        _ => write!(f, "id{}", id4op!(a).0)?,
+                    }
+                    if i < args.len() - 1 {
+                        write!(f, ", ")?
+                    }
+                }
+                write!(f, ")")
+            }
         }
     }
 }
