@@ -31,11 +31,16 @@ fn run_on_function(func: &mut DAGFunction) {
                                                 let rbp = c.arena.alloc(c.regs.get_phys_reg(GR64::RBP).into());
                                                 let mem = c.arena.alloc(OperandNode::Mem(MemKind::BaseFi(vec![rbp, m["dst"]])).into());
                                                 c.arena.alloc(MINode::new(MO::MOVmi32).args(vec![mem, m["src"]]).into()) })
+                      | ir(IROpcode::Store).args(vec![ir(IROpcode::FIAddr).args(vec![slot(MVType::i32).named("dst").into()]).into(), reg_class(RC::GR32).named("src").into()])
+                                           .generate(|m, c| {
+                                                let rbp = c.arena.alloc(c.regs.get_phys_reg(GR64::RBP).into());
+                                                let mem = c.arena.alloc(OperandNode::Mem(MemKind::BaseFi(vec![rbp, m["dst"]])).into());
+                                                c.arena.alloc(MINode::new(MO::MOVmr32).args(vec![mem, m["src"]]).into()) })
                       | ir(IROpcode::Store).args(vec![ir(IROpcode::FIAddr).args(vec![slot(MVType::i64).named("dst").into()]).into(), reg_class(RC::GR64).named("src").into()])
                                            .generate(|m, c| {
                                                 let rbp = c.arena.alloc(c.regs.get_phys_reg(GR64::RBP).into());
                                                 let mem = c.arena.alloc(OperandNode::Mem(MemKind::BaseFi(vec![rbp, m["dst"]])).into());
-                                                c.arena.alloc(MINode::new(MO::MOVmr64).args(vec![mem, m["src"]]).into()) })
+                                                c.arena.alloc(MINode::new(MO::MOVmr64).args(vec![mem, m["src"]]).into()) }).into()
                       | ir(IROpcode::Store).args(vec![reg_class(RC::GR64).named("dst").into(), any_i32_imm().named("src").into()])
                                            .generate(|m, c| {
                                                 let mem = c.arena.alloc(OperandNode::Mem(MemKind::Base(m["dst"])).into());

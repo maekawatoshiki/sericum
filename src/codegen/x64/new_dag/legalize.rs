@@ -5,8 +5,8 @@ use crate::codegen::common::new_dag::{
     module::DAGModule,
     node::{IRNode, IROpcode, MINode, NodeId, OperandNode},
     pat_match::{
-        any, any_cc, any_i32_imm, any_imm, any_reg, inst_select, ir, null_imm, reg_class, slot,
-        MatchContext, Pat, ReplacedNodeMap,
+        any, any_f64_imm, any_i32_imm, any_reg, any_slot, inst_select, ir, null_imm, reg_class,
+        slot, MatchContext, Pat, ReplacedNodeMap,
     },
 };
 use crate::ir::types::Type;
@@ -72,6 +72,29 @@ fn run_on_function(func: &mut DAGFunction) {
             )
         })
         .into();
+    let load3: Pat = ir(IROpcode::Load)
+        .ty(Type::f64)
+        .args(vec![ir(IROpcode::Add)
+            .args(vec![
+                ir(IROpcode::FIAddr)
+                    .args(vec![any_slot().named("slot").into()])
+                    .into(),
+                any_i32_imm().named("off").into(),
+            ])
+            .into()])
+        .generate(|m, c| {
+            let rbp = c.arena.alloc(c.regs.get_phys_reg(GR64::RBP).into());
+            let mem = c
+                .arena
+                .alloc(MemKind::BaseFiOff([rbp, m["slot"], m["off"]]).into());
+            c.arena.alloc(
+                MINode::new(MO::MOVSDrm)
+                    .args(vec![mem])
+                    .reg_class(RC::XMM)
+                    .into(),
+            )
+        })
+        .into();
     let store: Pat = ir(IROpcode::Store)
         .args(vec![
             ir(IROpcode::Add)
@@ -101,6 +124,33 @@ fn run_on_function(func: &mut DAGFunction) {
                 .alloc(MINode::new(MO::MOVmi32).args(vec![mem, m["src"]]).into())
         })
         .into();
+    let store2: Pat = ir(IROpcode::Store)
+        .args(vec![
+            ir(IROpcode::Add)
+                .args(vec![
+                    ir(IROpcode::FIAddr)
+                        .args(vec![any_slot().named("slot").into()])
+                        .into(),
+                    any_i32_imm().named("off").into(),
+                ])
+                .into(),
+            any_f64_imm().named("src").into(),
+        ])
+        .generate(|m, c| {
+            let rbp = c.arena.alloc(c.regs.get_phys_reg(GR64::RBP).into());
+            let mem = c
+                .arena
+                .alloc(MemKind::BaseFiOff([rbp, m["slot"], m["off"]]).into());
+            let src = c.arena.alloc(
+                MINode::new(MO::MOVSDrm64)
+                    .args(vec![m["src"]])
+                    .reg_class(RC::XMM)
+                    .into(),
+            );
+            c.arena
+                .alloc(MINode::new(MO::MOVSDmr).args(vec![mem, src]).into())
+        })
+        .into();
     let sext: Pat = ir(IROpcode::Sext)
         .ty(Type::i64)
         .args(vec![reg_class(RC::GR32).named("arg").into()])
@@ -114,7 +164,7 @@ fn run_on_function(func: &mut DAGFunction) {
         })
         .into();
 
-    let pats = vec![load, load2, store, sext];
+    let pats = vec![load, load2, load3, store, store2, sext];
 
     let mut replaced = ReplacedNodeMap::default();
     for &id in &func.dag_basic_blocks {

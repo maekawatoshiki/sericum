@@ -21,9 +21,9 @@ pub enum MemKind {
     // BaseFi(NodeId, NodeId),
     BaseFi(Vec<NodeId>),
     // BaseFiOff(NodeId, NodeId, NodeId),
-    BaseFiOff(Vec<NodeId>),
+    BaseFiOff([NodeId; 3]),
     // BaseFiAlignOff(NodeId, NodeId, NodeId, NodeId),
-    BaseFiAlignOff(Vec<NodeId>),
+    BaseFiAlignOff([NodeId; 4]),
     // BaseFiAlignOffOff,
     BaseAlignOff([NodeId; 3]),
     // BaseOff(NodeId, NodeId),
@@ -37,22 +37,18 @@ pub enum MemKind {
 impl MemKind {
     pub fn args(&self) -> &[NodeId] {
         match self {
-            Self::BaseFi(args)
-            | Self::BaseFiOff(args)
-            | Self::BaseFiAlignOff(args)
-            | Self::BaseOff(args) => args,
-            Self::BaseAlignOff(args) => args,
+            Self::BaseFi(args) | Self::BaseOff(args) => args,
+            Self::BaseFiAlignOff(args) => args,
+            Self::BaseFiOff(args) | Self::BaseAlignOff(args) => args,
             Self::Base(arg) => ::core::slice::from_ref(arg),
         }
     }
 
     pub fn args_mut(&mut self) -> &mut [NodeId] {
         match self {
-            Self::BaseFi(args)
-            | Self::BaseFiOff(args)
-            | Self::BaseFiAlignOff(args)
-            | Self::BaseOff(args) => args,
-            Self::BaseAlignOff(args) => args,
+            Self::BaseFi(args) | Self::BaseOff(args) => args,
+            Self::BaseFiAlignOff(args) => args,
+            Self::BaseFiOff(args) | Self::BaseAlignOff(args) => args,
             Self::Base(arg) => ::core::slice::from_mut(arg),
         }
     }

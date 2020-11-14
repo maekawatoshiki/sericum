@@ -67,6 +67,7 @@ pub enum Immediate {
     AnyInt8,
     AnyInt32,
     AnyInt64,
+    AnyF64,
     Int32(i32),
     Any,
     Null,
@@ -255,6 +256,15 @@ pub const fn any_i64_imm() -> OperandPat {
     OperandPat {
         name: "",
         kind: OperandKind::Imm(Immediate::AnyInt64),
+        not: false,
+        generate: None,
+    }
+}
+
+pub const fn any_f64_imm() -> OperandPat {
+    OperandPat {
+        name: "",
+        kind: OperandKind::Imm(Immediate::AnyF64),
         not: false,
         generate: None,
     }
@@ -611,6 +621,9 @@ fn matches(
                         }
                         OperandKind::Imm(Immediate::AnyInt64) => {
                             matches!(n, &OperandNode::Imm(ImmediateKind::Int64(_)))
+                        }
+                        OperandKind::Imm(Immediate::AnyF64) => {
+                            matches!(n, &OperandNode::Imm(ImmediateKind::F64(_)))
                         }
                         OperandKind::Imm(Immediate::Int32(i)) => {
                             matches!(n, &OperandNode::Imm(ImmediateKind::Int32(x)) if x == *i)
