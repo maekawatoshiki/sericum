@@ -584,7 +584,7 @@ fn matches(
                 .iter()
                 .zip(n.args.iter())
                 .all(|(pat, &id)| matches(ctx, id, pat, m).is_some());
-            let same_ty = pat.ty.map_or(true, |ty| n.ty == ty);
+            let same_ty = pat.ty.map_or(true, |ty| n.mvty == ty.into());
             if same_opcode && same_operands && same_ty {
                 if !pat.name.is_empty() {
                     m.insert(pat.name, id);

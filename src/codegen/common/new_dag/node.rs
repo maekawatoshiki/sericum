@@ -452,6 +452,7 @@ impl Node {
             Self::Operand(_) => panic!(),
             Self::None => panic!(),
         };
+        let mut margs: Vec<NodeId> = vec![];
         for (i, id) in self.args().iter().enumerate() {
             let op = &arena[*id];
             if i > 0 {
@@ -462,6 +463,13 @@ impl Node {
                 continue;
             }
             match op {
+                Node::Operand(OperandNode::Mem(mem)) => {
+                    write!(f, " {:?}", mem)?;
+                    margs.extend(mem.args());
+                    for a in mem.args() {
+                        write!(f, " id{}", id4op!(*a).0)?;
+                    }
+                }
                 Node::Operand(op) => {
                     write!(f, " ")?;
                     op.debug(f, tys)?;
@@ -471,6 +479,20 @@ impl Node {
             // write!(f, ".{}", tys.to_string(op.ty))?;
         }
         write!(f, "\n")?;
+        for op in margs {
+            match &arena[op] {
+                Self::Operand(_) | Self::None => {
+                    continue;
+                }
+                node => {
+                    let id = id4op!(op).0;
+                    // if !s[&op].1 {
+                    s.get_mut(&op).unwrap().1 = true;
+                    node.debug(f, arena, tys, s, id, indent + 2)?;
+                    // }
+                }
+            }
+        }
         for &op in self.args() {
             match &arena[op] {
                 Self::Operand(_) | Self::None => {

@@ -41,7 +41,80 @@ fn run_on_function(func: &mut DAGFunction) {
             )
         })
         .into();
-    let pats = vec![load];
+    let load2: Pat = ir(IROpcode::Load)
+        .ty(Type::i32)
+        .args(vec![ir(IROpcode::Add)
+            .args(vec![
+                reg_class(RC::GR64).named("base").into(),
+                ir(IROpcode::Mul)
+                    .args(vec![
+                        any().named("off").into(),
+                        any_i32_imm().named("align").into(),
+                    ])
+                    .into(),
+            ])
+            .into()])
+        .generate(|m, c| {
+            let off = c.arena.alloc(
+                IRNode::new(IROpcode::RegClass)
+                    .args(vec![m["off"]])
+                    .ty(Type::i64)
+                    .into(),
+            );
+            let mem = c
+                .arena
+                .alloc(MemKind::BaseAlignOff([m["base"], m["align"], off]).into());
+            c.arena.alloc(
+                MINode::new(MO::MOVrm32)
+                    .args(vec![mem])
+                    .reg_class(RC::GR32)
+                    .into(),
+            )
+        })
+        .into();
+    let store: Pat = ir(IROpcode::Store)
+        .args(vec![
+            ir(IROpcode::Add)
+                .args(vec![
+                    reg_class(RC::GR64).named("base").into(),
+                    ir(IROpcode::Mul)
+                        .args(vec![
+                            any().named("off").into(),
+                            any_i32_imm().named("align").into(),
+                        ])
+                        .into(),
+                ])
+                .into(),
+            any_i32_imm().named("src").into(),
+        ])
+        .generate(|m, c| {
+            let off = c.arena.alloc(
+                IRNode::new(IROpcode::RegClass)
+                    .args(vec![m["off"]])
+                    .ty(Type::i64)
+                    .into(),
+            );
+            let mem = c
+                .arena
+                .alloc(MemKind::BaseAlignOff([m["base"], m["align"], off]).into());
+            c.arena
+                .alloc(MINode::new(MO::MOVmi32).args(vec![mem, m["src"]]).into())
+        })
+        .into();
+    let sext: Pat = ir(IROpcode::Sext)
+        .ty(Type::i64)
+        .args(vec![reg_class(RC::GR32).named("arg").into()])
+        .generate(|m, c| {
+            c.arena.alloc(
+                IRNode::new(IROpcode::RegClass)
+                    .args(vec![m["arg"]])
+                    .ty(Type::i64)
+                    .into(),
+            )
+        })
+        .into();
+
+    let pats = vec![load, load2, store, sext];
 
     let mut replaced = ReplacedNodeMap::default();
     for &id in &func.dag_basic_blocks {

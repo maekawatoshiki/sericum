@@ -483,6 +483,13 @@ impl<'a> ScheduleContext<'a> {
                     *self.normal_arg(args[1]).as_frame_index(),
                 ))
             }
+            Node::Operand(OperandNode::Mem(MemKind::BaseAlignOff(args))) => {
+                MachineOperand::Mem(MachineMemOperand::BaseAlignOff(
+                    *self.normal_arg(args[0]).as_register(),
+                    self.normal_arg(args[1]).as_constant().as_i32(),
+                    *self.normal_arg(args[2]).as_register(),
+                ))
+            }
             Node::Operand(OperandNode::Reg(r)) => {
                 MachineOperand::Register(RegisterOperand::new(*r))
             }

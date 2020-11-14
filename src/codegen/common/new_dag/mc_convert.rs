@@ -1,5 +1,5 @@
 use super::node::*;
-// use crate::codegen::arch::machine::register::*;
+use crate::codegen::arch::machine::register::ty2rc;
 // use crate::codegen::arch::new_dag::mc_convert::
 use crate::codegen::common::machine::inst::*;
 use crate::codegen::common::{
@@ -121,14 +121,15 @@ impl<'a> ScheduleContext<'a> {
                 opcode: IROpcode::Root,
                 ..
             }) => None,
-            // Node::IR(IRNode {
-            //     opcode: IROpcode::RegClass,
-            //     args,
-            //     ..
-            // }) => {
-            //     let val = self.normal_arg(&self.func.node_arena[args[0]]);
-            //     Some(val.as_register().sub_super(ty2rc(&node.ty)))
-            // }
+            Node::IR(IRNode {
+                opcode: IROpcode::RegClass,
+                args,
+                ty,
+                ..
+            }) => {
+                let val = self.normal_arg(args[0]);
+                Some(val.as_register().sub_super(ty2rc(&ty)))
+            }
             _ => {
                 let inst_id = self.convert_node(node);
                 self.inst_arena[inst_id].get_def_reg()

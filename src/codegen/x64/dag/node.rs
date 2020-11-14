@@ -24,7 +24,7 @@ pub enum MemKind {
     // BaseFiAlignOff(NodeId, NodeId, NodeId, NodeId),
     BaseFiAlignOff(Vec<NodeId>),
     // BaseFiAlignOffOff,
-    // BaseAlignOff,
+    BaseAlignOff([NodeId; 3]),
     // BaseOff(NodeId, NodeId),
     BaseOff(Vec<NodeId>),
     Base(NodeId),
@@ -40,6 +40,7 @@ impl MemKind {
             | Self::BaseFiOff(args)
             | Self::BaseFiAlignOff(args)
             | Self::BaseOff(args) => args,
+            Self::BaseAlignOff(args) => args,
             Self::Base(arg) => ::core::slice::from_ref(arg),
         }
     }
@@ -50,6 +51,7 @@ impl MemKind {
             | Self::BaseFiOff(args)
             | Self::BaseFiAlignOff(args)
             | Self::BaseOff(args) => args,
+            Self::BaseAlignOff(args) => args,
             Self::Base(arg) => ::core::slice::from_mut(arg),
         }
     }
