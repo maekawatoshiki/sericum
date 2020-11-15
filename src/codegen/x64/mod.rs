@@ -94,10 +94,10 @@ pub fn standard_conversion_into_machine_module(mut module: Module) -> MachineMod
     ir::inst_combine::InstructionCombine::new().run_on_module(&mut module);
     ir::codegen_prepare::CodegenPrepare::new().run_on_module(&mut module);
 
-    println!("{:?}", module);
+    // println!("{:?}", module);
 
     let mut module = crate::codegen::common::new_dag::convert::convert_module_to_dag_module(module);
-    println!("Initial DAG:\n{:?}", module);
+    // println!("Initial DAG:\n{:?}", module);
     crate::codegen::common::new_dag::combine::run(&mut module);
     crate::codegen::arch::new_dag::legalize::run(&mut module);
     crate::codegen::arch::new_dag::isel::run(&mut module);
@@ -106,7 +106,7 @@ pub fn standard_conversion_into_machine_module(mut module: Module) -> MachineMod
 
     let mut module = crate::codegen::common::new_dag::mc_convert::convert_module(module);
 
-    println!("{:?}", module);
+    // println!("{:?}", module);
 
     // let mut dag_module = convert::convert_to_dag_module(module);
     //

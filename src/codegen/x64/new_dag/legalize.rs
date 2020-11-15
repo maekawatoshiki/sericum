@@ -151,6 +151,32 @@ fn run_on_function(func: &mut DAGFunction) {
                 .alloc(MINode::new(MO::MOVSDmr).args(vec![mem, src]).into())
         })
         .into();
+    let store3: Pat = ir(IROpcode::Store)
+        .args(vec![
+            ir(IROpcode::Add)
+                .args(vec![
+                    ir(IROpcode::FIAddr)
+                        .args(vec![any_slot().named("slot").into()])
+                        .into(),
+                    ir(IROpcode::Mul)
+                        .args(vec![
+                            any().named("off").into(),
+                            any_i32_imm().named("align").into(),
+                        ])
+                        .into(),
+                ])
+                .into(),
+            reg_class(RC::GR32).named("src").into(),
+        ])
+        .generate(|m, c| {
+            let rbp = c.arena.alloc(c.regs.get_phys_reg(GR64::RBP).into());
+            let mem = c
+                .arena
+                .alloc(MemKind::BaseFiAlignOff([rbp, m["slot"], m["align"], m["off"]]).into());
+            c.arena
+                .alloc(MINode::new(MO::MOVmr32).args(vec![mem, m["src"]]).into())
+        })
+        .into();
     let sext: Pat = ir(IROpcode::Sext)
         .ty(Type::i64)
         .args(vec![reg_class(RC::GR32).named("arg").into()])
@@ -164,7 +190,7 @@ fn run_on_function(func: &mut DAGFunction) {
         })
         .into();
 
-    let pats = vec![load, load2, load3, store, store2, sext];
+    let pats = vec![load, load2, load3, store, store2, store3, sext];
 
     let mut replaced = ReplacedNodeMap::default();
     for &id in &func.dag_basic_blocks {
@@ -188,7 +214,6 @@ fn select_node<'a>(
     pats: &[Pat],
     id: NodeId,
 ) -> NodeId {
-    println!("here");
     let new = inst_select(replaced, ctx, id, pats);
 
     if let Some(next) = ctx.arena[id].next() {

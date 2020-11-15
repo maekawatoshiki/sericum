@@ -502,8 +502,8 @@ fn xxx() {
         &pats,
     );
 
-    println!("{:#?}", arena);
-    println!("{:?}: {:?}", new_node, arena[new_node]);
+    // println!("{:#?}", arena);
+    // println!("{:?}: {:?}", new_node, arena[new_node]);
 
     // let mut map = NameMap::default();
     // if let Some(gen) = try_match(&arena, node, &pat, &mut map) {

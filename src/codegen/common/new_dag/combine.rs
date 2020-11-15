@@ -86,7 +86,6 @@ fn select_node<'a>(
     pats: &[Pat],
     id: NodeId,
 ) -> NodeId {
-    println!("here");
     let new = inst_select(replaced, ctx, id, pats);
 
     if let Some(next) = ctx.arena[id].next() {

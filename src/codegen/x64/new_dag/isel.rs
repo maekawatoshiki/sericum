@@ -45,6 +45,10 @@ fn run_on_function(func: &mut DAGFunction) {
                                            .generate(|m, c| {
                                                 let mem = c.arena.alloc(OperandNode::Mem(MemKind::Base(m["dst"])).into());
                                                 c.arena.alloc(MINode::new(MO::MOVmi32).args(vec![mem, m["src"]]).into()) }).into()
+                      | ir(IROpcode::Store).args(vec![reg_class(RC::GR64).named("dst").into(), reg_class(RC::GR32).named("src").into()])
+                                           .generate(|m, c| {
+                                                let mem = c.arena.alloc(OperandNode::Mem(MemKind::Base(m["dst"])).into());
+                                                c.arena.alloc(MINode::new(MO::MOVmr32).args(vec![mem, m["src"]]).into()) }).into()
                     ).into();
 
     // TODO: Support GlobalAddr
@@ -163,7 +167,6 @@ fn select_node<'a>(
     pats: &[Pat],
     id: NodeId,
 ) -> NodeId {
-    println!("here");
     let new = inst_select(replaced, ctx, id, pats);
 
     if let Some(next) = ctx.arena[id].next() {
