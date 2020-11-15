@@ -273,10 +273,14 @@ fn convert_block_to_dag_block<'a>(mut ctx: BlockConversionContext<'a>) -> NodeId
                 );
                 ctx.node_(
                     id,
-                    IRNode::new(IROpcode::Setcc)
-                        .args(vec![c, lhs, rhs])
-                        .ty(inst.ty)
-                        .into(),
+                    IRNode::new(match inst.opcode {
+                        Opcode::ICmp => IROpcode::Setcc,
+                        Opcode::FCmp => IROpcode::FCmp,
+                        _ => unreachable!(),
+                    })
+                    .args(vec![c, lhs, rhs])
+                    .ty(inst.ty)
+                    .into(),
                 )
             }
             Opcode::Phi => {

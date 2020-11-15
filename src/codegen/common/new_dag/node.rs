@@ -142,6 +142,13 @@ impl OperandNode {
         }
     }
 
+    pub fn as_cc_mut(&mut self) -> &mut CondKind {
+        match self {
+            Self::CC(x) => x,
+            _ => panic!(),
+        }
+    }
+
     pub fn as_block(&self) -> &DAGBasicBlockId {
         match self {
             Self::Block(x) => x,
@@ -375,6 +382,13 @@ impl Node {
     }
 
     pub fn as_operand(&self) -> &OperandNode {
+        match self {
+            Node::Operand(x) => x,
+            _ => panic!(),
+        }
+    }
+
+    pub fn as_operand_mut(&mut self) -> &mut OperandNode {
         match self {
             Node::Operand(x) => x,
             _ => panic!(),

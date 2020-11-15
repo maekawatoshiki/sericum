@@ -102,6 +102,36 @@ impl<'a> ScheduleContext<'a> {
                 ))
             }
             Node::IR(IRNode {
+                opcode: IROpcode::FPBrcc,
+                args,
+                ..
+            }) => {
+                let lhs = self.normal_arg(args[1]);
+                let rhs = self.normal_arg(args[2]);
+
+                self.append_inst(MachineInst::new_simple(
+                    MachineOpcode::UCOMISDrr,
+                    vec![lhs, rhs],
+                    self.block_id,
+                ));
+
+                self.append_inst(MachineInst::new_simple(
+                    match self.func.node_arena[args[0]].as_operand().as_cc() {
+                        CondKind::UEq => MachineOpcode::JE,
+                        CondKind::UNe => MachineOpcode::JNE,
+                        CondKind::ULe => MachineOpcode::JBE,
+                        CondKind::ULt => MachineOpcode::JB,
+                        CondKind::UGe => MachineOpcode::JAE,
+                        CondKind::UGt => MachineOpcode::JA,
+                        _ => unreachable!(),
+                    },
+                    vec![MachineOperand::Branch(
+                        self.bb_map[self.func.node_arena[args[3]].as_operand().as_block()],
+                    )],
+                    self.block_id,
+                ))
+            }
+            Node::IR(IRNode {
                 opcode: IROpcode::Div,
                 args,
                 mvty,

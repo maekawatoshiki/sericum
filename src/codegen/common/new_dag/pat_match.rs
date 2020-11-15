@@ -492,7 +492,7 @@ fn xxx() {
             .into(),
     ];
 
-    let new_node = inst_select(
+    let _new_node = inst_select(
         &mut ReplacedNodeMap::default(),
         &mut MatchContext {
             arena: &mut arena,
@@ -541,7 +541,9 @@ pub fn inst_select(
                 *named_id = inst_select(replaced, ctx, *named_id, pats);
             }
             let new_id = gen(&map, ctx);
-            replaced.insert(id, new_id);
+            if id != new_id {
+                replaced.insert(id, new_id);
+            }
             return inst_select(replaced, ctx, new_id, pats);
         }
     }

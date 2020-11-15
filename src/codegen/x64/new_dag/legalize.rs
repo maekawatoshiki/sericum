@@ -5,8 +5,8 @@ use crate::codegen::common::new_dag::{
     module::DAGModule,
     node::{IRNode, IROpcode, MINode, NodeId, OperandNode},
     pat_match::{
-        any, any_f64_imm, any_i32_imm, any_reg, any_slot, inst_select, ir, null_imm, reg_class,
-        slot, MatchContext, Pat, ReplacedNodeMap,
+        any, any_block, any_cc, any_f64_imm, any_i32_imm, any_imm, any_reg, any_slot, inst_select,
+        ir, reg_class, MatchContext, Pat, ReplacedNodeMap,
     },
 };
 use crate::ir::types::Type;
@@ -21,26 +21,23 @@ pub fn run(module: &mut DAGModule) {
 }
 
 fn run_on_function(func: &mut DAGFunction) {
+    let add_gr64_off: Pat = ir(IROpcode::Add)
+        .args(vec![
+            reg_class(RC::GR64).named("base").into(),
+            any_i32_imm().named("off").into(),
+        ])
+        .into();
+
+    #[rustfmt::skip]
+    // (Load (Add (base:GR64 off:imm32))) -> (MOVrm32 BaseOff(base off))
     let load: Pat = ir(IROpcode::Load)
         .ty(Type::i32)
-        .args(vec![ir(IROpcode::Add)
-            .args(vec![
-                reg_class(RC::GR64).named("base").into(),
-                any_i32_imm().named("off").into(),
-            ])
-            .into()])
+        .args(vec![add_gr64_off])
         .generate(|m, c| {
-            let mem = c
-                .arena
-                .alloc(MemKind::BaseOff(vec![m["base"], m["off"]]).into());
-            c.arena.alloc(
-                MINode::new(MO::MOVrm32)
-                    .args(vec![mem])
-                    .reg_class(RC::GR32)
-                    .into(),
-            )
-        })
-        .into();
+            let mem = c.arena.alloc(MemKind::BaseOff(vec![m["base"], m["off"]]).into());
+            c.arena.alloc(MINode::new(MO::MOVrm32).args(vec![mem]).reg_class(RC::GR32).into())}).into();
+    // (Load (Add (base:GR64 (Mul (off align:imm32))))) -> (MOVrm32 BaseAlignOff(base align off:GR64))
+    #[rustfmt::skip]
     let load2: Pat = ir(IROpcode::Load)
         .ty(Type::i32)
         .args(vec![ir(IROpcode::Add)
@@ -55,23 +52,9 @@ fn run_on_function(func: &mut DAGFunction) {
             ])
             .into()])
         .generate(|m, c| {
-            let off = c.arena.alloc(
-                IRNode::new(IROpcode::RegClass)
-                    .args(vec![m["off"]])
-                    .ty(Type::i64)
-                    .into(),
-            );
-            let mem = c
-                .arena
-                .alloc(MemKind::BaseAlignOff([m["base"], m["align"], off]).into());
-            c.arena.alloc(
-                MINode::new(MO::MOVrm32)
-                    .args(vec![mem])
-                    .reg_class(RC::GR32)
-                    .into(),
-            )
-        })
-        .into();
+            let off = c.arena.alloc(IRNode::new(IROpcode::RegClass).args(vec![m["off"]]).ty(Type::i64).into());
+            let mem = c.arena.alloc(MemKind::BaseAlignOff([m["base"], m["align"], off]).into());
+            c.arena.alloc(MINode::new(MO::MOVrm32).args(vec![mem]).reg_class(RC::GR32).into()) }).into();
     let load3: Pat = ir(IROpcode::Load)
         .ty(Type::f64)
         .args(vec![ir(IROpcode::Add)
@@ -189,8 +172,52 @@ fn run_on_function(func: &mut DAGFunction) {
             )
         })
         .into();
+    let brcc: Pat = ir(IROpcode::Brcc)
+        .named("brcc")
+        .args(vec![
+            any_cc().named("cc").into(),
+            any_imm().into(),
+            any_reg().into(),
+            any_block().into(),
+        ])
+        .generate(|m, c| {
+            let cc = c.arena[m["cc"]].as_operand_mut().as_cc_mut();
+            *cc = cc.flip();
+            c.arena[m["brcc"]].as_ir_mut().args.swap(1, 2);
+            m["brcc"]
+        })
+        .into();
+    #[rustfmt::skip]
+    let fpbrcc: Pat = (ir(IROpcode::FPBrcc)
+        .named("brcc")
+        .args(vec![
+            any_cc().named("cc").into(),
+            any_imm().into(),
+            any_reg().into(),
+            any_block().into(),
+        ])
+        .generate(|m, c| {
+            let cc = c.arena[m["cc"]].as_operand_mut().as_cc_mut();
+            *cc = cc.flip();
+            c.arena[m["brcc"]].as_ir_mut().args.swap(1, 2); // swap imm and reg
+            m["brcc"]
+        })
+        | ir(IROpcode::FPBrcc)
+            .args(vec![
+                any_cc().named("cc").into(),
+                any_reg().named("l").into(),
+                any_imm().named("r").into(),
+                any_block().named("dst").into(),
+            ])
+            .generate(|m, c| {
+                let r = c.arena.alloc(MINode::new(MO::MOVSDrm64).args(vec![m["r"]]).reg_class(RC::XMM).into());
+                c.arena.alloc(IRNode::new(IROpcode::FPBrcc).args(vec![m["cc"], m["l"], r, m["dst"]]).into())
+            }))
+    .into();
 
-    let pats = vec![load, load2, load3, store, store2, store3, sext];
+    let pats = vec![
+        load, load2, load3, store, store2, store3, sext, brcc, fpbrcc,
+    ];
 
     let mut replaced = ReplacedNodeMap::default();
     for &id in &func.dag_basic_blocks {
