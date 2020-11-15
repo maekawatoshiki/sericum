@@ -1,5 +1,6 @@
 #![feature(proc_macro_hygiene)]
 #![feature(const_fn_fn_ptr_basics)]
+#![feature(type_ascription)]
 #![feature(const_mut_refs)]
 #![feature(stmt_expr_attributes)]
 #![feature(drain_filter)]

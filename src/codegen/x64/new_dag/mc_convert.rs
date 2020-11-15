@@ -554,6 +554,35 @@ impl<'a> ScheduleContext<'a> {
                     self.normal_arg(args[2]).as_constant().as_i32(),
                 ))
             }
+            Node::Operand(OperandNode::Mem(MemKind::AddressAlignOff(args))) => {
+                MachineOperand::Mem(MachineMemOperand::AddressAlignOff(
+                    AddressKind::Global(
+                        *self.normal_arg(args[0]).as_mem().as_address().as_global(),
+                    ),
+                    self.normal_arg(args[1]).as_constant().as_i32(),
+                    *self.normal_arg(args[2]).as_register(),
+                ))
+            }
+            Node::Operand(OperandNode::Mem(MemKind::AddressOff(args))) => {
+                MachineOperand::Mem(MachineMemOperand::AddressOff(
+                    AddressKind::Global(
+                        *self.normal_arg(args[0]).as_mem().as_address().as_global(),
+                    ),
+                    self.normal_arg(args[1]).as_constant().as_i32(),
+                ))
+            }
+            Node::Operand(OperandNode::Mem(MemKind::Address(arg))) => {
+                MachineOperand::Mem(MachineMemOperand::Address(AddressKind::Constant(
+                    *self.normal_arg(*arg).as_mem().as_address().as_const(),
+                )))
+            }
+            Node::Operand(OperandNode::Addr(node::AddressKind::Const(id))) => {
+                MachineOperand::Mem(MachineMemOperand::Address(AddressKind::Constant(*id)))
+            }
+            // MemNodeKind::AddressOff => MachineOperand::Mem(MachineMemOperand::AddressOff(
+            //     inst::AddressKind::Global(*node.operand[0].as_address().as_global()),
+            //     self.normal_operand(node.operand[1]).as_constant().as_i32(),
+            // )),
             Node::Operand(OperandNode::Reg(r)) => {
                 MachineOperand::Register(RegisterOperand::new(*r))
             }
@@ -561,6 +590,9 @@ impl<'a> ScheduleContext<'a> {
                 MachineOperand::Mem(MachineMemOperand::Address(AddressKind::FunctionName(
                     name.clone(),
                 )))
+            }
+            Node::Operand(OperandNode::Addr(node::AddressKind::Global(id))) => {
+                MachineOperand::Mem(MachineMemOperand::Address(AddressKind::Global(*id)))
             }
             Node::Operand(OperandNode::Block(id)) => MachineOperand::Branch(self.bb_map[id]),
             Node::IR(_) | Node::MI(_) => MachineOperand::Register(self.convert(arg).unwrap()),

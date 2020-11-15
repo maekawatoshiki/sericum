@@ -379,6 +379,7 @@ fn ray_tracing() {
     #include <math.h>
 extern char *sericum_malloc_i32(int x) { return malloc(x); }
 extern double sericum_floor_f64(double x) { return floor(x); }
+extern double sericum_sqrt_f64(double x) { return sqrt(x); }
 extern int sericum_fabs_f64(double x) { return fabs(x); }
 extern int sericum_cos_f64(double x) { return cos(x); }
 extern int sericum_print_i32(int x) { printf(\"%d\", x); }

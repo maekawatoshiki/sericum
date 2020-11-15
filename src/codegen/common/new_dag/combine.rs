@@ -49,12 +49,12 @@ fn run_on_function(func: &mut DAGFunction) {
     let add: Pat = (
         // (IMM + any) -> (any + IMM)
         ir(IROpcode::Add)
-        .named("n")
-        .args(vec![any_imm().into(), any().into()])
-        .generate(|m, c| {
-            c.arena[m["n"]].as_ir_mut().args.swap(0, 1);
-            m["n"]
-        })
+            .named("n")
+            .args(vec![any_imm().into(), any().into()])
+            .generate(|m, c| {
+                c.arena[m["n"]].as_ir_mut().args.swap(0, 1);
+                m["n"]
+            })
         // (A + 0) -> A
         | ir(IROpcode::Add)
             .args(vec![any().named("l").into(), null_imm().into()])
@@ -62,7 +62,16 @@ fn run_on_function(func: &mut DAGFunction) {
     )
     .into();
 
-    let pats = vec![brcond, add];
+    let mul: Pat = (ir(IROpcode::Mul)
+        .named("n")
+        .args(vec![any_imm().into(), any().into()]))
+    .generate(|m, c| {
+        c.arena[m["n"]].as_ir_mut().args.swap(0, 1);
+        m["n"]
+    })
+    .into();
+
+    let pats = vec![brcond, add, mul];
 
     let mut replaced = ReplacedNodeMap::default();
     for &id in &func.dag_basic_blocks {

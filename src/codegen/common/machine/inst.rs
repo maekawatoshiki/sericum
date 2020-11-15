@@ -532,6 +532,13 @@ impl AddressKind {
             _ => panic!(),
         }
     }
+
+    pub fn as_const(&self) -> &ConstantId {
+        match self {
+            AddressKind::Constant(id) => id,
+            _ => panic!(),
+        }
+    }
 }
 
 impl MachineConstant {

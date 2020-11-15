@@ -27,29 +27,31 @@ pub enum MemKind {
     // BaseFiAlignOffOff,
     BaseAlignOff([NodeId; 3]),
     // BaseOff(NodeId, NodeId),
-    BaseOff(Vec<NodeId>),
+    BaseOff([NodeId; 2]),
     Base(NodeId),
-    // Address,
-    // AddressOff,
-    // AddressAlignOff,
+    Address(NodeId),
+    AddressOff([NodeId; 2]),
+    AddressAlignOff([NodeId; 3]),
 }
 
 impl MemKind {
     pub fn args(&self) -> &[NodeId] {
         match self {
-            Self::BaseFi(args) | Self::BaseOff(args) => args,
+            Self::BaseFi(args) => args,
             Self::BaseFiAlignOff(args) => args,
-            Self::BaseFiOff(args) | Self::BaseAlignOff(args) => args,
-            Self::Base(arg) => ::core::slice::from_ref(arg),
+            Self::BaseOff(args) | Self::AddressOff(args) => args,
+            Self::AddressAlignOff(args) | Self::BaseFiOff(args) | Self::BaseAlignOff(args) => args,
+            Self::Address(arg) | Self::Base(arg) => ::core::slice::from_ref(arg),
         }
     }
 
     pub fn args_mut(&mut self) -> &mut [NodeId] {
         match self {
-            Self::BaseFi(args) | Self::BaseOff(args) => args,
+            Self::BaseFi(args) => args,
             Self::BaseFiAlignOff(args) => args,
-            Self::BaseFiOff(args) | Self::BaseAlignOff(args) => args,
-            Self::Base(arg) => ::core::slice::from_mut(arg),
+            Self::BaseOff(args) | Self::AddressOff(args) => args,
+            Self::AddressAlignOff(args) | Self::BaseFiOff(args) | Self::BaseAlignOff(args) => args,
+            Self::Address(arg) | Self::Base(arg) => ::core::slice::from_mut(arg),
         }
     }
 }
@@ -66,6 +68,9 @@ impl fmt::Debug for MemKind {
                 Self::BaseAlignOff(_) => "BaseAlignOff",
                 Self::BaseOff(_) => "BaseOff",
                 Self::Base(_) => "Base",
+                Self::Address(_) => "Address",
+                Self::AddressOff(_) => "AddressOff",
+                Self::AddressAlignOff(_) => "AddressAlignOff",
             }
         )
     }
