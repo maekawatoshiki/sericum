@@ -481,7 +481,16 @@ impl<'a> ScheduleContext<'a> {
 
         if ret_ty != Type::Void {
             let arg = self.normal_arg(arg);
-            let rc = ty2rc(&ret_ty).unwrap();
+            let rc = match arg {
+                MachineOperand::Register(RegisterOperand { id, sub_super }) => {
+                    sub_super.unwrap_or_else(|| self.func.regs.arena_ref()[id].reg_class)
+                }
+                MachineOperand::Constant(MachineConstant::Int8(_)) => RegisterClassKind::GR8,
+                MachineOperand::Constant(MachineConstant::Int32(_)) => RegisterClassKind::GR32,
+                MachineOperand::Constant(MachineConstant::Int64(_)) => RegisterClassKind::GR64,
+                MachineOperand::Constant(MachineConstant::F64(_)) => RegisterClassKind::XMM,
+                _ => panic!(),
+            };
             let opcode = mov_rx(rc, &arg).unwrap();
             let mov = MachineInst::new_simple(opcode, vec![arg], self.block_id).with_def(vec![
                 RegisterOperand::new(self.func.regs.get_phys_reg(rc.return_value_register())),
