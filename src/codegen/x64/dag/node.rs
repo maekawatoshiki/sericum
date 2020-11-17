@@ -24,7 +24,7 @@ pub enum MemKind {
     BaseFiOff([NodeId; 3]),
     // BaseFiAlignOff(NodeId, NodeId, NodeId, NodeId),
     BaseFiAlignOff([NodeId; 4]),
-    // BaseFiAlignOffOff,
+    BaseFiAlignOffOff([NodeId; 5]),
     BaseAlignOff([NodeId; 3]),
     // BaseOff(NodeId, NodeId),
     BaseOff([NodeId; 2]),
@@ -40,6 +40,7 @@ impl MemKind {
             Self::BaseFi(args) => args,
             Self::BaseFiAlignOff(args) => args,
             Self::BaseOff(args) | Self::AddressOff(args) => args,
+            Self::BaseFiAlignOffOff(args) => args,
             Self::AddressAlignOff(args) | Self::BaseFiOff(args) | Self::BaseAlignOff(args) => args,
             Self::Address(arg) | Self::Base(arg) => ::core::slice::from_ref(arg),
         }
@@ -50,6 +51,7 @@ impl MemKind {
             Self::BaseFi(args) => args,
             Self::BaseFiAlignOff(args) => args,
             Self::BaseOff(args) | Self::AddressOff(args) => args,
+            Self::BaseFiAlignOffOff(args) => args,
             Self::AddressAlignOff(args) | Self::BaseFiOff(args) | Self::BaseAlignOff(args) => args,
             Self::Address(arg) | Self::Base(arg) => ::core::slice::from_mut(arg),
         }
@@ -66,6 +68,7 @@ impl fmt::Debug for MemKind {
                 Self::BaseFiOff(_) => "BaseFiOff",
                 Self::BaseFiAlignOff(_) => "BaseFiAlignOff",
                 Self::BaseAlignOff(_) => "BaseAlignOff",
+                Self::BaseFiAlignOffOff(_) => "BaseFiAlignOffOff",
                 Self::BaseOff(_) => "BaseOff",
                 Self::Base(_) => "Base",
                 Self::Address(_) => "Address",
