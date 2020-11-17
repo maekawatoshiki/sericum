@@ -554,6 +554,15 @@ impl<'a> ScheduleContext<'a> {
                     self.normal_arg(args[2]).as_constant().as_i32(),
                 ))
             }
+            Node::Operand(OperandNode::Mem(MemKind::BaseFiAlignOffOff(args))) => {
+                MachineOperand::Mem(MachineMemOperand::BaseFiAlignOffOff(
+                    *self.normal_arg(args[0]).as_register(),
+                    *self.normal_arg(args[1]).as_frame_index(),
+                    self.normal_arg(args[2]).as_constant().as_i32(),
+                    *self.normal_arg(args[3]).as_register(),
+                    self.normal_arg(args[4]).as_constant().as_i32(),
+                ))
+            }
             Node::Operand(OperandNode::Mem(MemKind::AddressAlignOff(args))) => {
                 MachineOperand::Mem(MachineMemOperand::AddressAlignOff(
                     AddressKind::Global(

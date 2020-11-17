@@ -286,18 +286,20 @@ fn run_on_function(func: &mut DAGFunction) {
                  | reg_class(RC::GR32).named("y").into()).named("x").into(),
                 any_i32_imm().named("m2").into()
             ]).into()]).into(),
-        (  any_i32_imm().named("imm").into(): CompoundPat 
+        (  any_i32_imm().named("imm").into(): CompoundPat
          | any_f64_imm().named("imm").into()
          | reg_class(RC::GR32).named("reg").into()).named("src").into()]).generate(|m, c| {
         let i = c.arena[m["m2"]].as_operand().as_imm().as_i32();
+        let off = c.arena[m["e"]].as_operand().as_imm().as_i32() * i;
+        let off = c.arena.alloc(off.into());
         let rbp = c.arena.alloc(c.regs.get_phys_reg(GR64::RBP).into());
         let mem = if (i as usize).is_power_of_two() && i <= 8 {
-            c.arena.alloc(MemKind::BaseFiAlignOffOff([rbp, m["slot"], m["m2"], m["w"], m["e"]]).into())
+            c.arena.alloc(MemKind::BaseFiAlignOffOff([rbp, m["slot"], m["m2"], m["w"], off]).into())
         } else {
             let one = c.arena.alloc(1.into());
             let off2 = c.arena.alloc(MINode::new(MO::IMULrr64i32)
                 .args(vec![m["w"], m["m2"]]).reg_class(RC::GR64).into());
-            c.arena.alloc(MemKind::BaseFiAlignOffOff([rbp, m["slot"], one, off2, m["e"]]).into())
+            c.arena.alloc(MemKind::BaseFiAlignOffOff([rbp, m["slot"], one, off2, off]).into())
         };
         let mi = match c.arena[m["src"]] {
             Node::IR(_) | Node::MI(_) | Node::Operand(OperandNode::Reg(_)) => MINode::new(MO::MOVmr32),
