@@ -51,7 +51,7 @@ pub struct CompoundPat {
     pub generate: Option<Box<GenFn>>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum OperandKind {
     Any,
     Imm(Immediate),
@@ -62,35 +62,36 @@ pub enum OperandKind {
     Invalid,
 }
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub enum Immediate {
     AnyInt8,
     AnyInt32,
     AnyInt64,
     AnyF64,
+    AnyInt32PowerOf2,
     Int32(i32),
     Any,
     Null,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Slot {
     Type(MVType),
     Any,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Register {
     Class(RC),
     Any,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Block {
     Any,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum Condition {
     Any,
 }
@@ -247,6 +248,15 @@ pub const fn any_i32_imm() -> OperandPat {
     OperandPat {
         name: "",
         kind: OperandKind::Imm(Immediate::AnyInt32),
+        not: false,
+        generate: None,
+    }
+}
+
+pub const fn any_i32_imm_power_of_2() -> OperandPat {
+    OperandPat {
+        name: "",
+        kind: OperandKind::Imm(Immediate::AnyInt32PowerOf2),
         not: false,
         generate: None,
     }
@@ -412,6 +422,57 @@ impl BitOr for CompoundPat {
 //     && node.operand[1].is_constant()
 // {
 
+impl Pat {
+    pub fn depth(&self) -> usize {
+        match self {
+            Self::IR(ir) => ir.depth(),
+            Self::MI => 0,
+            Self::Operand(op) => op.depth(),
+            Self::Compound(c) => c.depth(),
+            Self::Invalid => panic!(),
+        }
+    }
+}
+
+impl IRPat {
+    pub fn depth(&self) -> usize {
+        let mut max = 0;
+        for pat in &self.operands {
+            let depth = pat.depth();
+            if max < depth {
+                max = depth
+            }
+        }
+        max + 1
+    }
+}
+
+impl OperandPat {
+    pub fn depth(&self) -> usize {
+        1
+    }
+}
+
+impl CompoundPat {
+    pub fn depth(&self) -> usize {
+        let mut max = 0;
+        for pat in &self.pats {
+            let depth = pat.depth();
+            if max < depth {
+                max = depth
+            }
+        }
+        max + 1
+    }
+}
+
+pub fn reorder_patterns(pats: Vec<Pat>) -> Vec<Pat> {
+    let mut pats_with_depth: Vec<(usize, Pat)> =
+        pats.into_iter().map(|pat| (pat.depth(), pat)).collect();
+    pats_with_depth.sort_by(|x, y| y.0.cmp(&x.0));
+    pats_with_depth.into_iter().map(|(_, pat)| pat).collect()
+}
+
 #[test]
 fn xxx() {
     let mut arena: Arena<Node> = Arena::new();
@@ -527,7 +588,7 @@ pub fn inst_select(
         return *replaced;
     }
 
-    println!("{:?} = {:?}", id, ctx.arena[id]);
+    // println!("{:?} = {:?}", id, ctx.arena[id]);
 
     let mut map = NameMap::default();
     for pat in pats {
@@ -591,11 +652,17 @@ fn matches(
                 _ => return None,
             };
             let same_opcode = Some(n.opcode) == pat.opcode;
+            if !same_opcode {
+                return None;
+            }
             let same_operands = pat
                 .operands
                 .iter()
                 .zip(n.args.iter())
                 .all(|(pat, &id)| matches(ctx, id, pat, m).is_some());
+            if !same_operands {
+                return None;
+            }
             let same_ty = pat.ty.map_or(true, |ty| n.mvty == ty.into());
             if same_opcode && same_operands && same_ty {
                 if !pat.name.is_empty() {
@@ -629,6 +696,9 @@ fn matches(
                         }
                         OperandKind::Imm(Immediate::Int32(i)) => {
                             matches!(n, &OperandNode::Imm(ImmediateKind::Int32(x)) if x == *i)
+                        }
+                        OperandKind::Imm(Immediate::AnyInt32PowerOf2) => {
+                            matches!(n, &OperandNode::Imm(ImmediateKind::Int32(x)) if (x as usize).is_power_of_two())
                         }
                         OperandKind::Imm(Immediate::Any) => matches!(n, &OperandNode::Imm(_)),
                         OperandKind::Reg(Register::Class(reg_class)) => {

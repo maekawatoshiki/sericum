@@ -5,11 +5,11 @@ use crate::codegen::common::new_dag::{
     module::DAGModule,
     node::{IRNode, IROpcode, MINode, NodeId, OperandNode},
     pat_match::{
-        any, any_block, any_cc, any_imm, any_reg, inst_select, ir, null_imm, reg_class, slot,
-        MatchContext, Pat, ReplacedNodeMap,
+        any, any_block, any_cc, any_i32_imm, any_imm, any_reg, inst_select, ir, not, null_imm,
+        reg_class, slot, MatchContext, Pat, ReplacedNodeMap,
     },
 };
-// use crate::ir::types::Type;
+use crate::ir::types::Type;
 
 pub fn run(module: &mut DAGModule) {
     for (_, func) in &mut module.functions {
@@ -59,6 +59,20 @@ fn run_on_function(func: &mut DAGFunction) {
         | ir(IROpcode::Add)
             .args(vec![any().named("l").into(), null_imm().into()])
             .generate(|m, _| m["l"])
+        // ((node + C1) + C2) -> (node + C3)
+        | ir(IROpcode::Add).named("add").args(vec![
+            ir(IROpcode::Add).args(vec![
+                not().any_i32_imm().named("n").into(),
+                any_i32_imm().named("c1").into(),
+            ]).into(),
+            any_imm().named("c2").into()
+        ]).generate(|m, c|{
+            let c1 = c.arena[m["c1"]].as_operand().as_imm().as_i32();
+            let c2 = c.arena[m["c2"]].as_operand().as_imm().as_i32();
+            let c3 = c.arena.alloc((c1 + c2).into());
+            let ty = c.arena[m["add"]].as_ir().ty;
+            c.arena.alloc(IRNode::new(IROpcode::Add).args(vec![m["n"], c3]).ty(ty).into())
+        }).into()
     )
     .into();
 
