@@ -5,8 +5,8 @@ use crate::codegen::common::new_dag::{
     module::DAGModule,
     node::{IRNode, IROpcode, MINode, NodeId, OperandNode},
     pat_match::{
-        any, any_block, any_cc, any_i32_imm, any_imm, any_reg, inst_select, ir, not, null_imm,
-        reg_class, slot, MatchContext, Pat, ReplacedNodeMap,
+        any, any_block, any_cc, any_i32_imm, any_imm, any_reg, i32_imm, inst_select, ir, not,
+        null_imm, reg_class, slot, MatchContext, Pat, ReplacedNodeMap,
     },
 };
 use crate::ir::types::Type;
@@ -78,11 +78,18 @@ fn run_on_function(func: &mut DAGFunction) {
 
     let mul: Pat = (ir(IROpcode::Mul)
         .named("n")
-        .args(vec![any_imm().into(), any().into()]))
-    .generate(|m, c| {
-        c.arena[m["n"]].as_ir_mut().args.swap(0, 1);
-        m["n"]
-    })
+        .args(vec![any_imm().into(), any().into()])
+        .generate(|m, c| {
+            c.arena[m["n"]].as_ir_mut().args.swap(0, 1);
+            m["n"]
+        })
+        | ir(IROpcode::Mul)
+            .args(vec![any().into(), i32_imm(0).named("0").into()])
+            .generate(|m, _c| m["0"])
+        | ir(IROpcode::Mul)
+            .args(vec![any().named("n").into(), i32_imm(1).into()])
+            .generate(|m, _c| m["n"])
+            .into())
     .into();
 
     let pats = vec![brcond, add, mul];
