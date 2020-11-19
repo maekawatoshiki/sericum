@@ -65,7 +65,7 @@ fn run_on_function(func: &mut DAGFunction) {
                 not().any_i32_imm().named("n").into(),
                 any_i32_imm().named("c1").into(),
             ]).into(),
-            any_imm().named("c2").into()
+            any_i32_imm().named("c2").into()
         ]).generate(|m, c|{
             let c1 = c.arena[m["c1"]].as_operand().as_imm().as_i32();
             let c2 = c.arena[m["c2"]].as_operand().as_imm().as_i32();

@@ -281,55 +281,14 @@ fn run_on_function(func: &mut DAGFunction) {
         };
         let mem = c.arena.alloc(mem.into());
         match c.arena[m["src"]] {
-            Node::IR(_) | Node::MI(_) | Node::Operand(OperandNode::Reg(_)) => 
-                c.arena.alloc(MINode::new(MO::MOVmr32).args(vec![mem, m["reg"]]).into()),
-            Node::Operand(OperandNode::Imm(ImmediateKind::Int32(_))) => 
-                c.arena.alloc(MINode::new(MO::MOVmi32).args(vec![mem, m["imm"]]).into()),
+            Node::IR(_) | Node::MI(_) | Node::Operand(OperandNode::Reg(_)) => c.arena.alloc(MINode::new(MO::MOVmr32).args(vec![mem, m["reg"]]).into()),
+            Node::Operand(OperandNode::Imm(ImmediateKind::Int32(_))) => c.arena.alloc(MINode::new(MO::MOVmi32).args(vec![mem, m["imm"]]).into()),
             Node::Operand(OperandNode::Imm(ImmediateKind::F64(_))) => {
                 let src = c.arena.alloc(MINode::new(MO::MOVSDrm64).args(vec![m["imm"]]).reg_class(RC::XMM).into());
                 c.arena.alloc(MINode::new(MO::MOVSDmr).args(vec![mem, src]).into())
             }
             _ => unreachable!()
         }
-    }).into();
-    #[rustfmt::skip]
-    let store1: Pat = ir(IROpcode::Store).args(vec![
-        ir(IROpcode::Add).args(vec![
-            ir(IROpcode::FIAddr).args(vec![any_slot().named("slot").into()]).into(),
-            ir(IROpcode::Mul).args(vec![
-                (  ir(IROpcode::Sext).args(vec![
-                    ir(IROpcode::Add).args(vec![
-                        any().named("w").into(),
-                        any_i32_imm().named("e").into()]).into()]).into(): CompoundPat
-                 | any_i32_imm().named("y").into()
-                 | reg_class(RC::GR32).named("y").into()).named("x").into(),
-                any_i32_imm().named("m2").into()
-            ]).into()]).into(),
-        (  any_i32_imm().named("imm").into(): CompoundPat
-         | any_f64_imm().named("imm").into()
-         | reg_class(RC::GR32).named("reg").into()).named("src").into()]).generate(|m, c| {
-        let i = c.arena[m["m2"]].as_operand().as_imm().as_i32();
-        let off = c.arena[m["e"]].as_operand().as_imm().as_i32() * i;
-        let off = c.arena.alloc(off.into());
-        let rbp = c.arena.alloc(c.regs.get_phys_reg(GR64::RBP).into());
-        let mem = if (i as usize).is_power_of_two() && i <= 8 {
-            c.arena.alloc(MemKind::BaseFiAlignOffOff([rbp, m["slot"], m["m2"], m["w"], off]).into())
-        } else {
-            let one = c.arena.alloc(1.into());
-            let off2 = c.arena.alloc(MINode::new(MO::IMULrr64i32)
-                .args(vec![m["w"], m["m2"]]).reg_class(RC::GR64).into());
-            c.arena.alloc(MemKind::BaseFiAlignOffOff([rbp, m["slot"], one, off2, off]).into())
-        };
-        let mi = match c.arena[m["src"]] {
-            Node::IR(_) | Node::MI(_) | Node::Operand(OperandNode::Reg(_)) => MINode::new(MO::MOVmr32),
-            Node::Operand(OperandNode::Imm(ImmediateKind::Int32(_))) => MINode::new(MO::MOVmi32),
-            // Node::Operand(OperandNode::Imm(ImmediateKind::F64(_))) => {
-            //     let src = c.arena.alloc(MINode::new(MO::MOVSDrm64).args(vec![m["imm"]]).reg_class(RC::XMM).into());
-            //     MINode::new(MO::MOVSDmr)
-            // }
-            _ => unreachable!()
-        };
-        c.arena.alloc(mi.args(vec![mem, m["src"]]).into())
     }).into();
     #[rustfmt::skip]
     let store2: Pat = ir(IROpcode::Store).args(vec![
@@ -467,11 +426,10 @@ fn run_on_function(func: &mut DAGFunction) {
         .into();
 
     let pats = vec![
-        load4, load5, load6, load, load2, load3, store1, store2, store, sext, brcc, fpbrcc, store3,
-        store4,
+        load4, load5, load6, load, load2, load3, store2, store, sext, brcc, fpbrcc, store3, store4,
         bitcast,
-        // sext, load4, load5, store, load, load2, load3, store2, brcc, fpbrcc, bitcast, store1, load6,
-        // store3, store4,
+        // sext, load4, load5, store, load, load2, load3, store2, brcc, fpbrcc, bitcast, load6, store3,
+        // store4,
     ];
     let pats = reorder_patterns(pats);
 
