@@ -6,9 +6,10 @@ use crate::codegen::common::{
         module::DAGModule,
         node::{IRNode, IROpcode, ImmediateKind, MINode, Node, NodeId, OperandNode},
         pat_match::{
-            any, any_block, any_cc, any_f64_imm, any_i32_imm, any_i32_imm_power_of_2, any_imm,
-            any_reg, any_slot, inst_select, ir, not, reg_class, reorder_patterns, CompoundPat,
-            MatchContext, Pat, ReplacedNodeMap,
+            add, any, any_block, any_cc, any_f64_imm, any_i32_imm, any_imm, any_imm32,
+            any_imm32_power_of_2, any_imm_f64, any_reg, any_slot, fiaddr, gbladdr, inst_select, ir,
+            mul, not, reg_, reg_class, reorder_patterns, store, CompoundPat, MatchContext, Pat,
+            ReplacedNodeMap,
         },
     },
     types::MVType,
@@ -49,7 +50,7 @@ fn run_on_function(func: &mut DAGFunction) {
                 reg_class(RC::GR64).named("base").into(),
                 ir(IROpcode::Mul)
                     .args(vec![
-                        any().named("off").into(),
+                        any().named("off"),
                         any_i32_imm().named("align").into(),
                     ])
                     .into(),
@@ -69,10 +70,10 @@ fn run_on_function(func: &mut DAGFunction) {
         // .ty(Type::i32)
         .args(vec![ir(IROpcode::Add)
             .args(vec![
-                ir(IROpcode::GlobalAddr).args(vec![any().named("g").into()]).into(),
+                ir(IROpcode::GlobalAddr).args(vec![any().named("g")]).into(),
                 ir(IROpcode::Mul)
                     .args(vec![
-                        any().named("off").into(),
+                        any().named("off"),
                         any_i32_imm().named("align").into(),
                     ])
                     .into(),
@@ -91,7 +92,7 @@ fn run_on_function(func: &mut DAGFunction) {
     let load5: Pat = ir(IROpcode::Load).named("load")
         .args(vec![ir(IROpcode::Add)
             .args(vec![
-                ir(IROpcode::GlobalAddr).args(vec![any().named("g").into()]).into(),
+                ir(IROpcode::GlobalAddr).args(vec![any().named("g")]).into(),
                 any_i32_imm().named("off").into(),
             ])
             .into()])
@@ -144,48 +145,6 @@ fn run_on_function(func: &mut DAGFunction) {
             )
         })
         .into();
-
-    // {
-    //     fn store(src: Pat, dst: Pat) -> Pat {
-    //         ir(IROpcode::Store).args(vec![src, dst]).into()
-    //     }
-    //     fn add(lhs: Pat, rhs: Pat) -> Pat {
-    //         ir(IROpcode::Add).args(vec![lhs, rhs]).into()
-    //     }
-    //     fn fiaddr(slot: Pat) -> Pat {
-    //         ir(IROpcode::FIAddr).args(vec![slot]).into()
-    //     }
-    //     fn mul(lhs: Pat, rhs: Pat) -> Pat {
-    //         ir(IROpcode::Mul).args(vec![lhs, rhs]).into()
-    //     }
-    //     fn sext(arg: Pat) -> Pat {
-    //         ir(IROpcode::Sext).args(vec![arg]).into()
-    //     }
-    //     fn imm32() -> Pat {
-    //         any_i32_imm().into()
-    //     }
-    //     fn reg() -> Pat {
-    //         any_reg().into()
-    //     }
-    //     fn reg_(rc: RC) -> Pat {
-    //         reg_class(rc).into()
-    //     }
-    //     fn slot() -> Pat {
-    //         any_slot().into()
-    //     }
-    //     let _ = store(
-    //         add(
-    //             fiaddr(slot()),
-    //             mul(sext(add(reg().into(), imm32())), imm32()),
-    //         ),
-    //         imm32(),
-    //     );
-    //     // let store_add_slot_mul_off_align_gr32: Pat = ir(IROpcode::Store)
-    //     let _ = store(
-    //         add(fiaddr(slot()), mul(reg_(RC::GR32), imm32())),
-    //         reg_(RC::GR32),
-    //     );
-    // }
 
     let sext: Pat = ir(IROpcode::Sext)
         .named("sext")
@@ -243,21 +202,15 @@ fn run_on_function(func: &mut DAGFunction) {
                 c.arena.alloc(IRNode::new(IROpcode::FPBrcc).args(vec![m["cc"], m["l"], r, m["dst"]]).into())
             }))
     .into();
+
     #[rustfmt::skip]
-    let store: Pat = ir(IROpcode::Store).args(vec![
-        ir(IROpcode::Add).args(vec![
-            (( ir(IROpcode::FIAddr).args(vec![any_slot().named("slot").into()]).into(): CompoundPat
-             | ir(IROpcode::GlobalAddr).args(vec![any().named("g").into()]).into()
-             | reg_class(RC::GR64).named("base").into())).named("lhs").into(),
-            ( ir(IROpcode::Mul).args(vec![
-                any().named("off").into(),
-                any_i32_imm_power_of_2().named("align").into()]).into(): CompoundPat
-            | any_i32_imm().named("off").into()).named("rhs").into()
-        ]).into(),
-        (  any_i32_imm().named("imm").into(): CompoundPat 
-         | any_f64_imm().named("imm").into()
-         | reg_class(RC::GR32).named("reg").into()).named("src").into()
-    ]).generate(|m, c| {
+    let store1: Pat = store(
+        add(
+            (fiaddr(any_slot().named("slot")) | gbladdr(any().named("g")) | reg_(RC::GR64).named("base")).named("lhs"),
+            (mul(any().named("off"), any_imm32_power_of_2().named("align")) | any_imm32().named("off")).named("rhs"),
+        ),
+        (any_imm32().named("imm") | any_imm_f64().named("imm") | reg_(RC::GR32).named("reg")).named("src"),
+    ).generate(|m, c| {
         let mem = match c.arena[m["lhs"]] {
             Node::IR(IRNode { opcode: IROpcode::FIAddr, ..}) => {
                 let rbp = c.arena.alloc(c.regs.get_phys_reg(GR64::RBP).into());
@@ -295,7 +248,7 @@ fn run_on_function(func: &mut DAGFunction) {
         ir(IROpcode::Add).args(vec![
             ir(IROpcode::FIAddr).args(vec![any_slot().named("slot").into()]).into(),
             ir(IROpcode::Mul).args(vec![
-                any().named("m1").into(),
+                any().named("m1"),
                 any_i32_imm().named("m2").into()
             ]).into()]).into(),
         (  any_i32_imm().named("imm").into(): CompoundPat 
@@ -359,74 +312,62 @@ fn run_on_function(func: &mut DAGFunction) {
             c.arena.alloc(mi.args(vec![mem, m["src"]]).into())
         })
         .into();
-    let store4: Pat = ir(IROpcode::Store)
-        .args(vec![
-            ir(IROpcode::Add)
-                .args(vec![
-                    reg_class(RC::GR64).named("base").into(),
-                    any_i32_imm().named("off").into(),
-                ])
-                .into(),
-            (any_i32_imm().named("imm").into(): CompoundPat
-                | any_f64_imm().named("imm").into()
-                | reg_class(RC::GR32).named("reg").into()
-                | reg_class(RC::GR64).named("reg").into()
-                | reg_class(RC::XMM).named("reg").into())
-            .named("src")
-            .into(),
-        ])
-        .generate(|m, c| {
-            let mem = c
-                .arena
-                .alloc(MemKind::BaseOff([m["base"], m["off"]]).into())
-                .into();
-            let mi = match c.arena[m["src"]] {
-                Node::IR(IRNode {
-                    mvty: MVType::i64, ..
-                })
-                | Node::MI(MINode {
-                    reg_class: Some(RC::GR64),
-                    ..
-                }) => MINode::new(MO::MOVmr64),
-                Node::Operand(OperandNode::Reg(r))
-                    if c.regs.arena_ref()[r].reg_class == RC::GR64 =>
-                {
-                    MINode::new(MO::MOVmr64)
-                }
-                Node::IR(IRNode {
-                    mvty: MVType::f64, ..
-                })
-                | Node::MI(MINode {
-                    reg_class: Some(RC::XMM),
-                    ..
-                }) => MINode::new(MO::MOVSDmr),
-                Node::Operand(OperandNode::Reg(r))
-                    if c.regs.arena_ref()[r].reg_class == RC::XMM =>
-                {
-                    MINode::new(MO::MOVSDmr)
-                }
-                Node::IR(_) | Node::MI(_) | Node::Operand(OperandNode::Reg(_)) => {
-                    MINode::new(MO::MOVmr32)
-                }
-                Node::Operand(OperandNode::Imm(ImmediateKind::Int32(_))) => {
-                    MINode::new(MO::MOVmi32)
-                }
-                // Node::Operand(OperandNode::Imm(ImmediateKind::F64(_))) => {
-                //     let src = c.arena.alloc(MINode::new(MO::MOVSDrm64).args(vec![m["imm"]]).reg_class(RC::XMM).into());
-                //     MINode::new(MO::MOVSDmr)
-                // }
-                _ => unreachable!(),
-            };
-            c.arena.alloc(mi.args(vec![mem, m["src"]]).into())
-        })
-        .into();
+    let store4 = store(
+        add(reg_(RC::GR64).named("base"), any_imm32().named("off")),
+        (any_imm32().named("imm")
+            | any_imm_f64().named("imm")
+            | reg_(RC::GR32).named("reg")
+            | reg_(RC::GR64).named("reg")
+            | reg_(RC::XMM).named("reg"))
+        .named("src"),
+    )
+    .generate(|m, c| {
+        let mem = c
+            .arena
+            .alloc(MemKind::BaseOff([m["base"], m["off"]]).into())
+            .into();
+        let mi = match c.arena[m["src"]] {
+            Node::IR(IRNode {
+                mvty: MVType::i64, ..
+            })
+            | Node::MI(MINode {
+                reg_class: Some(RC::GR64),
+                ..
+            }) => MINode::new(MO::MOVmr64),
+            Node::Operand(OperandNode::Reg(r)) if c.regs.arena_ref()[r].reg_class == RC::GR64 => {
+                MINode::new(MO::MOVmr64)
+            }
+            Node::IR(IRNode {
+                mvty: MVType::f64, ..
+            })
+            | Node::MI(MINode {
+                reg_class: Some(RC::XMM),
+                ..
+            }) => MINode::new(MO::MOVSDmr),
+            Node::Operand(OperandNode::Reg(r)) if c.regs.arena_ref()[r].reg_class == RC::XMM => {
+                MINode::new(MO::MOVSDmr)
+            }
+            Node::IR(_) | Node::MI(_) | Node::Operand(OperandNode::Reg(_)) => {
+                MINode::new(MO::MOVmr32)
+            }
+            Node::Operand(OperandNode::Imm(ImmediateKind::Int32(_))) => MINode::new(MO::MOVmi32),
+            // Node::Operand(OperandNode::Imm(ImmediateKind::F64(_))) => {
+            //     let src = c.arena.alloc(MINode::new(MO::MOVSDrm64).args(vec![m["imm"]]).reg_class(RC::XMM).into());
+            //     MINode::new(MO::MOVSDmr)
+            // }
+            _ => unreachable!(),
+        };
+        c.arena.alloc(mi.args(vec![mem, m["src"]]).into())
+    })
+    .into();
     let bitcast: Pat = ir(IROpcode::Bitcast)
-        .args(vec![any().named("arg").into()])
+        .args(vec![any().named("arg")])
         .generate(|m, _| m["arg"])
         .into();
 
     let pats = vec![
-        load4, load5, load6, load, load2, load3, store2, store, sext, brcc, fpbrcc, store3, store4,
+        load4, load5, load6, load, load2, load3, store2, store1, sext, brcc, fpbrcc, store3,
+        store4,
         bitcast,
         // sext, load4, load5, store, load, load2, load3, store2, brcc, fpbrcc, bitcast, load6, store3,
         // store4,

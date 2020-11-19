@@ -1,15 +1,12 @@
-use crate::codegen::arch::machine::register::{RegisterClassKind as RC, GR64};
-use crate::codegen::arch::{dag::node::MemKind, machine::inst::MachineOpcode};
 use crate::codegen::common::new_dag::{
     function::DAGFunction,
     module::DAGModule,
-    node::{IRNode, IROpcode, MINode, NodeId, OperandNode},
+    node::{IRNode, IROpcode, NodeId},
     pat_match::{
         any, any_block, any_cc, any_i32_imm, any_imm, any_reg, i32_imm, inst_select, ir, not,
-        null_imm, reg_class, slot, MatchContext, Pat, ReplacedNodeMap,
+        null_imm, MatchContext, Pat, ReplacedNodeMap,
     },
 };
-use crate::ir::types::Type;
 
 pub fn run(module: &mut DAGModule) {
     for (_, func) in &mut module.functions {
@@ -50,14 +47,14 @@ fn run_on_function(func: &mut DAGFunction) {
         // (IMM + any) -> (any + IMM)
         ir(IROpcode::Add)
             .named("n")
-            .args(vec![any_imm().into(), any().into()])
+            .args(vec![any_imm().into(), any()])
             .generate(|m, c| {
                 c.arena[m["n"]].as_ir_mut().args.swap(0, 1);
                 m["n"]
             })
         // (A + 0) -> A
         | ir(IROpcode::Add)
-            .args(vec![any().named("l").into(), null_imm().into()])
+            .args(vec![any().named("l"), null_imm().into()])
             .generate(|m, _| m["l"])
         // ((node + C1) + C2) -> (node + C3)
         | ir(IROpcode::Add).named("add").args(vec![
@@ -78,16 +75,16 @@ fn run_on_function(func: &mut DAGFunction) {
 
     let mul: Pat = (ir(IROpcode::Mul)
         .named("n")
-        .args(vec![any_imm().into(), any().into()])
+        .args(vec![any_imm().into(), any()])
         .generate(|m, c| {
             c.arena[m["n"]].as_ir_mut().args.swap(0, 1);
             m["n"]
         })
         | ir(IROpcode::Mul)
-            .args(vec![any().into(), i32_imm(0).named("0").into()])
+            .args(vec![any(), i32_imm(0).named("0").into()])
             .generate(|m, _c| m["0"])
         | ir(IROpcode::Mul)
-            .args(vec![any().named("n").into(), i32_imm(1).into()])
+            .args(vec![any().named("n"), i32_imm(1).into()])
             .generate(|m, _c| m["n"])
             .into())
     .into();

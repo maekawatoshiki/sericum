@@ -1,5 +1,5 @@
 pub use crate::codegen::common::dag::node::*;
-use crate::codegen::common::new_dag::{node, node::NodeId};
+use crate::codegen::common::new_dag::node::NodeId;
 use std::fmt;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -19,7 +19,7 @@ pub enum MemNodeKind {
 #[derive(Clone, PartialEq)]
 pub enum MemKind {
     // BaseFi(NodeId, NodeId),
-    BaseFi(Vec<NodeId>),
+    BaseFi([NodeId; 2]),
     // BaseFiOff(NodeId, NodeId, NodeId),
     BaseFiOff([NodeId; 3]),
     // BaseFiAlignOff(NodeId, NodeId, NodeId, NodeId),
@@ -37,9 +37,8 @@ pub enum MemKind {
 impl MemKind {
     pub fn args(&self) -> &[NodeId] {
         match self {
-            Self::BaseFi(args) => args,
             Self::BaseFiAlignOff(args) => args,
-            Self::BaseOff(args) | Self::AddressOff(args) => args,
+            Self::BaseFi(args) | Self::BaseOff(args) | Self::AddressOff(args) => args,
             Self::BaseFiAlignOffOff(args) => args,
             Self::AddressAlignOff(args) | Self::BaseFiOff(args) | Self::BaseAlignOff(args) => args,
             Self::Address(arg) | Self::Base(arg) => ::core::slice::from_ref(arg),
@@ -48,9 +47,8 @@ impl MemKind {
 
     pub fn args_mut(&mut self) -> &mut [NodeId] {
         match self {
-            Self::BaseFi(args) => args,
             Self::BaseFiAlignOff(args) => args,
-            Self::BaseOff(args) | Self::AddressOff(args) => args,
+            Self::BaseFi(args) | Self::BaseOff(args) | Self::AddressOff(args) => args,
             Self::BaseFiAlignOffOff(args) => args,
             Self::AddressAlignOff(args) | Self::BaseFiOff(args) | Self::BaseAlignOff(args) => args,
             Self::Address(arg) | Self::Base(arg) => ::core::slice::from_mut(arg),

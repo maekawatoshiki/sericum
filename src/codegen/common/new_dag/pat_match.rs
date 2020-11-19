@@ -120,6 +120,30 @@ pub const fn mi_node() -> MIPat {
     MIPat {}
 }
 
+impl Pat {
+    pub fn named(mut self, name: &'static str) -> Self {
+        match &mut self {
+            Self::IR(IRPat { name: n, .. }) => *n = name,
+            Self::MI => panic!(),
+            Self::Operand(OperandPat { name: n, .. }) => *n = name,
+            Self::Compound(CompoundPat { name: n, .. }) => *n = name,
+            Self::Invalid => panic!(),
+        }
+        self
+    }
+
+    pub fn generate(mut self, f: GenFn) -> Self {
+        match &mut self {
+            Self::IR(IRPat { generate, .. }) => *generate = Some(Box::new(f)),
+            Self::MI => panic!(),
+            Self::Operand(OperandPat { generate, .. }) => *generate = Some(Box::new(f)),
+            Self::Compound(CompoundPat { generate, .. }) => *generate = Some(Box::new(f)),
+            Self::Invalid => panic!(),
+        }
+        self
+    }
+}
+
 impl IRPat {
     pub fn named(mut self, name: &'static str) -> Self {
         self.name = name;
@@ -190,13 +214,13 @@ pub const fn not() -> OperandPat {
     }
 }
 
-pub const fn any() -> OperandPat {
-    OperandPat {
+pub const fn any() -> Pat {
+    Pat::Operand(OperandPat {
         name: "",
         kind: OperandKind::Any,
         not: false,
         generate: None,
-    }
+    })
 }
 
 pub const fn any_cc() -> OperandPat {
@@ -253,13 +277,31 @@ pub const fn any_i32_imm() -> OperandPat {
     }
 }
 
-pub const fn any_i32_imm_power_of_2() -> OperandPat {
-    OperandPat {
+pub const fn any_imm32() -> Pat {
+    Pat::Operand(OperandPat {
+        name: "",
+        kind: OperandKind::Imm(Immediate::AnyInt32),
+        not: false,
+        generate: None,
+    })
+}
+
+pub const fn any_imm32_power_of_2() -> Pat {
+    Pat::Operand(OperandPat {
         name: "",
         kind: OperandKind::Imm(Immediate::AnyInt32PowerOf2),
         not: false,
         generate: None,
-    }
+    })
+}
+
+pub const fn any_i32_imm_power_of_2() -> Pat {
+    Pat::Operand(OperandPat {
+        name: "",
+        kind: OperandKind::Imm(Immediate::AnyInt32PowerOf2),
+        not: false,
+        generate: None,
+    })
 }
 
 pub const fn any_i64_imm() -> OperandPat {
@@ -271,6 +313,15 @@ pub const fn any_i64_imm() -> OperandPat {
     }
 }
 
+pub const fn any_imm_f64() -> Pat {
+    Pat::Operand(OperandPat {
+        name: "",
+        kind: OperandKind::Imm(Immediate::AnyF64),
+        not: false,
+        generate: None,
+    })
+}
+
 pub const fn any_f64_imm() -> OperandPat {
     OperandPat {
         name: "",
@@ -280,13 +331,13 @@ pub const fn any_f64_imm() -> OperandPat {
     }
 }
 
-pub const fn any_slot() -> OperandPat {
-    OperandPat {
+pub const fn any_slot() -> Pat {
+    Pat::Operand(OperandPat {
         name: "",
         kind: OperandKind::Slot(Slot::Any),
         not: false,
         generate: None,
-    }
+    })
 }
 
 pub const fn slot(ty: MVType) -> OperandPat {
@@ -307,6 +358,15 @@ pub const fn reg_class(rc: RC) -> OperandPat {
     }
 }
 
+pub const fn reg_(rc: RC) -> Pat {
+    Pat::Operand(OperandPat {
+        name: "",
+        kind: OperandKind::Reg(Register::Class(rc)),
+        not: false,
+        generate: None,
+    })
+}
+
 pub const fn any_reg() -> OperandPat {
     OperandPat {
         name: "",
@@ -323,6 +383,26 @@ pub const fn any_block() -> OperandPat {
         not: false,
         generate: None,
     }
+}
+
+pub fn store(src: Pat, dst: Pat) -> Pat {
+    ir(IROpcode::Store).args(vec![src, dst]).into()
+}
+
+pub fn add(lhs: Pat, rhs: Pat) -> Pat {
+    ir(IROpcode::Add).args(vec![lhs, rhs]).into()
+}
+
+pub fn fiaddr(slot: Pat) -> Pat {
+    ir(IROpcode::FIAddr).args(vec![slot]).into()
+}
+
+pub fn gbladdr(g: Pat) -> Pat {
+    ir(IROpcode::GlobalAddr).args(vec![g]).into()
+}
+
+pub fn mul(lhs: Pat, rhs: Pat) -> Pat {
+    ir(IROpcode::Mul).args(vec![lhs, rhs]).into()
 }
 
 impl Into<Pat> for IRPat {
@@ -409,6 +489,29 @@ impl BitOr for CompoundPat {
                 .flatten()
                 .collect::<Vec<Pat>>(),
             generate: None,
+        }
+    }
+}
+
+impl BitOr for Pat {
+    type Output = Pat;
+
+    fn bitor(self, rhs: Self) -> Self::Output {
+        match self {
+            Pat::Compound(mut c) => {
+                c.pats.push(rhs);
+                Pat::Compound(c)
+            }
+            Pat::IR(_) | Pat::Operand(_) => {
+                let pats = vec![self, rhs];
+                Pat::Compound(CompoundPat {
+                    name: "",
+                    pats,
+                    generate: None,
+                })
+            }
+            Pat::MI => todo!(),
+            _ => panic!(),
         }
     }
 }
