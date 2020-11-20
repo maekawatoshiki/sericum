@@ -169,6 +169,15 @@ impl ImmediateKind {
         matches!(self, Self::Int8(0) | Self::Int32(0) | Self::Int64(0))
             || matches!(self, Self::F64(f) if *f == 0.0)
     }
+
+    pub fn bits_within(&self, n: u32) -> Option<bool> {
+        match self {
+            Self::Int8(x) => Some((x << (8 - n)) >> (8 - n) == *x),
+            Self::Int32(x) => Some((x << (32 - n)) >> (32 - n) == *x),
+            Self::Int64(x) => Some((x << (64 - n)) >> (64 - n) == *x),
+            Self::F64(_) => None,
+        }
+    }
 }
 
 impl AddressKind {

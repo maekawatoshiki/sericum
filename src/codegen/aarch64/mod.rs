@@ -3,6 +3,7 @@ pub mod dag;
 pub mod exec;
 pub mod frame_object;
 pub mod machine;
+pub mod new_dag;
 
 use crate::{
     codegen::common::{
