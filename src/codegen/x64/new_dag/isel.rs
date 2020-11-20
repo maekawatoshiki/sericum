@@ -1,4 +1,4 @@
-use crate::codegen::arch::machine::register::{RegisterClassKind as RC, GR64};
+use crate::codegen::arch::machine::register::{str2reg, RegisterClassKind as RC, GR64};
 use crate::codegen::arch::{dag::node::MemKind, machine::inst::MachineOpcode as MO};
 use crate::codegen::common::{
     new_dag::{
@@ -13,6 +13,7 @@ use crate::codegen::common::{
     types::MVType,
 };
 use crate::ir::types::Type;
+use defs::node_gen;
 
 pub fn run(module: &mut DAGModule) {
     for (_, func) in &mut module.functions {
@@ -27,20 +28,11 @@ fn run_on_function(func: &mut DAGFunction) {
     #[rustfmt::skip]
     let store: Pat = (
                         ir(IROpcode::Store).args(vec![ir(IROpcode::FIAddr).args(vec![slot(MVType::i32).named("dst").into()]).into(), any_i32_imm().named("src").into()])
-                                           .generate(|m, c| {
-                                                let rbp = c.arena.alloc(c.regs.get_phys_reg(GR64::RBP).into());
-                                                let mem = c.arena.alloc(OperandNode::Mem(MemKind::BaseFi([rbp, m["dst"]])).into());
-                                                c.arena.alloc(MINode::new(MO::MOVmi32).args(vec![mem, m["src"]]).into()) })
+                                           .generate(|m, c| node_gen!((MI.MOVmi32 [BaseFi %rbp, m["dst"]], m["src"])))
                       | ir(IROpcode::Store).args(vec![ir(IROpcode::FIAddr).args(vec![slot(MVType::i32).named("dst").into()]).into(), reg_class(RC::GR32).named("src").into()])
-                                           .generate(|m, c| {
-                                                let rbp = c.arena.alloc(c.regs.get_phys_reg(GR64::RBP).into());
-                                                let mem = c.arena.alloc(OperandNode::Mem(MemKind::BaseFi([rbp, m["dst"]])).into());
-                                                c.arena.alloc(MINode::new(MO::MOVmr32).args(vec![mem, m["src"]]).into()) })
+                                           .generate(|m, c| node_gen!((MI.MOVmr32 [BaseFi %rbp, m["dst"]], m["src"])))
                       | ir(IROpcode::Store).args(vec![ir(IROpcode::FIAddr).args(vec![slot(MVType::i8).named("dst").into()]).into(), any_i8_imm().named("src").into()])
-                                           .generate(|m, c| {
-                                                let rbp = c.arena.alloc(c.regs.get_phys_reg(GR64::RBP).into());
-                                                let mem = c.arena.alloc(OperandNode::Mem(MemKind::BaseFi([rbp, m["dst"]])).into());
-                                                c.arena.alloc(MINode::new(MO::MOVmr8).args(vec![mem, m["src"]]).into()) }).into()
+                                           .generate(|m, c| node_gen!((MI.MOVmr8  [BaseFi %rbp, m["dst"]], m["src"]))).into()
                       | ir(IROpcode::Store).args(vec![ir(IROpcode::FIAddr).args(vec![slot(MVType::i8).named("dst").into()]).into(), reg_class(RC::GR8).named("src").into()])
                                            .generate(|m, c| {
                                                 let rbp = c.arena.alloc(c.regs.get_phys_reg(GR64::RBP).into());

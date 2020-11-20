@@ -7,6 +7,7 @@ use crate::codegen::common::new_dag::{
         null_imm, MatchContext, Pat, ReplacedNodeMap,
     },
 };
+use defs::node_gen;
 
 pub fn run(module: &mut DAGModule) {
     for (_, func) in &mut module.functions {
@@ -68,7 +69,7 @@ fn run_on_function(func: &mut DAGFunction) {
             let c2 = c.arena[m["c2"]].as_operand().as_imm().as_i32();
             let c3 = c.arena.alloc((c1 + c2).into());
             let ty = c.arena[m["add"]].as_ir().ty;
-            c.arena.alloc(IRNode::new(IROpcode::Add).args(vec![m["n"], c3]).ty(ty).into())
+            node_gen!((IR.Add.ty m["n"], c3))
         }).into()
     )
     .into();
