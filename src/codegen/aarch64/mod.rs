@@ -95,15 +95,14 @@ pub fn standard_conversion_into_machine_module(mut module: Module) -> MachineMod
     // ir::inst_combine::InstructionCombine::new().run_on_module(&mut module);
     ir::codegen_prepare::CodegenPrepare::new().run_on_module(&mut module);
 
-    let mut dag_module = convert::convert_to_dag_module(module);
+    let mut module = crate::codegen::common::new_dag::convert::convert_module_to_dag_module(module);
+    crate::codegen::common::new_dag::combine::run(&mut module);
+    // println!("Initial DAG:\n{:?}", module);
+    crate::codegen::arch::new_dag::legalize::run(&mut module);
+    crate::codegen::arch::new_dag::isel::run(&mut module);
+    // println!("Selected DAG:\n{:?}", module);
 
-    let mut pass_mgr = ModulePassManager::new();
-    pass_mgr.add_pass(combine::Combine::new());
-    pass_mgr.add_pass(dag::legalize::Legalize::new());
-    pass_mgr.add_pass(dag::isel::MISelector::new());
-    pass_mgr.run_on_module(&mut dag_module);
-
-    let mut machine_module = dag::mc_convert::convert_module(dag_module);
+    let mut machine_module = crate::codegen::common::new_dag::mc_convert::convert_module(module);
 
     let mut pass_mgr = ModulePassManager::new();
     pass_mgr.add_pass(phi_elimination::PhiElimination::new());

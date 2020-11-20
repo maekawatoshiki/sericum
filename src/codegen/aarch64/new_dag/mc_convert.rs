@@ -420,74 +420,18 @@ impl<'a> ScheduleContext<'a> {
                 MachineOperand::Constant(MachineConstant::F64(*f))
             }
             Node::Operand(OperandNode::Slot(slot)) => MachineOperand::FrameIndex(*slot),
-            // Node::Operand(OperandNode::Mem(MemKind::Base(base))) => MachineOperand::Mem(
-            //     MachineMemOperand::Base(*self.normal_arg(*base).as_register()),
-            // ),
-            // Node::Operand(OperandNode::Mem(MemKind::BaseOff(args))) => {
-            //     MachineOperand::Mem(MachineMemOperand::BaseOff(
-            //         *self.normal_arg(args[0]).as_register(),
-            //         self.normal_arg(args[1]).as_constant().as_i32(),
-            //     ))
-            // }
-            // Node::Operand(OperandNode::Mem(MemKind::BaseFi(args))) => {
-            //     MachineOperand::Mem(MachineMemOperand::BaseFi(
-            //         *self.normal_arg(args[0]).as_register(),
-            //         *self.normal_arg(args[1]).as_frame_index(),
-            //     ))
-            // }
-            // Node::Operand(OperandNode::Mem(MemKind::BaseAlignOff(args))) => {
-            //     MachineOperand::Mem(MachineMemOperand::BaseAlignOff(
-            //         *self.normal_arg(args[0]).as_register(),
-            //         self.normal_arg(args[1]).as_constant().as_i32(),
-            //         *self.normal_arg(args[2]).as_register(),
-            //     ))
-            // }
-            // Node::Operand(OperandNode::Mem(MemKind::BaseFiAlignOff(args))) => {
-            //     MachineOperand::Mem(MachineMemOperand::BaseFiAlignOff(
-            //         *self.normal_arg(args[0]).as_register(),
-            //         *self.normal_arg(args[1]).as_frame_index(),
-            //         self.normal_arg(args[2]).as_constant().as_i32(),
-            //         *self.normal_arg(args[3]).as_register(),
-            //     ))
-            // }
-            // Node::Operand(OperandNode::Mem(MemKind::BaseFiOff(args))) => {
-            //     MachineOperand::Mem(MachineMemOperand::BaseFiOff(
-            //         *self.normal_arg(args[0]).as_register(),
-            //         *self.normal_arg(args[1]).as_frame_index(),
-            //         self.normal_arg(args[2]).as_constant().as_i32(),
-            //     ))
-            // }
-            // Node::Operand(OperandNode::Mem(MemKind::BaseFiAlignOffOff(args))) => {
-            //     MachineOperand::Mem(MachineMemOperand::BaseFiAlignOffOff(
-            //         *self.normal_arg(args[0]).as_register(),
-            //         *self.normal_arg(args[1]).as_frame_index(),
-            //         self.normal_arg(args[2]).as_constant().as_i32(),
-            //         *self.normal_arg(args[3]).as_register(),
-            //         self.normal_arg(args[4]).as_constant().as_i32(),
-            //     ))
-            // }
-            // Node::Operand(OperandNode::Mem(MemKind::AddressAlignOff(args))) => {
-            //     MachineOperand::Mem(MachineMemOperand::AddressAlignOff(
-            //         AddressKind::Global(
-            //             *self.normal_arg(args[0]).as_mem().as_address().as_global(),
-            //         ),
-            //         self.normal_arg(args[1]).as_constant().as_i32(),
-            //         *self.normal_arg(args[2]).as_register(),
-            //     ))
-            // }
-            // Node::Operand(OperandNode::Mem(MemKind::AddressOff(args))) => {
-            //     MachineOperand::Mem(MachineMemOperand::AddressOff(
-            //         AddressKind::Global(
-            //             *self.normal_arg(args[0]).as_mem().as_address().as_global(),
-            //         ),
-            //         self.normal_arg(args[1]).as_constant().as_i32(),
-            //     ))
-            // }
-            // Node::Operand(OperandNode::Mem(MemKind::Address(arg))) => {
-            //     MachineOperand::Mem(MachineMemOperand::Address(AddressKind::Constant(
-            //         *self.normal_arg(*arg).as_mem().as_address().as_const(),
-            //     )))
-            // }
+            Node::Operand(OperandNode::Mem(mem)) => match mem {
+                MemKind::Reg(arg) => MachineOperand::Mem(MachineMemOperand::Reg(
+                    *self.normal_arg(*arg).as_register(),
+                )),
+                MemKind::RegFi(args) => MachineOperand::Mem(MachineMemOperand::RegFi(
+                    *self.normal_arg(args[0]).as_register(),
+                    *self.normal_arg(args[1]).as_frame_index(),
+                )),
+                MemKind::Address(arg) => MachineOperand::Mem(MachineMemOperand::Reg(
+                    *self.normal_arg(*arg).as_register(),
+                )),
+            },
             Node::Operand(OperandNode::Addr(node::AddressKind::Const(id))) => {
                 MachineOperand::Mem(MachineMemOperand::Address(AddressKind::Constant(*id)))
             }
