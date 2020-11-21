@@ -34,13 +34,10 @@ impl RegisterAllocator {
         ));
 
         let src = MachineOperand::Mem(MachineMemOperand::BaseFi(rbp, frinfo));
+        let opcode = mov_rx(f.regs_info.arena_ref()[reg].reg_class, &src).unwrap();
         let load_inst_id = f.alloc_inst(
-            MachineInst::new_simple(
-                mov_rx(&f.types, &f.regs_info, &src).unwrap(),
-                vec![src],
-                parent,
-            )
-            .with_def(vec![RegisterOperand::new(reg)]),
+            MachineInst::new_simple(opcode, vec![src], parent)
+                .with_def(vec![RegisterOperand::new(reg)]),
         );
 
         (store_inst_id, load_inst_id)

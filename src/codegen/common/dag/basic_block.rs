@@ -1,6 +1,5 @@
-// use super::node::DAGNode;
-use crate::codegen::arch::dag::node::DAGNode;
-use crate::{ir::types::Types, util::allocator::*};
+use crate::codegen::common::dag::node::{Node, NodeId};
+use crate::ir::types::Types;
 use id_arena::*;
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::fmt;
@@ -16,10 +15,10 @@ pub struct DAGBasicBlock {
     pub succ: FxHashSet<DAGBasicBlockId>,
 
     /// Entry node
-    pub entry: Option<Raw<DAGNode>>,
+    pub entry: Option<NodeId>,
 
     /// Root node
-    pub root: Option<Raw<DAGNode>>,
+    pub root: Option<NodeId>,
 }
 
 impl DAGBasicBlock {
@@ -32,15 +31,21 @@ impl DAGBasicBlock {
         }
     }
 
-    pub fn set_entry(&mut self, entry: Raw<DAGNode>) {
+    pub fn set_entry(&mut self, entry: NodeId) {
         self.entry = Some(entry);
     }
 
-    pub fn set_root(&mut self, root: Raw<DAGNode>) {
+    pub fn set_root(&mut self, root: NodeId) {
         self.root = Some(root);
     }
 
-    pub fn debug(&self, f: &mut fmt::Formatter<'_>, tys: &Types, bb_idx: usize) -> fmt::Result {
+    pub fn debug(
+        &self,
+        f: &mut fmt::Formatter<'_>,
+        arena: &Arena<Node>,
+        tys: &Types,
+        bb_idx: usize,
+    ) -> fmt::Result {
         writeln!(
             f,
             "BB({}); pred: {{{}}}, succ: {{{}}});",
@@ -56,7 +61,7 @@ impl DAGBasicBlock {
         )?;
 
         if let Some(entry) = self.entry {
-            entry.debug(f, tys, &mut FxHashMap::default(), 0, 2)?;
+            arena[entry].debug(f, arena, tys, &mut FxHashMap::default(), 0, 2)?;
         }
 
         fmt::Result::Ok(())

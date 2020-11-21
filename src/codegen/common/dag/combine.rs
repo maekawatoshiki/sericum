@@ -1,189 +1,125 @@
-use crate::codegen::arch::dag::node::*;
-use crate::codegen::common::dag::{function::*, module::*};
-use crate::{traits::pass::ModulePassTrait, util::allocator::*};
-use rustc_hash::FxHashMap;
+use crate::codegen::common::dag::{
+    function::DAGFunction,
+    module::DAGModule,
+    node::{IRNode, IROpcode, NodeId},
+    pat_match::{
+        any, any_block, any_cc, any_i32_imm, any_imm, any_reg, i32_imm, inst_select, ir, not,
+        null_imm, MatchContext, Pat, ReplacedNodeMap,
+    },
+};
+use defs::node_gen;
 
-pub struct Combine {}
-
-impl ModulePassTrait for Combine {
-    type M = DAGModule;
-
-    fn name(&self) -> &'static str {
-        "Combine"
-    }
-
-    fn run_on_module(&mut self, module: &mut Self::M) {
-        self.combine_module(module);
+pub fn run(module: &mut DAGModule) {
+    for (_, func) in &mut module.functions {
+        if func.is_internal {
+            continue;
+        }
+        run_on_function(func);
     }
 }
 
-impl Combine {
-    pub fn new() -> Self {
-        Self {}
-    }
+fn run_on_function(func: &mut DAGFunction) {
+    let args = vec![
+        any_cc().named("cc").into(),
+        (any_imm() | any_reg()).named("lhs").into(),
+        (any_imm() | any_reg()).named("rhs").into(),
+    ];
+    let brcond: Pat = ir(IROpcode::BrCond)
+        .args(vec![
+            (ir(IROpcode::Setcc).args(args.clone()) | ir(IROpcode::FCmp).args(args))
+                .named("setcc")
+                .into(),
+            any_block().named("dst").into(),
+        ])
+        .generate(|m, c| {
+            c.arena.alloc(
+                IRNode::new(match c.arena[m["setcc"]].as_ir().opcode {
+                    IROpcode::Setcc => IROpcode::Brcc,
+                    IROpcode::FCmp => IROpcode::FPBrcc,
+                    _ => unreachable!(),
+                })
+                .args(vec![m["cc"], m["lhs"], m["rhs"], m["dst"]])
+                .into(),
+            )
+        })
+        .into();
 
-    pub fn combine_module(&mut self, module: &mut DAGModule) {
-        for (_, func) in &mut module.functions {
-            if func.is_internal {
-                continue;
-            }
-            self.combine_function(func)
-        }
-    }
-
-    fn combine_function(&mut self, func: &mut DAGFunction) {
-        for bb_id in &func.dag_basic_blocks {
-            let bb = &func.dag_basic_block_arena[*bb_id];
-            self.combine_node(
-                &mut FxHashMap::default(),
-                &mut func.dag_heap,
-                bb.entry.unwrap(),
-            );
-        }
-    }
-
-    fn combine_node(
-        &mut self,
-        replace: &mut FxHashMap<Raw<DAGNode>, Raw<DAGNode>>,
-        heap: &mut DAGHeap,
-        node: Raw<DAGNode>,
-    ) -> Raw<DAGNode> {
-        if !node.may_contain_children() {
-            return node;
-        }
-
-        if let Some(replaced) = replace.get(&node) {
-            return *replaced;
-        }
-
-        // TODO: Macro for pattern matching?
-        let mut replaced = match &node.kind {
-            NodeKind::IR(IRNodeKind::Add) => self.combine_node_add(replace, heap, node),
-            NodeKind::IR(IRNodeKind::Mul) => self.combine_node_mul(replace, heap, node),
-            NodeKind::IR(IRNodeKind::BrCond) => self.combine_node_brcond(replace, heap, node),
-            _ => self.combine_operands(replace, heap, node),
-        };
-
-        replace.insert(node, replaced);
-
-        if let Some(next) = node.next {
-            replaced.next = Some(self.combine_node(replace, heap, next));
-        }
-
-        replaced
-    }
-
-    fn combine_node_add(
-        &mut self,
-        replace: &mut FxHashMap<Raw<DAGNode>, Raw<DAGNode>>,
-        heap: &mut DAGHeap,
-        mut node: Raw<DAGNode>,
-    ) -> Raw<DAGNode> {
-        // (C + any) -> (any + C)
-        if node.operand[0].is_constant() && !node.operand[1].is_constant() {
-            node.operand.swap(0, 1);
-        }
-
-        // (~fi + fi) -> (fi + ~fi)
-        if node.operand[0].kind != NodeKind::IR(IRNodeKind::FIAddr)
-            && node.operand[1].kind == NodeKind::IR(IRNodeKind::FIAddr)
-        {
-            node.operand.swap(0, 1);
-        }
-
-        // (N + 0) -> N
-        if node.operand[1].is_constant() && node.operand[1].as_constant().is_null() {
-            node.operand[0].ty = node.ty;
-            return self.combine_node(replace, heap, node.operand[0]);
-        }
-
+    let add: Pat = (
+        // (IMM + any) -> (any + IMM)
+        ir(IROpcode::Add)
+            .named("n")
+            .args(vec![any_imm().into(), any()])
+            .generate(|m, c| {
+                c.arena[m["n"]].as_ir_mut().args.swap(0, 1);
+                m["n"]
+            })
+        // (A + 0) -> A
+        | ir(IROpcode::Add)
+            .args(vec![any().named("l"), null_imm().into()])
+            .generate(|m, _| m["l"])
         // ((node + C1) + C2) -> (node + C3)
-        if node.operand[0].is_operation()
-            && node.operand[0].kind == NodeKind::IR(IRNodeKind::Add)
-            && !node.operand[0].operand[0].is_constant()
-            && node.operand[0].operand[1].is_constant()
-            && node.operand[1].is_constant()
-        {
-            let op0 = self.combine_node(replace, heap, node.operand[0].operand[0]);
-            let const_folded = node.operand[0].operand[1]
-                .as_constant()
-                .add(node.operand[1].as_constant());
-            let c = heap.alloc(
-                DAGNode::new(NodeKind::Operand(OperandNodeKind::Constant(const_folded)))
-                    .with_ty(const_folded.get_type()),
-            );
-            let new_add = heap.alloc(
-                DAGNode::new(NodeKind::IR(IRNodeKind::Add))
-                    .with_operand(vec![op0, c])
-                    .with_ty(node.ty),
-            );
-            return self.combine_node_add(replace, heap, new_add);
-        }
+        | ir(IROpcode::Add).named("add").args(vec![
+            ir(IROpcode::Add).args(vec![
+                not().any_i32_imm().named("n").into(),
+                any_i32_imm().named("c1").into(),
+            ]).into(),
+            any_i32_imm().named("c2").into()
+        ]).generate(|m, c|{
+            let c1 = c.arena[m["c1"]].as_operand().as_imm().as_i32();
+            let c2 = c.arena[m["c2"]].as_operand().as_imm().as_i32();
+            let c3 = c.arena.alloc((c1 + c2).into());
+            let ty = c.arena[m["add"]].as_ir().ty;
+            node_gen!((IR.Add.ty m["n"], c3))
+        }).into()
+    )
+    .into();
 
-        self.combine_operands(replace, heap, node)
+    let mul: Pat = (ir(IROpcode::Mul)
+        .named("n")
+        .args(vec![any_imm().into(), any()])
+        .generate(|m, c| {
+            c.arena[m["n"]].as_ir_mut().args.swap(0, 1);
+            m["n"]
+        })
+        | ir(IROpcode::Mul)
+            .args(vec![any(), i32_imm(0).named("0").into()])
+            .generate(|m, _c| m["0"])
+        | ir(IROpcode::Mul)
+            .args(vec![any().named("n"), i32_imm(1).into()])
+            .generate(|m, _c| m["n"])
+            .into())
+    .into();
+
+    let pats = vec![brcond, add, mul];
+
+    let mut replaced = ReplacedNodeMap::default();
+    for &id in &func.dag_basic_blocks {
+        let block = &func.dag_basic_block_arena[id];
+        let a = select_node(
+            &mut MatchContext {
+                arena: &mut func.node_arena,
+                regs: &func.regs,
+            },
+            &mut replaced,
+            &pats,
+            block.entry.unwrap(),
+        );
+        assert_eq!(block.entry.unwrap(), a);
+    }
+}
+
+fn select_node<'a>(
+    ctx: &mut MatchContext<'a>,
+    replaced: &mut ReplacedNodeMap,
+    pats: &[Pat],
+    id: NodeId,
+) -> NodeId {
+    let new = inst_select(replaced, ctx, id, pats);
+
+    if let Some(next) = ctx.arena[id].next() {
+        let next = select_node(ctx, replaced, pats, next);
+        *ctx.arena[new].next_mut() = Some(next);
     }
 
-    fn combine_node_mul(
-        &mut self,
-        replace: &mut FxHashMap<Raw<DAGNode>, Raw<DAGNode>>,
-        heap: &mut DAGHeap,
-        mut node: Raw<DAGNode>,
-    ) -> Raw<DAGNode> {
-        // (C * !C) -> (!C * C)
-        if node.operand[0].is_constant() && !node.operand[1].is_constant() {
-            node.operand.swap(0, 1);
-        }
-
-        // (N * 0) -> 0
-        if node.operand[1].is_constant() && node.operand[1].as_constant().is_null() {
-            return node.operand[1];
-        }
-
-        // (N * 1) -> N
-        if node.operand[1].is_constant() && node.operand[1].as_constant().is_int(1) {
-            return node.operand[0];
-        }
-
-        self.combine_operands(replace, heap, node)
-    }
-
-    fn combine_node_brcond(
-        &mut self,
-        replace: &mut FxHashMap<Raw<DAGNode>, Raw<DAGNode>>,
-        heap: &mut DAGHeap,
-        node: Raw<DAGNode>,
-    ) -> Raw<DAGNode> {
-        let cond = node.operand[0];
-        let br = node.operand[1];
-        match cond.kind {
-            NodeKind::IR(IRNodeKind::Setcc) | NodeKind::IR(IRNodeKind::FCmp) => {
-                let cond_kind = cond.operand[0];
-                let lhs = self.combine_node(replace, heap, cond.operand[1]);
-                let rhs = self.combine_node(replace, heap, cond.operand[2]);
-                heap.alloc(
-                    DAGNode::new(match cond.kind {
-                        NodeKind::IR(IRNodeKind::Setcc) => NodeKind::IR(IRNodeKind::Brcc),
-                        NodeKind::IR(IRNodeKind::FCmp) => NodeKind::IR(IRNodeKind::FPBrcc),
-                        _ => unreachable!(),
-                    })
-                    .with_operand(vec![cond_kind, lhs, rhs, br]),
-                )
-            }
-            _ => self.combine_operands(replace, heap, node),
-        }
-    }
-
-    fn combine_operands(
-        &mut self,
-        replace: &mut FxHashMap<Raw<DAGNode>, Raw<DAGNode>>,
-        heap: &mut DAGHeap,
-        mut node: Raw<DAGNode>,
-    ) -> Raw<DAGNode> {
-        node.operand = node
-            .operand
-            .iter()
-            .map(|op| self.combine_node(replace, heap, *op))
-            .collect();
-        node
-    }
+    new
 }

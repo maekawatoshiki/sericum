@@ -164,13 +164,10 @@ impl<'a> LiveIntervalSplitter<'a> {
         );
 
         let src = MachineOperand::Mem(MachineMemOperand::BaseFi(rbp, *slot));
+        let opcode = mov_rx(self.func.regs_info.arena_ref()[new_reg].reg_class, &src).unwrap();
         let load_id = self.func.alloc_inst(
-            MachineInst::new_simple(
-                mov_rx(&self.func.types, &self.func.regs_info, &src).unwrap(),
-                vec![src],
-                parent,
-            )
-            .with_def(vec![RegisterOperand::new(new_reg)]),
+            MachineInst::new_simple(opcode, vec![src], parent)
+                .with_def(vec![RegisterOperand::new(new_reg)]),
         );
         let load_pp = self.matrix.program_points.next_of(before_load_pp);
         self.matrix.id2pp.insert(load_id, load_pp);

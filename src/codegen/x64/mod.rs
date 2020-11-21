@@ -3,7 +3,6 @@ pub mod dag;
 pub mod exec;
 pub mod frame_object;
 pub mod machine;
-pub mod new_dag;
 
 use crate::{
     codegen::common::machine::{
@@ -97,18 +96,18 @@ pub fn standard_conversion_into_machine_module(mut module: Module) -> MachineMod
     // println!("{:?}", module);
 
     let now = ::std::time::Instant::now();
-    let mut module = crate::codegen::common::new_dag::convert::convert_module_to_dag_module(module);
-    crate::codegen::common::new_dag::combine::run(&mut module);
+    let mut module = crate::codegen::common::dag::convert::convert_module_to_dag_module(module);
+    crate::codegen::common::dag::combine::run(&mut module);
     println!("Initial DAG:\n{:?}", module);
-    crate::codegen::arch::new_dag::legalize::run(&mut module);
-    crate::codegen::arch::new_dag::isel::run(&mut module);
+    crate::codegen::arch::dag::legalize::run(&mut module);
+    crate::codegen::arch::dag::isel::run(&mut module);
     debug!(println!(
         "after pass {:?}",
         ::std::time::Instant::now().duration_since(now)
     ));
     println!("Selected DAG:\n{:?}", module);
 
-    let mut module = crate::codegen::common::new_dag::mc_convert::convert_module(module);
+    let mut module = crate::codegen::common::dag::mc_convert::convert_module(module);
 
     // println!("{:?}", module);
 

@@ -134,7 +134,7 @@ impl<'a> Spiller<'a> {
             let rbp = RegisterOperand::new(self.func.regs_info.get_phys_reg(GR64::RBP));
             let src = MachineOperand::Mem(MachineMemOperand::BaseFi(rbp, slot.clone()));
             let load = MachineInst::new_simple(
-                mov_rx(&self.func.types, &self.func.regs_info, &src).unwrap(),
+                mov_rx(self.func.regs_info.arena_ref()[new_reg].reg_class, &src).unwrap(),
                 vec![src],
                 parent,
             )

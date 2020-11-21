@@ -1,439 +1,407 @@
-use super::{super::machine::register::*, node::*};
-use crate::codegen::common::dag::{
-    function::{DAGFunction, DAGHeap},
-    module::DAGModule,
+use crate::codegen::arch::machine::register::{RegisterClassKind as RC, GR64};
+use crate::codegen::arch::{dag::node::MemKind, machine::inst::MachineOpcode as MO};
+use crate::codegen::common::{
+    dag::{
+        function::DAGFunction,
+        module::DAGModule,
+        node::{IRNode, IROpcode, ImmediateKind, MINode, Node, NodeId, OperandNode},
+        pat_match::{
+            add, any, any_block, any_cc, any_f64_imm, any_i32_imm, any_imm, any_imm32,
+            any_imm32_power_of_2, any_imm_f64, any_reg, any_slot, fiaddr, gbladdr, inst_select, ir,
+            mul, not, reg_, reg_class, reorder_patterns, store, CompoundPat, MatchContext, Pat,
+            ReplacedNodeMap,
+        },
+    },
+    types::MVType,
 };
-use crate::codegen::common::types::MVType;
-use crate::{ir::types::*, traits::pass::ModulePassTrait, util::allocator::*};
-use defs::isel_pat;
-use rustc_hash::FxHashMap;
+use crate::ir::types::Type;
 
-impl ModulePassTrait for Legalize {
-    type M = DAGModule;
-
-    fn name(&self) -> &'static str {
-        "Legalize"
-    }
-
-    fn run_on_module(&mut self, module: &mut Self::M) {
-        self.run_on_module(module);
+pub fn run(module: &mut DAGModule) {
+    for (_, func) in &mut module.functions {
+        if func.is_internal {
+            continue;
+        }
+        run_on_function(func);
     }
 }
 
-pub struct Legalize {
-    selected: FxHashMap<Raw<DAGNode>, Raw<DAGNode>>,
-}
+fn run_on_function(func: &mut DAGFunction) {
+    let add_gr64_off: Pat = ir(IROpcode::Add)
+        .args(vec![
+            reg_class(RC::GR64).named("base").into(),
+            any_i32_imm().named("off").into(),
+        ])
+        .into();
 
-impl Legalize {
-    pub fn new() -> Self {
-        Self {
-            selected: FxHashMap::default(),
-        }
-    }
+    #[rustfmt::skip]
+    // (Load (Add (base:GR64 off:imm32))) -> (MOVrm32 BaseOff(base off))
+    let load: Pat = ir(IROpcode::Load)
+        .ty(Type::i32)
+        .args(vec![add_gr64_off.clone()])
+        .generate(|m, c| {
+            let mem = c.arena.alloc(MemKind::BaseOff([m["base"], m["off"]]).into());
+            c.arena.alloc(MINode::new(MO::MOVrm32).args(vec![mem]).reg_class(RC::GR32).into())}).into();
+    // (Load (Add (base:GR64 (Mul (off align:imm32))))) -> (MOVrm32 BaseAlignOff(base align off:GR64))
+    #[rustfmt::skip]
+    let load2: Pat = ir(IROpcode::Load).named("load")
+        // .ty(Type::i32)
+        .args(vec![ir(IROpcode::Add)
+            .args(vec![
+                reg_class(RC::GR64).named("base").into(),
+                ir(IROpcode::Mul)
+                    .args(vec![
+                        any().named("off"),
+                        any_i32_imm().named("align").into(),
+                    ])
+                    .into(),
+            ])
+            .into()])
+        .generate(|m, c| {
+            let off = c.arena.alloc(IRNode::new(IROpcode::RegClass).args(vec![m["off"]]).ty(Type::i64).into());
+            let mem = c.arena.alloc(MemKind::BaseAlignOff([m["base"], m["align"], off]).into());
+            let opcode = match c.arena[m["load"]].as_ir().mvty {
+                MVType::i8 => MO::MOVrm8,
+                MVType::i32 => MO::MOVrm32,
+                _ => todo!()
+            };
+            c.arena.alloc(MINode::new(opcode).args(vec![mem]).reg_class(opcode.inst_def().unwrap().def_reg_class()).into()) }).into();
+    #[rustfmt::skip]
+    let load4: Pat = ir(IROpcode::Load).named("load")
+        // .ty(Type::i32)
+        .args(vec![ir(IROpcode::Add)
+            .args(vec![
+                ir(IROpcode::GlobalAddr).args(vec![any().named("g")]).into(),
+                ir(IROpcode::Mul)
+                    .args(vec![
+                        any().named("off"),
+                        any_i32_imm().named("align").into(),
+                    ])
+                    .into(),
+            ])
+            .into()])
+        .generate(|m, c| {
+            let off = c.arena.alloc(IRNode::new(IROpcode::RegClass).args(vec![m["off"]]).ty(Type::i64).into());
+            let mem = c.arena.alloc(MemKind::AddressAlignOff([m["g"], m["align"], off]).into());
+            let opcode = match c.arena[m["load"]].as_ir().mvty {
+                MVType::i8 => MO::MOVrm8,
+                MVType::i32 => MO::MOVrm32,
+                _ => todo!()
+            };
+            c.arena.alloc(MINode::new(opcode).args(vec![mem]).reg_class(opcode.inst_def().unwrap().def_reg_class()).into()) }).into();
+    #[rustfmt::skip]
+    let load5: Pat = ir(IROpcode::Load).named("load")
+        .args(vec![ir(IROpcode::Add)
+            .args(vec![
+                ir(IROpcode::GlobalAddr).args(vec![any().named("g")]).into(),
+                any_i32_imm().named("off").into(),
+            ])
+            .into()])
+        .generate(|m, c| {
+            let mem = c.arena.alloc(MemKind::AddressOff([m["g"], m["off"]]).into());
+            let opcode = match c.arena[m["load"]].as_ir().mvty {
+                MVType::i8 => MO::MOVrm8,
+                MVType::i32 => MO::MOVrm32,
+                _ => todo!()
+            };
+            c.arena.alloc(MINode::new(opcode).args(vec![mem]).reg_class(opcode.inst_def().unwrap().def_reg_class()).into()) }).into();
+    #[rustfmt::skip]
+    let load6: Pat = ir(IROpcode::Load).named("load")
+        .args(vec![ir(IROpcode::Add)
+            .args(vec![
+                not().any_i32_imm().named("base").into(),
+                any_i32_imm().named("off").into(),
+            ])
+            .into()])
+        .generate(|m, c| {
+            let mem = c.arena.alloc(MemKind::BaseOff([m["base"], m["off"]]).into());
+            let opcode = match c.arena[m["load"]].as_ir().mvty {
+                MVType::i8 => MO::MOVrm8,
+                MVType::i32 => MO::MOVrm32,
+                MVType::i64 => MO::MOVrm64,
+                MVType::f64 => MO::MOVSDrm,
+                _ => todo!()
+            };
+            c.arena.alloc(MINode::new(opcode).args(vec![mem]).reg_class(opcode.inst_def().unwrap().def_reg_class()).into()) }).into();
+    let load3: Pat = ir(IROpcode::Load)
+        .ty(Type::f64)
+        .args(vec![ir(IROpcode::Add)
+            .args(vec![
+                ir(IROpcode::FIAddr)
+                    .args(vec![any_slot().named("slot").into()])
+                    .into(),
+                any_i32_imm().named("off").into(),
+            ])
+            .into()])
+        .generate(|m, c| {
+            let rbp = c.arena.alloc(c.regs.get_phys_reg(GR64::RBP).into());
+            let mem = c
+                .arena
+                .alloc(MemKind::BaseFiOff([rbp, m["slot"], m["off"]]).into());
+            c.arena.alloc(
+                MINode::new(MO::MOVSDrm)
+                    .args(vec![mem])
+                    .reg_class(RC::XMM)
+                    .into(),
+            )
+        })
+        .into();
 
-    pub fn run_on_module(&mut self, module: &mut DAGModule) {
-        for (_, func) in &mut module.functions {
-            if func.is_internal {
-                continue;
-            }
-            self.run_on_function(&module.types, func)
-        }
-    }
+    let sext: Pat = ir(IROpcode::Sext)
+        .named("sext")
+        // .ty(Type::i64)
+        .args(vec![any_reg().named("arg").into()])
+        .generate(|m, c| {
+            let ty = c.arena[m["sext"]].as_ir().ty;
+            c.arena.alloc(
+                IRNode::new(IROpcode::RegClass)
+                    .args(vec![m["arg"]])
+                    .ty(ty)
+                    .into(),
+            )
+        })
+        .into();
+    let brcc: Pat = ir(IROpcode::Brcc)
+        .named("brcc")
+        .args(vec![
+            any_cc().named("cc").into(),
+            any_imm().into(),
+            any_reg().into(),
+            any_block().into(),
+        ])
+        .generate(|m, c| {
+            let cc = c.arena[m["cc"]].as_operand_mut().as_cc_mut();
+            *cc = cc.flip();
+            c.arena[m["brcc"]].as_ir_mut().args.swap(1, 2);
+            m["brcc"]
+        })
+        .into();
+    #[rustfmt::skip]
+    let fpbrcc: Pat = (ir(IROpcode::FPBrcc)
+        .named("brcc")
+        .args(vec![
+            any_cc().named("cc").into(),
+            any_imm().into(),
+            any_reg().into(),
+            any_block().into(),
+        ])
+        .generate(|m, c| {
+            let cc = c.arena[m["cc"]].as_operand_mut().as_cc_mut();
+            *cc = cc.flip();
+            c.arena[m["brcc"]].as_ir_mut().args.swap(1, 2); // swap imm and reg
+            m["brcc"]
+        })
+        | ir(IROpcode::FPBrcc)
+            .args(vec![
+                any_cc().named("cc").into(),
+                any_reg().named("l").into(),
+                any_imm().named("r").into(),
+                any_block().named("dst").into(),
+            ])
+            .generate(|m, c| {
+                let r = c.arena.alloc(MINode::new(MO::MOVSDrm64).args(vec![m["r"]]).reg_class(RC::XMM).into());
+                c.arena.alloc(IRNode::new(IROpcode::FPBrcc).args(vec![m["cc"], m["l"], r, m["dst"]]).into())
+            }))
+    .into();
 
-    fn run_on_function(&mut self, tys: &Types, func: &mut DAGFunction) {
-        for bb_id in &func.dag_basic_blocks {
-            let bb = &func.dag_basic_block_arena[*bb_id];
-            self.run_on_node(tys, &func.regs_info, &mut func.dag_heap, bb.entry.unwrap());
-        }
-    }
-
-    fn run_on_node(
-        &mut self,
-        tys: &Types,
-        regs_info: &RegistersInfo,
-        heap: &mut DAGHeap,
-        node: Raw<DAGNode>,
-    ) -> Raw<DAGNode> {
-        if !node.may_contain_children() {
-            return node;
-        }
-
-        if let Some(node) = self.selected.get(&node) {
-            return *node;
-        }
-
-        // TODO: auto-generate the following code by macro
-        let mut selected = match node.kind {
-            NodeKind::IR(IRNodeKind::Load) => self.run_on_node_load(tys, regs_info, heap, node),
-            NodeKind::IR(IRNodeKind::Store) => self.run_on_node_store(tys, regs_info, heap, node),
-            NodeKind::IR(IRNodeKind::Add) => self.run_on_node_add(tys, regs_info, heap, node),
-            NodeKind::IR(IRNodeKind::Sext) => self.run_on_node_sext(tys, regs_info, heap, node),
-            NodeKind::IR(IRNodeKind::Bitcast) => {
-                self.run_on_node_bitcast(tys, regs_info, heap, node)
-            }
-            NodeKind::IR(IRNodeKind::Brcc) => self.run_on_node_brcc(tys, regs_info, heap, node),
-            NodeKind::IR(IRNodeKind::FPBrcc) => self.run_on_node_fpbrcc(tys, regs_info, heap, node),
-            _ => {
-                self.run_on_node_operand(tys, regs_info, heap, node);
-                node
-            }
-        };
-
-        self.selected.insert(node, selected);
-
-        if let Some(next) = node.next {
-            selected.next = Some(self.run_on_node(tys, regs_info, heap, next));
-        }
-
-        selected
-    }
-
-    fn run_on_node_load(
-        &mut self,
-        tys: &Types,
-        regs_info: &RegistersInfo,
-        heap: &mut DAGHeap,
-        mut node: Raw<DAGNode>,
-    ) -> Raw<DAGNode> {
-        isel_pat! {
-        (ir.Load dst): i32 {
-            (ir.Add x, y) dst {
-                (ir.FIAddr fi) x {
-                    (ir.Mul z, u) y {
-                        imm32 u {
-                            (ir.Sext q) z {
-                                (ir.Add w, e) q {
-                                    imm32 e => { {
-                                        // TODO: Refactoring
-                                        let fi = self.run_on_node(tys, regs_info, heap, fi);
-                                        let w = self.run_on_node(tys, regs_info, heap, w);
-                                        let w = heap.alloc(DAGNode::new(NodeKind::IR(IRNodeKind::RegClass)).with_operand(vec![w]).with_ty(Type::i64));
-                                        let rbp = heap.alloc_phys_reg(regs_info, GR64::RBP);
-                                        let i = u.kind.as_operand().as_constant().as_i32();
-                                        let off = e.kind.as_operand().as_constant().as_i32() * i;
-                                        let off = heap.alloc(
-                                            DAGNode::new(NodeKind::Operand(OperandNodeKind::Constant(ConstantKind::Int32(off)))).with_ty(Type::i32)
-                                        );
-                                        let m = if (i as usize).is_power_of_two() && i <= 8 {
-                                            heap.alloc(DAGNode::new_mem(
-                                                MemNodeKind::BaseFiAlignOffOff,
-                                                vec![rbp, fi, u, w, off],
-                                            ))
-                                        } else {
-                                            let one = heap.alloc(DAGNode::new(
-                                                NodeKind::Operand(OperandNodeKind::Constant(ConstantKind::Int32(1)))).with_ty(Type::i32)
-                                            );
-                                            let off2 = heap.alloc(DAGNode::new(
-                                                NodeKind::MI(MINodeKind::IMULrr64i32))
-                                                .with_operand(vec![w, u])
-                                                .with_ty(Type::i64)
-                                            );
-                                            heap.alloc(DAGNode::new_mem(
-                                                MemNodeKind::BaseFiAlignOffOff,
-                                                vec![rbp, fi, one, off2, off],
-                                            ))
-                                        };
-                                        heap.alloc(DAGNode::new(
-                                            NodeKind::MI(MINodeKind::MOVrm32))
-                                            .with_operand(vec![m])
-                                            .with_ty(Type::i32)
-                                        )
-                                        // mov [rbp + fi + w*u + e * u]
-                                    } }
-                                }
-                            }
-                        }
-                    }
+    #[rustfmt::skip]
+    let store1: Pat = store(
+        add(
+            (fiaddr(any_slot().named("slot")) | gbladdr(any().named("g")) | reg_(RC::GR64).named("base")).named("lhs"),
+            (mul(any().named("off"), any_imm32_power_of_2().named("align")) | any_imm32().named("off")).named("rhs"),
+        ),
+        (any_imm32().named("imm") | any_imm_f64().named("imm") | reg_(RC::GR32).named("reg")).named("src"),
+    ).generate(|m, c| {
+        let mem = match c.arena[m["lhs"]] {
+            Node::IR(IRNode { opcode: IROpcode::FIAddr, ..}) => {
+                let rbp = c.arena.alloc(c.regs.get_phys_reg(GR64::RBP).into());
+                match c.arena[m["rhs"]] {
+                    Node::IR(IRNode { opcode: IROpcode::Mul, ..}) => MemKind::BaseFiAlignOff([rbp, m["slot"], m["align"], m["off"]]),
+                    Node::Operand(OperandNode::Imm(_)) => MemKind::BaseFiOff([rbp, m["slot"], m["off"]]),
+                    _ => unreachable!(),
                 }
             }
-
-            (ir.Add x, y) dst {
-                (ir.FIAddr fi) x {
-                    imm32 y => (mi.MOVrm32 [BaseFiOff %rbp, fi, y])
-                    (ir.Mul z, u) y {
-                        imm32 u if ({
-                            let i = u.kind.as_operand().as_constant().as_i32() as usize;
-                            i.is_power_of_two() && i <= 8
-                        }) => (mi.MOVrm32 [BaseFiAlignOff %rbp, fi, u, z])
-                        imm32 u => (mi.MOVrm32 [BaseFiAlignOff %rbp, fi, $1, (mi.IMULrr64i32 z, u)]) } }
-                (ir.GlobalAddr g) x {
-                    imm32 y => (mi.MOVrm32 [AddressOff g, y])
-                    (ir.Mul z, u) y {
-                        imm32 u => (mi.MOVrm32 [AddressAlignOff g, u, z]) } }
-                GR64 x {
-                    imm32 y => (mi.MOVrm32 [BaseOff x, y])
-                    (ir.Mul z, u) y {
-                        imm32 u => (mi.MOVrm32 [BaseAlignOff x, u, (ir.RegClass z):i64]) } }
+            Node::IR(IRNode { opcode: IROpcode::GlobalAddr, ..}) => match c.arena[m["rhs"]] {
+                Node::IR(IRNode { opcode: IROpcode::Mul, ..}) => MemKind::AddressAlignOff([m["g"], m["align"], m["off"]]),
+                Node::Operand(OperandNode::Imm(_)) => MemKind::AddressOff([m["g"], m["off"]]),
+                _ => unreachable!(),
             }
-        }
-        (ir.Load dst): i8 {
-            (ir.Add x, y) dst {
-                (ir.FIAddr fi) x {
-                    imm32 y => (mi.MOVrm8 [BaseFiOff %rbp, fi, y])
-                    (ir.Mul z, u) y {
-                        imm32 u => (mi.MOVrm8 [BaseFiAlignOff %rbp, fi, u, z]) } }
-                (ir.GlobalAddr g) x {
-                    imm32 y => (mi.MOVrm8 [AddressOff g, y])
-                    (ir.Mul z, u) y {
-                        imm32 u => (mi.MOVrm8 [AddressAlignOff g, u, z]) } }
-                GR64 x {
-                    imm32 y => (mi.MOVrm8 [BaseOff x, y])
-                    GR64  y => (mi.MOVrm8 [BaseAlignOff x, $1, y]) } } }
-        (ir.Load dst): f64 {
-            (ir.Add x, y) dst {
-                (ir.FIAddr fi) x {
-                    imm32 y => (mi.MOVSDrm [BaseFiOff %rbp, fi, y])
-                    (ir.Mul z, u) y {
-                        imm32 u => (mi.MOVSDrm [BaseFiAlignOff %rbp, fi, u, z]) } } } }
-        }
-    }
-
-    fn run_on_node_store(
-        &mut self,
-        tys: &Types,
-        regs_info: &RegistersInfo,
-        heap: &mut DAGHeap,
-        mut node: Raw<DAGNode>,
-    ) -> Raw<DAGNode> {
-        isel_pat! {
-        (ir.Store dst, src) {
-            (ir.FIAddr fi) dst {
-                mem fi {
-                    imm32   src => (mi.MOVmi32 [BaseFi %rbp, fi], src)
-                    GR32    src => (mi.MOVmr32 [BaseFi %rbp, fi], src)
-                    GR64    src => (mi.MOVmr64 [BaseFi %rbp, fi], src)
-                    XMM     src => (mi.MOVSDmr [BaseFi %rbp, fi], src)
-                    imm_f64 src => (mi.MOVSDmr [BaseFi %rbp, fi], (mi.MOVSDrm64 src)) } }
-            (ir.Add a1, a2) dst {
-                (ir.FIAddr fi) a1 {
-                    mem fi {
-                        imm32 a2 {
-                            imm32   src => (mi.MOVmi32 [BaseFiOff %rbp, fi, a2], src)
-                            GR32    src => (mi.MOVmr32 [BaseFiOff %rbp, fi, a2], src)
-                            GR64    src => (mi.MOVmr64 [BaseFiOff %rbp, fi, a2], src)
-                            XMM     src => (mi.MOVSDmr [BaseFiOff %rbp, fi, a2], src)
-                            imm_f64 src => (mi.MOVSDmr [BaseFiOff %rbp, fi, a2], (mi.MOVSDrm64 src)) } }
-                    mem fi {
-                        imm32 a2 {
-                            imm32 src => (mi.MOVmi32 [BaseFiOff %rbp, fi, a2], src)
-                            GR32  src => (mi.MOVmr32 [BaseFiOff %rbp, fi, a2], src) }
-                        (ir.Mul m1, m2) a2 {
-                            imm32 m2 {
-                                (ir.Sext q) m1 {
-                                    (ir.Add w, e) q {
-                                        imm32 e => { {
-                                            // TODO: Refactoring
-                                            let src = self.run_on_node(tys, regs_info, heap, src);
-                                            let fi = self.run_on_node(tys, regs_info, heap, fi);
-                                            let w = self.run_on_node(tys, regs_info, heap, w);
-                                            let w = heap.alloc(DAGNode::new(NodeKind::IR(IRNodeKind::RegClass)).with_operand(vec![w]).with_ty(Type::i64));
-                                            let rbp = heap.alloc_phys_reg(regs_info, GR64::RBP);
-                                            let i = m2.kind.as_operand().as_constant().as_i32();
-                                            let off = e.kind.as_operand().as_constant().as_i32() * i;
-                                            let off = heap.alloc(DAGNode::new(
-                                                NodeKind::Operand(OperandNodeKind::Constant(ConstantKind::Int32(off))))
-                                                .with_ty(Type::i32)
-                                            );
-                                            let m = if (i as usize).is_power_of_two() && i <= 8 {
-                                                heap.alloc(DAGNode::new_mem(
-                                                    MemNodeKind::BaseFiAlignOffOff,
-                                                    vec![rbp, fi, m2, w, off],
-                                                ))
-                                            } else {
-                                                let one = heap.alloc(DAGNode::new(
-                                                    NodeKind::Operand(OperandNodeKind::Constant(ConstantKind::Int32(1))))
-                                                    .with_ty(Type::i32)
-                                                );
-                                                let off2 = heap.alloc(DAGNode::new(
-                                                    NodeKind::MI(MINodeKind::IMULrr64i32))
-                                                    .with_operand(vec![w, m2])
-                                                    .with_ty(Type::i64)
-                                                );
-                                                heap.alloc(DAGNode::new_mem(
-                                                    MemNodeKind::BaseFiAlignOffOff,
-                                                    vec![rbp, fi, one, off2, off],
-                                                ))
-                                            };
-                                            heap.alloc(DAGNode::new(
-                                                if src.is_constant() {
-                                                    NodeKind::MI(MINodeKind::MOVmi32)
-                                                } else {
-                                                    NodeKind::MI(MINodeKind::MOVmr32)
-                                                }).with_operand(vec![m, src]).with_ty(Type::Void)
-                                            )
-                                        } }
-                                    }
-                                }
-                                imm32 src if ({
-                                    let i = m2.kind.as_operand().as_constant().as_i32() as usize;
-                                    i.is_power_of_two() && i <= 8
-                                }) => (mi.MOVmi32 [BaseFiAlignOff %rbp, fi, m2, m1], src)
-                                imm32 src => (mi.MOVmi32 [BaseFiAlignOff %rbp, fi, $1, (mi.IMULrr64i32 m1, m2)], src)
-                                GR32  src => (mi.MOVmr32 [BaseFiAlignOff %rbp, fi, m2, m1], src)
-                            }
-                        } } }
-                (ir.GlobalAddr g) a1 {
-                    imm32 a2 {
-                        imm32 src => (mi.MOVmi32 [AddressOff g, a2], src)
-                        GR32  src => (mi.MOVmr32 [AddressOff g, a2], src) }
-                    (ir.Mul m1, m2) a2 {
-                        imm32 m2 {
-                            GR32  src => (mi.MOVmr32 [AddressAlignOff g, m2, m1], src)
-                            imm32 src => (mi.MOVmi32 [AddressAlignOff g, m2, m1], src) } } }
-                GR64 a1 {
-                    (ir.Mul m1, m2) a2 {
-                        imm32 m2 {
-                            GR32  src => (mi.MOVmr32 [BaseAlignOff a1, m2, (ir.RegClass m1):i64], src)
-                            imm32 src => (mi.MOVmi32 [BaseAlignOff a1, m2, (ir.RegClass m1):i64], src) } } } } } }
-    }
-
-    fn run_on_node_add(
-        &mut self,
-        tys: &Types,
-        regs_info: &RegistersInfo,
-        heap: &mut DAGHeap,
-        mut node: Raw<DAGNode>,
-    ) -> Raw<DAGNode> {
-        isel_pat! {
-        (ir.Add x, y) {
-            (ir.FIAddr fi) x {
-                imm32 y => (mi.LEAr64m [BaseFiOff %rbp, fi, y])
-                GR64 y => (mi.LEAr64m [BaseFiAlignOff %rbp, fi, $1, y]) } } }
-    }
-
-    fn run_on_node_sext(
-        &mut self,
-        tys: &Types,
-        regs_info: &RegistersInfo,
-        heap: &mut DAGHeap,
-        node: Raw<DAGNode>,
-    ) -> Raw<DAGNode> {
-        // if node.ty == Type::i64
-        //     && node.operand[0].kind == NodeKind::IR(IRNodeKind::Load)
-        //     && node.operand[0].ty == Type::i32
-        //     && node.operand[0].operand[0].kind == NodeKind::IR(IRNodeKind::FIAddr)
-        // {
-        //     let rbp = heap.alloc_phys_reg(regs_info, GR64::RBP);
-        //     let mem = heap.alloc(DAGNode::new_mem(
-        //         MemNodeKind::BaseFi,
-        //         vec![rbp, node.operand[0].operand[0].operand[0]],
-        //     ));
-        //     return heap.alloc(DAGNode::new(
-        //         NodeKind::MI(MINodeKind::MOVSXDr64m32),
-        //         vec![mem],
-        //         node.ty.clone(),
-        //     ));
-        // }
-
-        if node.ty == Type::i64 && !node.operand[0].is_constant() && node.operand[0].ty == Type::i32
-        // && node.operand[0].operand[0].kind == NodeKind::IR(IRNodeKind::FIAddr)
-        {
-            let op = self.run_on_node(tys, regs_info, heap, node.operand[0]);
-            return heap.alloc(
-                DAGNode::new(NodeKind::IR(IRNodeKind::RegClass))
-                    .with_operand(vec![op])
-                    .with_ty(node.ty),
-            );
-        }
-
-        self.run_on_node_operand(tys, regs_info, heap, node);
-        node
-    }
-
-    fn run_on_node_bitcast(
-        &mut self,
-        tys: &Types,
-        regs_info: &RegistersInfo,
-        heap: &mut DAGHeap,
-        node: Raw<DAGNode>,
-    ) -> Raw<DAGNode> {
-        if !node.operand[0].is_constant()
-            && node.ty.size_in_byte(tys) == node.operand[0].ty.size_in_byte(tys)
-        {
-            let op = self.run_on_node(tys, regs_info, heap, node.operand[0]);
-            return op;
-        }
-
-        self.run_on_node_operand(tys, regs_info, heap, node);
-        node
-    }
-
-    fn run_on_node_brcc(
-        &mut self,
-        tys: &Types,
-        regs_info: &RegistersInfo,
-        heap: &mut DAGHeap,
-        mut node: Raw<DAGNode>,
-    ) -> Raw<DAGNode> {
-        let mut cond = node.operand[0];
-        let lhs = node.operand[1];
-        let rhs = node.operand[2];
-        // lhs must be register
-        if lhs.is_constant() && rhs.is_maybe_register() {
-            let tmp = node.operand[1];
-            node.operand[1] = node.operand[2];
-            node.operand[2] = tmp;
-            if let NodeKind::Operand(OperandNodeKind::CondKind(kind)) = &mut cond.kind {
-                *kind = kind.flip();
+            Node::IR(_) | Node::MI(_) | Node::Operand(OperandNode::Reg(_)) => match c.arena[m["rhs"]] {
+                Node::IR(IRNode { opcode: IROpcode::Mul, ..}) => MemKind::BaseAlignOff([m["base"], m["align"], m["off"]]),
+                Node::Operand(OperandNode::Imm(_)) => MemKind::BaseOff([m["base"], m["off"]]),
+                _ => unreachable!(),
             }
-            return self.run_on_node_brcc(tys, regs_info, heap, node);
-        }
-        self.run_on_node_operand(tys, regs_info, heap, node);
-        node
-    }
-
-    fn run_on_node_fpbrcc(
-        &mut self,
-        tys: &Types,
-        regs_info: &RegistersInfo,
-        heap: &mut DAGHeap,
-        mut node: Raw<DAGNode>,
-    ) -> Raw<DAGNode> {
-        let mut cond = node.operand[0];
-        let lhs = node.operand[1];
-        let rhs = node.operand[2];
-
-        // lhs must be register
-        if lhs.is_constant() && rhs.is_maybe_register() {
-            let tmp = lhs;
-            node.operand[1] = node.operand[2];
-            node.operand[2] = tmp;
-            if let NodeKind::Operand(OperandNodeKind::CondKind(kind)) = &mut cond.kind {
-                *kind = kind.flip();
+            _ => unreachable!(),
+        };
+        let mem = c.arena.alloc(mem.into());
+        match c.arena[m["src"]] {
+            Node::IR(_) | Node::MI(_) | Node::Operand(OperandNode::Reg(_)) => c.arena.alloc(MINode::new(MO::MOVmr32).args(vec![mem, m["reg"]]).into()),
+            Node::Operand(OperandNode::Imm(ImmediateKind::Int32(_))) => c.arena.alloc(MINode::new(MO::MOVmi32).args(vec![mem, m["imm"]]).into()),
+            Node::Operand(OperandNode::Imm(ImmediateKind::F64(_))) => {
+                let src = c.arena.alloc(MINode::new(MO::MOVSDrm64).args(vec![m["imm"]]).reg_class(RC::XMM).into());
+                c.arena.alloc(MINode::new(MO::MOVSDmr).args(vec![mem, src]).into())
             }
-            return self.run_on_node_fpbrcc(tys, regs_info, heap, node);
+            _ => unreachable!()
         }
+    }).into();
+    #[rustfmt::skip]
+    let store2: Pat = ir(IROpcode::Store).args(vec![
+        ir(IROpcode::Add).args(vec![
+            ir(IROpcode::FIAddr).args(vec![any_slot().named("slot").into()]).into(),
+            ir(IROpcode::Mul).args(vec![
+                any().named("m1"),
+                any_i32_imm().named("m2").into()
+            ]).into()]).into(),
+        (  any_i32_imm().named("imm").into(): CompoundPat 
+         | any_f64_imm().named("imm").into()
+         | reg_class(RC::GR32).named("reg").into()).named("src").into()]).generate(|m, c| {
+        let i = c.arena[m["m2"]].as_operand().as_imm().as_i32() as usize;
+        let rbp = c.arena.alloc(c.regs.get_phys_reg(GR64::RBP).into());
+        let mem = if i.is_power_of_two() && i <= 8 {
+            c.arena.alloc(MemKind::BaseFiAlignOff([rbp, m["slot"], m["m2"], m["m1"]]).into())
+        } else {
+            let one = c.arena.alloc(1.into());
+            let mul = c.arena.alloc(MINode::new(MO::IMULrr64i32).args(vec![m["m1"], m["m2"]]).reg_class(RC::GR64).into());
+            c.arena.alloc(MemKind::BaseFiAlignOff([rbp, m["slot"], one, mul]).into())
+        };
+        let mi = match c.arena[m["src"]] {
+            Node::IR(_) | Node::MI(_) | Node::Operand(OperandNode::Reg(_)) => MINode::new(MO::MOVmr32),
+            Node::Operand(OperandNode::Imm(ImmediateKind::Int32(_))) => MINode::new(MO::MOVmi32),
+            // Node::Operand(OperandNode::Imm(ImmediateKind::F64(_))) => {
+            //     let src = c.arena.alloc(MINode::new(MO::MOVSDrm64).args(vec![m["imm"]]).reg_class(RC::XMM).into());
+            //     MINode::new(MO::MOVSDmr)
+            // }
+            _ => unreachable!()
+        };
+        c.arena.alloc(mi.args(vec![mem, m["src"]]).into())
+    }).into();
+    let store3: Pat = ir(IROpcode::Store)
+        .args(vec![
+            ir(IROpcode::Add)
+                .args(vec![
+                    ir(IROpcode::FIAddr)
+                        .args(vec![any_slot().named("slot").into()])
+                        .into(),
+                    any_i32_imm().named("off").into(),
+                ])
+                .into(),
+            (any_i32_imm().named("imm").into(): CompoundPat
+                | any_f64_imm().named("imm").into()
+                | reg_class(RC::GR32).named("reg").into())
+            .named("src")
+            .into(),
+        ])
+        .generate(|m, c| {
+            let rbp = c.arena.alloc(c.regs.get_phys_reg(GR64::RBP).into());
+            let mem = c
+                .arena
+                .alloc(MemKind::BaseFiOff([rbp, m["slot"], m["off"]]).into())
+                .into();
+            let mi = match c.arena[m["src"]] {
+                Node::IR(_) | Node::MI(_) | Node::Operand(OperandNode::Reg(_)) => {
+                    MINode::new(MO::MOVmr32)
+                }
+                Node::Operand(OperandNode::Imm(ImmediateKind::Int32(_))) => {
+                    MINode::new(MO::MOVmi32)
+                }
+                // Node::Operand(OperandNode::Imm(ImmediateKind::F64(_))) => {
+                //     let src = c.arena.alloc(MINode::new(MO::MOVSDrm64).args(vec![m["imm"]]).reg_class(RC::XMM).into());
+                //     MINode::new(MO::MOVSDmr)
+                // }
+                _ => unreachable!(),
+            };
+            c.arena.alloc(mi.args(vec![mem, m["src"]]).into())
+        })
+        .into();
+    let store4 = store(
+        add(reg_(RC::GR64).named("base"), any_imm32().named("off")),
+        (any_imm32().named("imm")
+            | any_imm_f64().named("imm")
+            | reg_(RC::GR32).named("reg")
+            | reg_(RC::GR64).named("reg")
+            | reg_(RC::XMM).named("reg"))
+        .named("src"),
+    )
+    .generate(|m, c| {
+        let mem = c
+            .arena
+            .alloc(MemKind::BaseOff([m["base"], m["off"]]).into())
+            .into();
+        let mi = match c.arena[m["src"]] {
+            Node::IR(IRNode {
+                mvty: MVType::i64, ..
+            })
+            | Node::MI(MINode {
+                reg_class: Some(RC::GR64),
+                ..
+            }) => MINode::new(MO::MOVmr64),
+            Node::Operand(OperandNode::Reg(r)) if c.regs.arena_ref()[r].reg_class == RC::GR64 => {
+                MINode::new(MO::MOVmr64)
+            }
+            Node::IR(IRNode {
+                mvty: MVType::f64, ..
+            })
+            | Node::MI(MINode {
+                reg_class: Some(RC::XMM),
+                ..
+            }) => MINode::new(MO::MOVSDmr),
+            Node::Operand(OperandNode::Reg(r)) if c.regs.arena_ref()[r].reg_class == RC::XMM => {
+                MINode::new(MO::MOVSDmr)
+            }
+            Node::IR(_) | Node::MI(_) | Node::Operand(OperandNode::Reg(_)) => {
+                MINode::new(MO::MOVmr32)
+            }
+            Node::Operand(OperandNode::Imm(ImmediateKind::Int32(_))) => MINode::new(MO::MOVmi32),
+            // Node::Operand(OperandNode::Imm(ImmediateKind::F64(_))) => {
+            //     let src = c.arena.alloc(MINode::new(MO::MOVSDrm64).args(vec![m["imm"]]).reg_class(RC::XMM).into());
+            //     MINode::new(MO::MOVSDmr)
+            // }
+            _ => unreachable!(),
+        };
+        c.arena.alloc(mi.args(vec![mem, m["src"]]).into())
+    })
+    .into();
+    let bitcast: Pat = ir(IROpcode::Bitcast)
+        .args(vec![any().named("arg")])
+        .generate(|m, _| m["arg"])
+        .into();
 
-        // now: lhs=register, rhs=const|register
-        if lhs.is_maybe_register() && rhs.is_constant() {
-            let lhs = self.run_on_node(tys, regs_info, heap, lhs);
-            let rhs = heap.alloc(
-                DAGNode::new(NodeKind::MI(MINodeKind::MOVSDrm64))
-                    .with_operand(vec![rhs])
-                    .with_ty(Type::f64),
-            );
-            return heap.alloc(
-                DAGNode::new(NodeKind::IR(IRNodeKind::FPBrcc))
-                    .with_operand(vec![cond, lhs, rhs, node.operand[3]])
-                    .with_ty(node.ty),
-            );
-        }
+    let pats = vec![
+        load4, load5, load6, load, load2, load3, store2, store1, sext, brcc, fpbrcc, store3,
+        store4,
+        bitcast,
+        // sext, load4, load5, store, load, load2, load3, store2, brcc, fpbrcc, bitcast, load6, store3,
+        // store4,
+    ];
+    let pats = reorder_patterns(pats);
 
-        self.run_on_node_operand(tys, regs_info, heap, node);
-        node
+    let mut replaced = ReplacedNodeMap::default();
+    for &id in &func.dag_basic_blocks {
+        let block = &func.dag_basic_block_arena[id];
+        let a = select_node(
+            &mut MatchContext {
+                arena: &mut func.node_arena,
+                regs: &func.regs,
+            },
+            &mut replaced,
+            &pats,
+            block.entry.unwrap(),
+        );
+        assert_eq!(block.entry.unwrap(), a);
+    }
+}
+
+fn select_node<'a>(
+    ctx: &mut MatchContext<'a>,
+    replaced: &mut ReplacedNodeMap,
+    pats: &[Pat],
+    id: NodeId,
+) -> NodeId {
+    let new = inst_select(replaced, ctx, id, pats);
+
+    if let Some(next) = ctx.arena[id].next() {
+        let next = select_node(ctx, replaced, pats, next);
+        *ctx.arena[new].next_mut() = Some(next);
     }
 
-    fn run_on_node_operand(
-        &mut self,
-        tys: &Types,
-        regs_info: &RegistersInfo,
-        heap: &mut DAGHeap,
-        mut node: Raw<DAGNode>,
-    ) {
-        node.operand = node
-            .operand
-            .iter()
-            .map(|op| self.run_on_node(tys, regs_info, heap, *op))
-            .collect()
-    }
+    new
 }

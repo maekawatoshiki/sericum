@@ -1,16 +1,14 @@
 use crate::codegen::{
     arch::{
-        dag::node::MemNodeKind,
+        dag::node::MemKind,
         frame_object::FrameIndexInfo,
         machine::{inst::MachineOpcode, register::*},
     },
-    common::{dag::basic_block::*, types::MVType},
+    common::{dag::basic_block::DAGBasicBlockId, types::MVType},
 };
 use crate::ir::{constant_pool, global_val::GlobalVariableId, opcode::*, types::*};
-use crate::util::allocator::*;
 use id_arena::*;
-use rustc_hash::FxHashMap;
-use std::fmt;
+// use std::fmt;
 
 //////////
 
@@ -18,7 +16,7 @@ pub type NodeId = Id<Node>;
 
 pub type IROpcode = IRNodeKind;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Node {
     IR(IRNode),
     MI(MINode),
@@ -26,32 +24,33 @@ pub enum Node {
     None,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct IRNode {
     pub opcode: IROpcode,
     pub args: Vec<NodeId>,
     pub ty: Type,
     pub mvty: MVType,
-    pub next: Option<Raw<DAGNode>>,
-    pub chain: Option<Raw<DAGNode>>,
+    pub next: Option<NodeId>,
+    pub chain: Option<NodeId>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct MINode {
     pub opcode: MachineOpcode,
     pub args: Vec<NodeId>,
-    pub next: Option<Raw<DAGNode>>,
-    pub chain: Option<Raw<DAGNode>>,
+    pub reg_class: Option<RegisterClassKind>,
+    pub next: Option<NodeId>,
+    pub chain: Option<NodeId>,
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum OperandNode {
     Imm(ImmediateKind),
     Reg(RegisterId),
     Addr(AddressKind),
     Slot(FrameIndexInfo), // TODO: FrameIndex will be named Slot
     Block(DAGBasicBlockId),
-    Mem(MemNodeKind),
+    Mem(MemKind),
     CC(CondKind),
 }
 
@@ -61,42 +60,6 @@ pub enum ImmediateKind {
     Int32(i32),
     Int64(i64),
     F64(f64),
-}
-
-impl Node {
-    pub fn as_ir(&self) -> &IRNode {
-        match self {
-            Node::IR(x) => x,
-            _ => panic!(),
-        }
-    }
-
-    pub fn as_ir_mut(&mut self) -> &mut IRNode {
-        match self {
-            Node::IR(x) => x,
-            _ => panic!(),
-        }
-    }
-
-    pub fn as_operand(&self) -> &OperandNode {
-        match self {
-            Node::Operand(x) => x,
-            _ => panic!(),
-        }
-    }
-
-    pub fn as_i32(&self) -> i32 {
-        self.as_operand().as_imm().as_i32()
-    }
-
-    pub fn args_mut(&mut self) -> &mut [NodeId] {
-        match self {
-            Self::IR(ir) => &mut ir.args,
-            Self::MI(mi) => &mut mi.args,
-            Self::Operand(_) => &mut [],
-            Self::None => &mut [],
-        }
-    }
 }
 
 impl IRNode {
@@ -123,6 +86,28 @@ impl IRNode {
     }
 }
 
+impl MINode {
+    pub fn new(opcode: MachineOpcode) -> Self {
+        Self {
+            opcode,
+            args: vec![],
+            reg_class: None,
+            next: None,
+            chain: None,
+        }
+    }
+
+    pub fn args(mut self, args: Vec<NodeId>) -> Self {
+        self.args = args;
+        self
+    }
+
+    pub fn reg_class(mut self, rc: RegisterClassKind) -> Self {
+        self.reg_class = Some(rc);
+        self
+    }
+}
+
 impl OperandNode {
     pub fn i32(i: i32) -> Self {
         Self::Imm(ImmediateKind::Int32(i))
@@ -142,6 +127,34 @@ impl OperandNode {
             _ => panic!(),
         }
     }
+
+    pub fn as_addr(&self) -> &AddressKind {
+        match self {
+            Self::Addr(x) => x,
+            _ => panic!(),
+        }
+    }
+
+    pub fn as_cc(&self) -> &CondKind {
+        match self {
+            Self::CC(x) => x,
+            _ => panic!(),
+        }
+    }
+
+    pub fn as_cc_mut(&mut self) -> &mut CondKind {
+        match self {
+            Self::CC(x) => x,
+            _ => panic!(),
+        }
+    }
+
+    pub fn as_block(&self) -> &DAGBasicBlockId {
+        match self {
+            Self::Block(x) => x,
+            _ => panic!(),
+        }
+    }
 }
 
 impl ImmediateKind {
@@ -151,80 +164,29 @@ impl ImmediateKind {
             _ => panic!(),
         }
     }
-}
 
-impl Into<Node> for i32 {
-    fn into(self) -> Node {
-        Node::Operand(OperandNode::Imm(ImmediateKind::Int32(self)))
+    pub fn is_null(&self) -> bool {
+        matches!(self, Self::Int8(0) | Self::Int32(0) | Self::Int64(0))
+            || matches!(self, Self::F64(f) if *f == 0.0)
+    }
+
+    pub fn bits_within(&self, n: u32) -> Option<bool> {
+        match self {
+            Self::Int8(x) => Some((x << (8 - n)) >> (8 - n) == *x),
+            Self::Int32(x) => Some((x << (32 - n)) >> (32 - n) == *x),
+            Self::Int64(x) => Some((x << (64 - n)) >> (64 - n) == *x),
+            Self::F64(_) => None,
+        }
     }
 }
 
-impl Into<Node> for IRNode {
-    fn into(self) -> Node {
-        Node::IR(self)
+impl AddressKind {
+    pub fn as_func_name(&self) -> &String {
+        match self {
+            Self::FunctionName(name) => name,
+            _ => panic!(),
+        }
     }
-}
-
-impl Into<Node> for OperandNode {
-    fn into(self) -> Node {
-        Node::Operand(self)
-    }
-}
-
-impl Into<Node> for ImmediateKind {
-    fn into(self) -> Node {
-        Node::Operand(OperandNode::Imm(self))
-    }
-}
-
-impl Into<Node> for AddressKind {
-    fn into(self) -> Node {
-        Node::Operand(OperandNode::Addr(self))
-    }
-}
-
-// impl Into<Node> for DAGBasicBlockId
-
-impl Into<Node> for FrameIndexInfo {
-    fn into(self) -> Node {
-        Node::Operand(OperandNode::slot(self))
-    }
-}
-
-//////////
-
-#[derive(Debug, Clone)]
-pub struct DAGNode {
-    pub kind: NodeKind,
-    pub operand: Vec<Raw<DAGNode>>,
-    pub ty: Type,
-    pub mvty: MVType,
-    pub next: Option<Raw<DAGNode>>,
-    pub chain: Option<Raw<DAGNode>>,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum NodeKind {
-    // intermediate representation
-    IR(IRNodeKind),
-    // machine instruction
-    MI(MINodeKind),
-    // operand
-    Operand(OperandNodeKind),
-    None,
-}
-
-pub type MINodeKind = MachineOpcode;
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum OperandNodeKind {
-    CondKind(CondKind),
-    FrameIndex(FrameIndexInfo), // TODO
-    Constant(ConstantKind),
-    Address(AddressKind),
-    BasicBlock(DAGBasicBlockId),
-    Register(RegisterId),
-    Mem(MemNodeKind),
 }
 
 #[derive(Debug, Clone, PartialEq, Copy)]
@@ -268,15 +230,6 @@ pub enum IRNodeKind {
 
     CopyToLiveOut,
     RegClass,
-}
-
-#[derive(Debug, Clone, PartialEq, Copy)]
-pub enum ConstantKind {
-    Int8(i8),
-    Int32(i32),
-    Int64(i64),
-    F64(f64),
-    Other(constant_pool::ConstantId),
 }
 
 #[derive(Debug, Clone, PartialEq, Copy)]
@@ -340,248 +293,161 @@ impl CondKind {
     }
 }
 
-impl ConstantKind {
-    pub fn add(self, n: ConstantKind) -> ConstantKind {
-        match (self, n) {
-            (ConstantKind::Int32(x), ConstantKind::Int32(y)) => ConstantKind::Int32(x + y),
-            (ConstantKind::Int64(x), ConstantKind::Int64(y)) => ConstantKind::Int64(x + y),
-            (ConstantKind::F64(x), ConstantKind::F64(y)) => ConstantKind::F64(x + y),
-            _ => unimplemented!(),
+impl Into<Node> for i32 {
+    fn into(self) -> Node {
+        Node::Operand(OperandNode::Imm(ImmediateKind::Int32(self)))
+    }
+}
+
+impl Into<Node> for IRNode {
+    fn into(self) -> Node {
+        Node::IR(self)
+    }
+}
+
+impl Into<Node> for MINode {
+    fn into(self) -> Node {
+        Node::MI(self)
+    }
+}
+
+impl Into<Node> for OperandNode {
+    fn into(self) -> Node {
+        Node::Operand(self)
+    }
+}
+
+impl Into<Node> for ImmediateKind {
+    fn into(self) -> Node {
+        Node::Operand(OperandNode::Imm(self))
+    }
+}
+
+impl Into<Node> for AddressKind {
+    fn into(self) -> Node {
+        Node::Operand(OperandNode::Addr(self))
+    }
+}
+
+impl Into<Node> for DAGBasicBlockId {
+    fn into(self) -> Node {
+        Node::Operand(OperandNode::Block(self))
+    }
+}
+
+impl Into<Node> for FrameIndexInfo {
+    fn into(self) -> Node {
+        Node::Operand(OperandNode::slot(self))
+    }
+}
+
+impl Into<Node> for ICmpKind {
+    fn into(self) -> Node {
+        Node::Operand(OperandNode::CC(self.into()))
+    }
+}
+
+impl Into<Node> for FCmpKind {
+    fn into(self) -> Node {
+        Node::Operand(OperandNode::CC(self.into()))
+    }
+}
+
+impl Into<Node> for MemKind {
+    fn into(self) -> Node {
+        Node::Operand(OperandNode::Mem(self))
+    }
+}
+
+impl Into<Node> for RegisterId {
+    fn into(self) -> Node {
+        Node::Operand(OperandNode::Reg(self))
+    }
+}
+
+use rustc_hash::FxHashMap;
+use std::fmt;
+
+impl Node {
+    pub fn as_ir(&self) -> &IRNode {
+        match self {
+            Node::IR(x) => x,
+            _ => panic!(),
         }
     }
 
-    pub fn neg(self) -> ConstantKind {
+    pub fn as_ir_mut(&mut self) -> &mut IRNode {
         match self {
-            ConstantKind::Int8(i) => ConstantKind::Int8(-i),
-            ConstantKind::Int32(i) => ConstantKind::Int32(-i),
-            ConstantKind::Int64(i) => ConstantKind::Int64(-i),
-            ConstantKind::F64(f) => ConstantKind::F64(-f),
-            ConstantKind::Other(_) => panic!(),
+            Node::IR(x) => x,
+            _ => panic!(),
         }
     }
 
-    pub fn is_power_of_two(&self) -> Option<u32> {
+    pub fn as_mi(&self) -> &MINode {
         match self {
-            ConstantKind::Int32(x) if (*x as usize).is_power_of_two() => Some(x.trailing_zeros()),
-            ConstantKind::Int64(x) if (*x as usize).is_power_of_two() => Some(x.trailing_zeros()),
-            _ => None,
+            Node::MI(x) => x,
+            _ => panic!(),
         }
     }
 
-    pub fn bits_within(&self, n: u32) -> Option<bool> {
+    pub fn as_operand(&self) -> &OperandNode {
         match self {
-            ConstantKind::Int8(x) => Some((x << (8 - n)) >> (8 - n) == *x),
-            ConstantKind::Int32(x) => Some((x << (32 - n)) >> (32 - n) == *x),
-            ConstantKind::Int64(x) => Some((x << (64 - n)) >> (64 - n) == *x),
-            ConstantKind::F64(_) => None,
-            ConstantKind::Other(_) => None,
+            Node::Operand(x) => x,
+            _ => panic!(),
         }
     }
 
-    pub fn get_type(&self) -> Type {
+    pub fn as_operand_mut(&mut self) -> &mut OperandNode {
         match self {
-            ConstantKind::Int8(_) => Type::i8,
-            ConstantKind::Int32(_) => Type::i32,
-            ConstantKind::Int64(_) => Type::i64,
-            ConstantKind::F64(_) => Type::f64,
-            ConstantKind::Other(_) => panic!(),
-        }
-    }
-
-    pub fn is_null(&self) -> bool {
-        match self {
-            ConstantKind::Int8(0) | ConstantKind::Int32(0) | ConstantKind::Int64(0) => true,
-            ConstantKind::F64(f) if *f == 0.0 => true,
-            _ => false,
-        }
-    }
-
-    pub fn is_int(&self, i: i8) -> bool {
-        match self {
-            ConstantKind::Int8(x) if *x == i => true,
-            ConstantKind::Int32(x) if *x as i8 == i => true,
-            ConstantKind::Int64(x) if *x as i8 == i => true,
-            ConstantKind::F64(_) => false,
-            _ => false,
+            Node::Operand(x) => x,
+            _ => panic!(),
         }
     }
 
     pub fn as_i32(&self) -> i32 {
+        self.as_operand().as_imm().as_i32()
+    }
+
+    pub fn args(&self) -> &[NodeId] {
         match self {
-            Self::Int32(i) => *i,
+            Self::IR(ir) => &ir.args,
+            Self::MI(mi) => &mi.args,
+            Self::Operand(OperandNode::Mem(m)) => m.args(),
+            Self::Operand(_) => &[],
+            Self::None => &[],
+        }
+    }
+
+    pub fn args_mut(&mut self) -> &mut [NodeId] {
+        match self {
+            Self::IR(ir) => &mut ir.args,
+            Self::MI(mi) => &mut mi.args,
+            Self::Operand(OperandNode::Mem(m)) => m.args_mut(),
+            Self::Operand(_) => &mut [],
+            Self::None => &mut [],
+        }
+    }
+
+    pub fn next(&self) -> Option<NodeId> {
+        match self {
+            Self::IR(IRNode { next, .. }) | Self::MI(MINode { next, .. }) => *next,
+            _ => None,
+        }
+    }
+
+    pub fn next_mut(&mut self) -> &mut Option<NodeId> {
+        match self {
+            Self::IR(IRNode { next, .. }) | Self::MI(MINode { next, .. }) => next,
             _ => panic!(),
-        }
-    }
-}
-
-impl DAGNode {
-    // pub fn new(kind: NodeKind, operand: Vec<Raw<DAGNode>>, ty: Type) -> Self {
-    //     Self {
-    //         kind,
-    //         ty,
-    //         mvty: ty.into(),
-    //         next: None,
-    //         chain: None,
-    //         operand,
-    //     }
-    // }
-    //
-    pub fn new_simple(kind: NodeKind, operand: Vec<Raw<DAGNode>>) -> Self {
-        Self {
-            kind,
-            operand,
-            next: None,
-            chain: None,
-            ty: Type::Void,
-            mvty: MVType::Invalid,
-        }
-    }
-
-    pub fn new(kind: NodeKind) -> Self {
-        Self {
-            kind,
-            operand: vec![],
-            ty: Type::Void,
-            mvty: MVType::Invalid,
-            next: None,
-            chain: None,
-        }
-    }
-
-    pub fn new_none() -> Self {
-        Self {
-            kind: NodeKind::None,
-            ty: Type::Void,
-            mvty: MVType::Void,
-            next: None,
-            chain: None,
-            operand: vec![],
-        }
-    }
-
-    pub fn new_phys_reg<T: TargetRegisterTrait>(regs_info: &RegistersInfo, reg: T) -> Self {
-        let ty = rc2ty(reg.as_phys_reg().reg_class());
-        Self {
-            kind: NodeKind::Operand(OperandNodeKind::Register(regs_info.get_phys_reg(reg))),
-            ty,
-            mvty: ty.into(),
-            next: None,
-            chain: None,
-            operand: vec![],
-        }
-    }
-
-    pub fn new_mem(mem: MemNodeKind, operands: Vec<Raw<DAGNode>>) -> Self {
-        Self::new(NodeKind::Operand(OperandNodeKind::Mem(mem))).with_operand(operands)
-    }
-
-    pub fn with_ty(mut self, ty: Type) -> Self {
-        self.ty = ty;
-        self.mvty = ty.into();
-        self
-    }
-
-    pub fn with_operand(mut self, operand: Vec<Raw<DAGNode>>) -> Self {
-        self.operand = operand;
-        self
-    }
-
-    pub fn set_next(mut self, next: Raw<DAGNode>) -> Self {
-        self.next = Some(next);
-        self
-    }
-
-    pub fn set_chain(mut self, chain: Raw<DAGNode>) -> Self {
-        self.chain = Some(chain);
-        self
-    }
-
-    pub fn as_basic_block(&self) -> DAGBasicBlockId {
-        match self.kind {
-            NodeKind::Operand(OperandNodeKind::BasicBlock(bb)) => bb,
-            _ => panic!(),
-        }
-    }
-
-    pub fn as_cond_kind(&self) -> CondKind {
-        match self.kind {
-            NodeKind::Operand(OperandNodeKind::CondKind(ck)) => ck,
-            _ => panic!(),
-        }
-    }
-
-    pub fn as_constant(&self) -> ConstantKind {
-        match self.kind {
-            NodeKind::Operand(OperandNodeKind::Constant(c)) => c,
-            _ => panic!(),
-        }
-    }
-
-    pub fn as_frame_index(&self) -> FrameIndexInfo {
-        match self.kind {
-            NodeKind::Operand(OperandNodeKind::FrameIndex(fi)) => fi,
-            _ => panic!(),
-        }
-    }
-
-    pub fn as_address(&self) -> &AddressKind {
-        match &self.kind {
-            NodeKind::Operand(OperandNodeKind::Address(a)) => a,
-            _ => panic!(),
-        }
-    }
-
-    pub fn is_constant(&self) -> bool {
-        matches!(self.kind, NodeKind::Operand(OperandNodeKind::Constant(_)))
-    }
-
-    pub fn is_frame_index(&self) -> bool {
-        matches!(self.kind, NodeKind::Operand(OperandNodeKind::FrameIndex(_)))
-    }
-
-    pub fn is_address(&self) -> bool {
-        matches!(self.kind, NodeKind::Operand(OperandNodeKind::Address(_)))
-    }
-
-    pub fn is_maybe_register(&self) -> bool {
-        self.is_operation()
-            || matches!(self.kind,
-                 NodeKind::Operand(OperandNodeKind::Address(_)) |
-                 NodeKind::Operand(OperandNodeKind::Register(_)))
-    }
-
-    pub fn is_operation(&self) -> bool {
-        match self.kind {
-            NodeKind::Operand(OperandNodeKind::CondKind(_))
-            | NodeKind::Operand(OperandNodeKind::FrameIndex(_))
-            | NodeKind::Operand(OperandNodeKind::Constant(_))
-            | NodeKind::Operand(OperandNodeKind::Address(_))
-            | NodeKind::Operand(OperandNodeKind::BasicBlock(_))
-            | NodeKind::Operand(OperandNodeKind::Register(_))
-            | NodeKind::Operand(OperandNodeKind::Mem(_))
-            | NodeKind::None => false,
-            _ => true,
-        }
-    }
-
-    pub fn may_contain_children(&self) -> bool {
-        match self.kind {
-            NodeKind::Operand(OperandNodeKind::CondKind(_))
-            | NodeKind::Operand(OperandNodeKind::FrameIndex(_))
-            | NodeKind::Operand(OperandNodeKind::Constant(_))
-            | NodeKind::Operand(OperandNodeKind::Address(_))
-            | NodeKind::Operand(OperandNodeKind::BasicBlock(_))
-            | NodeKind::Operand(OperandNodeKind::Register(_))
-            | NodeKind::None => false,
-            _ => true,
         }
     }
 
     pub fn debug(
         &self,
         f: &mut fmt::Formatter<'_>,
+        arena: &Arena<Node>,
         tys: &Types,
-        s: &mut FxHashMap<Raw<DAGNode>, (usize, bool)>,
+        s: &mut FxHashMap<NodeId, (usize, bool)>,
         self_id: usize, // 0 is entry
         indent: usize,
     ) -> fmt::Result {
@@ -590,92 +456,118 @@ impl DAGNode {
             let l=s.len()+1; s.entry($op).or_insert((l, false))
         }}}
         write!(f, "{}", " ".repeat(indent))?;
-        write!(f, "id{}({}) = ", self_id, tys.to_string(self.ty))?;
-        write!(f, "{:?}", self.kind)?;
-        for (i, op) in self.operand.iter().enumerate() {
+        write!(
+            f,
+            "id{}({}) = ",
+            self_id,
+            match self {
+                Self::IR(IRNode { ty, .. }) => tys.to_string(*ty),
+                Self::MI(MINode {
+                    reg_class: Some(rc),
+                    ..
+                }) => format!("{:?}", rc),
+                _ => "".to_string(),
+            }
+        )?;
+        match self {
+            Self::IR(IRNode { opcode, .. }) => write!(f, "{:?}", opcode)?,
+            Self::MI(MINode { opcode, .. }) => write!(f, "{:?}", opcode)?,
+            Self::Operand(_) => panic!(),
+            Self::None => panic!(),
+        };
+        for (i, id) in self.args().iter().enumerate() {
+            let op = &arena[*id];
             if i > 0 {
                 write!(f, ",")?
             }
-            if op.kind == NodeKind::None {
-                write!(f, "None")?;
+            if matches!(op, Node::None) {
+                write!(f, " None")?;
                 continue;
             }
-            if op.may_contain_children() {
-                write!(f, " id{}", id4op!(*op).0)?;
-            } else {
-                write!(f, " ")?;
-                op.kind.as_operand().debug(f, tys)?;
+            match op {
+                Node::Operand(op) => {
+                    write!(f, " ")?;
+                    op.debug(f, arena, s, tys)?;
+                }
+                _ => write!(f, " id{}", id4op!(*id).0)?,
             }
-            write!(f, ".{}", tys.to_string(op.ty))?;
         }
         write!(f, "\n")?;
-        for op in &self.operand {
-            if !op.may_contain_children() || op.kind == NodeKind::None {
-                continue;
+        for &op in self.args() {
+            match &arena[op] {
+                Self::Operand(OperandNode::Mem(mem)) => {
+                    for &arg in mem.args() {
+                        match &arena[arg] {
+                            Self::Operand(_) | Self::None => continue,
+                            node => {
+                                let id = id4op!(arg).0;
+                                if !s[&arg].1 {
+                                    s.get_mut(&arg).unwrap().1 = true;
+                                    node.debug(f, arena, tys, s, id, indent + 2)?;
+                                }
+                            }
+                        };
+                    }
+                }
+                Self::Operand(_) | Self::None => {
+                    continue;
+                }
+                node => {
+                    let id = id4op!(op).0;
+                    if !s[&op].1 {
+                        s.get_mut(&op).unwrap().1 = true;
+                        node.debug(f, arena, tys, s, id, indent + 2)?;
+                    }
+                }
             }
-            let id = id4op!(*op).0;
-            if !s[op].1 {
-                s.get_mut(op).unwrap().1 = true;
-                op.debug(f, tys, s, id, indent + 2)?;
+        }
+        if let Self::IR(IRNode {
+            next: Some(next), ..
+        })
+        | Self::MI(MINode {
+            next: Some(next), ..
+        }) = self
+        {
+            let id = id4op!(*next).0;
+            s.get_mut(next).unwrap().1 = true;
+            arena[*next].debug(f, arena, tys, s, id, indent)?;
+        }
+
+        Ok(())
+    }
+}
+
+impl OperandNode {
+    pub fn debug(
+        &self,
+        f: &mut fmt::Formatter<'_>,
+        arena: &Arena<Node>,
+        s: &mut FxHashMap<NodeId, (usize, bool)>,
+        tys: &Types,
+    ) -> fmt::Result {
+        #[rustfmt::skip]
+        macro_rules! id4op { ($op:expr) => {{ let l=s.len()+1; s.entry($op).or_insert((l, false)) }}}
+        match self {
+            Self::Addr(a) => write!(f, "Addr({:?})", a),
+            Self::Block(b) => write!(f, "BB#{}", b.index()),
+            Self::CC(c) => write!(f, "Cond({:?})", c),
+            Self::Imm(c) => write!(f, "{:?}", c),
+            Self::Slot(fi) => write!(f, "FI<{}, {:?}>", tys.to_string(fi.ty), fi.idx),
+            Self::Reg(r) => write!(f, "Reg({:?})", r),
+            Self::Mem(mem) => {
+                write!(f, "{:?}(", mem)?;
+                let args = mem.args();
+                for (i, &a) in args.iter().enumerate() {
+                    match &arena[a] {
+                        Node::Operand(op) => op.debug(f, arena, s, tys)?,
+                        _ => write!(f, "id{}", id4op!(a).0)?,
+                    }
+                    if i < args.len() - 1 {
+                        write!(f, ", ")?
+                    }
+                }
+                write!(f, ")")
             }
         }
-        if let Some(next) = self.next {
-            let id = id4op!(next).0;
-            s.get_mut(&next).unwrap().1 = true;
-            next.debug(f, tys, s, id, indent)?;
-        }
-        fmt::Result::Ok(())
-    }
-}
-
-impl AddressKind {
-    pub fn as_global(&self) -> &GlobalVariableId {
-        match self {
-            Self::Global(id) => id,
-            _ => panic!(),
-        }
-    }
-}
-
-impl OperandNodeKind {
-    pub fn debug(&self, f: &mut fmt::Formatter<'_>, tys: &Types) -> fmt::Result {
-        match self {
-            Self::Address(a) => write!(f, "Addr({:?})", a),
-            Self::BasicBlock(b) => write!(f, "BB#{}", b.index()),
-            Self::CondKind(c) => write!(f, "Cond({:?})", c),
-            Self::Constant(c) => write!(f, "{:?}", c),
-            Self::FrameIndex(fi) => write!(f, "FI<{}, {:?}>", tys.to_string(fi.ty), fi.idx),
-            Self::Register(r) => write!(f, "Reg({:?})", r),
-            Self::Mem(mem) => write!(f, "{:?}", mem),
-        }
-    }
-
-    pub fn as_constant(&self) -> &ConstantKind {
-        match self {
-            Self::Constant(c) => c,
-            _ => panic!(),
-        }
-    }
-}
-
-impl NodeKind {
-    pub fn as_mi(&self) -> MINodeKind {
-        match self {
-            NodeKind::MI(mi) => *mi,
-            _ => panic!(),
-        }
-    }
-
-    pub fn as_operand(&self) -> &OperandNodeKind {
-        match self {
-            NodeKind::Operand(o) => o,
-            _ => panic!(),
-        }
-    }
-}
-
-impl MINodeKind {
-    pub fn get_def_type(&self) -> Type {
-        rc2ty(self.inst_def().unwrap().defs[0].as_reg_class())
     }
 }

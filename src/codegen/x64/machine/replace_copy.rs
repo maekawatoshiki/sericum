@@ -1,4 +1,4 @@
-use super::super::dag::mc_convert::mov_r_x;
+use super::super::dag::mc_convert::mov_rx;
 use super::inst::MachineOpcode;
 use crate::codegen::common::machine::{function::MachineFunction, module::MachineModule};
 use crate::traits::pass::ModulePassTrait;
@@ -42,7 +42,7 @@ impl ReplaceCopyWithProperMInst {
                 }
 
                 let mov =
-                    mov_r_x(inst.def[0].id.as_phys_reg().reg_class(), &inst.operand[0]).unwrap();
+                    mov_rx(inst.def[0].id.as_phys_reg().reg_class(), &inst.operand[0]).unwrap();
                 inst.opcode = mov;
             }
         }

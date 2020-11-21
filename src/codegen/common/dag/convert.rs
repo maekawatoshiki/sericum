@@ -1,66 +1,56 @@
-// Convert IR to architecture-independent DAG form
-// TODO: refactor
-
-use super::node::*;
-use crate::codegen::arch::{frame_object::*, machine::register::*};
-use crate::codegen::common::dag::{basic_block::*, function::*, module::*};
-use crate::ir::{
-    basic_block::*, function::*, liveness::*, module::*, opcode::*, types::*, value::*,
+use crate::codegen::arch::{
+    machine::register::{rc2ty, ty2rc},
+    dag::convert::copy_reg_args,
 };
-use crate::util::allocator::Raw;
-use id_arena::*;
+use crate::codegen::common::{
+    machine::{
+        frame_object::{FrameIndexInfo, FrameIndexKind, LocalVariables},
+        register::RegistersInfo,
+    },
+    dag::{
+        basic_block::{DAGBasicBlock, DAGBasicBlockId},
+        function::DAGFunction,
+        module::DAGModule,
+        node::{AddressKind, IRNode, IROpcode, ImmediateKind, MINode, Node, NodeId, OperandNode},
+    },
+};
+use crate::ir::{
+    basic_block::{BasicBlock, BasicBlockId},
+    function::Function,
+    liveness::IRLivenessAnalyzer,
+    module::Module,
+    opcode::{InstructionId, Opcode},
+    types::{Type, TypeSize},
+    value::{
+        ArgumentValue, ConstantValue, FunctionValue, GlobalValue, ImmediateValue, InstructionValue,
+        Value,
+    },
+};
+use id_arena::Arena;
 use rustc_hash::FxHashMap;
-use std::mem;
 
-pub struct ConvertToDAGFunction<'a> {
-    module: &'a Module,
-    func: &'a Function,
-    node_heap: DAGHeap,
-    bb_arena: Arena<DAGBasicBlock>,
-    bb_order: Vec<DAGBasicBlockId>,
-    bb_map: FxHashMap<BasicBlockId, DAGBasicBlockId>,
-    inst_to_node: FxHashMap<InstructionId, Raw<DAGNode>>,
-    arg_regs: FxHashMap<usize, Raw<DAGNode>>,
-    regs_info: RegistersInfo,
-    local_mgr: LocalVariables,
+impl Into<DAGModule> for Module {
+    fn into(self) -> DAGModule {
+        convert_module_to_dag_module(self)
+    }
 }
 
-pub struct ConvertToDAGNode<'a> {
-    pub module: &'a Module,
-    pub func: &'a Function,
-    pub block: &'a BasicBlock,
-    pub block_id: BasicBlockId,
-    pub node_heap: &'a mut DAGHeap,
-    pub inst_to_node: &'a mut FxHashMap<InstructionId, Raw<DAGNode>>,
-    pub regs_info: &'a mut RegistersInfo,
-    pub arg_regs: &'a mut FxHashMap<usize, Raw<DAGNode>>,
-    pub local_mgr: &'a mut LocalVariables,
-    pub bb_map: &'a FxHashMap<BasicBlockId, DAGBasicBlockId>,
-    pub entry: bool,
-    pub last_chained_node: Option<Raw<DAGNode>>,
-}
-
-pub fn convert_to_dag_module(mut module: Module) -> DAGModule {
+pub fn convert_module_to_dag_module(mut module: Module) -> DAGModule {
     IRLivenessAnalyzer::new(&mut module).analyze();
 
     let mut functions: Arena<DAGFunction> = Arena::new();
 
     for (_, func) in &module.functions {
-        functions.alloc(
-            ConvertToDAGFunction {
-                module: &module,
-                func,
-                bb_arena: Arena::new(),
-                bb_order: vec![],
-                bb_map: FxHashMap::default(),
-                node_heap: DAGHeap::new(),
-                inst_to_node: FxHashMap::default(),
-                regs_info: RegistersInfo::new(),
-                arg_regs: FxHashMap::default(),
-                local_mgr: LocalVariables::new(),
-            }
-            .run(),
-        );
+        let f = convert_function_to_dag_function(FunctionConversionContext {
+            module: &module,
+            func,
+            node_arena: Arena::new(),
+            local_vars: LocalVariables::new(),
+            node_map: FxHashMap::default(),
+            arg_regs: FxHashMap::default(),
+            regs: RegistersInfo::new(),
+        });
+        functions.alloc(f);
     }
 
     DAGModule {
@@ -72,637 +62,523 @@ pub fn convert_to_dag_module(mut module: Module) -> DAGModule {
     }
 }
 
-impl<'a> ConvertToDAGFunction<'a> {
-    pub fn run(mut self) -> DAGFunction {
-        for &bb_id in &self.func.basic_blocks.order {
-            let dag_bb_id = self.bb_arena.alloc(DAGBasicBlock::new());
-            self.bb_order.push(dag_bb_id);
-            self.bb_map.insert(bb_id, dag_bb_id);
-        }
+struct FunctionConversionContext<'a> {
+    module: &'a Module,
+    func: &'a Function,
+    node_arena: Arena<Node>,
+    local_vars: LocalVariables,
+    node_map: FxHashMap<InstructionId, NodeId>,
+    arg_regs: FxHashMap<usize, NodeId>,
+    regs: RegistersInfo,
+}
 
-        self.set_dag_bb_pred_and_succ();
+fn convert_function_to_dag_function<'a>(mut ctx: FunctionConversionContext<'a>) -> DAGFunction {
+    let mut block_order: Vec<DAGBasicBlockId> = vec![];
+    let mut block_map: FxHashMap<BasicBlockId, DAGBasicBlockId> = FxHashMap::default();
+    let mut block_arena: Arena<DAGBasicBlock> = Arena::new();
 
-        for (i, &bb_id) in self.func.basic_blocks.order.iter().enumerate() {
-            let block = &self.func.basic_blocks.arena[bb_id];
-            let entry = i == 0;
-            let (entry, root) = ConvertToDAGNode {
-                module: self.module,
-                func: self.func,
-                block,
-                block_id: bb_id,
-                node_heap: &mut self.node_heap,
-                inst_to_node: &mut self.inst_to_node,
-                regs_info: &mut self.regs_info,
-                arg_regs: &mut self.arg_regs,
-                local_mgr: &mut self.local_mgr,
-                bb_map: &self.bb_map,
-                entry,
-                last_chained_node: None,
-            }
-            .run();
-            self.bb_arena[self.bb_map[&bb_id]].set_entry(entry);
-            self.bb_arena[self.bb_map[&bb_id]].set_root(root);
-        }
-
-        DAGFunction {
-            name: self.func.name.clone(),
-            ty: self.func.ty,
-            dag_basic_block_arena: self.bb_arena,
-            dag_basic_blocks: self.bb_order,
-            dag_heap: self.node_heap,
-            local_mgr: self.local_mgr,
-            regs_info: self.regs_info,
-            is_internal: self.func.is_internal,
-            types: self.func.types.clone(),
-        }
+    // Create new dag blocks
+    for &id in &ctx.func.basic_blocks.order {
+        let new_id = block_arena.alloc(DAGBasicBlock::new());
+        block_order.push(new_id);
+        block_map.insert(id, new_id);
     }
 
-    fn set_dag_bb_pred_and_succ(&mut self) {
-        for (&bb, &dag_bb) in &self.bb_map {
-            self.bb_arena[dag_bb].pred = self.func.basic_blocks.arena[bb]
-                .pred
-                .iter()
-                .map(|bb| self.bb_map[bb])
-                .collect();
-            self.bb_arena[dag_bb].succ = self.func.basic_blocks.arena[bb]
-                .succ
-                .iter()
-                .map(|bb| self.bb_map[bb])
-                .collect();
-        }
+    // Set preds and succs for each new dag block
+    for (&id, &new_id) in &block_map {
+        block_arena[new_id].pred = ctx.func.basic_blocks.arena[id]
+            .pred
+            .iter()
+            .map(|id| block_map[id])
+            .collect();
+        block_arena[new_id].succ = ctx.func.basic_blocks.arena[id]
+            .succ
+            .iter()
+            .map(|id| block_map[id])
+            .collect();
+    }
+
+    for (i, &id) in ctx.func.basic_blocks.order.iter().enumerate() {
+        let block = &ctx.func.basic_blocks.arena[id];
+        let is_entry = i == 0;
+        let entry = convert_block_to_dag_block(BlockConversionContext::new(
+            ctx.module,
+            ctx.func,
+            &mut ctx.node_arena,
+            is_entry,
+            &mut ctx.local_vars,
+            &mut ctx.node_map,
+            &mut ctx.arg_regs,
+            &mut ctx.regs,
+            &block_map,
+            block,
+            id,
+        ));
+        block_arena[block_map[&id]].entry = Some(entry);
+    }
+
+    DAGFunction {
+        name: ctx.func.name.clone(),
+        ty: ctx.func.ty,
+        dag_basic_blocks: block_order,
+        dag_basic_block_arena: block_arena,
+        node_arena: ctx.node_arena,
+        local_vars: ctx.local_vars,
+        regs: ctx.regs,
+        is_internal: ctx.func.is_internal,
+        types: ctx.func.types.clone(),
     }
 }
 
-impl<'a> ConvertToDAGNode<'a> {
-    pub fn run(mut self) -> (Raw<DAGNode>, Raw<DAGNode>) {
-        // basic block entry
-        let entry = self.alloc_node(DAGNode::new(NodeKind::IR(IRNodeKind::Entry)));
-        self.last_chained_node = Some(entry);
+pub struct BlockConversionContext<'a> {
+    module: &'a Module,
+    pub func: &'a Function,
+    node_arena: &'a mut Arena<Node>,
+    is_entry: bool,
+    last_chained_node: NodeId,
+    entry: NodeId,
+    local_vars: &'a mut LocalVariables,
+    node_map: &'a mut FxHashMap<InstructionId, NodeId>,
+    pub arg_regs: &'a mut FxHashMap<usize, NodeId>,
+    pub regs: &'a mut RegistersInfo,
+    block_map: &'a FxHashMap<BasicBlockId, DAGBasicBlockId>,
+    block: &'a BasicBlock,
+    block_id: BasicBlockId,
+}
 
-        // program entry
-        if self.entry {
-            // Copy physical argument registers to virtual regieters
-            self.copy_reg_args();
-        }
+fn convert_block_to_dag_block<'a>(mut ctx: BlockConversionContext<'a>) -> NodeId {
+    if ctx.is_entry {
+        copy_reg_args(&mut ctx);
+    }
 
-        for &inst_id in &*self.block.iseq_ref() {
-            let inst = &self.func.inst_table[inst_id];
-            match inst.opcode {
-                Opcode::Alloca => {
-                    let ty = inst.operand.types()[0];
-                    let fi_ty = self.func.types.new_pointer_ty(ty);
-                    let frinfo = self.local_mgr.alloc(&ty);
-                    let fi = self.alloc_node(
-                        DAGNode::new(NodeKind::Operand(OperandNodeKind::FrameIndex(frinfo)))
-                            .with_ty(ty),
-                    );
-                    let fiaddr = self.alloc_node(
-                        DAGNode::new(NodeKind::IR(IRNodeKind::FIAddr))
-                            .with_operand(vec![fi])
-                            .with_ty(fi_ty),
-                    );
-                    self.inst_to_node.insert(inst_id, fiaddr);
+    for &id in &*ctx.block.iseq_ref() {
+        let inst = &ctx.func.inst_table[id];
+
+        let node = match inst.opcode {
+            Opcode::Alloca => {
+                let ty = inst.operand.types()[0];
+                let slot = ctx.local_vars.alloc(&ty);
+                let slot = ctx.node(slot.into());
+                let addr_ty = ctx.func.types.new_pointer_ty(ty);
+                ctx.node(
+                    IRNode::new(IROpcode::FIAddr)
+                        .args(vec![slot])
+                        .ty(addr_ty)
+                        .into(),
+                )
+            }
+            Opcode::Load => {
+                let arg = ctx.node_from_value(&inst.operand.args()[0]);
+                ctx.node_(
+                    id,
+                    IRNode::new(IROpcode::Load)
+                        .args(vec![arg])
+                        .ty(inst.ty)
+                        .into(),
+                )
+            }
+            Opcode::Store => {
+                let (src, dst) = (
+                    ctx.node_from_value(&inst.operand.args()[0]),
+                    ctx.node_from_value(&inst.operand.args()[1]),
+                );
+                ctx.node_(id, IRNode::new(IROpcode::Store).args(vec![dst, src]).into())
+            }
+            Opcode::GetElementPtr => ctx.gep_node_from_values(inst.operand.args()),
+            Opcode::Call => {
+                let args: Vec<NodeId> = inst
+                    .operand
+                    .args()
+                    .iter()
+                    .map(|arg| ctx.node_from_value(arg))
+                    .collect();
+                ctx.node_(
+                    id,
+                    IRNode::new(IROpcode::Call).args(args).ty(inst.ty).into(),
+                )
+            }
+            Opcode::Add | Opcode::Sub | Opcode::Mul | Opcode::Div | Opcode::Rem | Opcode::Shl => {
+                let (lhs, rhs) = (
+                    ctx.node_from_value(&inst.operand.args()[0]),
+                    ctx.node_from_value(&inst.operand.args()[1]),
+                );
+                ctx.node_(
+                    id,
+                    IRNode::new(match inst.opcode {
+                        Opcode::Add => IROpcode::Add,
+                        Opcode::Sub => IROpcode::Sub,
+                        Opcode::Mul => IROpcode::Mul,
+                        Opcode::Div => IROpcode::Div,
+                        Opcode::Rem => IROpcode::Rem,
+                        Opcode::Shl => IROpcode::Shl,
+                        _ => unreachable!(),
+                    })
+                    .args(vec![lhs, rhs])
+                    .ty(inst.ty)
+                    .into(),
+                )
+            }
+            Opcode::SIToFP | Opcode::FPToSI => {
+                let arg = ctx.node_from_value(&inst.operand.args()[0]);
+                ctx.node_(
+                    id,
+                    IRNode::new(match inst.opcode {
+                        Opcode::SIToFP => IROpcode::SIToFP,
+                        Opcode::FPToSI => IROpcode::FPToSI,
+                        _ => unreachable!(),
+                    })
+                    .args(vec![arg])
+                    .ty(inst.ty)
+                    .into(),
+                )
+            }
+            Opcode::Sext | Opcode::Bitcast => {
+                let arg = ctx.node_from_value(&inst.operand.args()[0]);
+                ctx.node_(
+                    id,
+                    IRNode::new(match inst.opcode {
+                        Opcode::Sext => IROpcode::Sext,
+                        Opcode::Bitcast => IROpcode::Bitcast,
+                        _ => unreachable!(),
+                    })
+                    .args(vec![arg])
+                    .ty(inst.ty)
+                    .into(),
+                )
+            }
+            Opcode::Br => {
+                let block = ctx.node(ctx.block_map[&inst.operand.blocks()[0]].into());
+                ctx.node(IRNode::new(IROpcode::Br).args(vec![block]).into())
+            }
+            Opcode::CondBr => {
+                let (arg, then_, else_) = (
+                    ctx.node_from_value(&inst.operand.args()[0]),
+                    ctx.node(ctx.block_map[&inst.operand.blocks()[0]].into()),
+                    ctx.node(ctx.block_map[&inst.operand.blocks()[1]].into()),
+                );
+                let brcond = ctx.node(IRNode::new(IROpcode::BrCond).args(vec![arg, then_]).into());
+                ctx.make_chain(brcond);
+                let br = ctx.node(IRNode::new(IROpcode::Br).args(vec![else_]).into());
+                br
+            }
+            Opcode::ICmp | Opcode::FCmp => {
+                let c = if inst.opcode == Opcode::ICmp {
+                    ctx.node(inst.operand.int_cmp()[0].into())
+                } else {
+                    ctx.node(inst.operand.float_cmp()[0].into())
+                };
+                let (lhs, rhs) = (
+                    ctx.node_from_value(&inst.operand.args()[0]),
+                    ctx.node_from_value(&inst.operand.args()[1]),
+                );
+                ctx.node_(
+                    id,
+                    IRNode::new(match inst.opcode {
+                        Opcode::ICmp => IROpcode::Setcc,
+                        Opcode::FCmp => IROpcode::FCmp,
+                        _ => unreachable!(),
+                    })
+                    .args(vec![c, lhs, rhs])
+                    .ty(inst.ty)
+                    .into(),
+                )
+            }
+            Opcode::Phi => {
+                let mut args = vec![];
+                for (block, val) in inst.operand.blocks().iter().zip(inst.operand.args().iter()) {
+                    let id = ctx.node_from_value(val);
+                    args.push(match &ctx.node_arena[id] {
+                        Node::IR(IRNode {
+                            opcode: IROpcode::CopyFromReg,
+                            args,
+                            ..
+                        }) => args[0],
+                        _ => id,
+                    });
+                    args.push(ctx.node(ctx.block_map[block].into()));
                 }
-                Opcode::Load => {
-                    let v = inst.operand.args()[0];
-                    let v = self.get_node_from_value(&v);
-                    let load_id = self.alloc_node_as_necessary(
-                        inst_id,
-                        DAGNode::new(NodeKind::IR(IRNodeKind::Load))
-                            .with_operand(vec![v])
-                            .with_ty(inst.ty),
-                    );
-                    // TODO
-                    if self.func.basic_blocks.liveness[&self.block_id]
-                        .live_out
-                        .contains(&inst_id)
-                    {
-                        let copy_from_reg = self.make_chain_with_copying(load_id);
-                        self.inst_to_node.insert(inst_id, copy_from_reg);
-                    } else {
-                        self.make_chain(load_id);
-                        self.inst_to_node.insert(inst_id, load_id);
-                    }
+                ctx.node_(id, IRNode::new(IROpcode::Phi).args(args).ty(inst.ty).into())
+            }
+            Opcode::Ret => {
+                let arg = ctx.node_from_value(&inst.operand.args()[0]);
+                ctx.node(IRNode::new(IROpcode::Ret).args(vec![arg]).into())
+            }
+        };
+
+        ctx.node_map.insert(id, node);
+
+        let may_live_out = !matches!(
+            inst.opcode,
+            Opcode::Alloca | Opcode::Store | Opcode::Br | Opcode::CondBr | Opcode::Ret
+        );
+        let must_make_chain = matches!(
+            inst.opcode,
+            Opcode::Load | Opcode::Store | Opcode::Call | Opcode::Br | Opcode::CondBr | Opcode::Ret
+        );
+        let mut chain_made = false;
+
+        if may_live_out {
+            let do_live_out = ctx.func.basic_blocks.liveness[&ctx.block_id]
+                .live_out
+                .contains(&id);
+            if do_live_out {
+                let copied = ctx.make_chain_with_copying(node);
+                ctx.node_map.insert(id, copied);
+                chain_made = true;
+            } else {
+                if must_make_chain {
+                    ctx.make_chain(node);
+                    chain_made = true;
                 }
-                Opcode::Store => {
-                    let src = self.get_node_from_value(&inst.operand.args()[0]);
-                    let dst = self.get_node_from_value(&inst.operand.args()[1]);
-                    let id = self.alloc_node_as_necessary(
-                        inst_id,
-                        DAGNode::new(NodeKind::IR(IRNodeKind::Store)).with_operand(vec![dst, src]),
-                    );
-                    self.make_chain(id);
-                }
-                Opcode::GetElementPtr => {
-                    let indices: Vec<Value> =
-                        inst.operand.args()[1..].into_iter().map(|x| *x).collect();
-                    let gep = self.construct_node_for_gep(&inst.operand.args()[0], &indices);
-                    if self.func.basic_blocks.liveness[&self.block_id]
-                        .live_out
-                        .contains(&inst_id)
-                    {
-                        let gep = self.make_chain_with_copying(gep);
-                        self.inst_to_node.insert(inst_id, gep);
-                    } else {
-                        self.inst_to_node.insert(inst_id, gep);
-                    }
-                }
-                Opcode::Call => {
-                    let mut operands: Vec<Raw<DAGNode>> = inst.operand.args()[1..]
-                        .iter()
-                        .map(|v| self.get_node_from_value(v))
-                        .collect();
-                    operands.insert(0, self.get_node_from_value(&inst.operand.args()[0]));
-                    let id = self.alloc_node_as_necessary(
-                        inst_id,
-                        DAGNode::new(NodeKind::IR(IRNodeKind::Call))
-                            .with_operand(operands)
-                            .with_ty(inst.ty),
-                    );
-                    if self.func.basic_blocks.liveness[&self.block_id]
-                        .live_out
-                        .contains(&inst_id)
-                    {
-                        let copy_from_reg = self.make_chain_with_copying(id);
-                        self.inst_to_node.insert(inst_id, copy_from_reg);
-                    } else {
-                        // if inst.ty == Type::Void || inst.users.borrow().len() == 0 {}
-                        self.make_chain(id);
-                        self.inst_to_node.insert(inst_id, id);
-                    }
-                }
-                Opcode::Add
-                | Opcode::Sub
-                | Opcode::Mul
-                | Opcode::Div
-                | Opcode::Rem
-                | Opcode::Shl => {
-                    let v1 = self.get_node_from_value(&inst.operand.args()[0]);
-                    let v2 = self.get_node_from_value(&inst.operand.args()[1]);
-                    let bin_id = self.alloc_node_as_necessary(
-                        inst_id,
-                        DAGNode::new(match inst.opcode {
-                            Opcode::Add => NodeKind::IR(IRNodeKind::Add),
-                            Opcode::Sub => NodeKind::IR(IRNodeKind::Sub),
-                            Opcode::Mul => NodeKind::IR(IRNodeKind::Mul),
-                            Opcode::Div => NodeKind::IR(IRNodeKind::Div),
-                            Opcode::Rem => NodeKind::IR(IRNodeKind::Rem),
-                            Opcode::Shl => NodeKind::IR(IRNodeKind::Shl),
-                            _ => unreachable!(),
-                        })
-                        .with_operand(vec![v1, v2])
-                        .with_ty(inst.ty),
-                    );
-                    if self.func.basic_blocks.liveness[&self.block_id]
-                        .live_out
-                        .contains(&inst_id)
-                    {
-                        let copy_from_reg = self.make_chain_with_copying(bin_id);
-                        self.inst_to_node.insert(inst_id, copy_from_reg);
-                    } else {
-                        self.inst_to_node.insert(inst_id, bin_id);
-                    }
-                }
-                Opcode::SIToFP | Opcode::FPToSI => {
-                    let v = self.get_node_from_value(&inst.operand.args()[0]);
-                    let inst = self.alloc_node_as_necessary(
-                        inst_id,
-                        DAGNode::new(match inst.opcode {
-                            Opcode::SIToFP => NodeKind::IR(IRNodeKind::SIToFP),
-                            Opcode::FPToSI => NodeKind::IR(IRNodeKind::FPToSI),
-                            _ => unreachable!(),
-                        })
-                        .with_operand(vec![v])
-                        .with_ty(inst.ty),
-                    );
-                    if self.func.basic_blocks.liveness[&self.block_id]
-                        .live_out
-                        .contains(&inst_id)
-                    {
-                        let copy_from_reg = self.make_chain_with_copying(inst);
-                        self.inst_to_node.insert(inst_id, copy_from_reg);
-                    } else {
-                        self.inst_to_node.insert(inst_id, inst);
-                    }
-                }
-                Opcode::Sext => {
-                    let x = self.get_node_from_value(&inst.operand.args()[0]);
-                    let inst = self.alloc_node_as_necessary(
-                        inst_id,
-                        DAGNode::new(NodeKind::IR(IRNodeKind::Sext))
-                            .with_operand(vec![x])
-                            .with_ty(inst.ty),
-                    );
-                    if self.func.basic_blocks.liveness[&self.block_id]
-                        .live_out
-                        .contains(&inst_id)
-                    {
-                        let copy_from_reg = self.make_chain_with_copying(inst);
-                        self.inst_to_node.insert(inst_id, copy_from_reg);
-                    } else {
-                        self.inst_to_node.insert(inst_id, inst);
-                    }
-                }
-                Opcode::Bitcast => {
-                    let x = self.get_node_from_value(&inst.operand.args()[0]);
-                    let inst = self.alloc_node_as_necessary(
-                        inst_id,
-                        DAGNode::new(NodeKind::IR(IRNodeKind::Bitcast))
-                            .with_operand(vec![x])
-                            .with_ty(inst.ty),
-                    );
-                    if self.func.basic_blocks.liveness[&self.block_id]
-                        .live_out
-                        .contains(&inst_id)
-                    {
-                        let copy_from_reg = self.make_chain_with_copying(inst);
-                        self.inst_to_node.insert(inst_id, copy_from_reg);
-                    } else {
-                        self.inst_to_node.insert(inst_id, inst);
-                    }
-                }
-                Opcode::Br => {
-                    let bb = self.node_heap.alloc(DAGNode::new(NodeKind::Operand(
-                        OperandNodeKind::BasicBlock(self.bb_map[&inst.operand.blocks()[0]]),
-                    )));
-                    let br = self
-                        .node_heap
-                        .alloc(DAGNode::new(NodeKind::IR(IRNodeKind::Br)).with_operand(vec![bb]));
-                    self.make_chain(br);
-                }
-                Opcode::CondBr => {
-                    let v = inst.operand.args()[0];
-                    let then_ = &inst.operand.blocks()[0];
-                    let else_ = &inst.operand.blocks()[1];
-                    let v = self.get_node_from_value(&v);
-                    let brcond = {
-                        let bb = self.node_heap.alloc(DAGNode::new(NodeKind::Operand(
-                            OperandNodeKind::BasicBlock(self.bb_map[then_]),
-                        )));
-                        self.node_heap.alloc(
-                            DAGNode::new(NodeKind::IR(IRNodeKind::BrCond))
-                                .with_operand(vec![v, bb]),
-                        )
-                    };
-                    self.make_chain(brcond);
-                    let br = {
-                        let bb = self.node_heap.alloc(DAGNode::new(NodeKind::Operand(
-                            OperandNodeKind::BasicBlock(self.bb_map[else_]),
-                        )));
-                        self.node_heap.alloc(
-                            DAGNode::new(NodeKind::IR(IRNodeKind::Br)).with_operand(vec![bb]),
-                        )
-                    };
-                    self.make_chain(br);
-                }
-                Opcode::ICmp => {
-                    let c = inst.operand.int_cmp()[0];
-                    let v1 = self.get_node_from_value(&inst.operand.args()[0]);
-                    let v2 = self.get_node_from_value(&inst.operand.args()[1]);
-                    let cond = self.alloc_node(DAGNode::new(NodeKind::Operand(
-                        OperandNodeKind::CondKind((c).into()),
-                    )));
-                    let id = self.alloc_node_as_necessary(
-                        inst_id,
-                        DAGNode::new(NodeKind::IR(IRNodeKind::Setcc))
-                            .with_operand(vec![cond, v1, v2])
-                            .with_ty(inst.ty),
-                    );
-                    if self.func.basic_blocks.liveness[&self.block_id]
-                        .live_out
-                        .contains(&inst_id)
-                    {
-                        let copy_from_reg = self.make_chain_with_copying(id);
-                        self.inst_to_node.insert(inst_id, copy_from_reg);
-                    } else {
-                        self.inst_to_node.insert(inst_id, id);
-                    }
-                }
-                Opcode::FCmp => {
-                    let c = inst.operand.float_cmp()[0];
-                    let v1 = self.get_node_from_value(&inst.operand.args()[0]);
-                    let v2 = self.get_node_from_value(&inst.operand.args()[1]);
-                    let cond = self.alloc_node(DAGNode::new(NodeKind::Operand(
-                        OperandNodeKind::CondKind((c).into()),
-                    )));
-                    let id = self.alloc_node_as_necessary(
-                        inst_id,
-                        DAGNode::new(NodeKind::IR(IRNodeKind::FCmp))
-                            .with_operand(vec![cond, v1, v2])
-                            .with_ty(inst.ty),
-                    );
-                    if self.func.basic_blocks.liveness[&self.block_id]
-                        .live_out
-                        .contains(&inst_id)
-                    {
-                        let copy_from_reg = self.make_chain_with_copying(id);
-                        self.inst_to_node.insert(inst_id, copy_from_reg);
-                    } else {
-                        self.inst_to_node.insert(inst_id, id);
-                    }
-                }
-                Opcode::Phi => {
-                    let mut operands = vec![];
-                    for (i, val) in inst.operand.args().iter().enumerate() {
-                        let bb = &inst.operand.blocks()[i];
-                        // Remove CopyFromReg if necessary
-                        let val = self.get_node_from_value(&val);
-                        operands.push(match val.kind {
-                            NodeKind::IR(IRNodeKind::CopyFromReg) => val.operand[0],
-                            _ => val,
-                        });
-                        operands.push(self.node_heap.alloc(DAGNode::new(NodeKind::Operand(
-                            OperandNodeKind::BasicBlock(self.bb_map[bb]),
-                        ))))
-                    }
-                    let id = self.alloc_node_as_necessary(
-                        inst_id,
-                        DAGNode::new(NodeKind::IR(IRNodeKind::Phi))
-                            .with_operand(operands)
-                            .with_ty(inst.ty),
-                    );
-                    if self.func.basic_blocks.liveness[&self.block_id]
-                        .live_out
-                        .contains(&inst_id)
-                    {
-                        let copy_from_reg = self.make_chain_with_copying(id);
-                        self.inst_to_node.insert(inst_id, copy_from_reg);
-                    } else {
-                        self.inst_to_node.insert(inst_id, id);
-                    }
-                }
-                Opcode::Ret => {
-                    let v = self.get_node_from_value(&inst.operand.args()[0]);
-                    let ret = self.alloc_node(
-                        DAGNode::new(NodeKind::IR(IRNodeKind::Ret)).with_operand(vec![v]),
-                    );
-                    self.make_chain(ret)
-                }
+                ctx.node_map.insert(id, node);
             }
         }
 
-        let root = self.alloc_node(DAGNode::new(NodeKind::IR(IRNodeKind::Root)));
-
-        if let Some(last_chained_node) = &mut self.last_chained_node {
-            last_chained_node.next = Some(root);
+        if must_make_chain && !chain_made {
+            ctx.make_chain(node);
         }
-
-        (entry, root)
     }
 
-    pub fn get_node_from_value(&mut self, v: &Value) -> Raw<DAGNode> {
-        match v {
-            Value::Instruction(iv) => {
-                if let Some(node) = self.inst_to_node.get(&iv.id) {
+    ctx.entry
+}
+
+impl<'a> BlockConversionContext<'a> {
+    pub fn new(
+        module: &'a Module,
+        func: &'a Function,
+        node_arena: &'a mut Arena<Node>,
+        is_entry: bool,
+        local_vars: &'a mut LocalVariables,
+        node_map: &'a mut FxHashMap<InstructionId, NodeId>,
+        arg_regs: &'a mut FxHashMap<usize, NodeId>,
+        regs: &'a mut RegistersInfo,
+        block_map: &'a FxHashMap<BasicBlockId, DAGBasicBlockId>,
+        block: &'a BasicBlock,
+        block_id: BasicBlockId,
+    ) -> Self {
+        let last_chained_node = node_arena.alloc(IRNode::new(IROpcode::Entry).into());
+        Self {
+            module,
+            func,
+            node_arena,
+            is_entry,
+            last_chained_node,
+            entry: last_chained_node,
+            local_vars,
+            node_map,
+            arg_regs,
+            regs,
+            block_map,
+            block,
+            block_id,
+        }
+    }
+
+    pub fn node(&mut self, node: Node) -> NodeId {
+        self.node_arena.alloc(node)
+    }
+
+    pub fn node_(&mut self, id: InstructionId, node: Node) -> NodeId {
+        if let Some(id) = self.node_map.get_mut(&id) {
+            self.node_arena[*id] = node;
+            *id
+        } else {
+            self.node(node)
+        }
+    }
+
+    pub fn node_from_value(&mut self, val: &Value) -> NodeId {
+        match val {
+            Value::Instruction(InstructionValue { id, .. }) => {
+                if let Some(node) = self.node_map.get(id) {
                     return *node;
                 }
-                let empty_node = self.alloc_node(DAGNode::new_none());
-                self.inst_to_node.insert(iv.id, empty_node);
+                let empty_node = self.node(Node::None);
+                self.node_map.insert(*id, empty_node);
                 empty_node
             }
             Value::Immediate(imm) => {
                 let imm = match imm {
-                    ImmediateValue::Int8(i) => ConstantKind::Int8(*i),
-                    ImmediateValue::Int32(i) => ConstantKind::Int32(*i),
-                    ImmediateValue::Int64(i) => ConstantKind::Int64(*i),
-                    ImmediateValue::F64(f) => ConstantKind::F64(*f),
+                    ImmediateValue::Int8(i) => ImmediateKind::Int8(*i),
+                    ImmediateValue::Int32(i) => ImmediateKind::Int32(*i),
+                    ImmediateValue::Int64(i) => ImmediateKind::Int64(*i),
+                    ImmediateValue::F64(f) => ImmediateKind::F64(*f),
                 };
-                self.alloc_node(
-                    DAGNode::new(NodeKind::Operand(OperandNodeKind::Constant(imm)))
-                        .with_ty(imm.get_type()),
-                )
+                self.node(imm.into())
             }
-            Value::Argument(av) => {
-                if let Some(r) = self.arg_regs.get(&av.index) {
+            Value::Argument(ArgumentValue { func_id, index, .. }) => {
+                if let Some(r) = self.arg_regs.get(index) {
                     return *r;
                 }
-                let ty = self
-                    .module
-                    .function_ref(av.func_id)
-                    .get_param_type(av.index)
-                    .unwrap();
-                let byval = self
-                    .module
-                    .function_ref(av.func_id)
-                    .get_param_attr(av.index)
-                    .map_or(false, |attr| attr.byval);
+                let (ty, byval) = (
+                    self.module
+                        .function_ref(*func_id)
+                        .get_param_type(*index)
+                        .unwrap(),
+                    self.module
+                        .function_ref(*func_id)
+                        .get_param_attr(*index)
+                        .map_or(false, |attr| attr.byval),
+                );
+                let slot_ty = self.func.types.new_pointer_ty(ty);
+                let slot = self.node(FrameIndexInfo::new(ty, FrameIndexKind::Arg(*index)).into());
+                let addr = self.node(
+                    IRNode::new(IROpcode::FIAddr)
+                        .args(vec![slot])
+                        .ty(slot_ty)
+                        .into(),
+                );
                 if byval {
-                    let fi = self.alloc_node(
-                        DAGNode::new(NodeKind::Operand(OperandNodeKind::FrameIndex(
-                            FrameIndexInfo::new(ty, FrameIndexKind::Arg(av.index)),
-                        )))
-                        .with_ty(ty),
-                    );
-                    self.alloc_node(
-                        DAGNode::new(NodeKind::IR(IRNodeKind::FIAddr))
-                            .with_operand(vec![fi])
-                            .with_ty(ty),
-                    )
+                    addr
                 } else {
-                    let fi_ty = self.func.types.new_pointer_ty(ty);
-                    let fi = self.alloc_node(
-                        DAGNode::new(NodeKind::Operand(OperandNodeKind::FrameIndex(
-                            FrameIndexInfo::new(ty, FrameIndexKind::Arg(av.index)),
-                        )))
-                        .with_ty(ty),
-                    );
-                    let fiaddr = self.alloc_node(
-                        DAGNode::new(NodeKind::IR(IRNodeKind::FIAddr))
-                            .with_operand(vec![fi])
-                            .with_ty(fi_ty),
-                    );
-                    self.alloc_node(
-                        DAGNode::new(NodeKind::IR(IRNodeKind::Load))
-                            .with_operand(vec![fiaddr])
-                            .with_ty(ty),
-                    )
+                    self.node(IRNode::new(IROpcode::Load).args(vec![addr]).ty(ty).into())
                 }
             }
-            Value::Function(FunctionValue { func_id, ty }) => {
+            Value::Function(FunctionValue { func_id, .. }) => {
                 let f = self.module.function_ref(*func_id);
-                self.alloc_node(
-                    DAGNode::new(NodeKind::Operand(OperandNodeKind::Address(
-                        AddressKind::FunctionName(f.name.to_string()),
-                    )))
-                    .with_ty(*ty),
-                )
+                self.node(AddressKind::FunctionName(f.name.to_string()).into())
             }
             Value::Global(GlobalValue { id, ty }) => {
-                let g = self.alloc_node(
-                    DAGNode::new(NodeKind::Operand(OperandNodeKind::Address(
-                        AddressKind::Global(*id),
-                    )))
-                    .with_ty(*ty),
-                );
-                self.alloc_node(
-                    DAGNode::new(NodeKind::IR(IRNodeKind::GlobalAddr))
-                        .with_operand(vec![g])
-                        .with_ty(*ty),
+                let gbl = self.node(AddressKind::Global(*id).into());
+                let addr_ty = self.func.types.new_pointer_ty(*ty);
+                self.node(
+                    IRNode::new(IROpcode::GlobalAddr)
+                        .args(vec![gbl])
+                        .ty(addr_ty)
+                        .into(),
                 )
             }
             Value::Constant(ConstantValue { id, ty }) => {
-                let c = self.alloc_node(
-                    DAGNode::new(NodeKind::Operand(OperandNodeKind::Address(
-                        AddressKind::Const(*id),
-                    )))
-                    .with_ty(*ty),
-                );
-                self.alloc_node(
-                    DAGNode::new(NodeKind::IR(IRNodeKind::ConstAddr))
-                        .with_operand(vec![c])
-                        .with_ty(*ty),
+                let cnst = self.node(AddressKind::Const(*id).into());
+                let addr_ty = self.func.types.new_pointer_ty(*ty);
+                self.node(
+                    IRNode::new(IROpcode::ConstAddr)
+                        .args(vec![cnst])
+                        .ty(addr_ty)
+                        .into(),
                 )
             }
-            Value::None => self.alloc_node(DAGNode::new_none()),
+            Value::None => self.node(Node::None),
         }
     }
 
-    fn construct_node_for_gep(&mut self, ptr: &Value, indices: &[Value]) -> Raw<DAGNode> {
-        let mut gep = self.get_node_from_value(ptr);
-        let mut ty = ptr.get_type();
+    pub fn gep_node_from_values(&mut self, vals: &[Value]) -> NodeId {
+        let mut base = self.node_from_value(&vals[0]);
+        let mut ty = vals[0].get_type();
 
-        for idx in indices {
-            let size = match ty {
+        for idx in &vals[1..] {
+            let (is_struct, size) = match ty {
                 Type::Struct(id) => {
                     let off = *self
-                        .module
+                        .func
                         .types
                         .compound_ty(id)
                         .as_struct()
                         .get_elem_offset(idx.as_imm().as_int32() as usize)
                         .unwrap();
-                    Some(off as i32)
+                    ty = self.func.types.get_element_ty(ty, Some(idx)).unwrap();
+                    (true, off as i32)
                 }
-                _ => None,
-            };
-            ty = self.module.types.get_element_ty(ty, Some(idx)).unwrap();
-
-            let idx = self.get_node_from_value(idx);
-            let idx = match idx.kind {
-                NodeKind::Operand(OperandNodeKind::Constant(ConstantKind::Int32(i))) => {
-                    self.node_heap.alloc(
-                        DAGNode::new(NodeKind::Operand(OperandNodeKind::Constant(
-                            ConstantKind::Int32(
-                                size.unwrap_or(i * ty.size_in_byte(&self.module.types) as i32),
-                            ),
-                        )))
-                        .with_ty(Type::i32),
-                    )
-                }
-                NodeKind::IR(IRNodeKind::FIAddr) => idx.operand[0], // retrieve frame index
-                NodeKind::Operand(OperandNodeKind::FrameIndex(_)) => unreachable!(),
-                NodeKind::Operand(OperandNodeKind::CondKind(_))
-                | NodeKind::Operand(OperandNodeKind::Address(_))
-                | NodeKind::Operand(OperandNodeKind::BasicBlock(_)) => idx,
                 _ => {
-                    let tysz = self.node_heap.alloc(
-                        DAGNode::new(NodeKind::Operand(OperandNodeKind::Constant(
-                            ConstantKind::Int32(ty.size_in_byte(&self.module.types) as i32),
-                        )))
-                        .with_ty(Type::i32),
-                    );
-                    let cast = sext_if_necessary(&self.func.types, self.node_heap, idx, Type::i64);
-                    // assert!(cast.ty == Type::i64);
-                    self.node_heap.alloc(
-                        DAGNode::new(NodeKind::IR(IRNodeKind::Mul))
-                            .with_operand(vec![cast, tysz])
-                            .with_ty(Type::i64),
+                    ty = self.func.types.get_element_ty(ty, Some(idx)).unwrap();
+                    (false, ty.size_in_byte(&self.func.types) as i32)
+                }
+            };
+            let idx = self.node_from_value(idx);
+            let idx = match &self.node_arena[idx] {
+                Node::Operand(OperandNode::Imm(ImmediateKind::Int32(_))) if is_struct => {
+                    self.node(size.into())
+                }
+                Node::Operand(OperandNode::Imm(ImmediateKind::Int32(i))) => {
+                    let i = *i; // to disable warning TODO
+                    self.node((i * size).into())
+                }
+                Node::IR(IRNode {
+                    opcode: IROpcode::FIAddr,
+                    args,
+                    ..
+                }) => args[0],
+                Node::Operand(OperandNode::Imm(_))
+                | Node::Operand(OperandNode::Slot(_))
+                | Node::Operand(OperandNode::CC(_))
+                | Node::Operand(OperandNode::Addr(_))
+                | Node::Operand(OperandNode::Block(_))
+                | Node::Operand(OperandNode::Mem(_))
+                | Node::None => unreachable!(),
+                Node::Operand(OperandNode::Reg(_))
+                | Node::MI(MINode { .. })
+                | Node::IR(IRNode { .. }) => {
+                    let size = self.node(size.into());
+                    let cast = self.sext_if_necessary(idx, Type::i64);
+                    self.node(
+                        IRNode::new(IROpcode::Mul)
+                            .args(vec![cast, size])
+                            .ty(Type::i64)
+                            .into(),
                     )
                 }
             };
 
-            let ptr_ty = self.module.types.new_pointer_ty(ty);
-            gep = self.node_heap.alloc(
-                DAGNode::new(NodeKind::IR(IRNodeKind::Add))
-                    .with_operand(vec![gep, idx])
-                    .with_ty(ptr_ty),
-            );
+            let ptr_ty = self.func.types.new_pointer_ty(ty);
+            base = self.node(
+                IRNode::new(IROpcode::Add)
+                    .args(vec![base, idx])
+                    .ty(ptr_ty)
+                    .into(),
+            )
         }
 
-        gep
+        base
     }
 
-    pub fn make_chain(&mut self, mut node: Raw<DAGNode>) {
-        if let Some(last_chained_node) = &mut self.last_chained_node {
-            node.chain = Some(*last_chained_node);
-            last_chained_node.next = Some(node);
-            *last_chained_node = node;
+    fn sext_if_necessary(&mut self, id: NodeId, to: Type) -> NodeId {
+        if self.node_ty(id).unwrap().size_in_byte(&self.func.types)
+            >= to.size_in_byte(&self.func.types)
+        {
+            return id;
+        }
+
+        self.node(IRNode::new(IROpcode::Sext).args(vec![id]).ty(to).into())
+    }
+
+    fn node_ty(&self, id: NodeId) -> Option<Type> {
+        match &self.node_arena[id] {
+            Node::IR(IRNode { ty, .. }) => Some(*ty),
+            Node::MI(_) => None,
+            Node::Operand(OperandNode::Imm(ImmediateKind::Int8(_))) => Some(Type::i8),
+            Node::Operand(OperandNode::Imm(ImmediateKind::Int32(_))) => Some(Type::i32),
+            Node::Operand(OperandNode::Imm(ImmediateKind::Int64(_))) => Some(Type::i64),
+            Node::Operand(OperandNode::Reg(id)) => {
+                Some(rc2ty(self.regs.arena_ref()[*id].reg_class))
+            }
+            Node::Operand(_) => None,
+            Node::None => None,
         }
     }
 
-    fn make_chain_with_copying(&mut self, mut node: Raw<DAGNode>) -> Raw<DAGNode> {
-        let kind = NodeKind::Operand(OperandNodeKind::Register(
-            self.regs_info.new_virt_reg(ty2rc(&node.ty).unwrap()),
-        ));
-        let reg = self.node_heap.alloc(DAGNode::new(kind).with_ty(node.ty));
-        let old_node = self
-            .node_heap
-            .alloc(mem::replace(&mut *node, (*reg).clone()));
-        let copy = self.node_heap.alloc(
-            DAGNode::new(NodeKind::IR(IRNodeKind::CopyToReg)).with_operand(vec![reg, old_node]),
+    pub fn make_chain(&mut self, id: NodeId) {
+        *match &mut self.node_arena[self.last_chained_node] {
+            Node::IR(IRNode { next, .. }) => next,
+            Node::MI(MINode { next, .. }) => next,
+            _ => panic!(),
+        } = Some(id);
+        self.last_chained_node = id;
+    }
+
+    fn make_chain_with_copying(&mut self, node: NodeId) -> NodeId {
+        let reg: Node = self
+            .regs
+            .new_virt_reg(ty2rc(&self.node_ty(node).unwrap()).unwrap())
+            .into();
+        let old_node = ::std::mem::replace(&mut self.node_arena[node], reg.clone());
+        let old_node = self.node(old_node);
+        let reg = self.node(reg);
+        let copy = self.node(
+            IRNode::new(IROpcode::CopyToReg)
+                .args(vec![reg, old_node])
+                .into(),
         );
         self.make_chain(copy);
         node
     }
-
-    // fn make_chain_with_copying_without_updating_last_chain(
-    //     &mut self,
-    //     mut node: Raw<DAGNode>,
-    // ) -> Raw<DAGNode> {
-    //     let kind = NodeKind::Operand(OperandNodeKind::Register(
-    //         self.regs_info.new_virt_reg(ty2rc(&node.ty).unwrap()),
-    //     ));
-    //     let reg = self.node_heap.alloc(DAGNode::new(kind, vec![], node.ty));
-    //     let old_node = self
-    //         .node_heap
-    //         .alloc(mem::replace(&mut *node, (*reg).clone()));
-    //     let mut copy = self.node_heap.alloc(DAGNode::new(
-    //         NodeKind::IR(IRNodeKind::CopyToReg),
-    //         vec![reg, old_node],
-    //         Type::Void,
-    //     ));
-    //
-    //     if let Some(last_chained_node) = &mut self.last_chained_node {
-    //         copy.chain = Some(*last_chained_node);
-    //     }
-    //
-    //     node
-    // }
-
-    // fn make_chain_without_updating_last_chain(&mut self, mut node: Raw<DAGNode>) -> Raw<DAGNode> {
-    //     if let Some(last_chained_node) = &mut self.last_chained_node {
-    //         node.chain = Some(*last_chained_node);
-    //     }
-    //     node
-    // }
-
-    pub fn alloc_node(&mut self, new: DAGNode) -> Raw<DAGNode> {
-        self.node_heap.alloc(new)
-    }
-
-    pub fn alloc_node_as_necessary(&mut self, id: InstructionId, new: DAGNode) -> Raw<DAGNode> {
-        if let Some(node) = self.inst_to_node.get_mut(&id) {
-            **node = new;
-            *node
-        } else {
-            self.node_heap.alloc(new)
-        }
-    }
-}
-
-fn sext_if_necessary(
-    types: &Types,
-    heap: &mut DAGHeap,
-    node: Raw<DAGNode>,
-    to: Type,
-) -> Raw<DAGNode> {
-    if node.ty.size_in_bits(types) >= to.size_in_bits(types) {
-        return node;
-    }
-
-    heap.alloc(
-        DAGNode::new(NodeKind::IR(IRNodeKind::Sext))
-            .with_operand(vec![node])
-            .with_ty(to),
-    )
 }
