@@ -1,10 +1,9 @@
 use super::node::*;
 use crate::codegen::arch::machine::register::ty2rc;
-// use crate::codegen::arch::new_dag::mc_convert::
 use crate::codegen::common::machine::inst::*;
 use crate::codegen::common::{
-    machine::{basic_block::*, const_data::ConstDataArena, function::*, module::*},
     dag::{basic_block::*, function::*, module::*},
+    machine::{basic_block::*, const_data::ConstDataArena, function::*, module::*},
 };
 use crate::ir::types::*;
 use id_arena::*;

@@ -1,4 +1,4 @@
-use super::super::dag::mc_convert::opcode_copy2reg;
+use super::super::dag::mc_convert::mov_rx;
 use super::inst::MachineOpcode;
 use crate::codegen::common::machine::{function::MachineFunction, module::MachineModule};
 use crate::traits::pass::ModulePassTrait;
@@ -40,7 +40,8 @@ impl ReplaceCopyWithProperMInst {
                     continue;
                 }
 
-                let opcode = opcode_copy2reg(&inst.operand[0]);
+                let opcode =
+                    mov_rx(inst.def[0].id.as_phys_reg().reg_class(), &inst.operand[0]).unwrap();
                 inst.opcode = opcode;
             }
         }

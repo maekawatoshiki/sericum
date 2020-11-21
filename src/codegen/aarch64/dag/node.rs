@@ -1,5 +1,5 @@
+use crate::codegen::common::dag::node::NodeId;
 pub use crate::codegen::common::dag::node::*;
-use crate::codegen::common::new_dag::node::NodeId;
 use std::fmt;
 
 #[derive(Debug, Clone, PartialEq)]
