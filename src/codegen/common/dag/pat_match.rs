@@ -121,6 +121,14 @@ pub const fn mi_node() -> MIPat {
 }
 
 impl Pat {
+    pub fn ty(mut self, ty: Type) -> Self {
+        match &mut self {
+            Self::IR(IRPat { ty: t, .. }) => *t = Some(ty),
+            Self::MI | Self::Operand(_) | Self::Compound(_) | Self::Invalid => panic!(),
+        }
+        self
+    }
+
     pub fn named(mut self, name: &'static str) -> Self {
         match &mut self {
             Self::IR(IRPat { name: n, .. }) => *n = name,
@@ -268,6 +276,15 @@ pub const fn any_i8_imm() -> OperandPat {
     }
 }
 
+pub const fn any_imm8() -> Pat {
+    Pat::Operand(OperandPat {
+        name: "",
+        kind: OperandKind::Imm(Immediate::AnyInt8),
+        not: false,
+        generate: None,
+    })
+}
+
 pub const fn any_i32_imm() -> OperandPat {
     OperandPat {
         name: "",
@@ -393,16 +410,16 @@ pub fn add(lhs: Pat, rhs: Pat) -> Pat {
     ir(IROpcode::Add).args(vec![lhs, rhs]).into()
 }
 
+pub fn mul(lhs: Pat, rhs: Pat) -> Pat {
+    ir(IROpcode::Mul).args(vec![lhs, rhs]).into()
+}
+
 pub fn fiaddr(slot: Pat) -> Pat {
     ir(IROpcode::FIAddr).args(vec![slot]).into()
 }
 
 pub fn gbladdr(g: Pat) -> Pat {
     ir(IROpcode::GlobalAddr).args(vec![g]).into()
-}
-
-pub fn mul(lhs: Pat, rhs: Pat) -> Pat {
-    ir(IROpcode::Mul).args(vec![lhs, rhs]).into()
 }
 
 impl Into<Pat> for IRPat {

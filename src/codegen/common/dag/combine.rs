@@ -69,7 +69,7 @@ fn run_on_function(func: &mut DAGFunction) {
             let c2 = c.arena[m["c2"]].as_operand().as_imm().as_i32();
             let c3 = c.arena.alloc((c1 + c2).into());
             let ty = c.arena[m["add"]].as_ir().ty;
-            node_gen!((IR.Add.ty m["n"], c3))
+            node_gen!((IR.Add.(ty) m["n"], c3))
         }).into()
     )
     .into();

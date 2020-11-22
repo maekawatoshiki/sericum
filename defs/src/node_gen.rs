@@ -74,7 +74,7 @@ impl Parse for IRNode {
         assert!(input.parse::<Token![.]>().is_ok());
         let opcode = input.parse::<Ident>()?;
         let ty = if input.parse::<Token![.]>().is_ok() {
-            Some(input.parse::<Expr>()?)
+            Some(syn::parse2(input.parse::<Group>()?.stream())?)
         } else {
             None
         };
@@ -101,6 +101,10 @@ impl Parse for MINode {
 
 impl Parse for Args {
     fn parse(input: ParseStream) -> Result<Self, Error> {
+        if input.is_empty() {
+            return Ok(Args(vec![]));
+        }
+
         let mut args = vec![];
         loop {
             args.push(input.parse::<Node>()?);
@@ -114,12 +118,6 @@ impl Parse for Args {
 
 impl Parse for ArgNode {
     fn parse(input: ParseStream) -> Result<Self, Error> {
-        // Multi-line code
-        if input.peek(token::Brace) {
-            let group = input.parse::<Group>()?;
-            return Ok(Self::User(group.stream()));
-        }
-
         // Memory operand
         if input.peek(token::Bracket) {
             let group = input.parse::<Group>()?;
@@ -199,15 +197,18 @@ fn expand_arg(node: ArgNode) -> TS {
         }
         ArgNode::Mem(MemNode { kind, args: args_ }) => {
             let mut args = quote! {};
+            let one_arg = args_.len() == 1;
             for arg in args_ {
                 let arg = expand(arg);
-                args = quote! {
-                    #args
-                    #arg ,
-                };
+                args = quote! {#args #arg , };
             }
+            let node = if one_arg {
+                quote! { let node = MemKind::#kind(#args); }
+            } else {
+                quote! { let node = MemKind::#kind([#args]); }
+            };
             quote! {{
-                let mut node = MemKind::#kind([#args]);
+                #node
                 c.arena.alloc(node.into())
             }}
         }

@@ -112,30 +112,23 @@ fn run_on_function(func: &mut DAGFunction) {
         })
         .into();
 
-    #[rustfmt::skip]
-    let mul8: Pat = ir(IROpcode::Mul)
-        .named("bin")
-        .ty(Type::i8)
-        .args(vec![
-            reg_class(RC::GR8).named("lhs").into(),
-            (reg_class(RC::GR8) | any_i8_imm()).named("rhs").into(),
-        ])
-        .generate(|m, c| match c.arena[m["rhs"]] {
-            Node::Operand(OperandNode::Reg(_)) => {
-                let lhs = c.arena.alloc(IRNode::new(IROpcode::RegClass).args(vec![m["lhs"]]).ty(Type::i32).into());
-                let rhs = c.arena.alloc(IRNode::new(IROpcode::RegClass).args(vec![m["rhs"]]).ty(Type::i32).into());
-                let mul = c.arena.alloc(MINode::new(MO::IMULrr32).args(vec![lhs, rhs]).reg_class(RC::GR32).into());
-                c.arena.alloc(IRNode::new(IROpcode::RegClass).args(vec![mul]).ty(Type::i8).into())
-            },
-            Node::Operand(OperandNode::Imm(_)) => c.arena.alloc(
-                MINode::new(MO::IMULrri8)
-                    .args(vec![m["lhs"], m["rhs"]])
-                    .reg_class(RC::GR8)
-                    .into(),
-            ),
-            _ => panic!(),
-        })
-        .into();
+    use crate::codegen::common::dag::pat_match::{any_imm8, mul, reg_};
+
+    let mul8: Pat = mul(
+        reg_(RC::GR8).named("lhs"),
+        (reg_(RC::GR8) | any_imm8()).named("rhs"),
+    )
+    .ty(Type::i8)
+    .generate(|m, c| match c.arena[m["rhs"]] {
+        Node::Operand(OperandNode::Reg(_)) => node_gen!(
+                                                 (IR.RegClass.(Type::i8)
+                                                     (MI.IMULrr32
+                                                         (IR.RegClass.(Type::i32) m["lhs"]),
+                                                         (IR.RegClass.(Type::i32) m["rhs"])))),
+        Node::Operand(OperandNode::Imm(_)) => node_gen!((MI.IMULrri8 m["lhs"], m["rhs"])),
+        _ => panic!(),
+    });
+
     #[rustfmt::skip]
     let bin: Pat = {
         let add8  = ir(IROpcode::Add).named("bin").ty(Type::i8) .args(vec![                 reg_class(RC::GR8)  .named("lhs").into(), (reg_class(RC::GR8)  | any_i8_imm() ).named("rhs").into()]);
@@ -148,11 +141,11 @@ fn run_on_function(func: &mut DAGFunction) {
         let mul64 = ir(IROpcode::Mul).named("bin").ty(Type::i64).args(vec![                 reg_class(RC::GR64) .named("lhs").into(),                        any_i32_imm() .named("rhs").into()]);
         let shl32 = ir(IROpcode::Shl).named("bin").ty(Type::i32).args(vec![                 reg_class(RC::GR32) .named("lhs").into(),                        any_i8_imm()  .named("rhs").into()]);
         let shl64 = ir(IROpcode::Shl).named("bin").ty(Type::i64).args(vec![                 reg_class(RC::GR64) .named("lhs").into(),                        any_i8_imm()  .named("rhs").into()]);
-                // GR32 a {
-                //     GR32  b => (mi.IMULrr32  a, b)
-                //     imm32 b => (mi.IMULrri32 a, b) }
-                // GR64 a {
-                //     imm32 b => (mi.IMULrr64i32 a, b) }
+        // GR32 a {
+        //     GR32  b => (mi.IMULrr32  a, b)
+        //     imm32 b => (mi.IMULrri32 a, b) }
+        // GR64 a {
+        //     imm32 b => (mi.IMULrr64i32 a, b) }
         (((add8 | add32 | add64.into())) | (sub8 | sub32 | sub64.into()) | (mul32 | mul64) | (shl32 | shl64)).generate(|m, c| {
             let ty = c.arena[m["bin"]].as_ir().mvty;
             let lhs = match c.arena[m["lhs"]] {
@@ -211,32 +204,27 @@ fn run_on_function(func: &mut DAGFunction) {
 
     let br: Pat = ir(IROpcode::Br)
         .args(vec![any_block().named("dst").into()])
-        .generate(|m, c| {
-            c.arena
-                .alloc(MINode::new(MO::JMP).args(vec![m["dst"]]).into())
-        })
+        .generate(|m, c| node_gen!((MI.JMP m["dst"])))
         .into();
 
-    // (ir.FIAddr a) { mem a => (mi.LEAr64m [BaseFi %rbp, a]) }
-    #[rustfmt::skip]
-    let fiaddr: Pat = ir(IROpcode::FIAddr).args(vec![any_slot().named("slot").into()])
-                                          .generate(|m, c| {
-                                              let rbp = c.arena.alloc(c.regs.get_phys_reg(GR64::RBP).into());
-                                              let mem = c.arena.alloc(OperandNode::Mem(MemKind::BaseFi([rbp, m["slot"]])).into());
-                                              c.arena.alloc(MINode::new(MO::LEAr64m).args(vec![mem]).reg_class(RC::GR64).into()) }).into();
-    #[rustfmt::skip]
-    let constaddr: Pat = ir(IROpcode::ConstAddr).args(vec![any().named("a")])
-                                          .generate(|m, c| {
-                                              let mem = c.arena.alloc(OperandNode::Mem(MemKind::Address(m["a"])).into());
-                                              c.arena.alloc(MINode::new(MO::MOVrm64).args(vec![mem]).reg_class(RC::GR64).into()) }).into();
-    #[rustfmt::skip]
-    let fptosi: Pat = ir(IROpcode::FPToSI).ty(Type::i32).args(vec![reg_class(RC::XMM).named("x").into()])
-                                          .generate(|m, c| {
-                                              c.arena.alloc(MINode::new(MO::CVTTSD2SIr32r).args(vec![m["x"]]).reg_class(RC::GR32).into()) }).into();
-    #[rustfmt::skip]
-    let sitofp: Pat = ir(IROpcode::SIToFP).ty(Type::f64).args(vec![reg_class(RC::GR32).named("x").into()])
-                                          .generate(|m, c| {
-                                              c.arena.alloc(MINode::new(MO::CVTSI2SDrr32).args(vec![m["x"]]).reg_class(RC::XMM).into()) }).into();
+    let fiaddr: Pat = ir(IROpcode::FIAddr)
+        .args(vec![any_slot().named("slot").into()])
+        .generate(|m, c| node_gen!((MI.LEAr64m [BaseFi %rbp, m["slot"]])))
+        .into();
+    let constaddr: Pat = ir(IROpcode::ConstAddr)
+        .args(vec![any().named("a")])
+        .generate(|m, c| node_gen!((MI.MOVrm64 [Address m["a"]])))
+        .into();
+    let fptosi: Pat = ir(IROpcode::FPToSI)
+        .ty(Type::i32)
+        .args(vec![reg_class(RC::XMM).named("x").into()])
+        .generate(|m, c| node_gen!((MI.CVTTSD2SIr32r m["x"])))
+        .into();
+    let sitofp: Pat = ir(IROpcode::SIToFP)
+        .ty(Type::f64)
+        .args(vec![reg_class(RC::GR32).named("x").into()])
+        .generate(|m, c| node_gen!((MI.CVTSI2SDrr32 m["x"])))
+        .into();
 
     let pats = vec![
         store, load, mul8, bin, fbin, br, fiaddr, constaddr, fptosi, sitofp,
