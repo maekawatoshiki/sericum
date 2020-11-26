@@ -73,7 +73,7 @@ impl Module {
         Function::new(self, name, ret_ty, params_ty)
     }
 
-    pub fn create_function2(&mut self, name: &str, func_ty: Type) -> FunctionId {
+    pub fn create_function_with_type(&mut self, name: &str, func_ty: Type) -> FunctionId {
         self.add_function(Function {
             name: name.to_string(),
             ty: func_ty,

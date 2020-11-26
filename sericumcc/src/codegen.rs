@@ -152,7 +152,7 @@ impl<'a> FunctionCodeGenerator<'a> {
                 .collect(),
             _ => panic!(),
         };
-        let func_id = module.create_function2(name.as_str(), func_ty);
+        let func_id = module.create_function_with_type(name.as_str(), func_ty);
         let val = Value::Function(value::FunctionValue {
             func_id,
             ty: func_ty,
