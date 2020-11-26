@@ -143,12 +143,16 @@ impl<'a> FunctionCodeGenerator<'a> {
         body: &AST,
     ) -> Result<Value> {
         let func_ty = ty.conv(compound_types, &module.types);
-        let sericum_func_ty = module.types.compound_ty(func_ty).as_function().clone();
-        let func_id = module.create_function(
-            name.as_str(),
-            sericum_func_ty.ret_ty,
-            sericum_func_ty.params_ty.clone(),
-        );
+        let params_ty: Vec<types::Type> = match ty {
+            Type::Func(id) => compound_types[*id]
+                .as_func()
+                .1
+                .iter()
+                .map(|p| p.conv(compound_types, &module.types))
+                .collect(),
+            _ => panic!(),
+        };
+        let func_id = module.create_function2(name.as_str(), func_ty);
         let val = Value::Function(value::FunctionValue {
             func_id,
             ty: func_ty,
@@ -171,11 +175,16 @@ impl<'a> FunctionCodeGenerator<'a> {
         };
 
         for (i, name) in param_names.iter().enumerate() {
-            let sericum_ty = sericum_func_ty.params_ty[i];
+            let sericum_ty = params_ty[i];
             let ty = gen.compound_types[*ty].as_func().1[i];
             let val = gen.builder.func_ref().get_param_value(i).unwrap();
-            let var = gen.builder.build_alloca(sericum_ty);
-            gen.builder.build_store(val, var);
+            let var = if matches!(ty, Type::Struct(_)) {
+                val
+            } else {
+                let var = gen.builder.build_alloca(sericum_ty);
+                gen.builder.build_store(val, var);
+                var
+            };
             let p_sericum_ty = gen
                 .builder
                 .module()
@@ -208,6 +217,7 @@ impl<'a> FunctionCodeGenerator<'a> {
             ast::Kind::Int { n, bits: 32 } => {
                 Ok((Value::new_imm_int32(*n as i32), Type::Int(Sign::Signed)))
             }
+            ast::Kind::Float(f) => Ok((Value::new_imm_f64(*f), Type::Double)),
             ast::Kind::String(s) => self.generate_string(s),
             ast::Kind::Char(c) => Ok((
                 Value::new_imm_int32(*c as u8 as i32),
@@ -542,6 +552,7 @@ impl<'a> FunctionCodeGenerator<'a> {
                         .build_gep(val, vec![Value::new_imm_int32(0), Value::new_imm_int32(0)]),
                     self.compound_types.pointer(inner),
                 )),
+                CompoundType::Struct { .. } => Ok((val, inner)),
                 _ => Ok((
                     self.builder.build_load(val),
                     self.compound_types[ty].inner_ty(),
