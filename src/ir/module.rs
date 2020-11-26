@@ -1,7 +1,8 @@
 use super::{
-    builder::IRBuilderWithModuleAndFuncId, constant_pool::*, function::*, global_val::*, types::*,
-    value,
+    basic_block::BasicBlocks, builder::IRBuilderWithModuleAndFuncId, constant_pool::*, function::*,
+    global_val::*, types::*, value,
 };
+use crate::codegen::is_internal_function;
 use id_arena::*;
 use std::fmt;
 
@@ -70,6 +71,19 @@ impl Module {
         params_ty: Vec<Type>,
     ) -> FunctionId {
         Function::new(self, name, ret_ty, params_ty)
+    }
+
+    pub fn create_function2(&mut self, name: &str, func_ty: Type) -> FunctionId {
+        self.add_function(Function {
+            name: name.to_string(),
+            ty: func_ty,
+            basic_blocks: BasicBlocks::new(),
+            inst_table: Arena::new(),
+            id: None,
+            analyses: vec![],
+            types: self.types.clone(),
+            is_internal: is_internal_function(name),
+        })
     }
 
     /// Attaches an existing function to the module.

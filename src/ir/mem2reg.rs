@@ -28,6 +28,7 @@ pub type InstructionIndex = usize;
 struct InstructionIndexes {
     inst2index: FxHashMap<InstructionId, InstructionIndex>,
 }
+
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 struct BBWithLevel(usize, BasicBlockId);
 
@@ -457,7 +458,9 @@ impl<'a> Mem2RegOnFunction<'a> {
             .is_atomic()
             && alloca.users.borrow().iter().all(|&use_id| {
                 let inst = &self.cur_func.inst_table[use_id];
-                matches!(inst.opcode, Opcode::Load | Opcode::Store)
+                matches!(inst.opcode, Opcode::Load) || (matches!(inst.opcode,Opcode::Store) && {
+                    matches!(inst.operand.args()[1], Value::Instruction(InstructionValue { id, ..}) if Some(id) == alloca.id)
+                })
             })
     }
 
