@@ -1,4 +1,4 @@
-#define W 40
+#define W 30
 #define H 30
 #define RAND_MAX 2147483647
 
@@ -7,18 +7,18 @@ int putchar(char);
 int rand();
 int srand(int);
 int puts(char *);
+int printf(char *);
 
 int show(int univ[H][W]) {
+	printf("\033[H");
   for (int y = 0; y < H; y += 1) {
     for (int x = 0; x < W; x += 1) {
       if (univ[y][x] == 1)
-        putchar('#');
-      else
-        putchar(' ');
+        printf("\033[07m  \033[m");
+      else printf("  ");
     }
-    puts("");
+		printf("\033[E");
   }
-  puts("");
   return 0;
 }
 

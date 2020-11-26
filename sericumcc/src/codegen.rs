@@ -8,7 +8,7 @@ use rustc_hash::FxHashMap;
 use sericum::ir::{
     builder::IRBuilderWithModuleAndFuncId,
     constant_pool::{Constant, ConstantArrayElement, ConstantKind},
-    opcode::ICmpKind,
+    opcode::{FCmpKind, ICmpKind},
     prelude::*,
     types, value,
 };
@@ -616,7 +616,7 @@ impl<'a> FunctionCodeGenerator<'a> {
         };
 
         if matches!(conv_ty, Type::Float | Type::Double) {
-            todo!()
+            return self.generate_float_binary_op(conv_ty, op, lhs, rhs);
         }
 
         if conv_ty.is_int() {
@@ -624,6 +624,46 @@ impl<'a> FunctionCodeGenerator<'a> {
         }
 
         panic!("{:?}", conv_ty)
+    }
+
+    fn generate_float_binary_op(
+        &mut self,
+        ty: Type,
+        op: ast::BinaryOp,
+        lhs: Value,
+        rhs: Value,
+    ) -> Result<(Value, Type)> {
+        match op {
+            ast::BinaryOp::Eq => Ok((
+                self.builder.build_fcmp(FCmpKind::UEq, lhs, rhs),
+                Type::Int(Sign::Signed),
+            )),
+            ast::BinaryOp::Ne => Ok((
+                self.builder.build_fcmp(FCmpKind::UNe, lhs, rhs),
+                Type::Int(Sign::Signed),
+            )),
+            ast::BinaryOp::Le => Ok((
+                self.builder.build_fcmp(FCmpKind::ULe, lhs, rhs),
+                Type::Int(Sign::Signed),
+            )),
+            ast::BinaryOp::Lt => Ok((
+                self.builder.build_fcmp(FCmpKind::ULt, lhs, rhs),
+                Type::Int(Sign::Signed),
+            )),
+            ast::BinaryOp::Gt => Ok((
+                self.builder.build_fcmp(FCmpKind::UGt, lhs, rhs),
+                Type::Int(Sign::Signed),
+            )),
+            ast::BinaryOp::Ge => Ok((
+                self.builder.build_fcmp(FCmpKind::UGe, lhs, rhs),
+                Type::Int(Sign::Signed),
+            )),
+            ast::BinaryOp::Add => Ok((self.builder.build_add(lhs, rhs), ty)),
+            ast::BinaryOp::Sub => Ok((self.builder.build_sub(lhs, rhs), ty)),
+            ast::BinaryOp::Mul => Ok((self.builder.build_mul(lhs, rhs), ty)),
+            ast::BinaryOp::Div => Ok((self.builder.build_div(lhs, rhs), ty)),
+            _ => unimplemented!(),
+        }
     }
 
     fn generate_int_binary_op(

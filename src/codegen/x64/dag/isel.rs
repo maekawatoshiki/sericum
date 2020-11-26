@@ -7,7 +7,7 @@ use crate::codegen::common::{
         node::{IRNode, IROpcode, ImmediateKind, MINode, Node, NodeId, OperandNode},
         pat_match::{
             any, any_block, any_f64_imm, any_i32_imm, any_i8_imm, any_slot, inst_select, ir,
-            reg_class, slot, CompoundPat, MatchContext, Pat, ReplacedNodeMap,
+            reg_class, CompoundPat, MatchContext, Pat, ReplacedNodeMap,
         },
     },
     types::MVType,
@@ -27,22 +27,34 @@ pub fn run(module: &mut DAGModule) {
 fn run_on_function(func: &mut DAGFunction) {
     #[rustfmt::skip]
     let store: Pat = (
-                        ir(IROpcode::Store).args(vec![ir(IROpcode::FIAddr).args(vec![slot(MVType::i32).named("dst").into()]).into(), any_i32_imm().named("src").into()])
+                        ir(IROpcode::Store).args(vec![ir(IROpcode::FIAddr).args(vec![any_slot().named("dst").into()]).into(), any_i32_imm().named("src").into()])
                                            .generate(|m, c| node_gen!((MI.MOVmi32 [BaseFi %rbp, m["dst"]], m["src"])))
-                      | ir(IROpcode::Store).args(vec![ir(IROpcode::FIAddr).args(vec![slot(MVType::i32).named("dst").into()]).into(), reg_class(RC::GR32).named("src").into()])
+                      | ir(IROpcode::Store).args(vec![ir(IROpcode::FIAddr).args(vec![any_slot().named("dst").into()]).into(), reg_class(RC::GR32).named("src").into()])
                                            .generate(|m, c| node_gen!((MI.MOVmr32 [BaseFi %rbp, m["dst"]], m["src"])))
-                      | ir(IROpcode::Store).args(vec![ir(IROpcode::FIAddr).args(vec![slot(MVType::i8).named("dst").into()]).into(), any_i8_imm().named("src").into()])
+                      | ir(IROpcode::Store).args(vec![ir(IROpcode::FIAddr).args(vec![any_slot().named("dst").into()]).into(), any_i8_imm().named("src").into()])
                                            .generate(|m, c| node_gen!((MI.MOVmr8  [BaseFi %rbp, m["dst"]], m["src"]))).into()
-                      | ir(IROpcode::Store).args(vec![ir(IROpcode::FIAddr).args(vec![slot(MVType::i8).named("dst").into()]).into(), reg_class(RC::GR8).named("src").into()])
+                      | ir(IROpcode::Store).args(vec![ir(IROpcode::FIAddr).args(vec![any_slot().named("dst").into()]).into(), reg_class(RC::GR8).named("src").into()])
                                            .generate(|m, c| {
                                                 let rbp = c.arena.alloc(c.regs.get_phys_reg(GR64::RBP).into());
                                                 let mem = c.arena.alloc(OperandNode::Mem(MemKind::BaseFi([rbp, m["dst"]])).into());
                                                 c.arena.alloc(MINode::new(MO::MOVmr8).args(vec![mem, m["src"]]).into()) }).into()
-                      | ir(IROpcode::Store).args(vec![ir(IROpcode::FIAddr).args(vec![slot(MVType::i64).named("dst").into()]).into(), reg_class(RC::GR64).named("src").into()])
+                      | ir(IROpcode::Store).args(vec![ir(IROpcode::FIAddr).args(vec![any_slot().named("dst").into()]).into(), reg_class(RC::GR64).named("src").into()])
                                            .generate(|m, c| {
                                                 let rbp = c.arena.alloc(c.regs.get_phys_reg(GR64::RBP).into());
                                                 let mem = c.arena.alloc(OperandNode::Mem(MemKind::BaseFi([rbp, m["dst"]])).into());
                                                 c.arena.alloc(MINode::new(MO::MOVmr64).args(vec![mem, m["src"]]).into()) }).into()
+                      | ir(IROpcode::Store).args(vec![ir(IROpcode::FIAddr).args(vec![any_slot().named("dst")]).into(), any_f64_imm().named("src").into()])
+                                           .generate(|m, c| {
+                                                let rbp = c.arena.alloc(c.regs.get_phys_reg(GR64::RBP).into());
+                                                let mem = c.arena.alloc(OperandNode::Mem(MemKind::BaseFi([rbp, m["dst"]])).into());
+                                                let src = c.arena.alloc(MINode::new(MO::MOVSDrm64).args(vec![m["src"]]).reg_class(RC::XMM).into());
+                                                c.arena.alloc(MINode::new(MO::MOVSDmr).args(vec![mem, src]).into()) }).into()
+                       // (Store (FIAddr slot:f64) src:XMM) -> (MOVSDmr BaseFi(rbp, slot) src)
+                      | ir(IROpcode::Store).args(vec![ir(IROpcode::FIAddr).args(vec![any_slot().named("dst")]).into(), reg_class(RC::XMM).named("src").into()])
+                                           .generate(|m, c| {
+                                                let rbp = c.arena.alloc(c.regs.get_phys_reg(GR64::RBP).into());
+                                                let mem = c.arena.alloc(OperandNode::Mem(MemKind::BaseFi([rbp, m["dst"]])).into());
+                                                c.arena.alloc(MINode::new(MO::MOVSDmr).args(vec![mem, m["src"]]).into()) }).into()
                       | ir(IROpcode::Store).args(vec![reg_class(RC::GR64).named("dst").into(), any_i32_imm().named("src").into()])
                                            .generate(|m, c| {
                                                 let mem = c.arena.alloc(OperandNode::Mem(MemKind::Base(m["dst"])).into());
@@ -59,18 +71,6 @@ fn run_on_function(func: &mut DAGFunction) {
                                            .generate(|m, c| {
                                                 let mem = c.arena.alloc(OperandNode::Mem(MemKind::Base(m["dst"])).into());
                                                 c.arena.alloc(MINode::new(MO::MOVmr64).args(vec![mem, m["src"]]).into()) }).into()
-                      | ir(IROpcode::Store).args(vec![ir(IROpcode::FIAddr).args(vec![any_slot().named("dst")]).into(), any_f64_imm().named("src").into()])
-                                           .generate(|m, c| {
-                                                let rbp = c.arena.alloc(c.regs.get_phys_reg(GR64::RBP).into());
-                                                let mem = c.arena.alloc(OperandNode::Mem(MemKind::BaseFi([rbp, m["dst"]])).into());
-                                                let src = c.arena.alloc(MINode::new(MO::MOVSDrm64).args(vec![m["src"]]).reg_class(RC::XMM).into());
-                                                c.arena.alloc(MINode::new(MO::MOVSDmr).args(vec![mem, src]).into()) }).into()
-                       // (Store (FIAddr slot:f64) src:XMM) -> (MOVSDmr BaseFi(rbp, slot) src)
-                      | ir(IROpcode::Store).args(vec![ir(IROpcode::FIAddr).args(vec![any_slot().named("dst")]).into(), reg_class(RC::XMM).named("src").into()])
-                                           .generate(|m, c| {
-                                                let rbp = c.arena.alloc(c.regs.get_phys_reg(GR64::RBP).into());
-                                                let mem = c.arena.alloc(OperandNode::Mem(MemKind::BaseFi([rbp, m["dst"]])).into());
-                                                c.arena.alloc(MINode::new(MO::MOVSDmr).args(vec![mem, m["src"]]).into()) }).into()
                     ).into();
 
     // TODO: Support GlobalAddr
