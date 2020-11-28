@@ -112,6 +112,12 @@ pub trait IRBuilder {
     fn block(&self) -> Option<BasicBlockId>;
     fn block_mut(&mut self) -> &mut Option<BasicBlockId>;
 
+    fn new_func_value(&self, id: FunctionId) -> Option<Value> {
+        let module = self.module()?;
+        let ty = module.function_ref(id).ty;
+        Some(Value::Function(FunctionValue { func_id: id, ty }))
+    }
+
     fn get_param(&self, idx: usize) -> Option<Value> {
         self.func_ref().get_param_value(idx)
     }
