@@ -231,7 +231,10 @@ pub trait IRBuilder {
         inst
     }
 
-    fn build_sub(&mut self, v1: Value, v2: Value) -> Value {
+    fn build_sub<V1: Into<Value>, V2: Into<Value>>(&mut self, v1: V1, v2: V2) -> Value {
+        let v1 = v1.into();
+        let v2 = v2.into();
+
         if let Some(konst) = v1.const_sub(&v2) {
             return konst;
         }
@@ -329,12 +332,17 @@ pub trait IRBuilder {
         inst
     }
 
-    fn build_icmp(&mut self, kind: ICmpKind, v1: Value, v2: Value) -> Value {
+    fn build_icmp<V1: Into<Value>, V2: Into<Value>>(
+        &mut self,
+        kind: ICmpKind,
+        v1: V1,
+        v2: V2,
+    ) -> Value {
         let inst = self.create_inst_value(
             Opcode::ICmp,
             InstOperand::IntCmp {
                 cond: kind,
-                args: [v1, v2],
+                args: [v1.into(), v2.into()],
             },
             Type::i1,
         );
@@ -420,8 +428,9 @@ pub trait IRBuilder {
         inst
     }
 
-    fn build_ret(&mut self, v: Value) -> Value {
-        let inst = self.create_inst_value(Opcode::Ret, InstOperand::Ret { arg: v }, Type::Void);
+    fn build_ret<V: Into<Value>>(&mut self, v: V) -> Value {
+        let inst =
+            self.create_inst_value(Opcode::Ret, InstOperand::Ret { arg: v.into() }, Type::Void);
         self.append_inst_to_current_block(inst.as_instruction().id);
         inst
     }

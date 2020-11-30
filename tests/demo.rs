@@ -1,7 +1,6 @@
 use sericum::{
     codegen::arch::{asm::print::MachineAsmPrinter, standard_conversion_into_machine_module},
     ir::{builder::IRBuilder, module::Module, opcode::ICmpKind, types::Type, value::Value},
-    value::FunctionValue,
 };
 
 #[test]
@@ -16,16 +15,16 @@ fn demo() {
 
     builder.set_insert_point(entry);
     let arg0 = builder.get_param(0).unwrap();
-    let eq = builder.build_icmp(ICmpKind::Le, arg0, Value::new_imm_int32(1));
+    let eq = builder.build_icmp(ICmpKind::Le, arg0, 1);
     builder.build_cond_br(eq, block1, block2);
 
     builder.set_insert_point(block1);
-    builder.build_ret(Value::new_imm_int32(1));
+    builder.build_ret(1);
 
     builder.set_insert_point(block2);
-    let arg1 = builder.build_sub(arg0, Value::new_imm_int32(1));
+    let arg1 = builder.build_sub(arg0, 1);
     let ret0 = builder.build_call(builder.new_func_value(fibo).unwrap(), vec![arg1]);
-    let arg2 = builder.build_sub(arg0, Value::new_imm_int32(2));
+    let arg2 = builder.build_sub(arg0, 2);
     let ret1 = builder.build_call(builder.new_func_value(fibo).unwrap(), vec![arg2]);
     let add = builder.build_add(ret0, ret1);
     builder.build_ret(add);

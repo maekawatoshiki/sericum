@@ -279,3 +279,9 @@ impl ImmediateValue {
         }
     }
 }
+
+impl Into<Value> for i32 {
+    fn into(self) -> Value {
+        Value::new_imm_int32(self)
+    }
+}
