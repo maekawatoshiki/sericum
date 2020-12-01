@@ -24,13 +24,13 @@ enum InstNode {
 }
 
 struct IRNode {
-    opcode: Ident,
+    opcode: TS,
     args: Vec<Node>,
     ty: Option<Expr>,
 }
 
 struct MINode {
-    opcode: Ident,
+    opcode: TS,
     args: Vec<Node>,
 }
 
@@ -72,7 +72,13 @@ impl Parse for InstNode {
 impl Parse for IRNode {
     fn parse(input: ParseStream) -> Result<Self, Error> {
         assert!(input.parse::<Token![.]>().is_ok());
-        let opcode = input.parse::<Ident>()?;
+        let opcode = if input.peek(token::Paren) {
+            let opcode = syn::parse2::<Ident>(input.parse::<Group>()?.stream())?;
+            quote! { #opcode }
+        } else {
+            let opcode = input.parse::<Ident>()?;
+            quote! { IROpcode::#opcode }
+        };
         let ty = if input.parse::<Token![.]>().is_ok() {
             Some(syn::parse2(input.parse::<Group>()?.stream())?)
         } else {
@@ -90,7 +96,13 @@ impl Parse for IRNode {
 impl Parse for MINode {
     fn parse(input: ParseStream) -> Result<Self, Error> {
         assert!(input.parse::<Token![.]>().is_ok());
-        let opcode = input.parse::<Ident>()?;
+        let opcode = if input.peek(token::Paren) {
+            let opcode = syn::parse2::<Expr>(input.parse::<Group>()?.stream())?;
+            quote! { #opcode }
+        } else {
+            let opcode = input.parse::<Ident>()?;
+            quote! { MO::#opcode }
+        };
         let args = input.parse::<Args>()?;
         Ok(MINode {
             opcode,
@@ -168,7 +180,7 @@ fn expand_inst(node: InstNode) -> TS {
                 None => quote! {},
             };
             quote! {{
-                let node = IRNode::new(IROpcode::#opcode).args(vec![#args]) #ty;
+                let node = IRNode::new(#opcode).args(vec![#args]) #ty;
                 c.arena.alloc(node.into())
             }}
         }
@@ -180,9 +192,9 @@ fn expand_inst(node: InstNode) -> TS {
             }
             let opcode = mi.opcode;
             quote! {{
-                let mut node = MINode::new(MO::#opcode).args(vec![#args]);
-                if MO::#opcode.inst_def().unwrap().defs.len() > 0 {
-                    node = node.reg_class(MO::#opcode.inst_def().unwrap().defs[0].as_reg_class());
+                let mut node = MINode::new(#opcode).args(vec![#args]);
+                if #opcode.inst_def().unwrap().defs.len() > 0 {
+                    node = node.reg_class(#opcode.inst_def().unwrap().defs[0].as_reg_class());
                 }
                 c.arena.alloc(node.into())
             }}

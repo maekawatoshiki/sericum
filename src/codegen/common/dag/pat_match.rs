@@ -402,6 +402,10 @@ pub const fn any_block() -> OperandPat {
     }
 }
 
+pub fn load(arg: Pat) -> Pat {
+    ir(IROpcode::Load).args(vec![arg]).into()
+}
+
 pub fn store(src: Pat, dst: Pat) -> Pat {
     ir(IROpcode::Store).args(vec![src, dst]).into()
 }

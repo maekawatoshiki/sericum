@@ -1,6 +1,6 @@
 use sericum::{
     codegen::arch::{asm::print::MachineAsmPrinter, standard_conversion_into_machine_module},
-    ir::{builder::IRBuilder, module::Module, opcode::ICmpKind, types::Type, value::Value},
+    ir::{builder::IRBuilder, module::Module, opcode::ICmpKind, types::Type},
 };
 
 #[test]

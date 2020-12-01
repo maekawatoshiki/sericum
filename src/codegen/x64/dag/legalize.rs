@@ -8,13 +8,14 @@ use crate::codegen::common::{
         pat_match::{
             add, any, any_block, any_cc, any_f64_imm, any_i32_imm, any_imm, any_imm32,
             any_imm32_power_of_2, any_imm_f64, any_reg, any_slot, fiaddr, gbladdr, inst_select, ir,
-            mul, not, reg_, reg_class, reorder_patterns, store, CompoundPat, MatchContext, Pat,
-            ReplacedNodeMap,
+            load, mul, not, reg_, reg_class, reorder_patterns, store, CompoundPat, MatchContext,
+            Pat, ReplacedNodeMap,
         },
     },
     types::MVType,
 };
 use crate::ir::types::Type;
+use defs::node_gen;
 
 pub fn run(module: &mut DAGModule) {
     for (_, func) in &mut module.functions {
@@ -33,95 +34,71 @@ fn run_on_function(func: &mut DAGFunction) {
         ])
         .into();
 
-    #[rustfmt::skip]
     // (Load (Add (base:GR64 off:imm32))) -> (MOVrm32 BaseOff(base off))
-    let load: Pat = ir(IROpcode::Load)
+
+    let load1 = load(add_gr64_off)
         .ty(Type::i32)
-        .args(vec![add_gr64_off.clone()])
+        .generate(|m, c| node_gen!((MI.MOVrm32 [BaseOff m["base"], m["off"]])));
+    let load2 = load(add(
+        reg_(RC::GR64).named("base"),
+        mul(any().named("off"), any_imm32().named("align")),
+    ))
+    .named("load")
+    .generate(|m, c| {
+        let opcode = match c.arena[m["load"]].as_ir().mvty {
+            MVType::i8 => MO::MOVrm8,
+            MVType::i32 => MO::MOVrm32,
+            _ => todo!(),
+        };
+        node_gen!((MI.(opcode) [BaseAlignOff m["base"], m["align"], (IR.RegClass.(Type::i64) m["off"])]))
+    });
+    let load4 = load(add(
+        gbladdr(any().named("g")),
+        mul(any().named("off"), any_imm32().named("align")),
+    ))
+    .named("load")
+    .generate(|m, c| {
+        let opcode = match c.arena[m["load"]].as_ir().mvty {
+            MVType::i8 => MO::MOVrm8,
+            MVType::i32 => MO::MOVrm32,
+            _ => todo!(),
+        };
+        node_gen!((MI.(opcode) [AddressAlignOff m["g"], m["align"], (IR.RegClass.(Type::i64) m["off"])]))
+    })
+    .into();
+    let load5 = load(add(gbladdr(any().named("g")), any_imm32().named("off")))
+        .named("load")
         .generate(|m, c| {
-            let mem = c.arena.alloc(MemKind::BaseOff([m["base"], m["off"]]).into());
-            c.arena.alloc(MINode::new(MO::MOVrm32).args(vec![mem]).reg_class(RC::GR32).into())}).into();
-    // (Load (Add (base:GR64 (Mul (off align:imm32))))) -> (MOVrm32 BaseAlignOff(base align off:GR64))
-    #[rustfmt::skip]
-    let load2: Pat = ir(IROpcode::Load).named("load")
-        // .ty(Type::i32)
-        .args(vec![ir(IROpcode::Add)
-            .args(vec![
-                reg_class(RC::GR64).named("base").into(),
-                ir(IROpcode::Mul)
-                    .args(vec![
-                        any().named("off"),
-                        any_i32_imm().named("align").into(),
-                    ])
+            let mem = c
+                .arena
+                .alloc(MemKind::AddressOff([m["g"], m["off"]]).into());
+            let opcode = match c.arena[m["load"]].as_ir().mvty {
+                MVType::i8 => MO::MOVrm8,
+                MVType::i32 => MO::MOVrm32,
+                _ => todo!(),
+            };
+            c.arena.alloc(
+                MINode::new(opcode)
+                    .args(vec![mem])
+                    .reg_class(opcode.inst_def().unwrap().def_reg_class())
                     .into(),
-            ])
-            .into()])
-        .generate(|m, c| {
-            let off = c.arena.alloc(IRNode::new(IROpcode::RegClass).args(vec![m["off"]]).ty(Type::i64).into());
-            let mem = c.arena.alloc(MemKind::BaseAlignOff([m["base"], m["align"], off]).into());
-            let opcode = match c.arena[m["load"]].as_ir().mvty {
-                MVType::i8 => MO::MOVrm8,
-                MVType::i32 => MO::MOVrm32,
-                _ => todo!()
-            };
-            c.arena.alloc(MINode::new(opcode).args(vec![mem]).reg_class(opcode.inst_def().unwrap().def_reg_class()).into()) }).into();
-    #[rustfmt::skip]
-    let load4: Pat = ir(IROpcode::Load).named("load")
-        // .ty(Type::i32)
-        .args(vec![ir(IROpcode::Add)
-            .args(vec![
-                ir(IROpcode::GlobalAddr).args(vec![any().named("g")]).into(),
-                ir(IROpcode::Mul)
-                    .args(vec![
-                        any().named("off"),
-                        any_i32_imm().named("align").into(),
-                    ])
-                    .into(),
-            ])
-            .into()])
-        .generate(|m, c| {
-            let off = c.arena.alloc(IRNode::new(IROpcode::RegClass).args(vec![m["off"]]).ty(Type::i64).into());
-            let mem = c.arena.alloc(MemKind::AddressAlignOff([m["g"], m["align"], off]).into());
-            let opcode = match c.arena[m["load"]].as_ir().mvty {
-                MVType::i8 => MO::MOVrm8,
-                MVType::i32 => MO::MOVrm32,
-                _ => todo!()
-            };
-            c.arena.alloc(MINode::new(opcode).args(vec![mem]).reg_class(opcode.inst_def().unwrap().def_reg_class()).into()) }).into();
-    #[rustfmt::skip]
-    let load5: Pat = ir(IROpcode::Load).named("load")
-        .args(vec![ir(IROpcode::Add)
-            .args(vec![
-                ir(IROpcode::GlobalAddr).args(vec![any().named("g")]).into(),
-                any_i32_imm().named("off").into(),
-            ])
-            .into()])
-        .generate(|m, c| {
-            let mem = c.arena.alloc(MemKind::AddressOff([m["g"], m["off"]]).into());
-            let opcode = match c.arena[m["load"]].as_ir().mvty {
-                MVType::i8 => MO::MOVrm8,
-                MVType::i32 => MO::MOVrm32,
-                _ => todo!()
-            };
-            c.arena.alloc(MINode::new(opcode).args(vec![mem]).reg_class(opcode.inst_def().unwrap().def_reg_class()).into()) }).into();
-    #[rustfmt::skip]
-    let load6: Pat = ir(IROpcode::Load).named("load")
-        .args(vec![ir(IROpcode::Add)
-            .args(vec![
-                not().any_i32_imm().named("base").into(),
-                any_i32_imm().named("off").into(),
-            ])
-            .into()])
-        .generate(|m, c| {
-            let mem = c.arena.alloc(MemKind::BaseOff([m["base"], m["off"]]).into());
-            let opcode = match c.arena[m["load"]].as_ir().mvty {
-                MVType::i8 => MO::MOVrm8,
-                MVType::i32 => MO::MOVrm32,
-                MVType::i64 => MO::MOVrm64,
-                MVType::f64 => MO::MOVSDrm,
-                _ => todo!()
-            };
-            c.arena.alloc(MINode::new(opcode).args(vec![mem]).reg_class(opcode.inst_def().unwrap().def_reg_class()).into()) }).into();
+            )
+        })
+        .into();
+    let load6 = load(add(
+        not().any_i32_imm().named("base").into(),
+        any_imm32().named("off"),
+    ))
+    .named("load")
+    .generate(|m, c| {
+        node_gen!((MI.(match c.arena[m["load"]].as_ir().mvty {
+            MVType::i8 => MO::MOVrm8,
+            MVType::i32 => MO::MOVrm32,
+            MVType::i64 => MO::MOVrm64,
+            MVType::f64 => MO::MOVSDrm,
+            _ => todo!(),
+        }) [BaseOff m["base"], m["off"]]))
+    });
     let load3: Pat = ir(IROpcode::Load)
         .ty(Type::f64)
         .args(vec![ir(IROpcode::Add)
@@ -366,7 +343,7 @@ fn run_on_function(func: &mut DAGFunction) {
         .into();
 
     let pats = vec![
-        load4, load5, load6, load, load2, load3, store2, store1, sext, brcc, fpbrcc, store3,
+        load4, load5, load6, load1, load2, load3, store2, store1, sext, brcc, fpbrcc, store3,
         store4,
         bitcast,
         // sext, load4, load5, store, load, load2, load3, store2, brcc, fpbrcc, bitcast, load6, store3,
