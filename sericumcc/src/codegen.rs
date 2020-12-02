@@ -165,7 +165,7 @@ impl<'a> FunctionCodeGenerator<'a> {
 
         let mut gen = Self {
             builder: {
-                let mut builder = IRBuilderWithModuleAndFuncId::new(module, func_id);
+                let mut builder = module.ir_builder(func_id);
                 let entry = builder.append_basic_block();
                 builder.set_insert_point(entry);
                 builder
@@ -521,7 +521,8 @@ impl<'a> FunctionCodeGenerator<'a> {
                     ],
                 );
             } else {
-                let val = self.generate(val)?.0;
+                let (val, val_ty) = self.generate(val)?;
+                assert!(ty.rough_equal(&val_ty));
                 self.builder.build_store(val, alloca);
             }
         }
@@ -530,7 +531,7 @@ impl<'a> FunctionCodeGenerator<'a> {
     }
 
     fn generate_assign(&mut self, dst: &AST, src: &AST) -> Result<(Value, Type)> {
-        let (dst, _) = self.generate(retrieve_from_load(dst))?;
+        let (dst, _ty) = self.generate(retrieve_from_load(dst))?;
         let (src, ty) = self.generate(src)?;
         self.builder.build_store(src, dst);
         Ok((self.builder.build_load(dst), ty))

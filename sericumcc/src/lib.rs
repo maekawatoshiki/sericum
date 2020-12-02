@@ -58,11 +58,11 @@ pub fn compile(path: PathBuf) {
             panic!();
         }
     }
-    println!("{:?}", codegen.module);
 
     // sericum::ir::mem2reg::Mem2Reg::new().run_on_module(&mut codegen.module);
     // sericum::ir::cse::CommonSubexprElimination::new().run_on_module(&mut codegen.module);
     // sericum::ir::licm::LoopInvariantCodeMotion::new().run_on_module(&mut codegen.module);
+    println!("{:?}", codegen.module);
 
     let machine_module =
         sericum::codegen::x64::standard_conversion_into_machine_module(codegen.module);
@@ -97,7 +97,7 @@ fn assemble_and_run(s_target: &str) {
 
     let output_name = unique_file_name("out");
     let compilation = process::Command::new("clang")
-        .args(&[target_name.as_str(), "-o", output_name.as_str()])
+        .args(&[target_name.as_str(), "-o", output_name.as_str(), "-lm"])
         .status()
         .unwrap();
     assert!(compilation.success());

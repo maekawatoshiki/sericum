@@ -92,6 +92,15 @@ impl Type {
     pub fn is_compound(&self) -> bool {
         matches!(self, Type::Pointer(_) | Type::Array(_) | Type::Func(_) | Type::Struct(_) | Type::Union(_))
     }
+
+    pub fn rough_equal(&self, x: &Type) -> bool {
+        matches!((self, x), (Type::Void, Type::Void) |(Type::Char(_), Type::Char(_)) |
+            (Type::Short(_), Type::Short(_)) | (Type::Int(_), Type::Int(_)) |
+            (Type::Long(_), Type::Long(_)) | (Type::LLong(_), Type::LLong(_)) |
+            (Type::Float, Type::Float) | (Type::Double, Type::Double) |
+            (Type::Pointer(_), Type::Pointer(_))
+        )
+    }
 }
 
 impl CompoundTypes {
