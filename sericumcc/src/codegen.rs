@@ -575,10 +575,13 @@ impl<'a> FunctionCodeGenerator<'a> {
 
     fn do_type_cast(&mut self, from: Value, to: types::Type) -> Result<Value> {
         use sericum::types::TypeSize;
-        let ty_sz = from
-            .get_type()
-            .size_in_byte(&self.builder.module().unwrap().types);
+        let from_ty = from.get_type();
+        let ty_sz = from_ty.size_in_byte(&self.builder.module().unwrap().types);
         let to_sz = to.size_in_byte(&self.builder.module().unwrap().types);
+
+        if from_ty == to {
+            return Ok(from);
+        }
 
         if ty_sz == to_sz {
             return Ok(self.builder.build_bitcast(from, to));
