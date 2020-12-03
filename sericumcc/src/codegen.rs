@@ -521,7 +521,7 @@ impl<'a> FunctionCodeGenerator<'a> {
                     ],
                 );
             } else {
-                let (val, val_ty) = self.generate(val)?;
+                let (val, _) = self.generate(val)?;
                 let val = self.do_type_cast(val, sericum_ty)?;
                 self.builder.build_store(val, alloca);
             }
@@ -567,7 +567,7 @@ impl<'a> FunctionCodeGenerator<'a> {
     }
 
     fn generate_type_cast(&mut self, expr: &AST, to: &Type) -> Result<(Value, Type)> {
-        let (val, ty) = self.generate(expr)?;
+        let (val, _ty) = self.generate(expr)?;
         let to_ = to.conv(self.compound_types, &self.builder.module().unwrap().types);
         let val = self.do_type_cast(val, to_)?;
         Ok((val, *to))

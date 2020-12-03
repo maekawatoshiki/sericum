@@ -238,6 +238,16 @@ impl Instruction {
             Opcode::Mul => self.operand.args()[0].const_mul(&self.operand.args()[1]),
             Opcode::Div => self.operand.args()[0].const_div(&self.operand.args()[1]),
             Opcode::Rem => self.operand.args()[0].const_rem(&self.operand.args()[1]),
+            Opcode::ICmp => match self.operand.int_cmp()[0] {
+                ICmpKind::Eq => self.operand.args()[0].const_eq(&self.operand.args()[1]),
+                _ => None,
+            },
+            Opcode::Zext => match self.ty {
+                Type::i32 => Some(Value::new_imm_int32(
+                    self.operand.args()[0].as_imm().to_i32()?,
+                )),
+                _ => None,
+            },
             _ => None,
         }
     }

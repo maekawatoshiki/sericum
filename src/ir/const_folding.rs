@@ -91,7 +91,7 @@ impl<'a> ConstantFoldingOnFunction<'a> {
     fn is_foldable(inst: &Instruction) -> bool {
         matches!(
             inst.opcode,
-            Opcode::Add | Opcode::Sub | Opcode::Mul | Opcode::Div
+            Opcode::Add | Opcode::Sub | Opcode::Mul | Opcode::Div | Opcode::ICmp | Opcode::Zext
         ) && inst
             .operand
             .args()

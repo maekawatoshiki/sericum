@@ -24,6 +24,16 @@ macro_rules! const_op {
             (Value::Immediate(Int32(x)), Value::Immediate(Int32(y))) => Some(Value::Immediate(Int32(x $op y))),
             _ => None,
         }
+    } };
+    (cmp $name:ident, $op:tt) => {
+    pub fn $name(&self, v: &Value) -> Option<Value> {
+        use ImmediateValue::*;
+        match (self, v) {
+            (Value::Immediate(Int8(x)), Value::Immediate(Int8(y))) => Some(Value::Immediate(Int8((x $op y) as i8))),
+            (Value::Immediate(Int32(x)), Value::Immediate(Int32(y))) => Some(Value::Immediate(Int8((x $op y) as i8))),
+            (Value::Immediate(F64(x)), Value::Immediate(F64(y))) => Some(Value::Immediate(Int8((x $op y) as i8))),
+            _ => None,
+        }
     } }
 }
 
@@ -150,6 +160,7 @@ impl Value {
     const_op!(const_mul, *);
     const_op!(const_div, /);
     const_op!(int_only const_rem, %);
+    const_op!(cmp const_eq, ==);
 
     // Utils
 
@@ -276,6 +287,15 @@ impl ImmediateValue {
         match self {
             ImmediateValue::F64(f) => *f,
             _ => panic!(),
+        }
+    }
+
+    pub fn to_i32(&self) -> Option<i32> {
+        match self {
+            ImmediateValue::Int8(i) => Some(*i as i32),
+            ImmediateValue::Int32(i) => Some(*i),
+            ImmediateValue::Int64(i) => Some(*i as i32),
+            _ => todo!(),
         }
     }
 }

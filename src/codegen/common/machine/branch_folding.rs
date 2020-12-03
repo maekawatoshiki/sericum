@@ -1,9 +1,10 @@
+use super::basic_block::MachineBasicBlockId;
 use crate::codegen::common::machine::{
     builder::*, function::MachineFunction, inst::*, module::MachineModule,
 };
 use crate::traits::basic_block::BasicBlocksTrait;
 use crate::traits::pass::ModulePassTrait;
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 // Must run after phi elimination
 pub struct BranchFolding {}
@@ -119,6 +120,8 @@ impl BranchFolding {
     // Very simple branch folding. TODO: Implement further complicated one
     fn remove_empty_block(&mut self, f: &mut MachineFunction) {
         let mut worklist = vec![];
+        let mut replaced: FxHashMap<MachineBasicBlockId, MachineBasicBlockId> =
+            FxHashMap::default();
 
         for (id, block) in f.body.basic_blocks.id_and_block() {
             let v: &Vec<_> = &*block.iseq_ref();
@@ -136,6 +139,7 @@ impl BranchFolding {
         }
 
         for &(block_to_remove, new_dst) in &worklist {
+            let new_dst = *replaced.get(&new_dst).unwrap_or(&new_dst);
             let preds = f.body.basic_blocks.arena[block_to_remove].pred.clone();
             let succs = f.body.basic_blocks.arena[block_to_remove].succ.clone();
 
@@ -158,6 +162,8 @@ impl BranchFolding {
                     inst.replace_operand_block(block_to_remove, new_dst);
                 }
             }
+
+            replaced.insert(block_to_remove, new_dst);
         }
 
         debug!(println!("{} empty blocks removed", worklist.len(),));

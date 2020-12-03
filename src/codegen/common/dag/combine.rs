@@ -51,7 +51,6 @@ fn run_on_function(func: &mut DAGFunction) {
             any_reg().into(),
         ])
         .generate(|m, c| {
-            println!("!!");
             let cc = c.arena[m["cc"]].as_operand_mut().as_cc_mut();
             *cc = cc.flip();
             c.arena[m["setcc"]].as_ir_mut().args.swap(1, 2);
