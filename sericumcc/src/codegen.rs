@@ -522,7 +522,7 @@ impl<'a> FunctionCodeGenerator<'a> {
                 );
             } else {
                 let (val, val_ty) = self.generate(val)?;
-                assert!(ty.rough_equal(&val_ty));
+                let val = self.do_type_cast(val, sericum_ty)?;
                 self.builder.build_store(val, alloca);
             }
         }
@@ -531,8 +531,10 @@ impl<'a> FunctionCodeGenerator<'a> {
     }
 
     fn generate_assign(&mut self, dst: &AST, src: &AST) -> Result<(Value, Type)> {
-        let (dst, _ty) = self.generate(retrieve_from_load(dst))?;
+        let (dst, ty_) = self.generate(retrieve_from_load(dst))?;
         let (src, ty) = self.generate(src)?;
+        let ty_ = ty_.conv(self.compound_types, &self.builder.module().unwrap().types);
+        let src = self.do_type_cast(src, ty_)?;
         self.builder.build_store(src, dst);
         Ok((self.builder.build_load(dst), ty))
     }
@@ -565,24 +567,28 @@ impl<'a> FunctionCodeGenerator<'a> {
     }
 
     fn generate_type_cast(&mut self, expr: &AST, to: &Type) -> Result<(Value, Type)> {
-        use sericum::types::TypeSize;
         let (val, ty) = self.generate(expr)?;
-
-        let ty_ = ty.conv(self.compound_types, &self.builder.module().unwrap().types);
         let to_ = to.conv(self.compound_types, &self.builder.module().unwrap().types);
-        let ty_sz = ty_.size_in_byte(&self.builder.module().unwrap().types);
-        let to_sz = to_.size_in_byte(&self.builder.module().unwrap().types);
+        let val = self.do_type_cast(val, to_)?;
+        Ok((val, *to))
+    }
+
+    fn do_type_cast(&mut self, from: Value, to: types::Type) -> Result<Value> {
+        use sericum::types::TypeSize;
+        let ty_sz = from
+            .get_type()
+            .size_in_byte(&self.builder.module().unwrap().types);
+        let to_sz = to.size_in_byte(&self.builder.module().unwrap().types);
 
         if ty_sz == to_sz {
-            return Ok((self.builder.build_bitcast(val, to_), *to));
+            return Ok(self.builder.build_bitcast(from, to));
         }
 
-        if ty_sz < to_sz {}
-
-        println!("{:?} {:?}", ty, to);
+        if ty_sz < to_sz {
+            return Ok(self.builder.build_zext(from, to));
+        }
 
         todo!()
-        // self.builder.build_
     }
 
     fn generate_unary_op(&mut self, op: ast::UnaryOp, expr: &AST) -> Result<(Value, Type)> {

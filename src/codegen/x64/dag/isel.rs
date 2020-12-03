@@ -225,9 +225,14 @@ fn run_on_function(func: &mut DAGFunction) {
         .args(vec![reg_class(RC::GR32).named("x").into()])
         .generate(|m, c| node_gen!((MI.CVTSI2SDrr32 m["x"])))
         .into();
+    let zext_: Pat = ir(IROpcode::Zext)
+        .ty(Type::i32)
+        .args(vec![reg_(RC::GR8).named("r")])
+        .generate(|m, c| node_gen!((MI.MOVZXr32r8 m["r"])))
+        .into();
 
     let pats = vec![
-        store, load, mul8, bin, fbin, br, fiaddr, constaddr, fptosi, sitofp,
+        store, load, mul8, bin, fbin, br, fiaddr, constaddr, fptosi, sitofp, zext_,
     ];
 
     let mut replaced = ReplacedNodeMap::default();

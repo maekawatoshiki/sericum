@@ -26,7 +26,7 @@ fn run_on_function(func: &mut DAGFunction) {
     ];
     let brcond: Pat = ir(IROpcode::BrCond)
         .args(vec![
-            (ir(IROpcode::Setcc).args(args.clone()) | ir(IROpcode::FCmp).args(args))
+            (ir(IROpcode::Setcc).args(args.clone()) | ir(IROpcode::FCmp).args(args.clone()))
                 .named("setcc")
                 .into(),
             any_block().named("dst").into(),
@@ -41,6 +41,21 @@ fn run_on_function(func: &mut DAGFunction) {
                 .args(vec![m["cc"], m["lhs"], m["rhs"], m["dst"]])
                 .into(),
             )
+        })
+        .into();
+    let setcc: Pat = ir(IROpcode::Setcc)
+        .named("setcc")
+        .args(vec![
+            any_cc().named("cc").into(),
+            any_imm().into(),
+            any_reg().into(),
+        ])
+        .generate(|m, c| {
+            println!("!!");
+            let cc = c.arena[m["cc"]].as_operand_mut().as_cc_mut();
+            *cc = cc.flip();
+            c.arena[m["setcc"]].as_ir_mut().args.swap(1, 2);
+            m["setcc"]
         })
         .into();
 
@@ -90,7 +105,7 @@ fn run_on_function(func: &mut DAGFunction) {
             .into())
     .into();
 
-    let pats = vec![brcond, add, mul];
+    let pats = vec![brcond, setcc, add, mul];
 
     let mut replaced = ReplacedNodeMap::default();
     for &id in &func.dag_basic_blocks {

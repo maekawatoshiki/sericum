@@ -30,7 +30,8 @@ pub enum Opcode {
     SIToFP, //
     FPToSI, //
     Bitcast,
-    Sext,   //
+    Sext, //
+    Zext,
     ICmp,   //
     FCmp,   //
     Br,     //
@@ -343,6 +344,7 @@ impl Opcode {
             Opcode::SIToFP => "sitofp",
             Opcode::FPToSI => "fptosi",
             Opcode::Sext => "sext",
+            Opcode::Zext => "zext",
             Opcode::Bitcast => "bitcast",
             Opcode::ICmp => "icmp",
             Opcode::FCmp => "fcmp",

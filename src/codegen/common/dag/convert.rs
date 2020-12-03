@@ -1,17 +1,17 @@
 use crate::codegen::arch::{
-    machine::register::{rc2ty, ty2rc},
     dag::convert::copy_reg_args,
+    machine::register::{rc2ty, ty2rc},
 };
 use crate::codegen::common::{
-    machine::{
-        frame_object::{FrameIndexInfo, FrameIndexKind, LocalVariables},
-        register::RegistersInfo,
-    },
     dag::{
         basic_block::{DAGBasicBlock, DAGBasicBlockId},
         function::DAGFunction,
         module::DAGModule,
         node::{AddressKind, IRNode, IROpcode, ImmediateKind, MINode, Node, NodeId, OperandNode},
+    },
+    machine::{
+        frame_object::{FrameIndexInfo, FrameIndexKind, LocalVariables},
+        register::RegistersInfo,
     },
 };
 use crate::ir::{
@@ -232,12 +232,13 @@ fn convert_block_to_dag_block<'a>(mut ctx: BlockConversionContext<'a>) -> NodeId
                     .into(),
                 )
             }
-            Opcode::Sext | Opcode::Bitcast => {
+            Opcode::Zext | Opcode::Sext | Opcode::Bitcast => {
                 let arg = ctx.node_from_value(&inst.operand.args()[0]);
                 ctx.node_(
                     id,
                     IRNode::new(match inst.opcode {
                         Opcode::Sext => IROpcode::Sext,
+                        Opcode::Zext => IROpcode::Zext,
                         Opcode::Bitcast => IROpcode::Bitcast,
                         _ => unreachable!(),
                     })

@@ -326,6 +326,12 @@ pub trait IRBuilder {
         inst
     }
 
+    fn build_zext(&mut self, v: Value, ty: Type) -> Value {
+        let inst = self.create_inst_value(Opcode::Zext, InstOperand::Cast { arg: v }, ty);
+        self.append_inst_to_current_block(inst.as_instruction().id);
+        inst
+    }
+
     fn build_bitcast(&mut self, v: Value, ty: Type) -> Value {
         let inst = self.create_inst_value(Opcode::Bitcast, InstOperand::Cast { arg: v }, ty);
         self.append_inst_to_current_block(inst.as_instruction().id);

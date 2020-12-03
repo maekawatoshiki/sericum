@@ -45,6 +45,11 @@ mod inst {
                 .set_uses(vec![TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR32))])
                 .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR64)])
         };
+        pub static ref MOVZXr32r8: TargetInstDef = {
+            TargetInstDef::new("movzx", TargetOpcode::MOVZXr32r8)
+                .set_uses(vec![TargetOperand::Register(TargetRegister::RegClass(RegisterClassKind::GR8))])
+                .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR32)])
+        };
         pub static ref LEAr64m: TargetInstDef = {
             TargetInstDef::new("lea", TargetOpcode::LEAr64m)
                 .set_uses(vec![TargetOperand::Mem])
@@ -446,6 +451,26 @@ mod inst {
                 TargetRegister::RegClass(RegisterClassKind::GR64),
             )])
         };
+        pub static ref SETE: TargetInstDef = {
+            TargetInstDef::new("sete", TargetOpcode::SETE)
+                .set_defs(vec![TargetRegister::RegClass(RegisterClassKind::GR8)])
+        };
+        pub static ref SETG: TargetInstDef = {
+            TargetInstDef::new("setg", TargetOpcode::SETG).set_uses(vec![TargetOperand::Block])
+        };
+        pub static ref SETGE: TargetInstDef = {
+            TargetInstDef::new("setge", TargetOpcode::SETGE).set_uses(vec![TargetOperand::Block])
+        };
+        pub static ref SETNE: TargetInstDef = {
+            TargetInstDef::new("setne", TargetOpcode::SETNE).set_uses(vec![TargetOperand::Block])
+        };
+        pub static ref SETLE: TargetInstDef = {
+            TargetInstDef::new("setle", TargetOpcode::SETLE).set_uses(vec![TargetOperand::Block])
+        };
+        pub static ref SETL: TargetInstDef = {
+            TargetInstDef::new("setl", TargetOpcode::SETL).set_uses(vec![TargetOperand::Block])
+        };
+
         pub static ref JG: TargetInstDef = {
             TargetInstDef::new("jg", TargetOpcode::JG).set_uses(vec![TargetOperand::Block])
         };
@@ -503,10 +528,6 @@ mod inst {
     }
 }
 
-// r => register
-// i => constant integer
-// m => TODO: [memory] or [rbp - fi.off]
-// p => [register]
 #[derive(Debug, Clone, PartialEq, Copy)]
 pub enum TargetOpcode {
     MOVSDrm64, // out(xmm) = movsd [memory64] TODO
@@ -528,6 +549,8 @@ pub enum TargetOpcode {
     MOVSXr32r8,
     MOVSXDr64m32, // out = movsxd [rbp - fi.off]
     MOVSXDr64r32, // r64 = movsxd r32
+
+    MOVZXr32r8,
 
     LEAr64m,
 
@@ -589,6 +612,12 @@ pub enum TargetOpcode {
     CMPrr,
     CMPri,
     UCOMISDrr,
+    SETE,
+    SETNE,
+    SETGE,
+    SETG,
+    SETLE,
+    SETL,
     JE,
     JNE,
     JBE,
@@ -620,6 +649,7 @@ impl TargetOpcode {
             Self::MOVSXr32r8 => Some(&*inst::MOVSXr32r8),
             Self::MOVSXDr64m32 => Some(&*inst::MOVSXDr64m32),
             Self::MOVSXDr64r32 => Some(&*inst::MOVSXDr64r32),
+            Self::MOVZXr32r8 => Some(&*inst::MOVZXr32r8),
             Self::LEAr64m => Some(&*inst::LEAr64m),
             Self::ADDrr8 => Some(&*inst::ADDrr8),
             Self::ADDri8 => Some(&*inst::ADDri8),
@@ -673,6 +703,12 @@ impl TargetOpcode {
             Self::IDIV => Some(&*inst::IDIV),
             Self::PUSH64 => Some(&*inst::PUSH64),
             Self::POP64 => Some(&*inst::POP64),
+            Self::SETE => Some(&*inst::SETE),
+            Self::SETG => Some(&*inst::SETG),
+            Self::SETGE => Some(&*inst::SETGE),
+            Self::SETNE => Some(&*inst::SETNE),
+            Self::SETLE => Some(&*inst::SETLE),
+            Self::SETL => Some(&*inst::SETL),
             Self::JMP => Some(&*inst::JMP),
             Self::JG => Some(&*inst::JG),
             Self::JGE => Some(&*inst::JGE),

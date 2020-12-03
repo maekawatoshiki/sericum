@@ -66,6 +66,53 @@ impl<'a> ScheduleContext<'a> {
                 ))
             }
             Node::IR(IRNode {
+                opcode: IROpcode::Setcc,
+                args,
+                ..
+            }) => {
+                let lhs = self.normal_arg(args[1]);
+                let rhs = self.normal_arg(args[2]);
+
+                self.append_inst(MachineInst::new_simple(
+                    if lhs.is_register() && rhs.is_constant() {
+                        MachineOpcode::CMPri
+                    } else if lhs.is_register() && rhs.is_register() {
+                        MachineOpcode::CMPrr
+                    } else {
+                        unreachable!()
+                    },
+                    vec![lhs, rhs],
+                    self.block_id,
+                ));
+
+                let r = RegisterOperand::new(self.func.regs.new_virt_reg(RegisterClassKind::GR8));
+                self.append_inst(
+                    MachineInst::new_simple(
+                        match self.func.node_arena[args[0]].as_operand().as_cc() {
+                            CondKind::Eq => MachineOpcode::SETE,
+                            CondKind::Ne => MachineOpcode::SETNE,
+                            CondKind::Le => MachineOpcode::SETLE,
+                            CondKind::Lt => MachineOpcode::SETL,
+                            CondKind::Ge => MachineOpcode::SETGE,
+                            CondKind::Gt => MachineOpcode::SETG,
+                            _ => todo!(),
+                        },
+                        vec![],
+                        self.block_id,
+                    )
+                    .with_def(vec![r]),
+                );
+
+                let copy = MachineInst::new(
+                    &self.func.regs,
+                    MachineOpcode::Copy,
+                    vec![MachineOperand::Register(r)],
+                    Some(RegisterClassKind::GR8),
+                    self.block_id,
+                );
+                self.append_inst(copy)
+            }
+            Node::IR(IRNode {
                 opcode: IROpcode::Brcc,
                 args,
                 ..

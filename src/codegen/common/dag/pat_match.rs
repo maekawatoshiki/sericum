@@ -410,6 +410,10 @@ pub fn store(src: Pat, dst: Pat) -> Pat {
     ir(IROpcode::Store).args(vec![src, dst]).into()
 }
 
+pub fn sext(arg: Pat) -> Pat {
+    ir(IROpcode::Sext).args(vec![arg]).into()
+}
+
 pub fn add(lhs: Pat, rhs: Pat) -> Pat {
     ir(IROpcode::Add).args(vec![lhs, rhs]).into()
 }
