@@ -465,7 +465,7 @@ impl<'a> BlockConversionContext<'a> {
 
     pub fn gep_node_from_values(&mut self, vals: &[Value]) -> NodeId {
         let mut base = self.node_from_value(&vals[0]);
-        let mut ty = vals[0].get_type();
+        let mut ty = self.func.get_value_type(&vals[0]);
 
         for idx in &vals[1..] {
             let (is_struct, size) = match ty {

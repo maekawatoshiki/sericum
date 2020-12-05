@@ -7,9 +7,9 @@ use crate::codegen::common::{
         node::{IRNode, IROpcode, ImmediateKind, MINode, Node, NodeId, OperandNode},
         pat_match::{
             add, any, any_block, any_cc, any_f64_imm, any_i32_imm, any_imm, any_imm32,
-            any_imm32_power_of_2, any_imm_f64, any_reg, any_slot, fiaddr, gbladdr, inst_select, ir,
-            load, mul, not, reg_, reg_class, reorder_patterns, sext, store, CompoundPat,
-            MatchContext, Pat, ReplacedNodeMap,
+            any_imm32_power_of_2, any_imm_f64, any_reg, any_slot, bitcast, fiaddr, gbladdr,
+            inst_select, ir, load, mul, not, reg_, reg_class, reorder_patterns, sext, store,
+            CompoundPat, MatchContext, Pat, ReplacedNodeMap,
         },
     },
     types::MVType,
@@ -297,15 +297,22 @@ fn run_on_function(func: &mut DAGFunction) {
         c.arena.alloc(mi.args(vec![mem, m["src"]]).into())
     })
     .into();
-    let bitcast: Pat = ir(IROpcode::Bitcast)
-        .args(vec![any().named("arg")])
-        .generate(|m, _| m["arg"])
-        .into();
 
     let pats = vec![
-        load4, load5, load6, load1, load2, load3, store2, store1, sext1, brcc, fpbrcc, store3,
+        load4,
+        load5,
+        load6,
+        load1,
+        load2,
+        load3,
+        store2,
+        store1,
+        sext1,
+        brcc,
+        fpbrcc,
+        store3,
         store4,
-        bitcast,
+        bitcast(any().named("arg")).generate(|m, _| m["arg"]),
         // sext, load4, load5, store, load, load2, load3, store2, brcc, fpbrcc, bitcast, load6, store3,
         // store4,
     ];

@@ -225,6 +225,28 @@ impl Function {
         }
         None
     }
+
+    pub fn get_value_type(&self, val: &Value) -> Type {
+        match val {
+            Value::Argument(ArgumentValue { func_id, index, .. }) => {
+                assert_eq!(self.id, Some(*func_id));
+                self.get_param_type(*index).unwrap()
+            }
+            Value::Instruction(InstructionValue { func_id, id, .. }) => {
+                assert_eq!(self.id, Some(*func_id));
+                self.inst_table[*id].ty
+            }
+            Value::Function(FunctionValue { func_id, .. }) => {
+                self.types.base.borrow().func_ptr_types[func_id]
+            }
+            Value::Global(GlobalValue { id, .. }) => self.types.base.borrow().gblvar_ptr_types[id],
+            Value::Immediate(ref im) => *im.get_type(),
+            Value::Constant(ConstantValue { id, .. }) => {
+                self.types.base.borrow().const_ptr_types[id]
+            }
+            Value::None => Type::Void,
+        }
+    }
 }
 
 impl FunctionTrait for Function {

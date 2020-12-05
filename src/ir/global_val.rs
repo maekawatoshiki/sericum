@@ -38,11 +38,18 @@ impl GlobalVariables {
         linkage: Linkage,
         name: &str,
     ) -> GlobalVariableId {
-        self.arena.alloc(GlobalVariable {
+        let ptr_ty = self.types.new_pointer_ty(ty);
+        let id = self.arena.alloc(GlobalVariable {
             ty,
             linkage,
             name: name.to_string(),
-        })
+        });
+        self.types
+            .base
+            .borrow_mut()
+            .gblvar_ptr_types
+            .insert(id, ptr_ty);
+        id
     }
 
     pub fn new_global_var(&mut self, ty: Type, linkage: Linkage) -> GlobalVariableId {

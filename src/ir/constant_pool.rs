@@ -39,7 +39,14 @@ impl ConstantPool {
     }
 
     pub fn add(&mut self, c: Constant) -> ConstantId {
-        self.arena.alloc(c)
+        let ptr_ty = self.types.new_pointer_ty(c.ty);
+        let id = self.arena.alloc(c);
+        self.types
+            .base
+            .borrow_mut()
+            .const_ptr_types
+            .insert(id, ptr_ty);
+        id
     }
 }
 

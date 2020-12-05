@@ -430,6 +430,10 @@ pub fn gbladdr(g: Pat) -> Pat {
     ir(IROpcode::GlobalAddr).args(vec![g]).into()
 }
 
+pub fn bitcast(arg: Pat) -> Pat {
+    ir(IROpcode::Bitcast).args(vec![arg]).into()
+}
+
 impl Into<Pat> for IRPat {
     fn into(self) -> Pat {
         Pat::IR(self)

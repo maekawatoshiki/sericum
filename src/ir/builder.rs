@@ -176,10 +176,11 @@ pub trait IRBuilder {
     }
 
     fn build_gep(&mut self, v: Value, indices: Vec<Value>) -> Value {
+        let ty = self.func_ref().get_value_type(&v);
         let elem_ty = self
             .func_ref()
             .types
-            .get_element_ty_with_indices(v.get_type(), &indices)
+            .get_element_ty_with_indices(ty, &indices)
             .unwrap();
         let ptr_ty = self.func_ref_mut().types.new_pointer_ty(elem_ty);
         let mut operands = vec![v];
@@ -194,12 +195,13 @@ pub trait IRBuilder {
     }
 
     fn build_load(&mut self, arg: Value) -> Value {
+        let ty = self.func_ref().get_value_type(&arg);
         let inst = self.create_inst_value(
             Opcode::Load,
             InstOperand::Load { arg },
             self.func_ref()
                 .types
-                .get_element_ty(arg.get_type(), None)
+                .get_element_ty(ty, None)
                 .unwrap()
                 .clone(),
         );
@@ -222,11 +224,8 @@ pub trait IRBuilder {
             return konst;
         }
 
-        let inst = self.create_inst_value(
-            Opcode::Add,
-            InstOperand::Binary { args: [v1, v2] },
-            v1.get_type(),
-        );
+        let ty = self.func_ref().get_value_type(&v1);
+        let inst = self.create_inst_value(Opcode::Add, InstOperand::Binary { args: [v1, v2] }, ty);
         self.append_inst_to_current_block(inst.as_instruction().id);
         inst
     }
@@ -239,11 +238,8 @@ pub trait IRBuilder {
             return konst;
         }
 
-        let inst = self.create_inst_value(
-            Opcode::Sub,
-            InstOperand::Binary { args: [v1, v2] },
-            v1.get_type(),
-        );
+        let ty = self.func_ref().get_value_type(&v1);
+        let inst = self.create_inst_value(Opcode::Sub, InstOperand::Binary { args: [v1, v2] }, ty);
         self.append_inst_to_current_block(inst.as_instruction().id);
         inst
     }
@@ -253,11 +249,8 @@ pub trait IRBuilder {
             return konst;
         }
 
-        let inst = self.create_inst_value(
-            Opcode::Mul,
-            InstOperand::Binary { args: [v1, v2] },
-            v1.get_type(),
-        );
+        let ty = self.func_ref().get_value_type(&v1);
+        let inst = self.create_inst_value(Opcode::Mul, InstOperand::Binary { args: [v1, v2] }, ty);
         self.append_inst_to_current_block(inst.as_instruction().id);
         inst
     }
@@ -271,11 +264,8 @@ pub trait IRBuilder {
             return konst;
         }
 
-        let inst = self.create_inst_value(
-            Opcode::Div,
-            InstOperand::Binary { args: [v1, v2] },
-            v1.get_type(),
-        );
+        let ty = self.func_ref().get_value_type(&v1);
+        let inst = self.create_inst_value(Opcode::Div, InstOperand::Binary { args: [v1, v2] }, ty);
         self.append_inst_to_current_block(inst.as_instruction().id);
         inst
     }
@@ -285,11 +275,8 @@ pub trait IRBuilder {
             return konst;
         }
 
-        let inst = self.create_inst_value(
-            Opcode::Rem,
-            InstOperand::Binary { args: [v1, v2] },
-            v1.get_type(),
-        );
+        let ty = self.func_ref().get_value_type(&v1);
+        let inst = self.create_inst_value(Opcode::Rem, InstOperand::Binary { args: [v1, v2] }, ty);
         self.append_inst_to_current_block(inst.as_instruction().id);
         inst
     }
@@ -299,11 +286,8 @@ pub trait IRBuilder {
         //     return konst;
         // }
 
-        let inst = self.create_inst_value(
-            Opcode::Shl,
-            InstOperand::Binary { args: [v1, v2] },
-            v1.get_type(),
-        );
+        let ty = self.func_ref().get_value_type(&v1);
+        let inst = self.create_inst_value(Opcode::Shl, InstOperand::Binary { args: [v1, v2] }, ty);
         self.append_inst_to_current_block(inst.as_instruction().id);
         inst
     }
@@ -407,7 +391,7 @@ pub trait IRBuilder {
     }
 
     fn build_phi(&mut self, pairs: Vec<(Value, BasicBlockId)>) -> Value {
-        let ty = pairs.get(0).unwrap().0.get_type();
+        let ty = self.func_ref().get_value_type(&pairs.get(0).unwrap().0);
         let mut blocks = vec![];
         let mut args = vec![];
         for (v, bb) in pairs {
@@ -420,12 +404,9 @@ pub trait IRBuilder {
     }
 
     fn build_call(&mut self, f: Value, args: Vec<Value>) -> Value {
-        let ret_ty = self
-            .func_ref()
-            .types
-            .compound_ty(f.get_type())
-            .as_function()
-            .ret_ty;
+        let f_ptr_ty = self.func_ref().get_value_type(&f);
+        let f_ty = *self.func_ref().types.compound_ty(f_ptr_ty).as_pointer();
+        let ret_ty = self.func_ref().types.compound_ty(f_ty).as_function().ret_ty;
         let mut operands = vec![f];
         operands.extend(args);
         let inst =

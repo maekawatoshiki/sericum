@@ -89,7 +89,13 @@ impl Module {
     /// Attaches an existing function to the module.
     /// See also [Function](../function/struct.Function.html) to understand how this method is used.
     pub fn add_function(&mut self, f: Function) -> FunctionId {
+        let ptr_ty = self.types.new_pointer_ty(f.ty);
         let id = self.functions.alloc(f);
+        self.types
+            .base
+            .borrow_mut()
+            .func_ptr_types
+            .insert(id, ptr_ty);
         self.function_ref_mut(id).id = Some(id);
         id
     }

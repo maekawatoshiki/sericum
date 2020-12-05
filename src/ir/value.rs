@@ -134,18 +134,6 @@ impl Value {
         }
     }
 
-    pub fn get_type(&self) -> Type {
-        match self {
-            Value::Argument(ArgumentValue { ty, .. }) => *ty,
-            Value::Instruction(InstructionValue { ty, .. }) => *ty,
-            Value::Function(FunctionValue { ty, .. }) => *ty,
-            Value::Global(GlobalValue { ty, .. }) => *ty,
-            Value::Immediate(ref im) => *im.get_type(),
-            Value::Constant(ConstantValue { ty, .. }) => *ty,
-            Value::None => Type::Void,
-        }
-    }
-
     pub fn get_inst_id(&self) -> Option<InstructionId> {
         match self {
             Value::Instruction(InstructionValue { id, .. }) => Some(*id),

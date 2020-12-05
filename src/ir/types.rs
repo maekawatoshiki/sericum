@@ -1,4 +1,5 @@
 use super::value::Value;
+use crate::{constant_pool::ConstantId, function::FunctionId, global_val::GlobalVariableId};
 use id_arena::*;
 use rustc_hash::{FxHashMap, FxHashSet};
 use std::convert::From;
@@ -17,6 +18,9 @@ pub struct Types {
 #[derive(Clone)]
 pub struct TypesBase {
     pub compound_types: Arena<CompoundType>,
+    pub func_ptr_types: FxHashMap<FunctionId, Type>,
+    pub const_ptr_types: FxHashMap<ConstantId, Type>,
+    pub gblvar_ptr_types: FxHashMap<GlobalVariableId, Type>,
 }
 
 pub type CompoundTypeId = Id<CompoundType>;
@@ -232,6 +236,9 @@ impl TypesBase {
     pub fn new() -> Self {
         Self {
             compound_types: Arena::new(),
+            func_ptr_types: FxHashMap::default(),
+            const_ptr_types: FxHashMap::default(),
+            gblvar_ptr_types: FxHashMap::default(),
         }
     }
 

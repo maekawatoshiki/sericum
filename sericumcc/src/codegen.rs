@@ -531,12 +531,20 @@ impl<'a> FunctionCodeGenerator<'a> {
     }
 
     fn generate_assign(&mut self, dst: &AST, src: &AST) -> Result<(Value, Type)> {
-        let (dst, ty_) = self.generate(retrieve_from_load(dst))?;
-        let (src, ty) = self.generate(src)?;
-        let ty_ = ty_.conv(self.compound_types, &self.builder.module().unwrap().types);
-        let src = self.do_type_cast(src, ty_)?;
+        let (dst, dst_ty) = self.generate(retrieve_from_load(dst))?;
+        let (src, _ty) = self.generate(src)?;
+        let (cast_ty, cast_ty_s) = if let Type::Pointer(id) = dst_ty {
+            let inner = self.compound_types[id].as_pointer();
+            (
+                inner,
+                inner.conv(self.compound_types, &self.builder.module().unwrap().types),
+            )
+        } else {
+            panic!()
+        };
+        let src = self.do_type_cast(src, cast_ty_s)?;
         self.builder.build_store(src, dst);
-        Ok((self.builder.build_load(dst), ty))
+        Ok((self.builder.build_load(dst), cast_ty))
     }
 
     fn generate_load(&mut self, val: &AST) -> Result<(Value, Type)> {
@@ -575,7 +583,7 @@ impl<'a> FunctionCodeGenerator<'a> {
 
     fn do_type_cast(&mut self, from: Value, to: types::Type) -> Result<Value> {
         use sericum::types::TypeSize;
-        let from_ty = from.get_type();
+        let from_ty = self.builder.func_ref().get_value_type(&from);
         let ty_sz = from_ty.size_in_byte(&self.builder.module().unwrap().types);
         let to_sz = to.size_in_byte(&self.builder.module().unwrap().types);
 
