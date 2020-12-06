@@ -373,7 +373,7 @@ impl<'a> Mem2RegOnFunction<'a> {
                         let val = Value::Instruction(InstructionValue {
                             func_id: self.cur_func.id.unwrap(),
                             id,
-                            ty,
+                            // ty,
                         });
                         added_phi.insert((cur, *alloca_id), val);
                         *incoming_val = val;

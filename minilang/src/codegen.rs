@@ -379,10 +379,7 @@ impl<'a> CodeGeneratorForFunction<'a> {
                 let ret_ty = self.types.functions.get(&func_id).unwrap().0.clone();
                 (
                     self.builder.build_call(
-                        sericum::value::Value::new_func(sericum::value::FunctionValue {
-                            func_id,
-                            ty: self.builder.module().unwrap().function_ref(func_id).ty,
-                        }),
+                        sericum::value::Value::new_func(sericum::value::FunctionValue { func_id }),
                         args,
                     ),
                     ret_ty,

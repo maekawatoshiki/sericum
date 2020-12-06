@@ -149,16 +149,13 @@ impl Module {
             kind: ConstantKind::String(s),
             ty: i8_arr,
         });
-        value::Value::Constant(value::ConstantValue {
-            id,
-            ty: self.types.new_pointer_ty(i8_arr),
-        })
+        value::Value::Constant(value::ConstantValue { id })
     }
 
     pub fn create_constant(&mut self, c: Constant) -> value::Value {
-        let ty = self.types.new_pointer_ty(c.ty);
+        // let ty = self.types.new_pointer_ty(c.ty);
         let id = self.const_pool.add(c);
-        value::Value::Constant(value::ConstantValue { ty, id })
+        value::Value::Constant(value::ConstantValue { id })
     }
 
     pub fn ir_builder<'a>(&'a mut self, func_id: FunctionId) -> IRBuilderWithModuleAndFuncId<'a> {

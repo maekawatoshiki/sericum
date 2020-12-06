@@ -951,6 +951,7 @@ fn assemble_and_run(c_lib: &str, s_target: &str, md5hash: Option<&str>) {
         .args(&[
             lib_name.as_str(),
             target_name.as_str(),
+            "-no-pie",
             "-lm",
             "-o",
             output_name.as_str(),

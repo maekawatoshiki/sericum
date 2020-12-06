@@ -110,18 +110,10 @@ impl Function {
     }
 
     pub fn get_param_value(&self, idx: usize) -> Option<Value> {
-        self.types
-            .compound_ty(self.ty)
-            .as_function()
-            .params_ty
-            .get(idx)
-            .map_or(None, |&ty| {
-                Some(Value::Argument(ArgumentValue {
-                    func_id: self.id.unwrap(),
-                    index: idx,
-                    ty,
-                }))
-            })
+        Some(Value::Argument(ArgumentValue {
+            func_id: self.id?,
+            index: idx,
+        }))
     }
 
     pub fn get_param_type(&self, idx: usize) -> Option<Type> {

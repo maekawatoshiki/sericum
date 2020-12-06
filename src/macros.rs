@@ -193,15 +193,13 @@ macro_rules! sericum_expr {
             let id = $builder.module().unwrap().find_function(stringify!($name)).unwrap();
             value::FunctionValue {
                 func_id: id,
-                ty: $builder.module().unwrap().function_ref(id).ty,
             }}), args);
         $crate::sericum_expr!($builder; $bb_map; $( $remain )*);
     };
     ($builder:expr; $bb_map:expr; $x:ident = call (->$id:expr) [$( ( $($arg:tt)* ) ),*] ; $($remain:tt)*) => {
         let args = vec![ $( $crate::sericum_value!($builder; $( $arg )*) ),* ];
         let $x = $builder.build_call(value::Value::Function({
-            let ty = $builder.module().unwrap().function_ref($id).ty;
-            value::FunctionValue { func_id: $id, ty}
+            value::FunctionValue { func_id: $id }
         }), args);
         $crate::sericum_expr!($builder; $bb_map; $( $remain )*);
     };

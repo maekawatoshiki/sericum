@@ -97,7 +97,13 @@ fn assemble_and_run(s_target: &str) {
 
     let output_name = unique_file_name("out");
     let compilation = process::Command::new("clang")
-        .args(&[target_name.as_str(), "-o", output_name.as_str(), "-lm"])
+        .args(&[
+            target_name.as_str(),
+            "-o",
+            output_name.as_str(),
+            "-lm",
+            "-no-pie",
+        ])
         .status()
         .unwrap();
     assert!(compilation.success());

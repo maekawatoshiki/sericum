@@ -73,7 +73,7 @@ impl<'a> GlobalCommonSubexprEliminationOnFunction<'a> {
                 let common_val = Value::Instruction(InstructionValue {
                     id: *common,
                     func_id: self.func.id.unwrap(),
-                    ty: self.func.inst_table[*common].ty,
+                    // ty: self.func.inst_table[*common].ty,
                 });
                 Instruction::replace_all_uses(&mut self.func.inst_table, inst_id, common_val);
                 self.removal_list.push(inst_id);
@@ -168,11 +168,10 @@ impl<'a> GlobalCommonSubexprEliminationOnFunction<'a> {
                     args.push(Value::Instruction(InstructionValue {
                         func_id: self.func.id.unwrap(),
                         id: inst_id,
-                        ty: self.func.inst_table[inst_id].ty,
                     }));
                     blocks.push(block);
                 }
-                let ty = args[0].as_instruction().ty;
+                let ty = self.func.get_value_type(&args[0]);
                 let phi = Instruction::new(
                     Opcode::Phi,
                     InstOperand::Phi { args, blocks },
@@ -184,7 +183,6 @@ impl<'a> GlobalCommonSubexprEliminationOnFunction<'a> {
         }
 
         for (inst2replace, phi) in phis {
-            let ty = phi.ty;
             let id = self.func.alloc_inst(phi);
             self.func.basic_blocks.arena[*ebb_start]
                 .iseq_ref_mut()
@@ -192,7 +190,7 @@ impl<'a> GlobalCommonSubexprEliminationOnFunction<'a> {
             let val = Value::Instruction(InstructionValue {
                 func_id: self.func.id.unwrap(),
                 id,
-                ty,
+                // ty,
             });
             Instruction::replace_all_uses(&mut self.func.inst_table, inst2replace, val);
             self.removal_list.push(inst2replace);

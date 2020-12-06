@@ -439,9 +439,10 @@ impl<'a> BlockConversionContext<'a> {
                 let f = self.module.function_ref(*func_id);
                 self.node(AddressKind::FunctionName(f.name.to_string()).into())
             }
-            Value::Global(GlobalValue { id, ty }) => {
+            Value::Global(GlobalValue { id }) => {
+                let ty = self.func.get_value_type(val);
                 let gbl = self.node(AddressKind::Global(*id).into());
-                let addr_ty = self.func.types.new_pointer_ty(*ty);
+                let addr_ty = self.func.types.new_pointer_ty(ty);
                 self.node(
                     IRNode::new(IROpcode::GlobalAddr)
                         .args(vec![gbl])
@@ -449,9 +450,10 @@ impl<'a> BlockConversionContext<'a> {
                         .into(),
                 )
             }
-            Value::Constant(ConstantValue { id, ty }) => {
+            Value::Constant(ConstantValue { id }) => {
+                let ty = self.func.get_value_type(val);
                 let cnst = self.node(AddressKind::Const(*id).into());
-                let addr_ty = self.func.types.new_pointer_ty(*ty);
+                let addr_ty = self.func.types.new_pointer_ty(ty);
                 self.node(
                     IRNode::new(IROpcode::ConstAddr)
                         .args(vec![cnst])

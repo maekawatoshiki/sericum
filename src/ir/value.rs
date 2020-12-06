@@ -52,32 +52,27 @@ pub enum Value {
 pub struct ArgumentValue {
     pub func_id: FunctionId,
     pub index: usize,
-    pub ty: Type,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Hash, Eq)]
 pub struct InstructionValue {
     pub func_id: FunctionId,
     pub id: InstructionId,
-    pub ty: Type,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Hash, Eq)]
 pub struct FunctionValue {
     pub func_id: FunctionId,
-    pub ty: Type,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Hash, Eq)]
 pub struct GlobalValue {
     pub id: GlobalVariableId,
-    pub ty: Type,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Hash, Eq)]
 pub struct ConstantValue {
     pub id: ConstantId,
-    pub ty: Type,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -118,8 +113,8 @@ impl Value {
         Self::Function(f)
     }
 
-    pub fn new_inst(func_id: FunctionId, id: InstructionId, ty: Type) -> Self {
-        Value::Instruction(InstructionValue { func_id, id, ty })
+    pub fn new_inst(func_id: FunctionId, id: InstructionId) -> Self {
+        Value::Instruction(InstructionValue { func_id, id })
     }
 
     pub fn null(ty: Type) -> Self {
@@ -197,12 +192,13 @@ impl Value {
                     .ret_ty;
                 format!("{} {}", parent.types.to_string(ret_ty), f.name)
             }
-            Value::Global(GlobalValue { id, ty }) => {
+            Value::Global(GlobalValue { id }) => {
                 let g = &parent.global_vars.arena[*id];
-                format!("{} @{}", parent.types.to_string(*ty), g.name)
+                format!("{} @{}", parent.types.to_string(g.ty), g.name)
             }
-            Value::Constant(ConstantValue { id, ty }) => {
-                format!("{} @const.{}", parent.types.to_string(*ty), id.index())
+            Value::Constant(ConstantValue { id }) => {
+                let ty = parent.const_pool.arena[*id].ty;
+                format!("{} @const.{}", parent.types.to_string(ty), id.index())
             }
             Value::None => "".to_string(),
         }

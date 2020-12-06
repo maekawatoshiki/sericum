@@ -113,9 +113,7 @@ pub trait IRBuilder {
     fn block_mut(&mut self) -> &mut Option<BasicBlockId>;
 
     fn new_func_value(&self, id: FunctionId) -> Option<Value> {
-        let module = self.module()?;
-        let ty = module.function_ref(id).ty;
-        Some(Value::Function(FunctionValue { func_id: id, ty }))
+        Some(Value::Function(FunctionValue { func_id: id }))
     }
 
     fn get_param(&self, idx: usize) -> Option<Value> {
@@ -441,7 +439,6 @@ pub trait IRBuilder {
         Value::Instruction(InstructionValue {
             func_id: self.func_ref().id.unwrap(),
             id: inst_id,
-            ty: ret_ty,
         })
     }
 
