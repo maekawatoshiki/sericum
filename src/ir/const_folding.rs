@@ -1,4 +1,5 @@
 use crate::ir::{
+    builder::IRBuilder,
     function::Function,
     module::Module,
     opcode::{Instruction, Opcode},
@@ -32,6 +33,7 @@ impl<'a> ConstantFoldingOnFunction<'a> {
 
     pub fn run(&mut self) {
         let mut foldable = VecDeque::new();
+        let mut foldable_condbr = VecDeque::new();
         // TODO: Had better implement a conversion from Mul/Div to Shl/Shr in instcombine pass
         let mut to_shift = VecDeque::new();
 
@@ -44,10 +46,37 @@ impl<'a> ConstantFoldingOnFunction<'a> {
                     foldable.push_back(inst_id);
                 }
 
+                if Self::is_foldable_condbr(inst) {
+                    foldable_condbr.push_back(inst_id)
+                }
+
                 if Self::is_mul_power_of_two(inst) {
                     to_shift.push_back(inst_id);
                 }
             }
+        }
+
+        while let Some(inst_id) = foldable_condbr.pop_front() {
+            let inst = &self.cur_func.inst_table[inst_id];
+            let cur_block = inst.parent;
+            let cond = inst.operand.args()[0].as_imm().as_int1();
+            let dst = inst.operand.blocks()[1 - cond as usize];
+            let not_dst = inst.operand.blocks()[cond as usize];
+            let (block, index) = self.cur_func.find_inst_pos(inst_id).unwrap();
+            {
+                let mut builder = self.cur_func.ir_builder();
+                builder.set_insert_point_at(index, block);
+                builder.build_br(dst);
+            }
+            self.cur_func
+                .basic_block_ref_mut(cur_block)
+                .succ
+                .remove(&not_dst);
+            self.cur_func
+                .basic_block_ref_mut(not_dst)
+                .pred
+                .remove(&cur_block);
+            self.cur_func.remove_inst(inst_id);
         }
 
         while let Some(inst_id) = foldable.pop_front() {
@@ -96,6 +125,15 @@ impl<'a> ConstantFoldingOnFunction<'a> {
             .args()
             .iter()
             .all(|op| matches!(op, Value::Immediate(_)))
+    }
+
+    fn is_foldable_condbr(inst: &Instruction) -> bool {
+        matches!(inst.opcode, Opcode::CondBr)
+            && inst
+                .operand
+                .args()
+                .iter()
+                .all(|op| matches!(op, Value::Immediate(_)))
     }
 
     fn is_mul_power_of_two(inst: &Instruction) -> bool {

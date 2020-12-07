@@ -400,6 +400,7 @@ impl<'a> BlockConversionContext<'a> {
             }
             Value::Immediate(imm) => {
                 let imm = match imm {
+                    ImmediateValue::Int1(i) => ImmediateKind::Int8(*i as i8),
                     ImmediateValue::Int8(i) => ImmediateKind::Int8(*i),
                     ImmediateValue::Int32(i) => ImmediateKind::Int32(*i),
                     ImmediateValue::Int64(i) => ImmediateKind::Int64(*i),

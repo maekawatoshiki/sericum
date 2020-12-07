@@ -863,11 +863,6 @@ mod aarch64 {
                     builder.build_call(
                         value::Value::new_func(value::FunctionValue {
                             func_id: sericum_printch_i32,
-                            ty: builder
-                                .module()
-                                .unwrap()
-                                .function_ref(sericum_printch_i32)
-                                .ty,
                         }),
                         vec![cur_val],
                     );

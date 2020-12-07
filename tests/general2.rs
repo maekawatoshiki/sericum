@@ -183,10 +183,7 @@ mod x86_64 {
         let g = m
             .global_vars
             .new_global_var_with_name(ty, global_val::Linkage::Common, "g");
-        let g = value::Value::Global(value::GlobalValue {
-            id: g,
-            ty: m.types.new_pointer_ty(ty),
-        });
+        let g = value::Value::Global(value::GlobalValue { id: g });
 
         sericum_ir!(m; define [i32] test [] {
             entry:
@@ -218,10 +215,7 @@ mod x86_64 {
         let g = m
             .global_vars
             .new_global_var_with_name(ty, global_val::Linkage::Common, "g");
-        let g = value::Value::Global(value::GlobalValue {
-            id: g,
-            ty: m.types.new_pointer_ty(ty),
-        });
+        let g = value::Value::Global(value::GlobalValue { id: g });
 
         sericum_ir!(m; define [i32] test [] {
             entry:

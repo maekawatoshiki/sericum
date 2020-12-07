@@ -29,9 +29,9 @@ macro_rules! const_op {
     pub fn $name(&self, v: &Value) -> Option<Value> {
         use ImmediateValue::*;
         match (self, v) {
-            (Value::Immediate(Int8(x)), Value::Immediate(Int8(y))) => Some(Value::Immediate(Int8((x $op y) as i8))),
-            (Value::Immediate(Int32(x)), Value::Immediate(Int32(y))) => Some(Value::Immediate(Int8((x $op y) as i8))),
-            (Value::Immediate(F64(x)), Value::Immediate(F64(y))) => Some(Value::Immediate(Int8((x $op y) as i8))),
+            (Value::Immediate(Int8(x)), Value::Immediate(Int8(y))) => Some(Value::Immediate(Int1((x $op y) as bool))),
+            (Value::Immediate(Int32(x)), Value::Immediate(Int32(y))) => Some(Value::Immediate(Int1((x $op y) as bool))),
+            (Value::Immediate(F64(x)), Value::Immediate(F64(y))) => Some(Value::Immediate(Int1((x $op y) as bool))),
             _ => None,
         }
     } }
@@ -77,6 +77,7 @@ pub struct ConstantValue {
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ImmediateValue {
+    Int1(bool),
     Int8(i8),
     Int32(i32),
     Int64(i64),
@@ -86,6 +87,7 @@ pub enum ImmediateValue {
 impl hash::Hash for ImmediateValue {
     fn hash<H: hash::Hasher>(&self, state: &mut H) {
         match self {
+            Self::Int1(i) => i.hash(state),
             Self::Int8(i) => i.hash(state),
             Self::Int32(i) => i.hash(state),
             Self::Int64(i) => i.hash(state),
@@ -144,6 +146,7 @@ impl Value {
     const_op!(const_div, /);
     const_op!(int_only const_rem, %);
     const_op!(cmp const_eq, ==);
+    const_op!(cmp const_lt, <);
 
     // Utils
 
@@ -155,6 +158,7 @@ impl Value {
                 format!("{} %arg.{}", ty.to_string(), index)
             }
             Value::Immediate(iv) => match iv {
+                ImmediateValue::Int1(i) => format!("i1 {}", i),
                 ImmediateValue::Int8(i) => format!("i8 {}", i),
                 ImmediateValue::Int32(i) => format!("i32 {}", i),
                 ImmediateValue::Int64(i) => format!("i64 {}", i),
@@ -244,6 +248,7 @@ impl Value {
 impl ImmediateValue {
     pub fn is_power_of_two(&self) -> Option<u32> {
         match self {
+            Self::Int1(x) => Some(1 - *x as u32),
             Self::Int8(x) if (*x as usize).is_power_of_two() => Some(x.trailing_zeros()),
             Self::Int32(x) if (*x as usize).is_power_of_two() => Some(x.trailing_zeros()),
             Self::Int64(x) if (*x as usize).is_power_of_two() => Some(x.trailing_zeros()),
@@ -253,10 +258,18 @@ impl ImmediateValue {
 
     pub fn get_type(&self) -> &Type {
         match self {
+            ImmediateValue::Int1(_) => &Type::i1,
             ImmediateValue::Int8(_) => &Type::i8,
             ImmediateValue::Int32(_) => &Type::i32,
             ImmediateValue::Int64(_) => &Type::i64,
             ImmediateValue::F64(_) => &Type::f64,
+        }
+    }
+
+    pub fn as_int1(&self) -> bool {
+        match self {
+            ImmediateValue::Int1(i) => *i,
+            _ => panic!(),
         }
     }
 

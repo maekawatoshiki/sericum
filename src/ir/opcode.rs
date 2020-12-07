@@ -240,6 +240,7 @@ impl Instruction {
             Opcode::Rem => self.operand.args()[0].const_rem(&self.operand.args()[1]),
             Opcode::ICmp => match self.operand.int_cmp()[0] {
                 ICmpKind::Eq => self.operand.args()[0].const_eq(&self.operand.args()[1]),
+                ICmpKind::Lt => self.operand.args()[0].const_lt(&self.operand.args()[1]),
                 _ => None,
             },
             Opcode::Zext => match self.ty {

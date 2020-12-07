@@ -7,7 +7,9 @@ use crate::traits::pass::ModulePassTrait;
 use rustc_hash::{FxHashMap, FxHashSet};
 
 // Must run after phi elimination
-pub struct BranchFolding {}
+pub struct BranchFolding {
+    only_removing_unreachable_block: bool,
+}
 
 impl ModulePassTrait for BranchFolding {
     type M = MachineModule;
@@ -23,7 +25,14 @@ impl ModulePassTrait for BranchFolding {
 
 impl BranchFolding {
     pub fn new() -> Self {
-        Self {}
+        Self {
+            only_removing_unreachable_block: false,
+        }
+    }
+
+    pub fn only_removing_unreachable_block(mut self) -> Self {
+        self.only_removing_unreachable_block = true;
+        self
     }
 
     pub fn run_on_module(&mut self, module: &mut MachineModule) {
@@ -33,9 +42,11 @@ impl BranchFolding {
             }
 
             self.remove_unreachable(f);
-            self.remove_empty_block(f);
-            self.merge_blocks(f);
-            self.remove_jmp(f);
+            if !self.only_removing_unreachable_block {
+                self.remove_empty_block(f);
+                self.merge_blocks(f);
+                self.remove_jmp(f);
+            }
         }
     }
 

@@ -122,10 +122,11 @@ pub fn standard_conversion_into_machine_module(mut module: Module) -> MachineMod
     // let mut machine_module = dag::mc_convert::convert_module(dag_module);
 
     let mut pass_mgr = ModulePassManager::new();
+    pass_mgr.add_pass(branch_folding::BranchFolding::new().only_removing_unreachable_block());
     pass_mgr.add_pass(phi_elimination::PhiElimination::new());
     pass_mgr.add_pass(machine::two_addr::TwoAddressConverter::new());
     pass_mgr.add_pass(machine::regalloc::RegisterAllocator::new());
-    pass_mgr.add_pass(branch_folding::BranchFolding::new());
+    pass_mgr.add_pass(branch_folding::BranchFolding::new()); // apply after regalloc
     pass_mgr.add_pass(machine::pro_epi_inserter::PrologueEpilogueInserter::new());
     pass_mgr.add_pass(machine::replace_copy::ReplaceCopyWithProperMInst::new());
     pass_mgr.add_pass(machine::replace_data::ReplaceConstFPWithMemoryRef::new());

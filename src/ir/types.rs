@@ -420,13 +420,16 @@ impl TypesBase {
                         s.fields_ty
                             .iter()
                             .fold("".to_string(), |mut s, t| {
-                                s += &(self.to_string_sub(&mut FxHashSet::default(), *t) + ", ");
+                                s += &(self.to_string_sub(structs, *t) + ", ");
                                 s
                             })
                             .trim_matches(&[',', ' '][0..])
                     )
                 } else {
-                    format!("struct.{}", s.name.as_ref().unwrap())
+                    format!(
+                        "struct.{}",
+                        s.name.as_ref().unwrap_or(&"_anonymous".to_string())
+                    )
                 }
             }
         }
