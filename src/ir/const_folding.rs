@@ -1,9 +1,13 @@
-use crate::ir::{
-    builder::IRBuilder,
-    function::Function,
-    module::Module,
-    opcode::{Instruction, Opcode},
-    value::Value,
+use crate::{
+    basic_block::BasicBlockId,
+    ir::{
+        builder::IRBuilder,
+        function::Function,
+        module::Module,
+        opcode::{Instruction, Opcode},
+        remove_unreachable_block::RemoveUnreachableBlockOnFunction,
+        value::Value,
+    },
 };
 use std::collections::VecDeque;
 // use rustc_hash::FxHashMap;
@@ -21,7 +25,7 @@ impl ConstantFolding {
 
     pub fn run_on_module(&mut self, module: &mut Module) {
         for (_, func) in &mut module.functions {
-            ConstantFoldingOnFunction::new(func).run()
+            ConstantFoldingOnFunction::new(func).run();
         }
     }
 }
@@ -36,6 +40,8 @@ impl<'a> ConstantFoldingOnFunction<'a> {
         let mut foldable_condbr = VecDeque::new();
         // TODO: Had better implement a conversion from Mul/Div to Shl/Shr in instcombine pass
         let mut to_shift = VecDeque::new();
+        let mut changed = false;
+        let mut cfg_changed = false;
 
         for &id in &self.cur_func.basic_blocks.order {
             let bb = &self.cur_func.basic_blocks.arena[id];
@@ -77,6 +83,8 @@ impl<'a> ConstantFoldingOnFunction<'a> {
                 .pred
                 .remove(&cur_block);
             self.cur_func.remove_inst(inst_id);
+            changed |= true;
+            cfg_changed |= true;
         }
 
         while let Some(inst_id) = foldable.pop_front() {
@@ -87,11 +95,11 @@ impl<'a> ConstantFoldingOnFunction<'a> {
             };
             let users = inst.users.clone();
             for &user_id in &*users.borrow() {
-                Instruction::replace_operand_value(
+                Instruction::replace_inst_operand(
                     &mut self.cur_func.inst_table,
                     user_id,
                     // TODO: Very inefficient!
-                    &Value::new_inst(self.cur_func.id.unwrap(), inst_id),
+                    inst_id,
                     folded,
                 );
                 let user = &self.cur_func.inst_table[user_id];
@@ -100,6 +108,7 @@ impl<'a> ConstantFoldingOnFunction<'a> {
                 }
             }
             self.cur_func.remove_inst(inst_id);
+            changed |= true;
         }
 
         while let Some(inst_id) = to_shift.pop_front() {
@@ -113,6 +122,15 @@ impl<'a> ConstantFoldingOnFunction<'a> {
                     .is_power_of_two()
                     .unwrap() as i8,
             );
+            changed |= true;
+        }
+
+        if cfg_changed {
+            RemoveUnreachableBlockOnFunction::new(self.cur_func).run();
+        }
+
+        if self.fold_phi() || changed {
+            self.run()
         }
     }
 
@@ -142,5 +160,65 @@ impl<'a> ConstantFoldingOnFunction<'a> {
             && inst.operand.args()[1]
                 .get_imm()
                 .map_or(false, |i| i.is_power_of_two().is_some())
+    }
+}
+
+impl<'a> ConstantFoldingOnFunction<'a> {
+    fn fold_phi(&mut self) -> bool {
+        let mut changed = false;
+        let mut remove_list = vec![];
+
+        for &id in &self.cur_func.basic_blocks.order {
+            let bb = &self.cur_func.basic_blocks.arena[id];
+            for &inst_id in &*bb.iseq_ref() {
+                let inst = &self.cur_func.inst_table[inst_id];
+                if inst.opcode != Opcode::Phi {
+                    continue;
+                }
+                let args = self.necessary_phi_args(inst);
+                if inst.operand.args().len() == args.len() {
+                    // nothing to do
+                    continue;
+                }
+                assert_eq!(inst.operand.args().len(), 2); // TODO: Support cases with more than two values
+                let phi_users = inst.users.borrow().clone();
+                match args.len() {
+                    0 => panic!(),
+                    1 => {
+                        // replace phi users
+                        for user in phi_users {
+                            Instruction::replace_inst_operand(
+                                &mut self.cur_func.inst_table,
+                                user,
+                                inst_id,
+                                args[0].0,
+                            )
+                        }
+                        remove_list.push(inst_id);
+                        changed |= true;
+                    }
+                    _ => {
+                        // 1 < args.len() < phi.args.len()
+                        todo!()
+                    }
+                }
+            }
+        }
+
+        for id in remove_list {
+            self.cur_func.remove_inst(id)
+        }
+
+        changed
+    }
+
+    fn necessary_phi_args(&self, inst: &Instruction) -> Vec<(Value, BasicBlockId)> {
+        let mut args = vec![];
+        for (value, block) in inst.operand.args().iter().zip(inst.operand.blocks().iter()) {
+            if self.cur_func.basic_blocks.order.contains(block) {
+                args.push((*value, *block))
+            }
+        }
+        args
     }
 }

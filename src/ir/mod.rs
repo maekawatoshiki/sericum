@@ -15,6 +15,7 @@ pub mod merge_ret;
 pub mod module;
 pub mod opcode;
 pub mod prelude;
+pub mod remove_unreachable_block;
 pub mod simplify_loop;
 pub mod types;
 pub mod value;

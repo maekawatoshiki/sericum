@@ -19,7 +19,7 @@ pub mod types;
 
 // TODO: Refine code
 
-pub fn compile(path: PathBuf) {
+pub fn compile(path: PathBuf, optimization: bool) {
     let mut lexer = lexer::Lexer::new(path);
     let mut parser = parser::Parser::new(&mut lexer);
     let nodes = match parser.parse() {
@@ -59,9 +59,11 @@ pub fn compile(path: PathBuf) {
         }
     }
 
-    // sericum::ir::mem2reg::Mem2Reg::new().run_on_module(&mut codegen.module);
-    // sericum::ir::cse::CommonSubexprElimination::new().run_on_module(&mut codegen.module);
-    // sericum::ir::licm::LoopInvariantCodeMotion::new().run_on_module(&mut codegen.module);
+    if optimization {
+        sericum::ir::mem2reg::Mem2Reg::new().run_on_module(&mut codegen.module);
+        sericum::ir::cse::CommonSubexprElimination::new().run_on_module(&mut codegen.module);
+        sericum::ir::licm::LoopInvariantCodeMotion::new().run_on_module(&mut codegen.module);
+    }
     println!("{:?}", codegen.module);
 
     let machine_module =

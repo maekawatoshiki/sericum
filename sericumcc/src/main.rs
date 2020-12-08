@@ -13,7 +13,7 @@ fn main(
     files: Vec<PathBuf>,
 ) {
     for file in files {
-        compile(file)
+        compile(file, true)
     }
     ()
 }
@@ -31,6 +31,7 @@ fn run_examples() {
         if name.ends_with(".h") || name.contains("game_of_life") || name.contains("hello.c") {
             continue;
         }
-        compile(path.unwrap().path())
+        compile(path.as_ref().unwrap().path(), false);
+        compile(path.unwrap().path(), true)
     }
 }
