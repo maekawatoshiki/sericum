@@ -2,9 +2,8 @@
 
 [![CircleCI](https://circleci.com/gh/maekawatoshiki/sericum.svg?style=shield)](https://circleci.com/gh/maekawatoshiki/sericum)
 [![](http://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
-[![sericum at docs.rs](https://docs.rs/sericum/badge.svg)](https://docs.rs/sericum)
 
-(Toy) Compiler Infrastructure influenced by LLVM written in Rust
+Compiler Infrastructure influenced by LLVM written in Rust
 
 Do not expect too much stuff!
 
