@@ -228,9 +228,7 @@ impl Function {
                 assert_eq!(self.id, Some(*func_id));
                 self.inst_table[*id].ty
             }
-            Value::Function(FunctionValue { func_id, .. }) => {
-                self.types.base.borrow().func_ptr_types[func_id]
-            }
+            Value::Function(func_id) => self.types.base.borrow().func_ptr_types[func_id],
             Value::Global(GlobalValue { id, .. }) => self.types.base.borrow().gblvar_ptr_types[id],
             Value::Immediate(ref im) => *im.get_type(),
             Value::Constant(ConstantValue { id, .. }) => {

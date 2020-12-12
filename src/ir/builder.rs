@@ -113,7 +113,7 @@ pub trait IRBuilder {
     fn block_mut(&mut self) -> &mut Option<BasicBlockId>;
 
     fn new_func_value(&self, id: FunctionId) -> Option<Value> {
-        Some(Value::Function(FunctionValue { func_id: id }))
+        Some(Value::Function(id))
     }
 
     fn get_param(&self, idx: usize) -> Option<Value> {

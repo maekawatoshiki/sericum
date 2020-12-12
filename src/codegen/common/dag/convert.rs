@@ -21,10 +21,7 @@ use crate::ir::{
     module::Module,
     opcode::{InstructionId, Opcode},
     types::{Type, TypeSize},
-    value::{
-        ArgumentValue, ConstantValue, FunctionValue, GlobalValue, ImmediateValue, InstructionValue,
-        Value,
-    },
+    value::{ArgumentValue, ConstantValue, GlobalValue, ImmediateValue, InstructionValue, Value},
 };
 use id_arena::Arena;
 use rustc_hash::FxHashMap;
@@ -436,7 +433,7 @@ impl<'a> BlockConversionContext<'a> {
                     self.node(IRNode::new(IROpcode::Load).args(vec![addr]).ty(ty).into())
                 }
             }
-            Value::Function(FunctionValue { func_id, .. }) => {
+            Value::Function(func_id) => {
                 let f = self.module.function_ref(*func_id);
                 self.node(AddressKind::FunctionName(f.name.to_string()).into())
             }

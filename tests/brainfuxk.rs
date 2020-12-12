@@ -231,12 +231,7 @@ mod x86_64 {
                         builder.build_gep(tape, vec![value::Value::new_imm_int32(0), cur_idx]);
                     let cur_val = builder.build_load(cur_ptr);
 
-                    builder.build_call(
-                        value::Value::new_func(value::FunctionValue {
-                            func_id: sericum_printch_i32,
-                        }),
-                        vec![cur_val],
-                    );
+                    builder.build_call(value::Value::Function(sericum_printch_i32), vec![cur_val]);
                     code_pos += 1;
                 }
                 '>' | '<' => {
@@ -544,13 +539,7 @@ mod riscv64 {
                         builder.build_gep(tape, vec![value::Value::new_imm_int32(0), cur_idx]);
                     let cur_val = builder.build_load(cur_ptr);
 
-                    builder.build_call(
-                        value::Value::new_func(value::FunctionValue {
-                            func_id: sericum_printch_i32,
-                            ty: builder.func.module.function_ref(sericum_printch_i32).ty,
-                        }),
-                        vec![cur_val],
-                    );
+                    builder.build_call(value::Value::Function(sericum_printch_i32), vec![cur_val]);
                     code_pos += 1;
                 }
                 '>' | '<' => {
@@ -860,12 +849,7 @@ mod aarch64 {
                         builder.build_gep(tape, vec![value::Value::new_imm_int32(0), cur_idx]);
                     let cur_val = builder.build_load(cur_ptr);
 
-                    builder.build_call(
-                        value::Value::new_func(value::FunctionValue {
-                            func_id: sericum_printch_i32,
-                        }),
-                        vec![cur_val],
-                    );
+                    builder.build_call(value::Value::Function(sericum_printch_i32), vec![cur_val]);
                     code_pos += 1;
                 }
                 '>' | '<' => {

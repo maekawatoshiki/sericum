@@ -42,7 +42,7 @@ pub enum Value {
     Argument(ArgumentValue),
     Immediate(ImmediateValue),
     Instruction(InstructionValue),
-    Function(FunctionValue),
+    Function(FunctionId),
     Global(GlobalValue),
     Constant(ConstantValue),
     None,
@@ -58,11 +58,6 @@ pub struct ArgumentValue {
 pub struct InstructionValue {
     pub func_id: FunctionId,
     pub id: InstructionId,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Hash, Eq)]
-pub struct FunctionValue {
-    pub func_id: FunctionId,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Hash, Eq)]
@@ -111,7 +106,7 @@ impl Value {
         Self::Immediate(ImmediateValue::F64(f))
     }
 
-    pub fn new_func(f: FunctionValue) -> Self {
+    pub fn new_func(f: FunctionId) -> Self {
         Self::Function(f)
     }
 
@@ -181,11 +176,11 @@ impl Value {
                     id.index()
                 )
             }
-            Value::Function(FunctionValue { func_id, .. }) if inst => {
+            Value::Function(func_id) if inst => {
                 let f = parent.function_ref(*func_id);
                 f.dump(parent)
             }
-            Value::Function(FunctionValue { func_id, .. }) => {
+            Value::Function(func_id) => {
                 let f = parent.function_ref(*func_id);
                 let ret_ty = parent
                     .types
