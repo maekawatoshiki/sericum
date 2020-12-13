@@ -19,3 +19,4 @@ pub mod remove_unreachable_block;
 pub mod simplify_loop;
 pub mod types;
 pub mod value;
+pub mod verify;

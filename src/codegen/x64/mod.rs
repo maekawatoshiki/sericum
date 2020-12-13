@@ -93,6 +93,8 @@ pub fn standard_conversion_into_machine_module(mut module: Module) -> MachineMod
     ir::inst_combine::InstructionCombine::new().run_on_module(&mut module);
     ir::codegen_prepare::CodegenPrepare::new().run_on_module(&mut module);
 
+    ir::verify::verify_module(&module).unwrap();
+
     // println!("{:?}", module);
 
     // let now = ::std::time::Instant::now();
