@@ -79,28 +79,30 @@ impl<'a> LoopInvariantCodeMotionOnFunction<'a> {
     fn insert_pre_header(&mut self, loop_: &Loop<BasicBlock>) -> BasicBlockId {
         let pre_header = self.func.append_basic_block_before(loop_.header);
 
+        // self.func.basic_blocks.delete_edge(from, loop_.header);
+
         let mut preds = self.func.basic_blocks.arena[loop_.header].pred.clone();
         preds.retain(|p| !loop_.contains(p));
-        let preds_not_in_loop = preds;
+        let preds_outside_loop = preds;
 
-        assert!(preds_not_in_loop.len() == 1);
+        assert!(preds_outside_loop.len() == 1);
 
         let header_bb = &mut self.func.basic_blocks.arena[loop_.header];
         let header_preds = &mut header_bb.pred;
-        header_preds.retain(|p| !preds_not_in_loop.contains(p)); // retain preds in loop
+        header_preds.retain(|p| !preds_outside_loop.contains(p)); // retain preds in loop
         header_preds.insert(pre_header);
         for &id in header_bb.iseq_ref().iter().rev() {
             if self.func.inst_table[id].opcode == Opcode::Phi {
                 Instruction::replace_block_operand(
                     &mut self.func.inst_table,
                     id,
-                    preds_not_in_loop.iter().next().unwrap(),
+                    preds_outside_loop.iter().next().unwrap(),
                     pre_header,
                 );
             }
         }
 
-        for &pred in &preds_not_in_loop {
+        for &pred in &preds_outside_loop {
             let block = &mut self.func.basic_blocks.arena[pred];
             block.succ.retain(|&s| s != loop_.header);
             block.succ.insert(pre_header);
@@ -117,9 +119,9 @@ impl<'a> LoopInvariantCodeMotionOnFunction<'a> {
             }
         }
 
-        self.func.basic_blocks.arena[pre_header]
-            .pred
-            .extend(preds_not_in_loop);
+        for pred in preds_outside_loop {
+            self.func.basic_blocks.make_edge(pred, pre_header);
+        }
 
         let mut builder = self.func.ir_builder();
         builder.set_insert_point(pre_header);

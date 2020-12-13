@@ -31,18 +31,10 @@ impl<'a> RemoveUnreachableBlockOnFunction<'a> {
                 blocks2remove.insert(block_id);
             }
         }
+        // Do not remove entry block
         if let [entry, ..] = self.func.basic_blocks.order.as_slice() {
             blocks2remove.remove(entry);
         }
-        self.func
-            .basic_blocks
-            .order
-            .retain(|id| !blocks2remove.contains(id));
-        for b in &blocks2remove {
-            for (_, block) in &mut self.func.basic_blocks.arena {
-                block.pred.remove(b);
-                block.succ.remove(b);
-            }
-        }
+        self.func.basic_blocks.remove_blocks(&blocks2remove);
     }
 }

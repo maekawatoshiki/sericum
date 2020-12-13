@@ -7,8 +7,7 @@ use std::cell::{Ref, RefCell, RefMut};
 /// BasicBlockId that indicates a BasicBlock uniquely is given by [id_arena::Arena](https://docs.rs/id-arena).
 pub type BasicBlockId = Id<BasicBlock>;
 
-/// An allocator of BasicBlock and a sequence of BasicBlock.
-/// See also [Builder](../builder/struct.Builder.html) to know how it's used.
+/// All information for `BasicBlock`s.
 #[derive(Debug, Clone)]
 pub struct BasicBlocks {
     /// Arena for Basic Block
@@ -35,11 +34,11 @@ pub struct BasicBlock {
     pub iseq: RefCell<Vec<InstructionId>>,
 }
 
-/// Liveness analysis information for a basic block 
+/// Liveness analysis information for a basic block
 /// See also [liveness analysis](../liveness/struct.IRLivenessAnalyzer.html#method.analyze) to know how it's used.
 #[derive(Clone, Debug)]
 pub struct LivenessInfo {
-    /// Set of instructions executed in a basic block 
+    /// Set of instructions executed in a basic block
     pub def: FxHashSet<InstructionId>,
     /// Set of live-in instructions
     pub live_in: FxHashSet<InstructionId>,
@@ -64,6 +63,38 @@ impl BasicBlocks {
             arena: Arena::new(),
             order: vec![],
             liveness: FxHashMap::default(),
+        }
+    }
+
+    /// Makes an edge from `from` to `to`
+    pub fn make_edge(&mut self, from: BasicBlockId, to: BasicBlockId) {
+        self.arena[from].succ.insert(to);
+        self.arena[to].pred.insert(from);
+    }
+
+    /// Deletes an edge from `from` to `to`
+    pub fn delete_edge(&mut self, from: BasicBlockId, to: BasicBlockId) {
+        self.arena[from].succ.remove(&to);
+        self.arena[to].pred.remove(&from);
+    }
+
+    /// Removes a block
+    pub fn remove_block(&mut self, block: BasicBlockId) {
+        self.order.retain(|id| id != &block);
+        for (_, block_) in &mut self.arena {
+            block_.pred.remove(&block);
+            block_.succ.remove(&block);
+        }
+    }
+
+    /// Removes blocks
+    pub fn remove_blocks(&mut self, blocks: &FxHashSet<BasicBlockId>) {
+        self.order.retain(|id| !blocks.contains(id));
+        for (_, block_) in &mut self.arena {
+            for block in blocks {
+                block_.pred.remove(block);
+                block_.succ.remove(block);
+            }
         }
     }
 }

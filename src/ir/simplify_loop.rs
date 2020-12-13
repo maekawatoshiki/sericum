@@ -86,10 +86,10 @@ impl<'a> SimplifyLoopOnFunction<'a> {
         let merge = self.func.append_basic_block_before(back_edges.edges[0]);
 
         for &edge in &back_edges.edges {
-            let edge_ = &mut self.func.basic_blocks.arena[edge];
-            edge_.succ.remove(&back_edges.dest);
-            edge_.succ.insert(merge);
+            self.func.basic_blocks.delete_edge(edge, back_edges.dest);
+            self.func.basic_blocks.make_edge(edge, merge);
 
+            let edge_ = &mut self.func.basic_blocks.arena[edge];
             for &id in edge_.iseq_ref().iter().rev() {
                 if self.func.inst_table[id].opcode.is_terminator() {
                     Instruction::replace_block_operand(
@@ -100,11 +100,6 @@ impl<'a> SimplifyLoopOnFunction<'a> {
                     );
                 }
             }
-
-            let merge_ = &mut self.func.basic_blocks.arena[merge];
-            merge_.pred.insert(edge);
-            let dest_ = &mut self.func.basic_blocks.arena[back_edges.dest];
-            dest_.pred.remove(&edge);
         }
 
         let mut builder = self.func.ir_builder();

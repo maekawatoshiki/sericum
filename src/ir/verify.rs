@@ -16,7 +16,7 @@ pub fn verify_module(module: &Module) -> Result<()> {
     Ok(())
 }
 
-pub fn verify_function(func: &Function) -> Result<()> {
+pub fn verify_function(_func: &Function) -> Result<()> {
     Ok(())
 }
 
