@@ -3,6 +3,36 @@ mod x86_64 {
     use sericum::{codegen::x64::exec, ir, ir::prelude::*, sericum_ir};
 
     #[test]
+    fn test_pre() {
+        let mut m = Module::new("sericum");
+
+        sericum_ir!(m; define [i32] func [(i32)] {
+        entry:
+            cond = icmp eq (%arg.0), (i32 1);
+            br (%cond) label1, label2;
+        label1:
+            a = add (%arg.0), (i32 2);
+            br label3;
+        label2:
+            __ = call func [(%arg.0)];
+            br label3;
+        label3:
+            b = add (%arg.0), (i32 2);
+            ret (%b);
+        });
+
+        ir::mem2reg::Mem2Reg::new().run_on_module(&mut m);
+        ir::cse::CommonSubexprElimination::new().run_on_module(&mut m);
+        ir::pre::PartialRedundancyElimination::new().run_on_module(&mut m);
+
+        println!("{:?}", m);
+
+        // let mut jit = exec::jit::JITExecutor::new(m);
+        // let func = jit.find_function_by_name("func").unwrap();
+        // assert_eq!(jit.run(func, vec![]), exec::jit::GenericValue::Int32(3));
+    }
+
+    #[test]
     fn test0_mem2reg() {
         let mut m = Module::new("sericum");
 

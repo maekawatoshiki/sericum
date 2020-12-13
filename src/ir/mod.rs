@@ -14,6 +14,7 @@ pub mod mem2reg;
 pub mod merge_ret;
 pub mod module;
 pub mod opcode;
+pub mod pre;
 pub mod prelude;
 pub mod remove_unreachable_block;
 pub mod simplify_loop;
