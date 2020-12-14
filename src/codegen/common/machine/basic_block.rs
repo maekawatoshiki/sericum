@@ -111,6 +111,38 @@ impl MachineBasicBlocks {
             liveness_ref.live_out.remove(&r);
         }
     }
+
+    /// Makes an edge from `from` to `to`
+    pub fn make_edge(&mut self, from: MachineBasicBlockId, to: MachineBasicBlockId) {
+        self.arena[from].succ.insert(to);
+        self.arena[to].pred.insert(from);
+    }
+
+    /// Deletes an edge from `from` to `to`
+    pub fn delete_edge(&mut self, from: MachineBasicBlockId, to: MachineBasicBlockId) {
+        self.arena[from].succ.remove(&to);
+        self.arena[to].pred.remove(&from);
+    }
+
+    /// Removes a block
+    pub fn remove_block(&mut self, block: MachineBasicBlockId) {
+        self.order.retain(|id| id != &block);
+        for (_, block_) in &mut self.arena {
+            block_.pred.remove(&block);
+            block_.succ.remove(&block);
+        }
+    }
+
+    /// Removes blocks
+    pub fn remove_blocks(&mut self, blocks: &FxHashSet<MachineBasicBlockId>) {
+        self.order.retain(|id| !blocks.contains(id));
+        for (_, block_) in &mut self.arena {
+            for block in blocks {
+                block_.pred.remove(block);
+                block_.succ.remove(block);
+            }
+        }
+    }
 }
 
 impl MachineBasicBlock {

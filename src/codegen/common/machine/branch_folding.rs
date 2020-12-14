@@ -51,26 +51,18 @@ impl BranchFolding {
     }
 
     fn remove_unreachable(&mut self, f: &mut MachineFunction) {
-        let mut worklist = vec![];
-        let mut remove = vec![];
+        let mut remove = FxHashSet::default();
         for (i, &id) in f.body.basic_blocks.get_order().iter().enumerate() {
             let block = &f.body.basic_blocks.get_arena()[id];
             if i == 0 {
+                // Ignore entry block
                 continue;
             }
             if block.pred.len() == 0 {
-                remove.push(id);
-                for &succ in &block.succ {
-                    worklist.push((id, succ));
-                }
+                remove.insert(id);
             }
         }
-        for (bb, succ) in worklist {
-            f.body.basic_blocks.arena[succ].pred.remove(&bb);
-        }
-        for bb in remove {
-            f.body.basic_blocks.order.retain(|&b| b != bb);
-        }
+        f.body.basic_blocks.remove_blocks(&remove)
     }
 
     fn merge_blocks(&mut self, f: &mut MachineFunction) {
@@ -155,14 +147,14 @@ impl BranchFolding {
             let succs = f.body.basic_blocks.arena[block_to_remove].succ.clone();
 
             for &bb in &preds {
-                let cur = &mut f.body.basic_blocks.arena[bb];
-                cur.succ.remove(&block_to_remove);
-                cur.succ.insert(new_dst);
+                f.body.basic_blocks.delete_edge(bb, block_to_remove);
+                f.body.basic_blocks.make_edge(bb, new_dst);
             }
 
             for &bb in &succs {
+                f.body.basic_blocks.delete_edge(block_to_remove, bb);
+                // TODO: Refactoring
                 let cur = &mut f.body.basic_blocks.arena[bb];
-                cur.pred.remove(&block_to_remove);
                 cur.pred = &cur.pred | &preds;
             }
 
