@@ -6,19 +6,38 @@ mod x86_64 {
     fn test_pre() {
         let mut m = Module::new("sericum");
 
+        // sericum_ir!(m; define [i32] func [(i32)] {
+        // entry:
+        //     cond = icmp eq (%arg.0), (i32 1);
+        //     br (%cond) label1, label2;
+        // label1:
+        //     a = add (%arg.0), (i32 2);
+        //     br label3;
+        // label2:
+        //     __ = call func [(%arg.0)];
+        //     br label3;
+        // label3:
+        //     b = add (%arg.0), (i32 2);
+        //     ret (%b);
+        // });
         sericum_ir!(m; define [i32] func [(i32)] {
         entry:
-            cond = icmp eq (%arg.0), (i32 1);
-            br (%cond) label1, label2;
+            i = alloca i32;
+            store (i32 0), (%i);
+            br label1;
         label1:
-            a = add (%arg.0), (i32 2);
-            br label3;
+            li = load (%i);
+            cond = icmp eq (%li), (i32 1);
+            br (%cond) label2, label3;
         label2:
-            __ = call func [(%arg.0)];
-            br label3;
+            a = add (%arg.0), (i32 2);
+            __ = call func [(%a)];
+            li = load (%i);
+            ll = add (%li), (i32 1);
+            store (%ll), (%i);
+            br label1;
         label3:
-            b = add (%arg.0), (i32 2);
-            ret (%b);
+            ret (i32 0);
         });
 
         ir::mem2reg::Mem2Reg::new().run_on_module(&mut m);

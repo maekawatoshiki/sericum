@@ -27,6 +27,7 @@ struct GlobalPartialRedundancyEliminationOnFunction<'a> {
         ),
     >,
     removal_list: Vec<InstructionId>,
+    a: FxHashSet<InstructionId>,
 }
 
 impl PartialRedundancyElimination {
@@ -46,6 +47,7 @@ impl PartialRedundancyElimination {
                 dom_frontiers: FxHashSet::default(),
                 inst_to_incomings_and_must_insert: FxHashMap::default(),
                 removal_list: vec![],
+                a: FxHashSet::default(),
             }
             .run()
         }
@@ -79,17 +81,9 @@ impl<'a> GlobalPartialRedundancyEliminationOnFunction<'a> {
             if self.removal_list.contains(&inst_id) {
                 continue;
             }
-            // if let Some(common) = find_common(&commons, &mut self.func.inst_table, &inst_id) {
-            //     let common_val = Value::Instruction(InstructionValue {
-            //         id: *common,
-            //         func_id: self.func.id.unwrap(),
-            //     });
-            //     Instruction::replace_all_uses(&mut self.func.inst_table, inst_id, common_val);
-            //     self.removal_list.push(inst_id);
-            //     continue;
-            // }
 
             let inst = &self.func.inst_table[inst_id];
+            let mut a = self.a.clone();
             if matches!(
                 inst.opcode,
                 Opcode::Add
@@ -104,7 +98,14 @@ impl<'a> GlobalPartialRedundancyEliminationOnFunction<'a> {
             ) {
                 if inst.operand.args().iter().all(|id| {
                     if let Value::Instruction(v) = id {
-                        self.func.inst_table[v.id].opcode != Opcode::Phi
+                        let b = !a.contains(&v.id)
+                            && self.func.inst_table[v.id].opcode != Opcode::Phi
+                            && self.func.inst_table[v.id].opcode != Opcode::Call
+                            && !self.func.inst_table[v.id].opcode.access_memory();
+                        if !b {
+                            a.insert(inst_id);
+                        }
+                        b
                     } else {
                         true
                     }
@@ -116,6 +117,7 @@ impl<'a> GlobalPartialRedundancyEliminationOnFunction<'a> {
                         .or_insert(inst_id);
                 }
             }
+            self.a = a;
         }
 
         self.bb_avails.insert(root, commons.clone());
@@ -154,15 +156,20 @@ impl<'a> GlobalPartialRedundancyEliminationOnFunction<'a> {
         ) -> Option<(Vec<(InstructionId, BasicBlockId)>, Vec<BasicBlockId>)> {
             let mut incomings = vec![];
             let mut must_insert = vec![];
+            let mut found = false;
             for pred in preds {
                 let e = &avails[pred];
-                if let Some(inst_id) = find_common(e, arena, inst_id) {
-                    incomings.push((*inst_id, *pred));
+                if let Some(inst_id_) = find_common(e, arena, inst_id) {
+                    // lexically the same expression
+                    if inst_id != inst_id_ {
+                        incomings.push((*inst_id_, *pred));
+                    }
+                    found |= true;
                 } else {
                     must_insert.push(*pred);
                 }
             }
-            if incomings.len() > 0 {
+            if found {
                 Some((incomings, must_insert))
             } else {
                 None
@@ -197,6 +204,7 @@ impl<'a> GlobalPartialRedundancyEliminationOnFunction<'a> {
     fn run_sub3(&mut self) {
         let mut done = FxHashSet::default();
         let mut phis = vec![];
+        let mut rep = vec![];
         let mut splits = FxHashMap::default();
         for (inst, (ebb_start, incomings, must_inserts)) in &self.inst_to_incomings_and_must_insert
         {
@@ -284,13 +292,19 @@ impl<'a> GlobalPartialRedundancyEliminationOnFunction<'a> {
                 blocks.push(split);
             }
             let ty = self.func.get_value_type(&args[0]);
-            let phi = Instruction::new(
-                Opcode::Phi,
-                InstOperand::Phi { args, blocks },
-                ty,
-                *ebb_start,
-            );
-            phis.push((*ebb_start, *inst, phi));
+            assert!(args.len() > 0);
+            if args.len() == 1 {
+                rep.push((*inst, args[0]));
+                // phis.push((*ebb_start, *inst, phi));
+            } else {
+                let phi = Instruction::new(
+                    Opcode::Phi,
+                    InstOperand::Phi { args, blocks },
+                    ty,
+                    *ebb_start,
+                );
+                phis.push((*ebb_start, *inst, phi));
+            }
         }
 
         let mut q = vec![];
@@ -304,6 +318,9 @@ impl<'a> GlobalPartialRedundancyEliminationOnFunction<'a> {
                 id,
             });
             q.push((inst2replace, val));
+        }
+        for (inst2replace, to) in rep {
+            q.push((inst2replace, to));
         }
         for (inst2replace, val) in q {
             Instruction::replace_all_uses(&mut self.func.inst_table, inst2replace, val);

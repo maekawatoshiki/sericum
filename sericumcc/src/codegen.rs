@@ -117,7 +117,7 @@ impl<'a> Codegenerator<'a> {
                     sericum_func_ty.ret_ty,
                     sericum_func_ty.params_ty.clone(),
                 );
-                let val = Value::Function(value::FunctionValue { func_id });
+                let val = Value::Function(func_id);
                 let p_sericum_ty = self.module.types.new_pointer_ty(sericum_ty);
                 let p_ty = self.compound_types.pointer(ty);
                 self.variables
@@ -150,7 +150,7 @@ impl<'a> FunctionCodeGenerator<'a> {
             _ => panic!(),
         };
         let func_id = module.create_function_with_type(name.as_str(), func_ty);
-        let val = Value::Function(value::FunctionValue { func_id });
+        let val = Value::Function(func_id);
 
         let p_sericum_ty = module.types.new_pointer_ty(func_ty);
         let p_ty = compound_types.pointer(*ty);
@@ -499,7 +499,7 @@ impl<'a> FunctionCodeGenerator<'a> {
                     .unwrap()
                     .find_function("memcpy")
                     .unwrap();
-                let memcpy = Value::Function(value::FunctionValue { func_id });
+                let memcpy = Value::Function(func_id);
                 use sericum::ir::types::TypeSize;
                 self.builder.build_call(
                     memcpy,
